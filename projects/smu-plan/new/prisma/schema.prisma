@@ -1,0 +1,361 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ═══════════════════════════════════════
+// 用户与认证
+// ═══════════════════════════════════════
+
+model User {
+  id              String    @id @default(cuid())
+  email           String?   @unique
+  username        String    @unique
+  passwordHash    String
+  nickname        String?
+  role            String    @default("contributor") // contributor | admin
+  status          String    @default("active") // active | banned
+  emailVerifiedAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  messages     Message[]
+  articles     Article[]
+  quizAttempts QuizAttempt[]
+  sessions     Session[]
+  apiTokens    ApiToken[]
+}
+
+model Session {
+  id               String    @id @default(cuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id])
+  refreshTokenHash String
+  ip               String?
+  userAgent        String?
+  expiresAt        DateTime
+  createdAt        DateTime  @default(now())
+  revokedAt        DateTime?
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model EmailVerification {
+  id        String    @id @default(cuid())
+  email     String
+  codeHash  String
+  purpose   String    @default("register")
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([email])
+  @@index([expiresAt])
+}
+
+model QuizQuestion {
+  id       String  @id @default(cuid())
+  question String
+  options  String  // JSON: ["A","B","C","D"]
+  answer   Int
+  active   Boolean @default(true)
+}
+
+model QuizAttempt {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  score     Int
+  passed    Boolean
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// ═══════════════════════════════════════
+// 内容
+// ═══════════════════════════════════════
+
+model Article {
+  id          String    @id @default(cuid())
+  title       String
+  slug        String    @unique
+  content     String    // Markdown
+  summary     String?
+  category    String?
+  tags        String?   // JSON string
+  status      String    @default("draft") // draft | pending | published | rejected
+  viewCount   Int       @default(0)
+  authorId    String
+  author      User      @relation(fields: [authorId], references: [id])
+  reviewerId  String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  publishedAt DateTime?
+
+  @@index([status])
+  @@index([category])
+  @@index([publishedAt])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  content   String
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+// ═══════════════════════════════════════
+// AI 与工具
+// ═══════════════════════════════════════
+
+model SearchLog {
+  id        String   @id @default(cuid())
+  query     String
+  toolUsed  String?
+  userId    String?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([query])
+}
+
+model ToolRun {
+  id        String   @id @default(cuid())
+  toolName  String
+  input     String   // JSON
+  output    String?  // JSON
+  latencyMs Int?
+  success   Boolean  @default(true)
+  errorCode String?
+  userId    String?
+  requestId String?
+  createdAt DateTime @default(now())
+
+  @@index([toolName])
+  @@index([createdAt])
+}
+
+// ═══════════════════════════════════════
+// 上游 Key 管理
+// ═══════════════════════════════════════
+
+model ProviderKey {
+  id           String    @id @default(cuid())
+  provider     String    // "longcat"
+  keyPrefix    String
+  keyCipher    String    // AES-256-GCM 加密
+  status       String    @default("active") // active | degraded | disabled
+  weight       Int       @default(1)
+  dailyLimit   Int?
+  monthlyLimit Int?
+  lastCheckAt  DateTime?
+  lastError    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  usages       KeyUsage[]
+  healthChecks KeyHealth[]
+
+  @@index([status])
+}
+
+model KeyUsage {
+  id               String      @id @default(cuid())
+  providerKeyId    String
+  providerKey      ProviderKey @relation(fields: [providerKeyId], references: [id])
+  apiTokenId       String?
+  channelId        String?
+  channel          ApiChannel? @relation(fields: [channelId], references: [id])
+  model            String
+  promptTokens     Int
+  completionTokens Int
+  costUsd          Float?
+  latencyMs        Int?
+  success          Boolean
+  errorCode        String?
+  requestId        String?
+  createdAt        DateTime    @default(now())
+
+  @@index([providerKeyId, createdAt])
+  @@index([apiTokenId, createdAt])
+}
+
+model KeyHealth {
+  id            String      @id @default(cuid())
+  providerKeyId String
+  providerKey   ProviderKey @relation(fields: [providerKeyId], references: [id])
+  status        String      // ok | fail | rate_limited
+  responseMs    Int?
+  error         String?
+  checkedAt     DateTime    @default(now())
+
+  @@index([providerKeyId, checkedAt])
+}
+
+// ═══════════════════════════════════════
+// 对外 Token 发放
+// ═══════════════════════════════════════
+
+model ApiToken {
+  id                String    @id @default(cuid())
+  name              String
+  tokenPrefix       String    @unique
+  tokenHash         String
+  status            String    @default("active") // active | suspended | revoked
+  ownerId           String?
+  owner             User?     @relation(fields: [ownerId], references: [id])
+  issuedTo          String?
+  description       String?
+  allowedModels     String?   // JSON: ["LongCat-Flash-Chat","LongCat-Flash-Lite"]
+  rateLimitRpm      Int?
+  rateLimitRpd      Int?
+  monthlyTokenQuota Int?
+  expiresAt         DateTime?
+  lastUsedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  usages            TokenUsage[]
+
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model TokenUsage {
+  id               String      @id @default(cuid())
+  apiTokenId       String
+  apiToken         ApiToken    @relation(fields: [apiTokenId], references: [id])
+  channelId        String?
+  channel          ApiChannel? @relation(fields: [channelId], references: [id])
+  endpoint         String
+  toolName         String?
+  model            String
+  promptTokens     Int
+  completionTokens Int
+  costUsd          Float?
+  success          Boolean
+  errorCode        String?
+  responseMs       Int?
+  clientIp         String?
+  userAgent        String?
+  requestId        String?
+  createdAt        DateTime    @default(now())
+
+  @@index([apiTokenId, createdAt])
+  @@index([endpoint, createdAt])
+}
+
+// ═══════════════════════════════════════
+// 渠道与审计
+// ═══════════════════════════════════════
+
+model ApiChannel {
+  id            String   @id @default(cuid())
+  name          String   @unique
+  description   String?
+  enabled       Boolean  @default(true)
+  rateLimitRpm  Int?
+  rateLimitRpd  Int?
+  modelMapping  String?  // JSON: {"external-model": "internal-model"}
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  keyUsages    KeyUsage[]
+  tokenUsages  TokenUsage[]
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  targetType String?
+  targetId   String?
+  payload    String?  // JSON
+  createdAt  DateTime @default(now())
+
+  @@index([action, createdAt])
+}
+
+// ═══════════════════════════════════════
+// 公告与链接
+// ═══════════════════════════════════════
+
+model Announcement {
+  id        String   @id @default(cuid())
+  content   String
+  active    Boolean  @default(true)
+  priority  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Link {
+  id          String   @id @default(cuid())
+  title       String
+  url         String
+  category    String   @default("general")
+  description String?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
+  @@index([order])
+}
+
+model SiteSetting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+
+  @@index([key])
+}
+
+// ═══════════════════════════════════════
+// BBS 论坛
+// ═══════════════════════════════════════
+
+model BbsTopic {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  category  String   @default("general") // general | study | life | trade | question
+  authorId  String
+  pinned    Boolean  @default(false)
+  locked    Boolean  @default(false)
+  viewCount Int      @default(0)
+  replyCount Int     @default(0)
+  lastReplyAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  replies   BbsReply[]
+
+  @@index([category])
+  @@index([pinned, createdAt])
+  @@index([authorId])
+}
+
+model BbsReply {
+  id        String   @id @default(cuid())
+  content   String
+  authorId  String
+  topicId   String
+  topic     BbsTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([topicId, createdAt])
+  @@index([authorId])
+}
