@@ -1,0 +1,87 @@
+/* ═══════════════════════════════════════════════════
+   DanmakuOverlay — Neo-Brutalism Bullet Comments
+   ═══════════════════════════════════════════════════ */
+
+.overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 220px;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: var(--z-overlay, 10);
+}
+
+.track {
+  height: 48px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--space-xs);
+}
+
+.item {
+  position: absolute;
+  left: 100%;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-md);
+  border: var(--neo-border);
+  border-radius: 999px;
+  box-shadow: 2px 2px 0 var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--dm-color, var(--text-primary));
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  will-change: transform;
+  animation: danmaku-scroll var(--dm-duration) linear var(--dm-delay) infinite;
+}
+
+.author {
+  color: var(--text-muted);
+  font-weight: var(--font-medium);
+  font-size: var(--text-xs);
+}
+
+.author::after {
+  content: ":";
+  margin-right: 2px;
+}
+
+.content {
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@keyframes danmaku-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(calc(-100vw - 100%));
+  }
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .item {
+    animation: none;
+    position: static;
+    margin-right: var(--space-sm);
+    margin-bottom: var(--space-xs);
+  }
+
+  .track {
+    flex-wrap: wrap;
+    height: auto;
+  }
+
+  .overlay {
+    position: relative;
+    height: auto;
+  }
+}

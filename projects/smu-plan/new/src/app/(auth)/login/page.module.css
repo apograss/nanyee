@@ -1,0 +1,131 @@
+.title {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-bold);
+  margin-bottom: var(--space-xs);
+}
+
+.subtitle {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-xl);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.error {
+  font-size: var(--text-sm);
+  color: var(--color-error);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-error-light);
+  border: 1px solid var(--color-error);
+  border-radius: var(--neo-radius);
+}
+
+.submitBtn {
+  width: 100%;
+  margin-top: var(--space-sm);
+}
+
+.footer {
+  margin-top: var(--space-lg);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.link {
+  color: var(--color-brand);
+  font-weight: var(--font-semibold);
+}
+
+.tabs {
+  display: flex;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-lg);
+}
+
+.tab {
+  flex: 1;
+  padding: var(--space-sm);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  text-align: center;
+  border: 2px solid var(--border-light);
+  border-radius: var(--neo-radius);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    color var(--transition-fast),
+    background var(--transition-fast);
+}
+
+.tab:hover {
+  border-color: var(--text-muted);
+}
+
+.tabActive {
+  border-color: var(--color-brand);
+  color: var(--color-brand);
+  background: var(--color-brand-lighter);
+  font-weight: var(--font-semibold);
+}
+
+.codeRow {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.codeRow > :first-child {
+  flex: 1;
+}
+
+.quizBlock {
+  padding: var(--space-md);
+  background: var(--bg-hover);
+  border-radius: var(--neo-radius);
+}
+
+.question {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  margin-bottom: var(--space-sm);
+}
+
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  border-radius: var(--neo-radius);
+  transition: background var(--transition-fast);
+}
+
+.option:hover {
+  background: var(--bg-muted);
+}
+
+.quizNav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: var(--space-md);
+}
+
+.quizScore {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}

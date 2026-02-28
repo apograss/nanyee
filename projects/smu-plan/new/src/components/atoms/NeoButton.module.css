@@ -1,0 +1,99 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  font-weight: var(--font-semibold);
+  line-height: 1;
+  border: var(--neo-border);
+  border-radius: var(--neo-radius);
+  box-shadow: var(--neo-shadow-sm);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition:
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast),
+    background var(--transition-fast);
+}
+
+.btn:hover:not(:disabled) {
+  transform: translate(-2px, -2px);
+  box-shadow: var(--neo-shadow);
+}
+
+.btn:active:not(:disabled) {
+  transform: translate(1px, 1px);
+  box-shadow: var(--neo-shadow-active);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Variants */
+.primary {
+  color: var(--text-inverse);
+  background: var(--color-brand);
+}
+.primary:hover:not(:disabled) {
+  background: var(--color-brand-hover);
+}
+
+.secondary {
+  color: var(--text-primary);
+  background: var(--color-mint);
+}
+.secondary:hover:not(:disabled) {
+  background: var(--color-mint-light);
+}
+
+.outline {
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+}
+.outline:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.ghost {
+  color: var(--text-secondary);
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+.ghost:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+  border-color: var(--border-color);
+  box-shadow: var(--neo-shadow-sm);
+}
+
+.danger {
+  color: var(--text-inverse);
+  background: var(--color-error);
+}
+.danger:hover:not(:disabled) {
+  background: #DC2626;
+}
+
+/* Sizes */
+.sm { padding: 6px 12px; font-size: var(--text-xs); }
+.md { padding: 10px 20px; font-size: var(--text-sm); }
+.lg { padding: 14px 28px; font-size: var(--text-base); }
+
+/* Spinner */
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

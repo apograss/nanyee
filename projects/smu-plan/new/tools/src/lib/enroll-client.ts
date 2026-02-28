@@ -1,0 +1,627 @@
+/**
+ * Client-side course enrollment logic — runs in the BROWSER.
+ * Login/captcha/categories route through local server-side proxy.
+ * Enrollment attempts route through CF Worker/VPS proxy to protect server IP.
+ */
+
+// ─── Configuration ────────────────────────────────────────────
+
+const UIS = "https://uis.smu.edu.cn";
+const ZHJW = "https://zhjw.smu.edu.cn";
+
+// CF Worker or VPS proxy base URL for enrollment requests (IP protection)
+// Set via .env.local: NEXT_PUBLIC_ENROLL_PROXY=https://proxy.nanyee.de
+const ENROLL_PROXY = process.env.NEXT_PUBLIC_ENROLL_PROXY || "";
+
+const XK_ROOT = `/new/student/xsxk/`;
+const WELCOME_PATH = `/new/welcome.page?ui=new`;
+
+const MAX_ATTEMPTS = 60;
+const PRIMARY_BURST_ATTEMPTS = 8;
+const ATTEMPT_DELAY_MIN = 150;   // 随机延迟最小值 ms
+const ATTEMPT_DELAY_MAX = 350;   // 随机延迟最大值 ms
+
+// ─── Types ────────────────────────────────────────────────────
+
+export interface CourseCategory {
+    code: string;
+    title: string;
+}
+
+export interface CourseItem {
+    kcrwdm: string;
+    kcmc: string;
+    teaxm: string;
+    pkrs: number;
+    xkrs: number;
+    xf: number;
+    zxs: number;
+    sksj: string;
+    skdd: string;
+    kkbmmc: string;
+}
+
+export interface EnrollResult {
+    success: boolean;
+    message: string;
+    courseName?: string;
+}
+
+export type LogCallback = (event: {
+    type: "calibrating" | "waiting" | "attempt" | "success" | "fail" | "error" | "info";
+    message: string;
+    index?: number;
+    course?: string;
+}) => void;
+
+// ─── Cookie Management ────────────────────────────────────────
+
+function mergeCookies(existing: string[], incoming: string[]): string[] {
+    const map = new Map<string, string>();
+    for (const c of [...existing, ...incoming]) {
+        const nameVal = c.split(";")[0];
+        const name = nameVal.split("=")[0].trim();
+        map.set(name, c);
+    }
+    return Array.from(map.values());
+}
+
+function cookieString(cookies: string[]): string {
+    return cookies.map((c) => c.split(";")[0]).join("; ");
+}
+
+// ─── Server-Side Proxy Fetch ─────────────────────────────────
+// Routes through /api/tools/proxy (local Next.js server)
+// which directly reaches uis.smu.edu.cn and zhjw.smu.edu.cn
+
+async function proxyFetch(
+    url: string,
+    cookies: string[],
+    options: RequestInit = {},
+): Promise<{ status: number; body: string; cookies: string[]; location?: string; dateHeader?: string }> {
+    const method = (options.method as string) || "GET";
+    const headers = (options.headers as Record<string, string>) || {};
+    const body = typeof options.body === "string" ? options.body : undefined;
+
+    console.log(`[proxy] ${method} ${url}`);
+
+    const res = await fetch("/api/tools/proxy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url, method, headers, body, cookies }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok || data.error) {
+        console.error(`[proxy] Error:`, data.error);
+        throw new Error(data.error || `Proxy error: ${res.status}`);
+    }
+
+    console.log(`[proxy] → ${data.status}`);
+
+    const merged = mergeCookies(cookies, data.cookies || []);
+    return {
+        status: data.status,
+        body: data.body || "",
+        cookies: merged,
+        location: data.location,
+        dateHeader: data.dateHeader,
+    };
+}
+
+// ─── CF Worker / VPS Proxy Fetch (for enrollment IP protection) ──
+
+async function enrollProxyFetch(
+    targetUrl: string,
+    cookies: string[],
+    options: RequestInit = {},
+): Promise<{ status: number; body: string; cookies: string[]; location?: string }> {
+    if (!ENROLL_PROXY) throw new Error("ENROLL_PROXY not configured");
+
+    // Convert target URL to proxy URL: https://zhjw.smu.edu.cn/path → PROXY/zhjw/path
+    const url = new URL(targetUrl);
+    let proxyPath = "";
+    if (url.host === "zhjw.smu.edu.cn") proxyPath = `/zhjw${url.pathname}${url.search}`;
+    else if (url.host === "uis.smu.edu.cn") proxyPath = `/uis${url.pathname}${url.search}`;
+    else throw new Error(`Unknown host: ${url.host}`);
+
+    const proxyUrl = `${ENROLL_PROXY}${proxyPath}`;
+    const method = (options.method as string) || "GET";
+    const headers: Record<string, string> = {
+        "X-Cookie": cookieString(cookies),
+        ...((options.headers as Record<string, string>) || {}),
+    };
+
+    console.log(`[enroll-proxy] ${method} ${proxyUrl}`);
+    const res = await fetch(proxyUrl, {
+        method,
+        headers,
+        body: options.body,
+    });
+
+    const body = await res.text();
+
+    let newCookies: string[] = [];
+    const xSetCookie = res.headers.get("X-Set-Cookie");
+    if (xSetCookie) {
+        try { newCookies = JSON.parse(xSetCookie); } catch { /* */ }
+    }
+
+    const merged = mergeCookies(cookies, newCookies);
+    const location = res.headers.get("X-Location") || undefined;
+    console.log(`[enroll-proxy] → ${res.status}`);
+
+    return { status: res.status, body, cookies: merged, location };
+}
+
+// ─── Login ────────────────────────────────────────────────────
+
+// Minimal MD5 for browser (from public domain)
+function md5Browser(input: string): string {
+    function md5cycle(x: number[], k: number[]) {
+        let a = x[0], b = x[1], c = x[2], d = x[3];
+        a = ff(a, b, c, d, k[0], 7, -680876936); d = ff(d, a, b, c, k[1], 12, -389564586);
+        c = ff(c, d, a, b, k[2], 17, 606105819); b = ff(b, c, d, a, k[3], 22, -1044525330);
+        a = ff(a, b, c, d, k[4], 7, -176418897); d = ff(d, a, b, c, k[5], 12, 1200080426);
+        c = ff(c, d, a, b, k[6], 17, -1473231341); b = ff(b, c, d, a, k[7], 22, -45705983);
+        a = ff(a, b, c, d, k[8], 7, 1770035416); d = ff(d, a, b, c, k[9], 12, -1958414417);
+        c = ff(c, d, a, b, k[10], 17, -42063); b = ff(b, c, d, a, k[11], 22, -1990404162);
+        a = ff(a, b, c, d, k[12], 7, 1804603682); d = ff(d, a, b, c, k[13], 12, -40341101);
+        c = ff(c, d, a, b, k[14], 17, -1502002290); b = ff(b, c, d, a, k[15], 22, 1236535329);
+        a = gg(a, b, c, d, k[1], 5, -165796510); d = gg(d, a, b, c, k[6], 9, -1069501632);
+        c = gg(c, d, a, b, k[11], 14, 643717713); b = gg(b, c, d, a, k[0], 20, -373897302);
+        a = gg(a, b, c, d, k[5], 5, -701558691); d = gg(d, a, b, c, k[10], 9, 38016083);
+        c = gg(c, d, a, b, k[15], 14, -660478335); b = gg(b, c, d, a, k[4], 20, -405537848);
+        a = gg(a, b, c, d, k[9], 5, 568446438); d = gg(d, a, b, c, k[14], 9, -1019803690);
+        c = gg(c, d, a, b, k[3], 14, -187363961); b = gg(b, c, d, a, k[8], 20, 1163531501);
+        a = gg(a, b, c, d, k[13], 5, -1444681467); d = gg(d, a, b, c, k[2], 9, -51403784);
+        c = gg(c, d, a, b, k[7], 14, 1735328473); b = gg(b, c, d, a, k[12], 20, -1926607734);
+        a = hh(a, b, c, d, k[5], 4, -378558); d = hh(d, a, b, c, k[8], 11, -2022574463);
+        c = hh(c, d, a, b, k[11], 16, 1839030562); b = hh(b, c, d, a, k[14], 23, -35309556);
+        a = hh(a, b, c, d, k[1], 4, -1530992060); d = hh(d, a, b, c, k[4], 11, 1272893353);
+        c = hh(c, d, a, b, k[7], 16, -155497632); b = hh(b, c, d, a, k[10], 23, -1094730640);
+        a = hh(a, b, c, d, k[13], 4, 681279174); d = hh(d, a, b, c, k[0], 11, -358537222);
+        c = hh(c, d, a, b, k[3], 16, -722521979); b = hh(b, c, d, a, k[6], 23, 76029189);
+        a = hh(a, b, c, d, k[9], 4, -640364487); d = hh(d, a, b, c, k[12], 11, -421815835);
+        c = hh(c, d, a, b, k[15], 16, 530742520); b = hh(b, c, d, a, k[2], 23, -995338651);
+        a = ii(a, b, c, d, k[0], 6, -198630844); d = ii(d, a, b, c, k[7], 10, 1126891415);
+        c = ii(c, d, a, b, k[14], 15, -1416354905); b = ii(b, c, d, a, k[5], 21, -57434055);
+        a = ii(a, b, c, d, k[12], 6, 1700485571); d = ii(d, a, b, c, k[3], 10, -1894986606);
+        c = ii(c, d, a, b, k[10], 15, -1051523); b = ii(b, c, d, a, k[1], 21, -2054922799);
+        a = ii(a, b, c, d, k[8], 6, 1873313359); d = ii(d, a, b, c, k[15], 10, -30611744);
+        c = ii(c, d, a, b, k[6], 15, -1560198380); b = ii(b, c, d, a, k[13], 21, 1309151649);
+        a = ii(a, b, c, d, k[4], 6, -145523070); d = ii(d, a, b, c, k[11], 10, -1120210379);
+        c = ii(c, d, a, b, k[2], 15, 718787259); b = ii(b, c, d, a, k[9], 21, -343485551);
+        x[0] = add32(a, x[0]); x[1] = add32(b, x[1]); x[2] = add32(c, x[2]); x[3] = add32(d, x[3]);
+    }
+    function cmn(q: number, a: number, b: number, x: number, s: number, t: number) {
+        a = add32(add32(a, q), add32(x, t));
+        return add32((a << s) | (a >>> (32 - s)), b);
+    }
+    function ff(a: number, b: number, c: number, d: number, x: number, s: number, t: number) {
+        return cmn((b & c) | ((~b) & d), a, b, x, s, t);
+    }
+    function gg(a: number, b: number, c: number, d: number, x: number, s: number, t: number) {
+        return cmn((b & d) | (c & (~d)), a, b, x, s, t);
+    }
+    function hh(a: number, b: number, c: number, d: number, x: number, s: number, t: number) {
+        return cmn(b ^ c ^ d, a, b, x, s, t);
+    }
+    function ii(a: number, b: number, c: number, d: number, x: number, s: number, t: number) {
+        return cmn(c ^ (b | (~d)), a, b, x, s, t);
+    }
+    function md51(s: string) {
+        const n = s.length;
+        let state = [1732584193, -271733879, -1732584194, 271733878];
+        let i: number;
+        for (i = 64; i <= n; i += 64) {
+            md5cycle(state, md5blk(s.substring(i - 64, i)));
+        }
+        s = s.substring(i - 64);
+        const tail = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        for (i = 0; i < s.length; i++) tail[i >> 2] |= s.charCodeAt(i) << ((i % 4) << 3);
+        tail[i >> 2] |= 0x80 << ((i % 4) << 3);
+        if (i > 55) { md5cycle(state, tail); for (i = 0; i < 16; i++) tail[i] = 0; }
+        tail[14] = n * 8;
+        md5cycle(state, tail);
+        return state;
+    }
+    function md5blk(s: string) {
+        const md5blks: number[] = [];
+        for (let i = 0; i < 64; i += 4) {
+            md5blks[i >> 2] = s.charCodeAt(i) + (s.charCodeAt(i + 1) << 8) +
+                (s.charCodeAt(i + 2) << 16) + (s.charCodeAt(i + 3) << 24);
+        }
+        return md5blks;
+    }
+    function rhex(n: number) {
+        const hc = "0123456789abcdef";
+        let s = "";
+        for (let j = 0; j < 4; j++)
+            s += hc.charAt((n >> (j * 8 + 4)) & 0x0f) + hc.charAt((n >> (j * 8)) & 0x0f);
+        return s;
+    }
+    function add32(a: number, b: number) {
+        return (a + b) & 0xffffffff;
+    }
+    const x = md51(input);
+    return rhex(x[0]) + rhex(x[1]) + rhex(x[2]) + rhex(x[3]);
+}
+
+// ─── Captcha ──────────────────────────────────────────────────
+
+export async function fetchCaptchaViaProxy(): Promise<{
+    imageBase64: string;
+    cookies: string[];
+}> {
+    const res = await fetch("/api/tools/captcha");
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    return {
+        imageBase64: data.image,
+        cookies: data.rawCookies || [],
+    };
+}
+
+// ─── Login via Proxy ──────────────────────────────────────────
+
+export async function loginViaProxy(
+    account: string,
+    password: string,
+    captcha: string,
+    uisCookies: string[],
+): Promise<string[]> {
+    const passwordMd5 = md5Browser(password);
+
+    const body = new URLSearchParams({
+        loginName: account,
+        password: passwordMd5,
+        randcodekey: captcha,
+        locationBrowser: "谷歌浏览器[Chrome]",
+        appid: "3550176",
+        redirect: "https://zhjw.smu.edu.cn/new/ssoLogin",
+        strength: "3",
+    });
+
+    console.log("[login] Sending login POST...");
+    const loginRes = await proxyFetch(`${UIS}/login/login.do`, uisCookies, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "X-Requested-With": "XMLHttpRequest",
+        },
+        body: body.toString(),
+    });
+
+    console.log("[login] Response:", loginRes.status, loginRes.body.slice(0, 200));
+
+    if (loginRes.status !== 200 || !loginRes.body.includes("成功")) {
+        let errorMsg = "登录失败";
+        try {
+            const json = JSON.parse(loginRes.body);
+            errorMsg = json.message || json.msg || "登录失败，请检查学号、密码和验证码";
+        } catch {
+            errorMsg = `登录失败: ${loginRes.body.slice(0, 200)}`;
+        }
+        throw new Error(errorMsg);
+    }
+
+    const json = JSON.parse(loginRes.body);
+    const ticket = json.ticket as string;
+    if (!ticket) throw new Error("登录成功但未获取到 ticket");
+
+    // Follow redirects to establish academic session
+    let currentPath = `/new/ssoLogin?ticket=${encodeURIComponent(ticket)}`;
+    let cookies = loginRes.cookies;
+
+    console.log("[login] Following SSO redirects...");
+    for (let i = 0; i < 5; i++) {
+        console.log(`[login] Redirect ${i + 1}: ${ZHJW}${currentPath}`);
+        const res = await proxyFetch(`${ZHJW}${currentPath}`, cookies, {
+            headers: { Accept: "text/html,*/*" },
+        });
+        cookies = res.cookies;
+
+        if (!res.location) { console.log("[login] No more redirects"); break; }
+        const loc = res.location;
+        console.log(`[login] → Location: ${loc}`);
+        if (loc.startsWith("http")) {
+            if (loc.includes("zhjw.smu.edu.cn")) {
+                currentPath = loc.replace("https://zhjw.smu.edu.cn", "");
+            } else {
+                break;
+            }
+        } else {
+            currentPath = loc;
+        }
+    }
+
+    if (cookies.length === 0) {
+        throw new Error("建立教务系统会话失败");
+    }
+
+    console.log("[login] Login complete, got", cookies.length, "cookies");
+    return cookies;
+}
+
+// ─── Course Categories ────────────────────────────────────────
+
+export async function getCategoriesViaProxy(
+    cookies: string[],
+): Promise<{ categories: CourseCategory[]; cookies: string[] }> {
+    // Visit welcome page
+    await proxyFetch(`${ZHJW}${WELCOME_PATH}`, cookies, {
+        headers: { Accept: "text/html,*/*" },
+    });
+
+    // Visit enrollment root
+    const res = await proxyFetch(`${ZHJW}${XK_ROOT}`, cookies, {
+        headers: { Accept: "text/html,*/*" },
+    });
+
+    const html = res.body;
+
+    if (html.includes("统一认证登录") || html.includes("扫码登录")) {
+        throw new Error("会话已过期，请重新登录");
+    }
+
+    const categories: CourseCategory[] = [];
+    const seen = new Set<string>();
+    let match: RegExpExecArray | null;
+
+    // Pattern 1: data-href with xklx + lay-iframe
+    const p1 = /data-href\s*=\s*["']([^"']*xklx[^"']*)["'][^>]*lay-iframe\s*=\s*["']([^"']*)["']/gi;
+    while ((match = p1.exec(html)) !== null) {
+        const cm = match[1].match(/xklx\/(\d+)/);
+        if (cm && !seen.has(cm[1])) { seen.add(cm[1]); categories.push({ code: cm[1], title: match[2] }); }
+    }
+    // Pattern 2: reversed order
+    const p2 = /lay-iframe\s*=\s*["']([^"']*)["'][^>]*data-href\s*=\s*["']([^"']*xklx[^"']*)["']/gi;
+    while ((match = p2.exec(html)) !== null) {
+        const cm = match[2].match(/xklx\/(\d+)/);
+        if (cm && !seen.has(cm[1])) { seen.add(cm[1]); categories.push({ code: cm[1], title: match[1] }); }
+    }
+    // Pattern 3: href + text
+    const p3 = /href\s*=\s*["']([^"']*xklx\/(\d+)[^"']*)["'][^>]*>([^<]+)</gi;
+    while ((match = p3.exec(html)) !== null) {
+        if (!seen.has(match[2])) { seen.add(match[2]); categories.push({ code: match[2], title: match[3].trim() }); }
+    }
+    // Pattern 4: generic /xklx/digits
+    const p4 = /['"]([^'"]*\/xklx\/(\d+)[^'"]*)['"]/gi;
+    while ((match = p4.exec(html)) !== null) {
+        if (!seen.has(match[2])) { seen.add(match[2]); categories.push({ code: match[2], title: `类型${match[2]}` }); }
+    }
+    // Pattern 5: xklxdm=digits
+    const p5 = /xklxdm=(\d+)/gi;
+    while ((match = p5.exec(html)) !== null) {
+        if (!seen.has(match[1])) { seen.add(match[1]); categories.push({ code: match[1], title: `类型${match[1]}` }); }
+    }
+
+    if (categories.length === 0) {
+        const bodyText = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+        throw new Error(`未找到选课类型: ${bodyText.slice(0, 160)}`);
+    }
+
+    return { categories, cookies: res.cookies };
+}
+
+// ─── Course List ──────────────────────────────────────────────
+
+export async function getCoursesViaProxy(
+    cookies: string[],
+    categoryCode: string,
+): Promise<{ courses: CourseItem[]; categoryUrl: string; cookies: string[] }> {
+    const categoryPath = `${XK_ROOT}xklx/${categoryCode}`;
+    const courseListPath = `${categoryPath}/kxkc`;
+
+    const allCourses: CourseItem[] = [];
+    let page = 1;
+    let total = Infinity;
+    let latestCookies = cookies;
+
+    while (allCourses.length < total) {
+        const body = new URLSearchParams({
+            page: String(page),
+            rows: "50",
+        });
+
+        const res = await proxyFetch(`${ZHJW}${courseListPath}`, latestCookies, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: body.toString(),
+        });
+        latestCookies = res.cookies;
+
+        if (!res.body.startsWith("{")) {
+            throw new Error(`课程列表返回异常: ${res.body.slice(0, 200)}`);
+        }
+
+        const json = JSON.parse(res.body);
+        total = json.total ?? 0;
+        const rows = json.rows ?? [];
+
+        for (const r of rows) {
+            allCourses.push({
+                kcrwdm: String(r.kcrwdm || ""),
+                kcmc: String(r.kcmc || ""),
+                teaxm: String(r.teaxm || ""),
+                pkrs: Number(r.pkrs) || 0,
+                xkrs: Number(r.xkrs) || 0,
+                xf: Number(r.xf) || 0,
+                zxs: Number(r.zxs) || 0,
+                sksj: String(r.sksj || ""),
+                skdd: String(r.skdd || ""),
+                kkbmmc: String(r.kkbmmc || ""),
+            });
+        }
+
+        if (rows.length === 0) break;
+        page++;
+    }
+
+    return { courses: allCourses, categoryUrl: categoryPath, cookies: latestCookies };
+}
+
+// ─── Submit One Course ────────────────────────────────────────
+
+async function orderCourseViaProxy(
+    cookies: string[],
+    kcrwdm: string,
+    kcmc: string,
+    categoryPath: string,
+): Promise<{ code: number; message: string }> {
+    const addPath = `${categoryPath}/add`;
+    const body = new URLSearchParams({ kcrwdm, kcmc, qz: "-1", xxyqdm: "", hlct: "0" });
+
+    // Use CF Worker/VPS proxy for enrollment (IP protection) if configured
+    let res;
+    if (ENROLL_PROXY) {
+        try {
+            res = await enrollProxyFetch(`${ZHJW}${addPath}`, cookies, {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: body.toString(),
+            });
+        } catch {
+            // Fallback to server-side proxy
+            res = await proxyFetch(`${ZHJW}${addPath}`, cookies, {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: body.toString(),
+            });
+        }
+    } else {
+        res = await proxyFetch(`${ZHJW}${addPath}`, cookies, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: body.toString(),
+        });
+    }
+
+    try {
+        return JSON.parse(res.body);
+    } catch {
+        return { code: -1, message: `非JSON: ${res.body.slice(0, 100)}` };
+    }
+}
+
+// ─── Enrollment Job ───────────────────────────────────────────
+
+export async function enrollJobViaProxy(
+    preferences: (number | null)[],
+    courses: CourseItem[],
+    categoryPath: string,
+    cookies: string[],
+    logger: LogCallback,
+): Promise<EnrollResult> {
+    const validOrders: number[] = [];
+    for (const pref of preferences) {
+        if (pref === null || pref === undefined) continue;
+        if (pref < 1 || pref > courses.length) continue;
+        if (!validOrders.includes(pref)) validOrders.push(pref);
+    }
+
+    if (validOrders.length === 0) {
+        return { success: false, message: "没有有效志愿" };
+    }
+
+    logger({
+        type: "info",
+        message: `有效志愿: ${validOrders.map((i) => `${i}.${courses[i - 1].kcmc}`).join(", ")}`,
+    });
+
+    let lastMessage = "";
+
+    for (let i = 0; i < MAX_ATTEMPTS; i++) {
+        const orderIdx =
+            i < PRIMARY_BURST_ATTEMPTS
+                ? validOrders[0]
+                : validOrders[(i - PRIMARY_BURST_ATTEMPTS) % validOrders.length];
+
+        const course = courses[orderIdx - 1];
+
+        logger({
+            type: "attempt",
+            index: i + 1,
+            course: course.kcmc,
+            message: `[${i + 1}/${MAX_ATTEMPTS}] 正在抢: ${course.kcmc}`,
+        });
+
+        try {
+            const result = await orderCourseViaProxy(cookies, course.kcrwdm, course.kcmc, categoryPath);
+            const msg = result.message || "";
+            lastMessage = msg || JSON.stringify(result);
+
+            if (result.code === 0 || msg === "您已经选了该门课程") {
+                logger({ type: "success", course: course.kcmc, message: `选课成功：${course.kcmc}` });
+                return { success: true, message: `选课成功：${course.kcmc}`, courseName: course.kcmc };
+            }
+
+            if (msg === "超出选课要求门数(1.0门)") {
+                logger({ type: "success", message: "已达到选课上限" });
+                return { success: true, message: "已达到选课上限" };
+            }
+
+            if (i % 5 === 0) {
+                logger({ type: "info", message: `服务器: ${msg}` });
+            }
+        } catch (err) {
+            const errMsg = err instanceof Error ? err.message : String(err);
+            lastMessage = `异常: ${errMsg}`;
+            if (i % 5 === 0) logger({ type: "error", message: lastMessage });
+        }
+
+        // Wait with random jitter between attempts
+        if (i < MAX_ATTEMPTS - 1) {
+            const delay = ATTEMPT_DELAY_MIN + Math.random() * (ATTEMPT_DELAY_MAX - ATTEMPT_DELAY_MIN);
+            await new Promise((r) => setTimeout(r, delay));
+        }
+    }
+
+    logger({ type: "fail", message: `${MAX_ATTEMPTS}次后未成功: ${lastMessage}` });
+    return { success: false, message: `抢课失败: ${lastMessage}` };
+}
+
+// ─── Time Calibration ─────────────────────────────────────────
+
+export async function calibrateTimeViaProxy(cookies: string[]): Promise<number> {
+    let bestDiff = 0;
+    let bestRtt = Infinity;
+
+    for (let i = 0; i < 3; i++) {
+        const before = Date.now();
+        try {
+            const res = await proxyFetch(`${ZHJW}${WELCOME_PATH}`, cookies, {
+                headers: { Accept: "text/html,*/*" },
+            });
+            const after = Date.now();
+            if (!res.dateHeader) continue;
+
+            const serverTime = new Date(res.dateHeader).getTime();
+            const rtt = after - before;
+            const localEstimate = before + rtt / 2;
+            const diff = serverTime - localEstimate;
+
+            if (rtt < bestRtt) { bestRtt = rtt; bestDiff = diff; }
+        } catch { /* ignore */ }
+        await new Promise((r) => setTimeout(r, 30));
+    }
+
+    return bestDiff;
+}
+
+// ─── Compute Run-At ───────────────────────────────────────────
+
+export function computeRunAt(timeStr: string, timeDiffMs: number, sendAheadMs = 50): number {
+    const [h, m, s] = timeStr.split(":").map(Number);
+    const now = new Date();
+    const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, s);
+    const targetLocal = target.getTime() - timeDiffMs - sendAheadMs;
+
+    if (targetLocal <= Date.now()) {
+        return targetLocal + 24 * 60 * 60 * 1000;
+    }
+    return targetLocal;
+}

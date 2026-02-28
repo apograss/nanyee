@@ -1,0 +1,422 @@
+/* ─── Reset & Base ─────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --bg: #0a0a0f;
+  --bg-card: #13131a;
+  --bg-input: #1a1a24;
+  --border: #2a2a3a;
+  --border-focus: #6366f1;
+  --text: #e8e8ed;
+  --text-dim: #8888a0;
+  --text-muted: #555566;
+  --accent: #6366f1;
+  --accent-light: #818cf8;
+  --accent-glow: rgba(99, 102, 241, 0.15);
+  --success: #22c55e;
+  --success-bg: rgba(34, 197, 94, 0.1);
+  --error: #ef4444;
+  --error-bg: rgba(239, 68, 68, 0.08);
+  --warning: #f59e0b;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── Layout ───────────────────────────────────────────────── */
+
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+
+.container {
+  width: 100%;
+  max-width: 460px;
+}
+
+/* ─── Header ───────────────────────────────────────────────── */
+
+.header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.logo {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin-bottom: 0.25rem;
+}
+
+.logo span {
+  color: var(--accent);
+}
+
+.subtitle {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+/* ─── Card ─────────────────────────────────────────────────── */
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.75rem;
+}
+
+/* ─── Form ─────────────────────────────────────────────────── */
+
+.formGroup {
+  margin-bottom: 1.25rem;
+}
+
+.label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-dim);
+  margin-bottom: 0.4rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.input {
+  width: 100%;
+  padding: 0.7rem 0.9rem;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.95rem;
+  font-family: var(--font);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.input::placeholder {
+  color: var(--text-muted);
+}
+
+.input:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+/* ─── Captcha ──────────────────────────────────────────────── */
+
+.captchaRow {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-end;
+}
+
+.captchaRow .input {
+  flex: 1;
+}
+
+.captchaBox {
+  height: 44px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: opacity 0.2s;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-input);
+  min-width: 110px;
+}
+
+.captchaBox:hover {
+  opacity: 0.8;
+}
+
+.captchaBox img {
+  height: 100%;
+  display: block;
+}
+
+.captchaPlaceholder {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* ─── Radio Group ──────────────────────────────────────────── */
+
+.radioGroup {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.radioOption {
+  flex: 1;
+  position: relative;
+}
+
+.radioOption input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.radioLabel {
+  display: block;
+  padding: 0.55rem 0.75rem;
+  text-align: center;
+  font-size: 0.85rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.radioOption input:checked+.radioLabel {
+  border-color: var(--accent);
+  background: var(--accent-glow);
+  color: var(--accent-light);
+}
+
+.radioLabel:hover {
+  border-color: var(--text-muted);
+}
+
+/* ─── Inline fields ────────────────────────────────────────── */
+
+.inlineRow {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.inlineRow .formGroup {
+  flex: 1;
+}
+
+/* ─── Button ───────────────────────────────────────────────── */
+
+.submitBtn {
+  width: 100%;
+  padding: 0.8rem;
+  margin-top: 0.5rem;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s, opacity 0.2s;
+}
+
+.submitBtn:hover:not(:disabled) {
+  background: var(--accent-light);
+}
+
+.submitBtn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.submitBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ─── Loading ──────────────────────────────────────────────── */
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  padding: 0.4rem 0;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+/* ─── Result ───────────────────────────────────────────────── */
+
+.result {
+  margin-top: 1.5rem;
+}
+
+.resultCard {
+  padding: 1.25rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid;
+}
+
+.resultSuccess {
+  border-color: var(--success);
+  background: var(--success-bg);
+}
+
+.resultError {
+  border-color: var(--error);
+  background: var(--error-bg);
+}
+
+.resultTitle {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.resultSuccess .resultTitle {
+  color: var(--success);
+}
+
+.resultError .resultTitle {
+  color: var(--error);
+}
+
+.shareCodeBox {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+  word-break: break-all;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.shareCode {
+  font-weight: 700;
+  color: var(--accent-light);
+  font-size: 1.1rem;
+}
+
+.copyBtn {
+  width: 100%;
+  padding: 0.6rem;
+  background: transparent;
+  border: 1px solid var(--success);
+  color: var(--success);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 500;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.copyBtn:hover {
+  background: var(--success-bg);
+}
+
+.resultMeta {
+  margin-top: 0.75rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.errorText {
+  font-size: 0.9rem;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+/* ─── Footer ───────────────────────────────────────────────── */
+
+.footer {
+  text-align: center;
+  margin-top: 1.75rem;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.footer a {
+  color: var(--text-dim);
+  text-decoration: none;
+}
+
+.footer a:hover {
+  color: var(--accent-light);
+}
+
+/* ─── Privacy ──────────────────────────────────────────────── */
+
+.privacyNote {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 1rem;
+  line-height: 1.5;
+}
+
+.privacyNote a {
+  color: var(--text-dim);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ─── Responsive ───────────────────────────────────────────── */
+
+@media (max-width: 480px) {
+  .page {
+    padding: 1.5rem 1rem;
+    justify-content: flex-start;
+    padding-top: 3rem;
+  }
+
+  .card {
+    padding: 1.25rem;
+  }
+
+  .radioGroup {
+    flex-direction: column;
+  }
+}

@@ -1,0 +1,126 @@
+.page {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: var(--space-xl) var(--space-md);
+}
+
+.header {
+  margin-bottom: var(--space-xl);
+}
+
+.title {
+  font-size: var(--text-3xl);
+  font-weight: var(--font-bold);
+  margin-bottom: var(--space-xs);
+}
+
+.desc {
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+}
+
+.articleContent {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: var(--space-xl) var(--space-md);
+}
+
+.articleContent h1 {
+  font-size: var(--text-3xl);
+  margin-bottom: var(--space-sm);
+}
+
+.meta {
+  display: flex;
+  gap: var(--space-md);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-bottom: var(--space-xl);
+}
+
+.tags {
+  display: flex;
+  gap: var(--space-xs);
+  margin-top: var(--space-sm);
+}
+
+.markdown {
+  font-size: var(--text-base);
+  line-height: var(--leading-relaxed);
+  color: var(--text-primary);
+}
+
+.markdown h2 {
+  font-size: var(--text-2xl);
+  margin-top: var(--space-xl);
+  margin-bottom: var(--space-sm);
+}
+
+.markdown h3 {
+  font-size: var(--text-xl);
+  margin-top: var(--space-lg);
+  margin-bottom: var(--space-sm);
+}
+
+.markdown p {
+  margin-bottom: var(--space-md);
+}
+
+.markdown ul,
+.markdown ol {
+  margin-bottom: var(--space-md);
+  padding-left: var(--space-lg);
+  list-style: disc;
+}
+
+.markdown ol {
+  list-style: decimal;
+}
+
+.markdown code {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  padding: 2px 6px;
+  background: var(--bg-muted);
+  border-radius: 3px;
+}
+
+.markdown pre {
+  margin-bottom: var(--space-md);
+  padding: var(--space-md);
+  background: var(--bg-muted);
+  border: var(--neo-border);
+  border-radius: var(--neo-radius);
+  overflow-x: auto;
+}
+
+.markdown pre code {
+  padding: 0;
+  background: none;
+}
+
+.markdown blockquote {
+  margin-bottom: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border-left: 4px solid var(--color-brand);
+  background: var(--color-brand-lighter);
+  color: var(--text-secondary);
+}
+
+.markdown a {
+  color: var(--color-brand);
+  text-decoration: underline;
+}
+
+.markdown img {
+  border: var(--neo-border);
+  border-radius: var(--neo-radius);
+  margin-bottom: var(--space-md);
+}
+
+.notFound {
+  text-align: center;
+  padding: var(--space-3xl);
+  font-size: var(--text-lg);
+  color: var(--text-muted);
+}

@@ -1,0 +1,15 @@
+<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- 后方视窗（橙色医疗底座）投影 & 主体 -->
+  <rect x="16" y="16" width="60" height="60" rx="8" fill="#1C2B39" transform="translate(6, 6)"/>
+  <rect x="16" y="16" width="60" height="60" rx="8" fill="#DF673A" stroke="#1C2B39" stroke-width="6"/>
+  <!-- 后视窗的白色十字 -->
+  <path d="M 42 32 H 50 V 40 H 58 V 48 H 50 V 56 H 42 V 48 H 34 V 40 H 42 Z" fill="#FFFFFF" stroke="#1C2B39" stroke-width="4" stroke-linejoin="round"/>
+
+  <!-- 前方视窗（白色Agent终端）投影 & 主体 -->
+  <rect x="44" y="44" width="60" height="60" rx="8" fill="#1C2B39" transform="translate(6, 6)"/>
+  <rect x="44" y="44" width="60" height="60" rx="8" fill="#FFFFFF" stroke="#1C2B39" stroke-width="6"/>
+
+  <!-- 前终端内容： >_ 指令符 -->
+  <polyline points="56,60 68,70 56,80" fill="none" stroke="#1C2B39" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="74" y1="84" x2="90" y2="84" stroke="#DF673A" stroke-width="6" stroke-linecap="round"/>
+</svg>

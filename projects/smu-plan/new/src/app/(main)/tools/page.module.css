@@ -1,0 +1,37 @@
+.page {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: var(--space-xl) var(--space-md);
+}
+
+.header {
+  margin-bottom: var(--space-xl);
+}
+
+.title {
+  font-size: var(--text-3xl);
+  font-weight: var(--font-bold);
+  margin-bottom: var(--space-xs);
+}
+
+.desc {
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+}
+
+.toolPage {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: var(--space-xl) var(--space-md);
+}
+
+.comingSoon {
+  text-align: center;
+  padding: var(--space-3xl);
+  color: var(--text-muted);
+}
+
+.comingSoon h2 {
+  font-size: var(--text-2xl);
+  margin-bottom: var(--space-sm);
+}
