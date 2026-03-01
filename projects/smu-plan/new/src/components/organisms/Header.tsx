@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import ThemeToggle from "@/components/atoms/ThemeToggle";
 import styles from "./Header.module.css";
 
-const NAV_LINKS = [
+const DEFAULT_NAV_LINKS = [
   { href: "/", label: "首页" },
   { href: "/kb", label: "知识库" },
   { href: "/bbs", label: "论坛" },
@@ -17,10 +17,33 @@ const NAV_LINKS = [
   { href: "/about", label: "关于" },
 ];
 
+interface NavLinkConfig {
+  href: string;
+  label: string;
+  external?: boolean;
+}
+
 export default function Header() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [navLinks, setNavLinks] = useState<NavLinkConfig[]>(DEFAULT_NAV_LINKS);
+
+  useEffect(() => {
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.ok && data.data.settings.navLinks) {
+          try {
+            const parsed = JSON.parse(data.data.settings.navLinks);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setNavLinks(parsed);
+            }
+          } catch {}
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const handleLogout = async () => {
     await logout();
@@ -35,15 +58,27 @@ export default function Header() {
         </Link>
 
         <nav className={styles.nav}>
-          {NAV_LINKS.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={`${styles.navLink} ${pathname === link.href ? styles.active : ""}`}
-            >
-              {link.label}
-            </Link>
-          ))}
+          {navLinks.map((link) =>
+            link.external ? (
+              <a
+                key={link.href}
+                href={link.href}
+                className={styles.navLink}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {link.label}
+              </a>
+            ) : (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`${styles.navLink} ${pathname === link.href ? styles.active : ""}`}
+              >
+                {link.label}
+              </Link>
+            )
+          )}
         </nav>
 
         <div className={styles.actions}>
@@ -68,6 +103,13 @@ export default function Header() {
                       管理后台
                     </Link>
                   )}
+                  <Link
+                    href="/profile"
+                    className={styles.dropItem}
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    个人中心
+                  </Link>
                   <Link
                     href="/editor"
                     className={styles.dropItem}
@@ -102,16 +144,29 @@ export default function Header() {
       {/* Mobile nav overlay */}
       {menuOpen && (
         <div className={styles.mobileNav}>
-          {NAV_LINKS.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={`${styles.mobileLink} ${pathname === link.href ? styles.active : ""}`}
-              onClick={() => setMenuOpen(false)}
-            >
-              {link.label}
-            </Link>
-          ))}
+          {navLinks.map((link) =>
+            link.external ? (
+              <a
+                key={link.href}
+                href={link.href}
+                className={styles.mobileLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setMenuOpen(false)}
+              >
+                {link.label}
+              </a>
+            ) : (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`${styles.mobileLink} ${pathname === link.href ? styles.active : ""}`}
+                onClick={() => setMenuOpen(false)}
+              >
+                {link.label}
+              </Link>
+            )
+          )}
         </div>
       )}
     </header>

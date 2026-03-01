@@ -1,0 +1,31 @@
+.page { padding: var(--space-lg); }
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-lg); }
+.title { font-size: var(--text-2xl); font-weight: var(--font-bold); margin: 0; }
+.empty { text-align: center; padding: var(--space-3xl); color: var(--text-muted); font-weight: var(--font-bold); border: var(--neo-border); background: var(--bg-secondary); }
+
+.searchForm { display: flex; gap: var(--space-sm); align-items: center; margin-bottom: var(--space-lg); }
+
+.table { width: 100%; border-collapse: collapse; border: var(--neo-border); background: var(--bg-secondary); }
+.tableWrap { overflow-x: auto; width: 100%; }
+.table th, .table td { padding: var(--space-sm) var(--space-md); text-align: left; border-bottom: 2px solid var(--border-color); font-size: var(--text-sm); }
+.table th { background: var(--bg-muted); font-weight: var(--font-bold); font-size: var(--text-xs); text-transform: uppercase; }
+.table tr:hover td { background: var(--bg-hover); }
+
+.toggle { padding: 4px 12px; border: var(--neo-border); font-weight: var(--font-bold); font-size: var(--text-xs); cursor: pointer; font-family: var(--font-sans); }
+.on { background: var(--color-success); color: var(--text-inverse); }
+.off { background: var(--bg-muted); color: var(--text-muted); }
+
+.replyBtn { background: none; border: none; color: var(--color-brand); cursor: pointer; font-size: var(--text-sm); text-decoration: underline; font-family: var(--font-sans); }
+
+.drawerOverlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; justify-content: flex-end; z-index: 100; }
+.drawer { width: 100%; max-width: 480px; background: var(--bg-primary); border-left: var(--neo-border); padding: var(--space-lg); overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-md); }
+.drawerHeader { display: flex; justify-content: space-between; align-items: center; }
+.drawerTitle { font-size: var(--text-xl); font-weight: var(--font-bold); margin: 0; }
+
+.replyList { display: flex; flex-direction: column; gap: var(--space-sm); }
+.replyItem { padding: var(--space-sm); border: var(--neo-border); background: var(--bg-secondary); }
+.replyContent { font-size: var(--text-sm); margin-bottom: var(--space-xs); }
+.replyMeta { display: flex; justify-content: space-between; align-items: center; font-size: var(--text-xs); color: var(--text-muted); }
+
+.pagination { display: flex; align-items: center; justify-content: center; gap: var(--space-md); margin-top: var(--space-lg); }
+.pageInfo { font-size: var(--text-sm); color: var(--text-muted); }

@@ -48,7 +48,7 @@
   align-items: center;
   gap: var(--space-lg);
   padding: var(--space-2xl) var(--space-xl);
-  max-width: 680px;
+  max-width: 720px;
   width: 100%;
   animation: fadeIn 0.6s ease-out;
 }
@@ -88,42 +88,6 @@
   font-size: var(--text-lg);
   color: var(--text-muted);
   margin-top: calc(-1 * var(--space-sm));
-}
-
-/* Hot Tags */
-.tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-sm);
-  justify-content: center;
-}
-
-.tag {
-  padding: 6px 14px;
-  font-size: var(--text-sm);
-  font-weight: var(--font-medium);
-  color: var(--text-secondary);
-  background: var(--bg-secondary);
-  border: var(--neo-border);
-  border-radius: var(--neo-radius);
-  box-shadow: var(--neo-shadow-sm);
-  cursor: pointer;
-  transition:
-    transform var(--transition-fast),
-    box-shadow var(--transition-fast),
-    background var(--transition-fast);
-}
-
-.tag:hover {
-  transform: translate(-2px, -2px);
-  box-shadow: var(--neo-shadow);
-  background: var(--color-brand-light);
-  color: var(--color-brand);
-}
-
-.tag:active {
-  transform: translate(1px, 1px);
-  box-shadow: var(--neo-shadow-active);
 }
 
 /* Search Box */
@@ -363,52 +327,48 @@
 }
 
 .toolsGrid {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-md);
 }
 
 .toolCard {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: var(--space-md);
-  padding: var(--space-md);
+  text-align: center;
+  gap: var(--space-sm);
+  padding: var(--space-lg) var(--space-md);
   background: var(--bg-secondary);
   border: var(--neo-border);
   border-radius: var(--neo-radius);
   box-shadow: var(--neo-shadow-sm);
   text-decoration: none;
   color: var(--text-primary);
-  transition:
-    transform var(--transition-spring),
-    box-shadow var(--transition-spring);
-  animation: toolSlideIn 0.5s ease-out both;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: toolSlideUp 0.5s ease-out both;
 }
 
-@keyframes toolSlideIn {
+@keyframes toolSlideUp {
   from {
     opacity: 0;
-    transform: translateX(-20px);
+    transform: translateY(16px);
   }
   to {
     opacity: 1;
-    transform: translateX(0);
+    transform: translateY(0);
   }
 }
 
 .toolCard:hover {
-  transform: translate(-3px, -3px);
-  box-shadow: 6px 6px 0px var(--border-color);
+  transform: translate(-4px, -4px);
+  box-shadow: 8px 8px 0px var(--border-color);
   color: var(--text-primary);
 }
 
-.toolCard:hover .toolArrow {
-  transform: translateX(4px);
-  color: var(--color-brand);
-}
-
 .toolCard:hover .toolIcon {
-  transform: scale(1.15) rotate(-5deg);
+  transform: scale(1.1);
+  color: var(--color-brand);
 }
 
 .toolCard:active {
@@ -417,43 +377,27 @@
 }
 
 .toolIcon {
-  width: 44px;
-  height: 44px;
+  width: 52px;
+  height: 52px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
-  background: var(--tool-gradient, var(--color-brand));
+  background: var(--bg-primary);
   border-radius: var(--neo-radius);
-  border: 2px solid var(--border-color);
-  flex-shrink: 0;
-  transition: transform var(--transition-spring);
-}
-
-.toolInfo {
-  flex: 1;
-  min-width: 0;
+  border: var(--neo-border);
+  color: var(--text-primary);
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .toolTitle {
   font-size: var(--text-base);
   font-weight: var(--font-bold);
-  margin-bottom: 2px;
 }
 
 .toolDesc {
   font-size: var(--text-xs);
   color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.toolArrow {
-  font-size: var(--text-lg);
-  color: var(--text-muted);
-  transition: transform var(--transition-spring), color var(--transition-fast);
-  flex-shrink: 0;
+  line-height: 1.4;
 }
 
 /* ═══ Chat Mode Layout ═══ */
@@ -601,7 +545,11 @@
   }
 
   .toolCard {
-    padding: var(--space-sm) var(--space-md);
+    padding: var(--space-md);
+  }
+
+  .toolsGrid {
+    grid-template-columns: 1fr;
   }
 
   .modelSwitchSmall {

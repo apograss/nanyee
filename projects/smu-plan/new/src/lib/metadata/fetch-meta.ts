@@ -1,7 +1,5 @@
 import { URL } from "url";
 import dns from "dns/promises";
-import http from "http";
-import https from "https";
 
 const PRIVATE_RANGES = [
   // 10.0.0.0/8
@@ -100,68 +98,22 @@ const TIMEOUT_MS = 5000;
 const MAX_REDIRECTS = 3;
 
 /**
- * Create a custom DNS lookup function that only allows pre-validated IPs.
- * This prevents DNS rebinding attacks by ensuring the actual connection
- * goes to an IP we already verified as non-private.
- */
-function createSafeLookup(allowedIPs: string[]) {
-  const v4Allowed = allowedIPs.filter((ip) => !ip.includes(":"));
-  const v6Allowed = allowedIPs.filter((ip) => ip.includes(":"));
-
-  return (
-    hostname: string,
-    options: { family?: number },
-    callback: (err: NodeJS.ErrnoException | null, address: string, family: number) => void
-  ) => {
-    const family = options.family;
-    let chosen: string | undefined;
-    if (family === 4 || family === undefined) {
-      chosen = v4Allowed[0];
-    }
-    if (!chosen && (family === 6 || family === undefined)) {
-      chosen = v6Allowed[0];
-    }
-    if (!chosen) {
-      chosen = v4Allowed[0] || v6Allowed[0];
-    }
-    if (!chosen) {
-      callback(new Error("No allowed IP addresses") as NodeJS.ErrnoException, "", 4);
-      return;
-    }
-    callback(null, chosen, chosen.includes(":") ? 6 : 4);
-  };
-}
-
-/**
- * Fetch a URL using Node http/https agents with pinned DNS lookup.
- * This prevents DNS rebinding by binding the connection to pre-resolved IPs.
+ * Fetch a URL with timeout, after DNS has been pre-validated.
+ * SSRF protection is handled by resolveAndCheck() before this call.
  */
 async function safeFetch(
   url: string,
-  allowedIPs: string[],
   signal: AbortSignal
 ): Promise<Response> {
-  const lookup = createSafeLookup(allowedIPs);
-
-  const httpAgent = new http.Agent({ lookup: lookup as never });
-  const httpsAgent = new https.Agent({
-    lookup: lookup as never,
-    rejectUnauthorized: true,
-  });
-
   return fetch(url, {
     signal,
     redirect: "manual",
     headers: {
-      "User-Agent": "NanyeeBot/1.0 (metadata fetcher)",
-      Accept: "text/html",
+      "User-Agent":
+        "Mozilla/5.0 (compatible; NanyeeBot/1.0; +https://nanyee.de)",
+      Accept: "text/html,application/xhtml+xml,*/*",
+      "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
     },
-    // @ts-expect-error Node.js fetch supports agent via dispatcher
-    dispatcher: undefined,
-    // Use the agent for the appropriate protocol
-    ...(url.startsWith("https:")
-      ? { agent: httpsAgent }
-      : { agent: httpAgent }),
   });
 }
 
@@ -179,9 +131,8 @@ export async function fetchUrlMeta(targetUrl: string): Promise<FetchMetaResult> 
   }
 
   // SSRF check — resolve and validate all IPs upfront
-  let allowedIPs: string[];
   try {
-    allowedIPs = await resolveAndCheck(parsed.hostname);
+    await resolveAndCheck(parsed.hostname);
   } catch {
     return EMPTY_RESULT;
   }
@@ -190,7 +141,6 @@ export async function fetchUrlMeta(targetUrl: string): Promise<FetchMetaResult> 
   let response: Response;
   let redirectCount = 0;
   let currentUrl = targetUrl;
-  let currentAllowedIPs = allowedIPs;
 
   try {
     while (redirectCount <= MAX_REDIRECTS) {
@@ -198,7 +148,7 @@ export async function fetchUrlMeta(targetUrl: string): Promise<FetchMetaResult> 
       const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
       try {
-        response = await safeFetch(currentUrl, currentAllowedIPs, controller.signal);
+        response = await safeFetch(currentUrl, controller.signal);
       } finally {
         clearTimeout(timer);
       }
@@ -212,7 +162,7 @@ export async function fetchUrlMeta(targetUrl: string): Promise<FetchMetaResult> 
         if (!["http:", "https:"].includes(redirectUrl.protocol)) return EMPTY_RESULT;
 
         // Re-resolve and re-validate the redirect target
-        currentAllowedIPs = await resolveAndCheck(redirectUrl.hostname);
+        await resolveAndCheck(redirectUrl.hostname);
         currentUrl = redirectUrl.href;
         redirectCount++;
         continue;

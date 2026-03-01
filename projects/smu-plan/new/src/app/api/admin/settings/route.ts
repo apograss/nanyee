@@ -28,6 +28,10 @@ const ALLOWED_KEYS = [
   "site_description",
   "homepage_announcement",
   "default_ai_model",
+  "navLinks",
+  "footerContent",
+  "homeSections",
+  "toolsConfig",
 ];
 
 const updateSettingsSchema = z

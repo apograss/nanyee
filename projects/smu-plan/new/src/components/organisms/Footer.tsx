@@ -1,7 +1,27 @@
 import Link from "next/link";
+import { prisma } from "@/lib/prisma";
 import styles from "./Footer.module.css";
 
-export default function Footer() {
+export default async function Footer() {
+  let footerContent = "";
+  try {
+    const setting = await prisma.siteSetting.findUnique({
+      where: { key: "footerContent" },
+    });
+    if (setting?.value) footerContent = setting.value;
+  } catch {}
+
+  if (footerContent) {
+    return (
+      <footer className={styles.footer}>
+        <div
+          className={styles.inner}
+          dangerouslySetInnerHTML={{ __html: footerContent }}
+        />
+      </footer>
+    );
+  }
+
   return (
     <footer className={styles.footer}>
       <div className={styles.inner}>

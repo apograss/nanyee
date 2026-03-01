@@ -7,36 +7,41 @@ import { useSearchHistory } from "@/hooks/useSearchHistory";
 import ChatStream from "@/components/organisms/ChatStream";
 import styles from "./page.module.css";
 
-const HOT_TAGS = [
-  "选课推荐",
-  "转专业条件",
-  "校园网连接",
-  "课表导入",
-  "实习流程",
-  "快递驿站",
-];
-
 const TOOLS = [
   {
-    icon: "\u{1F4C5}",
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+        <line x1="16" y1="2" x2="16" y2="6" />
+        <line x1="8" y1="2" x2="8" y2="6" />
+        <line x1="3" y1="10" x2="21" y2="10" />
+      </svg>
+    ),
     title: "课表导出",
     desc: "一键导出教务课表到 WakeUp / ICS",
     href: "/tools/schedule",
-    gradient: "linear-gradient(135deg, #FF6B35, #FF8F5E)",
   },
   {
-    icon: "\u{1F4CA}",
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="18" y1="20" x2="18" y2="10" />
+        <line x1="12" y1="20" x2="12" y2="4" />
+        <line x1="6" y1="20" x2="6" y2="14" />
+      </svg>
+    ),
     title: "成绩查询",
     desc: "GPA 计算 + 专业排名 + 趋势分析",
     href: "/tools/grades",
-    gradient: "linear-gradient(135deg, #4CAF50, #66BB6A)",
   },
   {
-    icon: "\u26A1",
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+      </svg>
+    ),
     title: "自动选课",
     desc: "时间校准 + 毫秒级抢课",
     href: "/tools/enroll",
-    gradient: "linear-gradient(135deg, #2196F3, #42A5F5)",
   },
 ];
 
@@ -57,6 +62,20 @@ export default function HomePage() {
 
   const isIdle = status === "idle" && messages.length === 0;
 
+  // Home sections visibility (from admin settings)
+  const [sections, setSections] = useState({ announcement: true, searchHistory: true, tools: true });
+
+  useEffect(() => {
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.ok && data.data.settings.homeSections) {
+          try { setSections(JSON.parse(data.data.settings.homeSections)); } catch {}
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const query = input.trim();
@@ -66,10 +85,10 @@ export default function HomePage() {
     send(query, model);
   };
 
-  const handleTagClick = (tag: string) => {
-    addHistory(tag);
+  const handleQuickSend = (query: string) => {
+    addHistory(query);
     setInput("");
-    send(tag, model);
+    send(query, model);
   };
 
   const handleNewChat = () => {
@@ -91,10 +110,12 @@ export default function HomePage() {
     return (
       <div className={styles.main}>
         {/* Announcement Banner */}
-        <div className={styles.announcement}>
-          <span className={styles.announcementDot} />
-          <span>Nanyee.de 2.0 — AI Agent 驱动的校园工具平台，现已上线</span>
-        </div>
+        {sections.announcement && (
+          <div className={styles.announcement}>
+            <span className={styles.announcementDot} />
+            <span>Nanyee.de 2.0 — AI Agent 驱动的校园工具平台，现已上线</span>
+          </div>
+        )}
 
         <div className={styles.center}>
           {/* Logo with SVG */}
@@ -111,19 +132,6 @@ export default function HomePage() {
             <h1 className={styles.logo}>Nanyee.de</h1>
           </div>
           <p className={styles.tagline}>南医的 AI Agent</p>
-
-          <div className={styles.tags}>
-            {HOT_TAGS.map((tag) => (
-              <button
-                key={tag}
-                className={styles.tag}
-                type="button"
-                onClick={() => handleTagClick(tag)}
-              >
-                {tag}
-              </button>
-            ))}
-          </div>
 
           <form className={styles.searchWrap} onSubmit={handleSubmit}>
             <div className={styles.searchRow}>
@@ -165,7 +173,7 @@ export default function HomePage() {
             </div>
           </form>
 
-          {history.length > 0 && (
+          {sections.searchHistory && history.length > 0 && (
             <div className={styles.historySection}>
               <div className={styles.historyHeader}>
                 <span className={styles.historyTitle}>最近搜索</span>
@@ -176,7 +184,7 @@ export default function HomePage() {
                   <button
                     key={item.query}
                     className={styles.historyItem}
-                    onClick={() => handleTagClick(item.query)}
+                    onClick={() => handleQuickSend(item.query)}
                   >
                     <span className={styles.historyText}>{item.query}</span>
                     <span
@@ -192,28 +200,27 @@ export default function HomePage() {
           )}
 
           {/* Tools Showcase */}
-          <div className={styles.toolsSection}>
-            <h2 className={styles.toolsSectionTitle}>
-              <span className={styles.sparkle}>&#x2728;</span> AI 驱动的校园工具
-            </h2>
-            <div className={styles.toolsGrid}>
-              {TOOLS.map((tool, i) => (
-                <Link
-                  key={tool.href}
-                  href={tool.href}
-                  className={styles.toolCard}
-                  style={{ animationDelay: `${i * 100}ms`, "--tool-gradient": tool.gradient } as React.CSSProperties}
-                >
-                  <div className={styles.toolIcon}>{tool.icon}</div>
-                  <div className={styles.toolInfo}>
+          {sections.tools && (
+            <div className={styles.toolsSection}>
+              <h2 className={styles.toolsSectionTitle}>
+                <span className={styles.sparkle}>&#x2728;</span> AI 驱动的校园工具
+              </h2>
+              <div className={styles.toolsGrid}>
+                {TOOLS.map((tool, i) => (
+                  <Link
+                    key={tool.href}
+                    href={tool.href}
+                    className={styles.toolCard}
+                    style={{ animationDelay: `${i * 100}ms` }}
+                  >
+                    <div className={styles.toolIcon}>{tool.icon}</div>
                     <div className={styles.toolTitle}>{tool.title}</div>
                     <div className={styles.toolDesc}>{tool.desc}</div>
-                  </div>
-                  <div className={styles.toolArrow}>&#x2192;</div>
-                </Link>
-              ))}
+                  </Link>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     );

@@ -1,0 +1,38 @@
+.page { padding: var(--space-lg); }
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-lg); }
+.title { font-size: var(--text-2xl); font-weight: var(--font-bold); margin: 0; }
+.empty { text-align: center; padding: var(--space-3xl); color: var(--text-muted); font-weight: var(--font-bold); border: var(--neo-border); background: var(--bg-secondary); }
+
+.message { padding: var(--space-sm) var(--space-md); border: var(--neo-border); background: var(--bg-secondary); font-size: var(--text-sm); font-weight: var(--font-bold); margin-bottom: var(--space-lg); }
+
+.section { margin-bottom: var(--space-xl); padding: var(--space-lg); background: var(--bg-secondary); border: var(--neo-border); border-radius: var(--neo-radius); }
+.sectionHeader { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm); }
+.sectionTitle { font-size: var(--text-lg); font-weight: var(--font-bold); margin: 0; }
+.hint { font-size: var(--text-sm); color: var(--text-muted); margin-bottom: var(--space-md); }
+
+.linkRow { display: flex; gap: var(--space-sm); align-items: center; margin-bottom: var(--space-sm); flex-wrap: wrap; }
+.linkRow > :first-child { flex: 1; min-width: 120px; }
+.linkRow > :nth-child(2) { flex: 2; min-width: 200px; }
+
+.checkLabel { display: flex; align-items: center; gap: 4px; font-size: var(--text-sm); font-weight: var(--font-medium); white-space: nowrap; cursor: pointer; }
+.checkLabel input { accent-color: var(--color-brand); }
+
+.textarea {
+  width: 100%;
+  padding: var(--space-md);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  background: var(--bg-primary);
+  border: var(--neo-border);
+  border-radius: var(--neo-radius);
+  color: var(--text-primary);
+  resize: vertical;
+  outline: none;
+}
+.textarea:focus { border-color: var(--color-brand); }
+
+.toggleList { display: flex; flex-direction: column; gap: var(--space-sm); }
+.toggleRow { display: flex; justify-content: space-between; align-items: center; padding: var(--space-sm) 0; border-bottom: 1px solid var(--border-light); font-weight: var(--font-medium); }
+.toggle { padding: 4px 16px; border: var(--neo-border); font-weight: var(--font-bold); font-size: var(--text-sm); cursor: pointer; font-family: var(--font-sans); }
+.on { background: var(--color-success); color: var(--text-inverse); }
+.off { background: var(--bg-muted); color: var(--text-muted); }

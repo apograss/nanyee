@@ -69,6 +69,12 @@
   font-size: var(--text-base);
 }
 
+.externalIcon {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
 .main {
   flex: 1;
   padding: var(--space-xl);

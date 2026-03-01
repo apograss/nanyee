@@ -5,9 +5,13 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import styles from "./layout.module.css";
 
-const NAV_ITEMS = [
+const NAV_ITEMS: { href: string; label: string; icon: string; external?: boolean }[] = [
   { href: "/admin", label: "概览", icon: "📊" },
+  { href: "/admin/articles", label: "文章管理", icon: "📄" },
   { href: "/admin/audit", label: "文章审核", icon: "📝" },
+  { href: "/admin/guestbook", label: "留言管理", icon: "💬" },
+  { href: "/admin/bbs", label: "论坛管理", icon: "🗣️" },
+  { href: "/admin/tools", label: "工具管理", icon: "🧰" },
   { href: "/admin/apikey", label: "API Key", icon: "🔑" },
   { href: "/admin/channels", label: "渠道管理", icon: "📡" },
   { href: "/admin/users", label: "用户管理", icon: "👤" },
@@ -17,6 +21,8 @@ const NAV_ITEMS = [
   { href: "/admin/logs/requests", label: "请求日志", icon: "📋" },
   { href: "/admin/logs/audit", label: "审计日志", icon: "🔍" },
   { href: "/admin/settings", label: "站点设置", icon: "⚙️" },
+  { href: "/admin/appearance", label: "外观设置", icon: "🎨" },
+  { href: "http://VPS_IP:3000", label: "API 管理 (New-API)", icon: "🔌", external: true },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -51,16 +57,30 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </Link>
         <span className={styles.badge}>Admin</span>
         <nav className={styles.nav}>
-          {NAV_ITEMS.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`${styles.navItem} ${pathname === item.href ? styles.active : ""}`}
-            >
-              <span className={styles.navIcon}>{item.icon}</span>
-              {item.label}
-            </Link>
-          ))}
+          {NAV_ITEMS.map((item) =>
+            item.external ? (
+              <a
+                key={item.href}
+                href={item.href}
+                className={styles.navItem}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <span className={styles.navIcon}>{item.icon}</span>
+                {item.label}
+                <span className={styles.externalIcon}>↗</span>
+              </a>
+            ) : (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`${styles.navItem} ${pathname === item.href ? styles.active : ""}`}
+              >
+                <span className={styles.navIcon}>{item.icon}</span>
+                {item.label}
+              </Link>
+            )
+          )}
         </nav>
       </aside>
       <main className={styles.main}>{children}</main>

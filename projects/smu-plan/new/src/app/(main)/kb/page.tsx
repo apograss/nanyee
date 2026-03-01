@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import Link from "next/link";
 import ArticleList from "@/components/organisms/ArticleList";
 import styles from "./page.module.css";
 
@@ -25,8 +26,13 @@ export default async function KBPage() {
   return (
     <div className={styles.page}>
       <div className={styles.header}>
-        <h1 className={styles.title}>知识库</h1>
-        <p className={styles.desc}>南医校园指南、攻略与经验分享</p>
+        <div className={styles.headerRow}>
+          <div>
+            <h1 className={styles.title}>知识库</h1>
+            <p className={styles.desc}>南医校园指南、攻略与经验分享</p>
+          </div>
+          <Link href="/editor" className={styles.contributeBtn}>投稿</Link>
+        </div>
       </div>
       <ArticleList articles={data} />
     </div>
