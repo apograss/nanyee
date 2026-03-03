@@ -6,6 +6,9 @@ const PUBLIC_KEYS = [
   "navLinks",
   "footerContent",
   "homeSections",
+  "aboutHtml",
+  "linkCategories",
+  "promptExamples",
 ];
 
 export async function GET() {

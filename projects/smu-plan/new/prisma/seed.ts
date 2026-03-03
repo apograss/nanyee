@@ -66,6 +66,31 @@ async function main() {
   });
   console.log("Created sample article:", article.slug);
 
+  // Create OAuth clients
+  await prisma.oAuthClient.upsert({
+    where: { clientId: "cloudmail" },
+    create: {
+      clientId: "cloudmail",
+      clientSecret: null, // Public client, uses PKCE
+      name: "CloudMail \u90AE\u7BB1",
+      redirectUris: JSON.stringify(["https://mail.nanyee.de/api/auth/oidc/callback"]),
+    },
+    update: {},
+  });
+
+  await prisma.oAuthClient.upsert({
+    where: { clientId: "newapi" },
+    create: {
+      clientId: "newapi",
+      clientSecret: await hash("newapi-secret-change-me", 12),
+      name: "API \u670D\u52A1",
+      redirectUris: JSON.stringify(["https://api.nanyee.de/oauth/oidc/callback"]),
+    },
+    update: {},
+  });
+
+  console.log("Created OAuth clients: cloudmail, newapi");
+
   await prisma.$disconnect();
 }
 

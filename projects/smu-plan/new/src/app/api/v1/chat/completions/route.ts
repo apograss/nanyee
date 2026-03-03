@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if model exists
-    if (!AVAILABLE_MODELS.includes(model as (typeof AVAILABLE_MODELS)[number])) {
+    if (!AVAILABLE_MODELS.includes(model)) {
       return Response.json(
         { error: { message: `Model ${model} not found`, type: "invalid_request_error" } },
         { status: 404 }

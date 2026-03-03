@@ -32,10 +32,13 @@ const ALLOWED_KEYS = [
   "footerContent",
   "homeSections",
   "toolsConfig",
+  "aboutHtml",
+  "linkCategories",
+  "promptExamples",
 ];
 
 const updateSettingsSchema = z
-  .record(z.string(), z.string().max(5000))
+  .record(z.string(), z.string().max(50000))
   .refine(
     (obj) => Object.keys(obj).every((key) => ALLOWED_KEYS.includes(key)),
     { message: "Unknown setting key" }

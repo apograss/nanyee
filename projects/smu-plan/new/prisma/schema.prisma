@@ -359,3 +359,49 @@ model BbsReply {
   @@index([topicId, createdAt])
   @@index([authorId])
 }
+
+// ═══════════════════════════════════════
+// OAuth / OIDC
+// ═══════════════════════════════════════
+
+model OAuthClient {
+  id           String   @id @default(cuid())
+  clientId     String   @unique
+  clientSecret String?  // bcrypt hash; null for public clients (PKCE)
+  name         String   // Display name: "CloudMail 邮箱"
+  redirectUris String   // JSON array: ["https://mail.nanyee.de/..."]
+  grants       String   @default("[\"authorization_code\"]")
+  scopes       String   @default("[\"openid\",\"profile\",\"email\"]")
+  createdAt    DateTime @default(now())
+}
+
+model OidcCode {
+  id                  String    @id @default(cuid())
+  code                String    @unique
+  clientId            String
+  userId              String
+  redirectUri         String
+  scope               String
+  nonce               String?
+  codeChallenge       String?   // PKCE
+  codeChallengeMethod String?   // "S256"
+  expiresAt           DateTime
+  consumedAt          DateTime?
+  createdAt           DateTime  @default(now())
+
+  @@index([code])
+  @@index([expiresAt])
+}
+
+model OidcToken {
+  id          String   @id @default(cuid())
+  accessToken String   @unique
+  clientId    String
+  userId      String
+  scope       String
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([accessToken])
+  @@index([expiresAt])
+}

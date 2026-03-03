@@ -179,3 +179,279 @@
 .category:nth-child(5) {
   animation-delay: 320ms;
 }
+
+/* ═══ Admin Edit Mode ═══ */
+
+.headerRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.editToggle {
+  padding: 6px 16px;
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--color-brand);
+  background: var(--color-brand-light);
+  border: 2px solid var(--color-brand);
+  border-radius: var(--neo-radius);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+.editToggle:hover {
+  background: var(--color-brand);
+  color: var(--text-inverse);
+}
+
+.editToggleActive {
+  background: var(--color-brand);
+  color: var(--text-inverse);
+}
+
+/* --- Inline Edit Panel --- */
+.editPanel {
+  background: var(--bg-secondary);
+  border: var(--neo-border);
+  border-radius: var(--neo-radius);
+  box-shadow: var(--soft-shadow);
+  padding: var(--space-lg);
+  margin-bottom: var(--space-xl);
+}
+
+.editPanelTitle {
+  font-size: var(--text-lg);
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
+  margin-bottom: var(--space-md);
+}
+
+.editForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.editRow {
+  display: flex;
+  gap: var(--space-md);
+}
+
+.editLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--text-secondary);
+  flex: 1;
+}
+
+.editInput {
+  padding: 8px 12px;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  border: var(--neo-border);
+  border-radius: var(--neo-radius-sm, var(--neo-radius));
+  outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.editInput:focus {
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 3px var(--color-brand-light);
+}
+
+.editActions {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.saveBtn {
+  padding: 8px 20px;
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--text-inverse);
+  background: var(--color-brand);
+  border: 2px solid var(--color-brand);
+  border-radius: var(--neo-radius);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.saveBtn:hover:not(:disabled) {
+  background: var(--color-brand-hover);
+}
+
+.saveBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cancelBtn {
+  padding: 8px 20px;
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--text-secondary);
+  background: var(--bg-primary);
+  border: var(--neo-border);
+  border-radius: var(--neo-radius);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.cancelBtn:hover {
+  background: var(--bg-muted);
+}
+
+/* --- Card Actions in Edit Mode --- */
+.cardActions {
+  display: flex;
+  gap: var(--space-xs);
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--border-light);
+}
+
+.cardEditBtn,
+.cardDeleteBtn {
+  padding: 4px 12px;
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  border-radius: var(--neo-radius-sm, var(--neo-radius));
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.cardEditBtn {
+  color: var(--color-brand);
+  background: var(--color-brand-light);
+  border: 1.5px solid var(--color-brand);
+}
+
+.cardEditBtn:hover {
+  background: var(--color-brand);
+  color: var(--text-inverse);
+}
+
+.cardDeleteBtn {
+  color: var(--color-error);
+  background: var(--color-error-light);
+  border: 1.5px solid var(--color-error);
+}
+
+.cardDeleteBtn:hover {
+  background: var(--color-error);
+  color: var(--text-inverse);
+}
+
+/* --- Add Button per Category --- */
+.addBtn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-lg);
+  font-weight: var(--font-bold);
+  color: var(--color-brand);
+  background: var(--color-brand-light);
+  border: 2px solid var(--color-brand);
+  border-radius: var(--neo-radius);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.addBtn:hover {
+  background: var(--color-brand);
+  color: var(--text-inverse);
+}
+
+/* --- Category Edit Button --- */
+.catEditBtn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-sm);
+  background: var(--bg-primary);
+  border: var(--neo-border);
+  border-radius: var(--neo-radius);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.catEditBtn:hover {
+  background: var(--color-brand-light);
+  border-color: var(--color-brand);
+}
+
+/* --- Category Inline Edit Row --- */
+.catEditRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+.catEditInput {
+  padding: 6px 10px;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  border: var(--neo-border);
+  border-radius: var(--neo-radius);
+  outline: none;
+  flex: 1;
+  min-width: 100px;
+}
+
+.catEditInput:focus {
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 3px var(--color-brand-light);
+}
+
+/* --- Global Add --- */
+.globalAdd {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-lg) 0;
+}
+
+.globalAddBtn {
+  padding: 10px 24px;
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--color-brand);
+  background: transparent;
+  border: 2px dashed var(--color-brand);
+  border-radius: var(--neo-radius);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.globalAddBtn:hover {
+  background: var(--color-brand-light);
+}
+
+/* --- Responsive for edit mode --- */
+@media (max-width: 560px) {
+  .headerRow {
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .editRow {
+    flex-direction: column;
+  }
+}

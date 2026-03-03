@@ -32,6 +32,9 @@ npm-debug.log*
 # Prisma
 prisma/migrations/**/migration_lock.toml
 
+# OIDC keys (auto-generated RSA key pair)
+.oidc-keys/
+
 # Tools subproject (separate build)
 tools/node_modules/
 tools/.next/

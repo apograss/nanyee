@@ -10,6 +10,9 @@ import {
   enrollJobViaProxy,
   calibrateTimeViaProxy,
   computeRunAt,
+  setActiveProxy,
+  getActiveProxy,
+  PROXY_NODES,
   type CourseCategory,
   type CourseItem,
   type LogCallback,
@@ -34,7 +37,7 @@ function saveCredentials(a: string, p: string) {
   try {
     localStorage.setItem("smu_account", a);
     localStorage.setItem("smu_password", btoa(p));
-  } catch {}
+  } catch { }
 }
 
 function loadCredentials(): { account: string; password: string } | null {
@@ -42,7 +45,7 @@ function loadCredentials(): { account: string; password: string } | null {
     const a = localStorage.getItem("smu_account");
     const p = localStorage.getItem("smu_password");
     if (a && p) return { account: a, password: atob(p) };
-  } catch {}
+  } catch { }
   return null;
 }
 
@@ -50,7 +53,7 @@ function clearCredentials() {
   try {
     localStorage.removeItem("smu_account");
     localStorage.removeItem("smu_password");
-  } catch {}
+  } catch { }
 }
 
 /* ─── Step Indicator Helper ───────────────────────── */
@@ -101,6 +104,14 @@ export default function EnrollPage() {
   const logRef = useRef<HTMLDivElement>(null);
   const loadedFromStorage = useRef(false);
 
+  /* ── proxy node ── */
+  const [proxyId, setProxyId] = useState(PROXY_NODES[0].id);
+
+  const handleProxyChange = (id: string) => {
+    setProxyId(id);
+    setActiveProxy(id);
+  };
+
   /* ── load saved credentials on mount ── */
   useEffect(() => {
     const creds = loadCredentials();
@@ -118,6 +129,17 @@ export default function EnrollPage() {
       logRef.current.scrollTop = logRef.current.scrollHeight;
     }
   }, [logs]);
+
+  /* ── prevent accidental tab close during enrollment ── */
+  useEffect(() => {
+    if (step === "enroll" && !enrollDone) {
+      const handler = (e: BeforeUnloadEvent) => {
+        e.preventDefault();
+      };
+      window.addEventListener("beforeunload", handler);
+      return () => window.removeEventListener("beforeunload", handler);
+    }
+  }, [step, enrollDone]);
 
   /* ── load captcha ── */
   const loadCaptcha = useCallback(async () => {
@@ -205,7 +227,7 @@ export default function EnrollPage() {
           ocrText = ocrResult.text;
           setCaptcha(ocrText);
         }
-      } catch {}
+      } catch { }
 
       if (!ocrText) {
         setAutoLoginStatus("验证码识别失败，重试...");
@@ -293,7 +315,11 @@ export default function EnrollPage() {
     };
 
     try {
-      /* 1. Calibrate time */
+      /* 1. Log proxy info */
+      const proxy = getActiveProxy();
+      logger({ type: "info", message: `使用代理: ${proxy?.label || "未知"} (${proxy?.region})` });
+
+      /* 2. Calibrate time */
       logger({ type: "calibrating", message: "正在校准服务器时间..." });
       const timeDiff = await calibrateTimeViaProxy(cookies);
       logger({
@@ -360,6 +386,33 @@ export default function EnrollPage() {
           <h1>自动选课</h1>
           <p>设定志愿与时间，系统自动抢课</p>
         </div>
+
+        {/* Proxy node selector */}
+        {step === "login" && (
+          <div className={s.proxySelector}>
+            <span className={s.proxySelectorLabel}>📡 代理节点</span>
+            <div className={s.proxyOptions}>
+              {PROXY_NODES.map((node) => (
+                <label
+                  key={node.id}
+                  className={[
+                    s.proxyOption,
+                    proxyId === node.id ? s.proxyOptionActive : "",
+                  ].filter(Boolean).join(" ")}
+                >
+                  <input
+                    type="radio"
+                    name="proxy-node"
+                    value={node.id}
+                    checked={proxyId === node.id}
+                    onChange={() => handleProxyChange(node.id)}
+                  />
+                  {node.label}
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Step indicator */}
         <div className={s.stepIndicator}>
@@ -635,9 +688,16 @@ export default function EnrollPage() {
           <div className={s.card}>
             <h2>选课日志</h2>
 
+            {/* Warning banner */}
+            {!enrollDone && (
+              <div className={s.autoLoginBanner} style={{ marginBottom: "var(--space-md)" }}>
+                ⚠️ 抢课进行中，请勿关闭此页面
+              </div>
+            )}
+
             {/* Result banners */}
             {enrollDone && enrollSuccess && (
-              <div className={s.successBanner}>选课成功!</div>
+              <div className={s.successBanner}>🎉 选课成功!</div>
             )}
             {enrollDone && enrollFail && (
               <div className={s.errorBanner}>

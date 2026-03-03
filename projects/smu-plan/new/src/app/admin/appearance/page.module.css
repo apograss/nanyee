@@ -36,3 +36,19 @@
 .toggle { padding: 4px 16px; border: var(--neo-border); font-weight: var(--font-bold); font-size: var(--text-sm); cursor: pointer; font-family: var(--font-sans); }
 .on { background: var(--color-success); color: var(--text-inverse); }
 .off { background: var(--bg-muted); color: var(--text-muted); }
+
+.aboutPreview {
+  padding: var(--space-lg);
+  background: var(--bg-primary);
+  border: var(--neo-border);
+  border-radius: var(--neo-radius);
+  min-height: 200px;
+  overflow: auto;
+  max-height: 600px;
+  line-height: 1.7;
+  font-size: var(--text-sm);
+}
+.aboutPreview h1, .aboutPreview h2, .aboutPreview h3 { margin: var(--space-md) 0 var(--space-sm); }
+.aboutPreview p { margin: var(--space-sm) 0; }
+.aboutPreview a { color: var(--color-brand); text-decoration: underline; }
+.aboutPreview img { max-width: 100%; border-radius: var(--neo-radius); }

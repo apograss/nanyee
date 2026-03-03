@@ -17,7 +17,7 @@
   --color-dark-hover: #152A45;
   --color-mint: #A8DADC;
   --color-mint-light: #D4EDEE;
-  --color-paper: #FDF0D5;
+  --color-paper: #FFFAED;
 
   /* Semantic */
   --bg-primary: var(--color-paper);
@@ -28,7 +28,7 @@
 
   --text-primary: var(--color-dark);
   --text-secondary: #457B9D;
-  --text-muted: #7B97AE;
+  --text-muted: #5C7A92;
   --text-inverse: #FFFFFF;
 
   --border-color: var(--color-dark);
@@ -45,15 +45,20 @@
   --color-info-light: #E3F2FD;
 
   /* Neo-Brutalism Core */
-  --neo-border-width: 3px;
+  --neo-border-width: 2px;
   --neo-border: var(--neo-border-width) solid var(--border-color);
-  --neo-radius: 4px;
-  --neo-shadow-offset: 4px;
+  --neo-radius-sm: 8px;
+  --neo-radius: 12px;
+  --neo-radius-lg: 16px;
+  --neo-radius-pill: 9999px;
+  --neo-shadow-offset: 3px;
   --neo-shadow: var(--neo-shadow-offset) var(--neo-shadow-offset) 0px var(--border-color);
-  --neo-shadow-sm: 3px 3px 0px var(--border-color);
+  --neo-shadow-sm: 2px 2px 0px var(--border-color);
   --neo-shadow-hover: 2px 2px 0px var(--border-color);
   --neo-shadow-active: 0px 0px 0px var(--border-color);
   --neo-shadow-brand: var(--neo-shadow-offset) var(--neo-shadow-offset) 0px var(--color-brand);
+  --soft-shadow: 0 2px 8px rgba(29, 53, 87, 0.06);
+  --soft-shadow-lg: 0 4px 16px rgba(29, 53, 87, 0.1);
 
   /* Spacing */
   --space-xs: 4px;
@@ -120,8 +125,8 @@
   --color-mint-light: #2A6568;
   --color-paper: #181818;
 
-  --bg-primary: #181818;
-  --bg-secondary: #222222;
+  --bg-primary: #111111;
+  --bg-secondary: #1A1A1A;
   --bg-hover: #2C2C2C;
   --bg-muted: #1E1E1E;
   --bg-overlay: rgba(0, 0, 0, 0.7);
@@ -144,7 +149,7 @@
   --color-info-light: rgba(66, 165, 245, 0.12);
 
   --neo-shadow: var(--neo-shadow-offset) var(--neo-shadow-offset) 0px #000000;
-  --neo-shadow-sm: 3px 3px 0px #000000;
+  --neo-shadow-sm: 2px 2px 0px #000000;
   --neo-shadow-hover: 2px 2px 0px #000000;
   --neo-shadow-active: 0px 0px 0px #000000;
   --neo-shadow-brand: var(--neo-shadow-offset) var(--neo-shadow-offset) 0px var(--color-brand);
@@ -260,7 +265,7 @@ h1, h2, h3, h4, h5, h6 {
     --header-height: 56px;
     --neo-shadow-offset: 2px;
     --neo-shadow: var(--neo-shadow-offset) var(--neo-shadow-offset) 0px var(--border-color);
-    --neo-shadow-sm: 2px 2px 0px var(--border-color);
+    --neo-shadow-sm: 1px 1px 0px var(--border-color);
     --neo-shadow-brand: var(--neo-shadow-offset) var(--neo-shadow-offset) 0px var(--color-brand);
   }
 
@@ -268,7 +273,7 @@ h1, h2, h3, h4, h5, h6 {
     --header-height: 56px;
     --neo-shadow-offset: 2px;
     --neo-shadow: var(--neo-shadow-offset) var(--neo-shadow-offset) 0px #000000;
-    --neo-shadow-sm: 2px 2px 0px #000000;
+    --neo-shadow-sm: 1px 1px 0px #000000;
     --neo-shadow-brand: var(--neo-shadow-offset) var(--neo-shadow-offset) 0px var(--color-brand);
   }
 }

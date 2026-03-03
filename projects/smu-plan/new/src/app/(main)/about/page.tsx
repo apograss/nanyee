@@ -1,11 +1,8 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import styles from "./about.module.css";
-
-export const metadata = {
-  title: "关于我们",
-  description:
-    "Nanyee.de 是 AI Agent 驱动的南方医科大学校园工具平台，提供智能搜索、课表导出、成绩查询、自动选课等功能。",
-};
 
 const FEATURES = [
   {
@@ -43,6 +40,32 @@ const TECH_STACK = [
 ];
 
 export default function AboutPage() {
+  const [customHtml, setCustomHtml] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.ok && data.data.settings.aboutHtml) {
+          setCustomHtml(data.data.settings.aboutHtml);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoaded(true));
+  }, []);
+
+  // Custom HTML mode: render admin-provided content
+  if (loaded && customHtml) {
+    return (
+      <div
+        className={styles.page}
+        dangerouslySetInnerHTML={{ __html: customHtml }}
+      />
+    );
+  }
+
+  // Default fallback: existing hardcoded content
   return (
     <div className={styles.page}>
       {/* ── Hero ── */}

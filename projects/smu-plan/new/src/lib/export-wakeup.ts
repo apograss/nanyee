@@ -22,6 +22,64 @@ function shuffleArray<T>(arr: T[]): T[] {
 }
 
 /**
+ * Split a sorted array of week numbers into contiguous ranges,
+ * detecting odd/even week patterns for WakeUp's type field.
+ *
+ * WakeUp type: 0 = every week, 1 = odd weeks only, 2 = even weeks only
+ */
+interface WeekRange {
+    startWeek: number;
+    endWeek: number;
+    type: number; // 0 | 1 | 2
+}
+
+function splitWeeksIntoRanges(weeks: number[]): WeekRange[] {
+    if (weeks.length === 0) return [];
+    if (weeks.length === 1) {
+        return [{ startWeek: weeks[0], endWeek: weeks[0], type: 0 }];
+    }
+
+    const sorted = [...weeks].sort((a, b) => a - b);
+
+    // Try to detect if the entire array is an odd-week or even-week pattern
+    const allOdd = sorted.every((w) => w % 2 === 1);
+    const allEven = sorted.every((w) => w % 2 === 0);
+
+    if (allOdd && isContiguousStep2(sorted)) {
+        return [{ startWeek: sorted[0], endWeek: sorted[sorted.length - 1], type: 1 }];
+    }
+    if (allEven && isContiguousStep2(sorted)) {
+        return [{ startWeek: sorted[0], endWeek: sorted[sorted.length - 1], type: 2 }];
+    }
+
+    // Otherwise split into contiguous (step=1) sub-ranges
+    const ranges: WeekRange[] = [];
+    let start = sorted[0];
+    let end = sorted[0];
+
+    for (let i = 1; i < sorted.length; i++) {
+        if (sorted[i] === end + 1) {
+            end = sorted[i];
+        } else {
+            ranges.push({ startWeek: start, endWeek: end, type: 0 });
+            start = sorted[i];
+            end = sorted[i];
+        }
+    }
+    ranges.push({ startWeek: start, endWeek: end, type: 0 });
+
+    return ranges;
+}
+
+/** Check if sorted array forms a contiguous sequence with step=2 (e.g. 1,3,5,7) */
+function isContiguousStep2(sorted: number[]): boolean {
+    for (let i = 1; i < sorted.length; i++) {
+        if (sorted[i] - sorted[i - 1] !== 2) return false;
+    }
+    return true;
+}
+
+/**
  * Generate the .wakeup_schedule file content
  */
 export function generateWakeUpSchedule(
@@ -94,22 +152,26 @@ export function generateWakeUpSchedule(
     lines.push(JSON.stringify(courseList));
 
     // Line 5: course time slots
-    const timeSlots = aggregatedCourses.map((c) => ({
-        day: c.xq,
-        endTime: "",
-        endWeek: c.weeks[c.weeks.length - 1],
-        startWeek: c.weeks[0],
-        id: c.id,
-        level: 0,
-        ownTime: false,
-        room: c.jxcdmc,
-        startNode: c.ps,
-        startTime: "",
-        step: c.pe - c.ps + 1,
-        tableId: 1,
-        teacher: c.teaxms,
-        type: 0,
-    }));
+    // Split non-contiguous weeks into multiple entries to avoid phantom conflicts
+    const timeSlots = aggregatedCourses.flatMap((c) => {
+        const ranges = splitWeeksIntoRanges(c.weeks);
+        return ranges.map((range) => ({
+            day: c.xq,
+            endTime: "",
+            endWeek: range.endWeek,
+            startWeek: range.startWeek,
+            id: c.id,
+            level: 0,
+            ownTime: false,
+            room: c.jxcdmc,
+            startNode: c.ps,
+            startTime: "",
+            step: c.pe - c.ps + 1,
+            tableId: 1,
+            teacher: c.teaxms,
+            type: range.type,  // 0=every week, 1=odd weeks, 2=even weeks
+        }));
+    });
     lines.push(JSON.stringify(timeSlots));
 
     return lines.join("\n");

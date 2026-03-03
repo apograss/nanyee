@@ -116,6 +116,21 @@ export function useChat(): UseChatReturn {
                     });
                     break;
 
+                  case "tool_references":
+                    setMessages((prev) => {
+                      const updated = [...prev];
+                      const last = updated[updated.length - 1];
+                      if (last && last.role === "ai") {
+                        const refs = Array.isArray(data) ? data : [data];
+                        updated[updated.length - 1] = {
+                          ...last,
+                          references: [...(last.references || []), ...refs],
+                        };
+                      }
+                      return updated;
+                    });
+                    break;
+
                   case "done":
                     setStatus("done");
                     break;

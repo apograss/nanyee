@@ -22,8 +22,15 @@ interface ChatStreamProps {
 
 export default function ChatStream({ messages, isLoading, onStop }: ChatStreamProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const isFirstRender = useRef(true);
 
   useEffect(() => {
+    // Skip scroll on the very first render — ChatStream mounts after
+    // the user sends their first message and we don't want to jump.
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 

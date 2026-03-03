@@ -121,6 +121,27 @@ export default function AdminArticlesPage() {
     }
   };
 
+  const handleHardDelete = async (id: string, title: string) => {
+    const input = window.prompt(
+      `⚠️ 危险操作！永久删除不可恢复。\n请输入文章标题 "${title}" 以确认：`
+    );
+    if (input === null) return;
+    if (input !== title) {
+      alert("标题输入不匹配，操作已取消。");
+      return;
+    }
+    try {
+      const res = await fetch(`/api/admin/articles/${id}?permanent=true`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.ok) loadArticles();
+      else alert(data.error?.message || "永久删除失败");
+    } catch {
+      alert("网络错误");
+    }
+  };
+
   const formatDate = (iso: string) =>
     new Date(iso).toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" });
 
@@ -199,6 +220,7 @@ export default function AdminArticlesPage() {
                     <td className={styles.actions}>
                       <NeoButton size="sm" variant="secondary" onClick={() => openEdit(item)}>编辑</NeoButton>
                       <NeoButton size="sm" variant="danger" onClick={() => handleDelete(item.id, item.title)}>隐藏</NeoButton>
+                      <NeoButton size="sm" variant="danger" onClick={() => handleHardDelete(item.id, item.title)}>永久删除</NeoButton>
                     </td>
                   </tr>
                 ))}

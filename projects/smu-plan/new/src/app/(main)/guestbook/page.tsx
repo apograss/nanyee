@@ -9,6 +9,7 @@ import styles from "./page.module.css";
 interface GuestMessage {
   id: string;
   content: string;
+  authorId: string;
   author: string;
   createdAt: string;
 }
@@ -18,6 +19,19 @@ export default function GuestbookPage() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [danmakuOn, setDanmakuOn] = useState(true);
+  const [user, setUser] = useState<{ id: string; role: string } | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.ok && data.data?.user) setUser({ id: data.data.user.id, role: data.data.user.role });
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetch("/api/board")
@@ -58,6 +72,39 @@ export default function GuestbookPage() {
     author: m.author,
   }));
 
+  const startEdit = (msg: GuestMessage) => {
+    setEditingId(msg.id);
+    setEditContent(msg.content);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditContent("");
+  };
+
+  const handleEditSave = async (msgId: string) => {
+    if (!editContent.trim() || savingEdit) return;
+    setSavingEdit(true);
+    try {
+      const res = await fetch(`/api/board/${msgId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: editContent.trim() }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === msgId ? { ...m, content: editContent.trim() } : m))
+        );
+        cancelEdit();
+      }
+    } catch {}
+    setSavingEdit(false);
+  };
+
+  const canEditMsg = (msg: GuestMessage) =>
+    user && (user.id === msg.authorId || user.role === "admin");
+
   return (
     <div className={styles.page}>
       <div className={styles.header}>
@@ -97,12 +144,54 @@ export default function GuestbookPage() {
 
       <div className={styles.messages}>
         {messages.map((msg) => (
-          <MessageItem
-            key={msg.id}
-            author={msg.author}
-            content={msg.content}
-            time={msg.createdAt}
-          />
+          <div key={msg.id}>
+            {editingId === msg.id ? (
+              <div className={styles.editRow}>
+                <textarea
+                  className={styles.textarea}
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  rows={2}
+                  maxLength={500}
+                />
+                <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
+                  <NeoButton size="sm" variant="primary" onClick={() => handleEditSave(msg.id)} isLoading={savingEdit}>
+                    保存
+                  </NeoButton>
+                  <NeoButton size="sm" variant="secondary" onClick={cancelEdit}>
+                    取消
+                  </NeoButton>
+                </div>
+              </div>
+            ) : (
+              <div style={{ position: "relative" }}>
+                <MessageItem
+                  author={msg.author}
+                  content={msg.content}
+                  time={msg.createdAt}
+                />
+                {canEditMsg(msg) && (
+                  <button
+                    onClick={() => startEdit(msg)}
+                    style={{
+                      position: "absolute",
+                      top: "0.5rem",
+                      right: "0.5rem",
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      fontWeight: "bold",
+                      fontSize: "var(--text-xs)",
+                      color: "var(--color-brand)",
+                      fontFamily: "var(--font-sans)",
+                    }}
+                  >
+                    编辑
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         ))}
         {messages.length === 0 && (
           <p className={styles.empty}>还没有留言，来第一个吧</p>

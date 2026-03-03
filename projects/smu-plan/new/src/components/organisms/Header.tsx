@@ -10,10 +10,10 @@ import styles from "./Header.module.css";
 const DEFAULT_NAV_LINKS = [
   { href: "/", label: "首页" },
   { href: "/kb", label: "知识库" },
-  { href: "/bbs", label: "论坛" },
+  // { href: "/bbs", label: "论坛" },        // TODO: 登录系统完成后恢复
   { href: "/tools", label: "工具" },
   { href: "/links", label: "链接" },
-  { href: "/guestbook", label: "留言板" },
+  // { href: "/guestbook", label: "留言板" }, // TODO: 登录系统完成后恢复
   { href: "/about", label: "关于" },
 ];
 
@@ -39,10 +39,10 @@ export default function Header() {
             if (Array.isArray(parsed) && parsed.length > 0) {
               setNavLinks(parsed);
             }
-          } catch {}
+          } catch { }
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const handleLogout = async () => {
@@ -124,9 +124,9 @@ export default function Header() {
               )}
             </div>
           ) : (
-            <Link href="/login" className={styles.loginBtn}>
+            <span className={styles.loginBtn} style={{ opacity: 0.5, cursor: "default" }} title="即将开放">
               登录
-            </Link>
+            </span>
           )}
 
           <button

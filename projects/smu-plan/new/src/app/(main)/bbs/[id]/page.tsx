@@ -50,6 +50,10 @@ export default function TopicDetailPage() {
   const [editContent, setEditContent] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
 
+  const [editingReplyId, setEditingReplyId] = useState<string | null>(null);
+  const [editReplyContent, setEditReplyContent] = useState("");
+  const [savingReplyEdit, setSavingReplyEdit] = useState(false);
+
   useEffect(() => {
     fetch("/api/auth/me")
       .then((res) => res.json())
@@ -131,6 +135,32 @@ export default function TopicDetailPage() {
       alert("网络错误");
     } finally {
       setSavingEdit(false);
+    }
+  };
+
+  const handleReplyEditSubmit = async (replyId: string) => {
+    if (!editReplyContent.trim() || savingReplyEdit) return;
+    setSavingReplyEdit(true);
+    try {
+      const res = await fetch(`/api/bbs/replies/${replyId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: editReplyContent }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setReplies((prev) =>
+          prev.map((r) => (r.id === replyId ? { ...r, content: editReplyContent } : r))
+        );
+        setEditingReplyId(null);
+        setEditReplyContent("");
+      } else {
+        alert(data.error?.message || "更新失败");
+      }
+    } catch {
+      alert("网络错误");
+    } finally {
+      setSavingReplyEdit(false);
     }
   };
 
@@ -220,7 +250,9 @@ export default function TopicDetailPage() {
           {replies.length === 0 ? (
             <div className={styles.emptyReplies}>暂无回复，来抢沙发吧</div>
           ) : (
-            replies.map((reply, idx) => (
+            replies.map((reply, idx) => {
+              const canEditReply = user && (user.id === reply.author.id || user.role === "admin");
+              return (
               <div key={reply.id} className={styles.replyCard}>
                 <div className={styles.replySidebar}>
                   <div className={styles.avatar}>
@@ -233,10 +265,33 @@ export default function TopicDetailPage() {
                     <span className={styles.replyAuthor}>{reply.author.nickname || reply.author.username}</span>
                     <span className={styles.replyTime}>{new Date(reply.createdAt).toLocaleString()}</span>
                   </div>
-                  <div className={styles.replyContent}>{reply.content}</div>
+                  {editingReplyId === reply.id ? (
+                    <div>
+                      <textarea
+                        className={styles.textarea}
+                        value={editReplyContent}
+                        onChange={(e) => setEditReplyContent(e.target.value)}
+                        rows={4}
+                      />
+                      <div className={styles.editActions}>
+                        <NeoButton size="sm" variant="primary" onClick={() => handleReplyEditSubmit(reply.id)} isLoading={savingReplyEdit}>保存</NeoButton>
+                        <NeoButton size="sm" variant="secondary" onClick={() => { setEditingReplyId(null); setEditReplyContent(""); }}>取消</NeoButton>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className={styles.replyContent}>{reply.content}</div>
+                      {canEditReply && (
+                        <div className={styles.topicActions} style={{ marginTop: "0.5rem", paddingTop: "0.25rem" }}>
+                          <NeoButton size="sm" variant="secondary" onClick={() => { setEditingReplyId(reply.id); setEditReplyContent(reply.content); }}>编辑</NeoButton>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
-            ))
+              );
+            })
           )}
         </div>
 

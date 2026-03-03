@@ -3,16 +3,24 @@ import { createDecipheriv } from "crypto";
 
 const KEY_ENCRYPTION_SECRET = process.env.KEY_ENCRYPTION_SECRET || "";
 const AI_API_KEY_FALLBACK = process.env.AI_API_KEY || "";
+const FORCE_ENV_KEY = process.env.AI_FORCE_ENV_KEY === "true";
 
 /**
  * Select a ProviderKey using weighted random for load balancing.
  * Only active keys within their limits are selected.
  * Falls back to AI_API_KEY env var if no database keys are available.
+ *
+ * When AI_FORCE_ENV_KEY=true, always use the env var key (useful when
+ * switching to New API gateway and wanting to bypass DB keys).
  */
 export async function selectProviderKey(): Promise<{
   id: string;
   apiKey: string;
 } | null> {
+  if (FORCE_ENV_KEY && AI_API_KEY_FALLBACK) {
+    return { id: "env-fallback", apiKey: AI_API_KEY_FALLBACK };
+  }
+
   const keys = await prisma.providerKey.findMany({
     where: { status: "active" },
   });

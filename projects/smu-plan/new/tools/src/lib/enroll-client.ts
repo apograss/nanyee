@@ -9,17 +9,39 @@
 const UIS = "https://uis.smu.edu.cn";
 const ZHJW = "https://zhjw.smu.edu.cn";
 
-// CF Worker or VPS proxy base URL for enrollment requests (IP protection)
-// Set via .env.local: NEXT_PUBLIC_ENROLL_PROXY=https://proxy.nanyee.de
-const ENROLL_PROXY = process.env.NEXT_PUBLIC_ENROLL_PROXY || "";
+// ─── Multi-Proxy Support ──────────────────────────────────────
+// Users can choose which proxy node to use for enrollment requests
+
+export interface ProxyNode {
+    id: string;
+    label: string;
+    url: string;
+    region: string;
+}
+
+export const PROXY_NODES: ProxyNode[] = [
+    { id: "tencent", label: "节点 A（国内）", url: "http://119.29.161.78:8080", region: "腾讯云" },
+    { id: "do", label: "节点 B（海外）", url: "http://104.248.158.12:8080", region: "DigitalOcean" },
+];
+
+let activeProxyUrl: string = PROXY_NODES[0].url;
+
+export function setActiveProxy(proxyId: string): void {
+    const node = PROXY_NODES.find((n) => n.id === proxyId);
+    if (node) activeProxyUrl = node.url;
+}
+
+export function getActiveProxy(): ProxyNode | undefined {
+    return PROXY_NODES.find((n) => n.url === activeProxyUrl);
+}
 
 const XK_ROOT = `/new/student/xsxk/`;
 const WELCOME_PATH = `/new/welcome.page?ui=new`;
 
-const MAX_ATTEMPTS = 60;
-const PRIMARY_BURST_ATTEMPTS = 8;
-const ATTEMPT_DELAY_MIN = 150;   // 随机延迟最小值 ms
-const ATTEMPT_DELAY_MAX = 350;   // 随机延迟最大值 ms
+const MAX_ATTEMPTS = 15;
+const PRIMARY_BURST_ATTEMPTS = 5;
+const ATTEMPT_DELAY_MIN = 500;   // 随机延迟最小值 ms
+const ATTEMPT_DELAY_MAX = 1000;  // 随机延迟最大值 ms
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -117,7 +139,7 @@ async function enrollProxyFetch(
     cookies: string[],
     options: RequestInit = {},
 ): Promise<{ status: number; body: string; cookies: string[]; location?: string }> {
-    if (!ENROLL_PROXY) throw new Error("ENROLL_PROXY not configured");
+    if (!activeProxyUrl) throw new Error("未选择代理节点");
 
     // Convert target URL to proxy URL: https://zhjw.smu.edu.cn/path → PROXY/zhjw/path
     const url = new URL(targetUrl);
@@ -126,7 +148,7 @@ async function enrollProxyFetch(
     else if (url.host === "uis.smu.edu.cn") proxyPath = `/uis${url.pathname}${url.search}`;
     else throw new Error(`Unknown host: ${url.host}`);
 
-    const proxyUrl = `${ENROLL_PROXY}${proxyPath}`;
+    const proxyUrl = `${activeProxyUrl}${proxyPath}`;
     const method = (options.method as string) || "GET";
     const headers: Record<string, string> = {
         "X-Cookie": cookieString(cookies),
@@ -475,9 +497,9 @@ async function orderCourseViaProxy(
     const addPath = `${categoryPath}/add`;
     const body = new URLSearchParams({ kcrwdm, kcmc, qz: "-1", xxyqdm: "", hlct: "0" });
 
-    // Use CF Worker/VPS proxy for enrollment (IP protection) if configured
+    // Use selected proxy node for enrollment (IP protection)
     let res;
-    if (ENROLL_PROXY) {
+    if (activeProxyUrl) {
         try {
             res = await enrollProxyFetch(`${ZHJW}${addPath}`, cookies, {
                 method: "POST",

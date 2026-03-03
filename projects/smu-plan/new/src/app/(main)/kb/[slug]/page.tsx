@@ -1,7 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
+import { cookies } from "next/headers";
 import { marked } from "marked";
 import Badge from "@/components/atoms/Badge";
+import ArticleEditButton from "./ArticleEditButton";
 import styles from "../page.module.css";
 
 interface Props {
@@ -13,7 +15,7 @@ export default async function ArticleDetailPage({ params }: Props) {
 
   const article = await prisma.article.findUnique({
     where: { slug },
-    include: { author: { select: { username: true, nickname: true } } },
+    include: { author: { select: { id: true, username: true, nickname: true } } },
   });
 
   if (!article || article.status !== "published") {
@@ -24,6 +26,20 @@ export default async function ArticleDetailPage({ params }: Props) {
   prisma.article
     .update({ where: { id: article.id }, data: { viewCount: { increment: 1 } } })
     .catch(() => {});
+
+  // Check if current user is author or admin (best-effort from cookie)
+  let showEditButton = false;
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("access_token")?.value;
+    if (token) {
+      const { verifyAccessToken } = await import("@/lib/auth/jwt");
+      const payload = await verifyAccessToken(token);
+      if (payload?.sub) {
+        showEditButton = payload.sub === article.authorId || payload.role === "admin";
+      }
+    }
+  } catch {}
 
   const html = await marked(article.content);
   const tags: string[] = article.tags ? JSON.parse(article.tags) : [];
@@ -37,6 +53,7 @@ export default async function ArticleDetailPage({ params }: Props) {
           {(article.publishedAt || article.createdAt).toLocaleDateString("zh-CN")}
         </span>
         <span>{article.viewCount} 阅读</span>
+        {showEditButton && <ArticleEditButton articleId={article.id} />}
       </div>
       {tags.length > 0 && (
         <div className={styles.tags}>

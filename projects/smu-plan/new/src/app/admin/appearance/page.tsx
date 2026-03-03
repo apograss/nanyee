@@ -17,9 +17,24 @@ interface HomeSections {
   tools: boolean;
 }
 
+interface PromptExample {
+  icon: string;
+  text: string;
+}
+
+const DEFAULT_PROMPT_EXAMPLES: PromptExample[] = [
+  { icon: "📅", text: "今天有什么课" },
+  { icon: "📊", text: "帮我算一下 GPA" },
+  { icon: "🏫", text: "南医大有哪些社团" },
+  { icon: "🍜", text: "二食堂几点开门" },
+];
+
 export default function AppearancePage() {
   const [navLinks, setNavLinks] = useState<NavLink[]>([]);
   const [footerContent, setFooterContent] = useState("");
+  const [aboutHtml, setAboutHtml] = useState("");
+  const [aboutPreview, setAboutPreview] = useState(false);
+  const [promptExamples, setPromptExamples] = useState<PromptExample[]>(DEFAULT_PROMPT_EXAMPLES);
   const [homeSections, setHomeSections] = useState<HomeSections>({
     announcement: true,
     searchHistory: true,
@@ -40,6 +55,15 @@ export default function AppearancePage() {
             try { setNavLinks(JSON.parse(s.navLinks)); } catch {}
           }
           if (s.footerContent) setFooterContent(s.footerContent);
+          if (s.aboutHtml) setAboutHtml(s.aboutHtml);
+          if (s.promptExamples) {
+            try {
+              const parsed = JSON.parse(s.promptExamples);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                setPromptExamples(parsed);
+              }
+            } catch {}
+          }
           if (s.homeSections) {
             try { setHomeSections(JSON.parse(s.homeSections)); } catch {}
           }
@@ -59,6 +83,8 @@ export default function AppearancePage() {
         body: JSON.stringify({
           navLinks: JSON.stringify(navLinks),
           footerContent,
+          aboutHtml,
+          promptExamples: JSON.stringify(promptExamples),
           homeSections: JSON.stringify(homeSections),
         }),
       });
@@ -80,6 +106,14 @@ export default function AppearancePage() {
 
   const toggleSection = (key: keyof HomeSections) => {
     setHomeSections({ ...homeSections, [key]: !homeSections[key] });
+  };
+
+  const addPromptExample = () => setPromptExamples([...promptExamples, { icon: "", text: "" }]);
+  const removePromptExample = (idx: number) => setPromptExamples(promptExamples.filter((_, i) => i !== idx));
+  const updatePromptExample = (idx: number, field: keyof PromptExample, value: string) => {
+    const updated = [...promptExamples];
+    updated[idx] = { ...updated[idx], [field]: value };
+    setPromptExamples(updated);
   };
 
   if (loading) return <div className={styles.page}><div className={styles.empty}>加载中...</div></div>;
@@ -126,6 +160,55 @@ export default function AppearancePage() {
           placeholder="Made with ♥ by Nanyee.de"
           aria-label="页脚内容"
         />
+      </section>
+
+      {/* About Page HTML */}
+      <section className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <h2 className={styles.sectionTitle}>关于页面</h2>
+          <NeoButton
+            size="sm"
+            variant="secondary"
+            onClick={() => setAboutPreview(!aboutPreview)}
+          >
+            {aboutPreview ? "编辑" : "预览"}
+          </NeoButton>
+        </div>
+        <p className={styles.hint}>
+          自定义「关于」页面内容（支持完整 HTML）。留空则使用默认内容。
+        </p>
+        {aboutPreview ? (
+          <div
+            className={styles.aboutPreview}
+            dangerouslySetInnerHTML={{ __html: aboutHtml }}
+          />
+        ) : (
+          <textarea
+            className={styles.textarea}
+            value={aboutHtml}
+            onChange={(e) => setAboutHtml(e.target.value)}
+            rows={16}
+            placeholder="<h1>自定义关于页面</h1>\n<p>输入任意 HTML 内容...</p>"
+            aria-label="关于页面 HTML"
+          />
+        )}
+      </section>
+
+      {/* Prompt Examples Editor */}
+      <section className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <h2 className={styles.sectionTitle}>推荐问题</h2>
+          <NeoButton size="sm" variant="secondary" onClick={addPromptExample}>+ 添加</NeoButton>
+        </div>
+        <p className={styles.hint}>自定义首页搜索框下方的推荐问题。留空则使用默认推荐。</p>
+        {promptExamples.map((example, idx) => (
+          <div key={idx} className={styles.linkRow}>
+            <NeoInput placeholder="图标 emoji" value={example.icon} onChange={(e) => updatePromptExample(idx, "icon", e.target.value)} />
+            <NeoInput placeholder="问题文字" value={example.text} onChange={(e) => updatePromptExample(idx, "text", e.target.value)} />
+            <NeoButton size="sm" variant="danger" onClick={() => removePromptExample(idx)}>删除</NeoButton>
+          </div>
+        ))}
+        {promptExamples.length === 0 && <p className={styles.hint}>没有推荐问题。点击「+ 添加」来创建。</p>}
       </section>
 
       {/* Home Sections Toggle */}

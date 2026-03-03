@@ -1,20 +1,49 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import NeoButton from "@/components/atoms/NeoButton";
 import NeoInput from "@/components/atoms/NeoInput";
 import styles from "./page.module.css";
 
 export default function EditorPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editId = searchParams.get("id");
+
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
   const [category, setCategory] = useState("");
   const [tagsInput, setTagsInput] = useState("");
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(!!editId);
   const [error, setError] = useState("");
+
+  // Load existing article data when editing
+  useEffect(() => {
+    if (!editId) return;
+    (async () => {
+      try {
+        const res = await fetch(`/api/wiki/${editId}`);
+        const data = await res.json();
+        if (data.ok) {
+          const a = data.data;
+          setTitle(a.title || "");
+          setSummary(a.summary || "");
+          setCategory(a.category || "");
+          setTagsInput(Array.isArray(a.tags) ? a.tags.join(", ") : "");
+          setContent(a.content || "");
+        } else {
+          setError("无法加载文章数据");
+        }
+      } catch {
+        setError("加载文章失败");
+      } finally {
+        setInitialLoading(false);
+      }
+    })();
+  }, [editId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,30 +56,54 @@ export default function EditorPage() {
         .map((t) => t.trim())
         .filter(Boolean);
 
-      const res = await fetch("/api/wiki", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title,
-          content,
-          summary: summary || undefined,
-          category: category || undefined,
-          tags: tags.length > 0 ? tags : undefined,
-        }),
-      });
+      if (editId) {
+        // Update existing article
+        const res = await fetch(`/api/wiki/${editId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title,
+            content,
+            summary: summary || undefined,
+            category: category || undefined,
+            tags: tags.length > 0 ? tags : undefined,
+          }),
+        });
 
-      const data = await res.json();
-      if (!data.ok) {
-        setError(data.error?.message || "Failed to create article");
-        return;
+        const data = await res.json();
+        if (!data.ok) {
+          setError(data.error?.message || "更新文章失败");
+          return;
+        }
+
+        router.push(`/kb/${data.data.slug}`);
+      } else {
+        // Create new article
+        const res = await fetch("/api/wiki", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title,
+            content,
+            summary: summary || undefined,
+            category: category || undefined,
+            tags: tags.length > 0 ? tags : undefined,
+          }),
+        });
+
+        const data = await res.json();
+        if (!data.ok) {
+          setError(data.error?.message || "Failed to create article");
+          return;
+        }
+
+        // Submit for review
+        await fetch(`/api/wiki/${data.data.id}`, {
+          method: "POST",
+        });
+
+        router.push("/kb");
       }
-
-      // Submit for review
-      await fetch(`/api/wiki/${data.data.id}`, {
-        method: "POST",
-      });
-
-      router.push("/kb");
     } catch {
       setError("Network error");
     } finally {
@@ -58,10 +111,18 @@ export default function EditorPage() {
     }
   };
 
+  if (initialLoading) {
+    return (
+      <div className={styles.page}>
+        <p style={{ textAlign: "center", padding: "2rem", fontWeight: "bold" }}>加载中...</p>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.page}>
-      <h1 className={styles.title}>投稿</h1>
-      <p className={styles.desc}>分享你的校园经验与知识</p>
+      <h1 className={styles.title}>{editId ? "编辑文章" : "投稿"}</h1>
+      <p className={styles.desc}>{editId ? "修改已发表的文章" : "分享你的校园经验与知识"}</p>
 
       <form onSubmit={handleSubmit} className={styles.form}>
         <NeoInput
@@ -104,7 +165,7 @@ export default function EditorPage() {
         {error && <p className={styles.error}>{error}</p>}
 
         <NeoButton type="submit" isLoading={loading}>
-          提交审核
+          {editId ? "保存修改" : "提交审核"}
         </NeoButton>
       </form>
     </div>

@@ -40,6 +40,44 @@ const createLinkSchema = z.object({
   order: z.number().int().optional().default(0),
 });
 
+const renameCategorySchema = z.object({
+  oldName: z.string().min(1).max(100),
+  newName: z.string().min(1).max(100),
+});
+
+// PATCH /api/admin/links — rename a category (updates all links in that category)
+export async function PATCH(req: NextRequest) {
+  try {
+    const auth = await requireAdmin(req);
+    const body = await req.json();
+    const data = renameCategorySchema.parse(body);
+
+    const result = await prisma.link.updateMany({
+      where: { category: data.oldName },
+      data: { category: data.newName },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        actorId: auth.userId,
+        action: "link.rename_category",
+        targetType: "link",
+        payload: JSON.stringify({ oldName: data.oldName, newName: data.newName, count: result.count }),
+      },
+    });
+
+    return Response.json({ ok: true, data: { updated: result.count } });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return Response.json(
+        { ok: false, error: { code: 400, message: err.errors[0]?.message } },
+        { status: 400 }
+      );
+    }
+    return handleAuthError(err);
+  }
+}
+
 // POST /api/admin/links — create a new link
 export async function POST(req: NextRequest) {
   try {

@@ -128,7 +128,7 @@ export async function POST(req: NextRequest) {
                   args = JSON.parse(tc.arguments);
                 } catch {}
 
-                const { result, toolCard } = await executeTool(
+                const { result, toolCard, references } = await executeTool(
                   tc.name as ToolName,
                   args,
                   auth?.userId
@@ -136,6 +136,10 @@ export async function POST(req: NextRequest) {
 
                 if (toolCard) {
                   send("tool_card", toolCard);
+                }
+
+                if (references && references.length > 0) {
+                  send("tool_references", references);
                 }
 
                 toolResults.push({

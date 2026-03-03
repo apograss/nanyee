@@ -67,18 +67,44 @@ export async function DELETE(
   try {
     const ctx = await requireAdmin(req);
     const { id } = await params;
+    const permanent = req.nextUrl.searchParams.get("permanent") === "true";
 
-    await prisma.$transaction([
-      prisma.article.update({ where: { id }, data: { status: "hidden" } }),
-      prisma.auditLog.create({
-        data: {
-          actorId: ctx.userId,
-          action: "article.hide",
-          targetType: "Article",
-          targetId: id,
-        },
-      }),
-    ]);
+    if (permanent) {
+      // Hard delete: permanently remove article + clean FTS5
+      await prisma.$transaction([
+        prisma.article.delete({ where: { id } }),
+        prisma.auditLog.create({
+          data: {
+            actorId: ctx.userId,
+            action: "article.delete",
+            targetType: "Article",
+            targetId: id,
+          },
+        }),
+      ]);
+      // Best-effort FTS5 cleanup (trigger handles it, but explicit as safety net)
+      try {
+        await prisma.$executeRawUnsafe(
+          `DELETE FROM article_fts WHERE article_id = ?`,
+          id
+        );
+      } catch {
+        // FTS5 table may not exist; ignore
+      }
+    } else {
+      // Soft delete: mark as hidden
+      await prisma.$transaction([
+        prisma.article.update({ where: { id }, data: { status: "hidden" } }),
+        prisma.auditLog.create({
+          data: {
+            actorId: ctx.userId,
+            action: "article.hide",
+            targetType: "Article",
+            targetId: id,
+          },
+        }),
+      ]);
+    }
 
     return Response.json({ ok: true });
   } catch (err) {

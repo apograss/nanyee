@@ -25,6 +25,7 @@ export async function GET(req: NextRequest) {
       messages: messages.map((m) => ({
         id: m.id,
         content: m.content,
+        authorId: m.authorId,
         author: m.author.nickname || m.author.username,
         createdAt: m.createdAt.toISOString(),
       })),
@@ -58,6 +59,7 @@ export async function POST(req: NextRequest) {
         data: {
           id: message.id,
           content: message.content,
+          authorId: message.authorId,
           author: message.author.nickname || message.author.username,
           createdAt: message.createdAt.toISOString(),
         },
