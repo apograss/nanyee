@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 const ISSUER = "https://nanyee.de";
 
 export async function GET() {
