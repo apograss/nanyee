@@ -54,12 +54,12 @@ const DEFAULT_PROMPT_EXAMPLES = [
   { icon: "🍜", text: "二食堂几点开门" },
 ];
 
-type ModelOption = "LongCat-Flash-Lite" | "LongCat-Flash-Thinking-2601";
+type ModelOption = "gpt-5.2" | "gpt-5.3-codex";
 
-const MODEL_OPTIONS: { id: ModelOption; label: string; desc: string }[] = [
-  { id: "LongCat-Flash-Lite", label: "快速", desc: "Flash Lite" },
-  { id: "LongCat-Flash-Thinking-2601", label: "深度思考", desc: "Flash Thinking" },
-];
+const MODEL_LABELS: Record<ModelOption, { label: string; desc: string }> = {
+  "gpt-5.2": { label: "快速", desc: "GPT-5.2 Fast" },
+  "gpt-5.3-codex": { label: "深度思考", desc: "GPT-5.3 Codex" },
+};
 
 /* ── Component ── */
 
@@ -67,20 +67,23 @@ export default function HomePage() {
   const { messages, status, send, stop, reset } = useChat();
   const { history, add: addHistory, remove: removeHistory, clear: clearHistory } = useSearchHistory();
   const [input, setInput] = useState("");
-  const [model, setModel] = useState<ModelOption>("LongCat-Flash-Lite");
+  const [model, setModel] = useState<ModelOption>("gpt-5.2");
   const inputRef = useRef<HTMLInputElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
   const searchBoxRef = useRef<HTMLFormElement>(null);
 
   const [focused, setFocused] = useState(false);
+  const [showModelSelector, setShowModelSelector] = useState(false); // Added for the new model selector behavior
 
   const isIdle = status === "idle" && messages.length === 0;
 
   // Home sections visibility (from admin settings)
   const [sections, setSections] = useState({ searchHistory: true, tools: true });
   const [promptExamples, setPromptExamples] = useState(DEFAULT_PROMPT_EXAMPLES);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   useEffect(() => {
+    const timeout = setTimeout(() => setSettingsLoaded(true), 1500);
     fetch("/api/settings")
       .then((r) => r.json())
       .then((data) => {
@@ -88,7 +91,7 @@ export default function HomePage() {
           try {
             const parsed = JSON.parse(data.data.settings.homeSections);
             setSections({ searchHistory: parsed.searchHistory ?? true, tools: parsed.tools ?? true });
-          } catch {}
+          } catch { }
         }
         if (data.ok && data.data.settings.promptExamples) {
           try {
@@ -96,10 +99,12 @@ export default function HomePage() {
             if (Array.isArray(parsed) && parsed.length > 0) {
               setPromptExamples(parsed);
             }
-          } catch {}
+          } catch { }
         }
       })
-      .catch(() => {});
+      .catch(() => { })
+      .finally(() => { clearTimeout(timeout); setSettingsLoaded(true); });
+    return () => clearTimeout(timeout);
   }, []);
 
   // Click outside to close history dropdown
@@ -107,6 +112,7 @@ export default function HomePage() {
     const handler = (e: MouseEvent) => {
       if (searchBoxRef.current && !searchBoxRef.current.contains(e.target as Node)) {
         setFocused(false);
+        setShowModelSelector(false); // Close model selector on outside click
       }
     };
     document.addEventListener("mousedown", handler);
@@ -120,6 +126,7 @@ export default function HomePage() {
     addHistory(query);
     setInput("");
     setFocused(false);
+    setShowModelSelector(false); // Close model selector on submit
     send(query, model);
   };
 
@@ -127,6 +134,7 @@ export default function HomePage() {
     addHistory(query);
     setInput("");
     setFocused(false);
+    setShowModelSelector(false); // Close model selector on quick send
     send(query, model);
   };
 
@@ -171,17 +179,14 @@ export default function HomePage() {
               <div className={styles.searchActions}>
                 {/* Inline Model Switch */}
                 <div className={styles.modelSwitch}>
-                  {MODEL_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      className={`${styles.modelBtn} ${model === opt.id ? styles.modelBtnActive : ""}`}
-                      onClick={() => setModel(opt.id)}
-                      title={opt.desc}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
+                  <button
+                    type="button"
+                    className={`${styles.modelBtn} ${styles.modelBtnActive}`} // Always active to show current model
+                    onClick={() => setShowModelSelector(!showModelSelector)}
+                    title={MODEL_LABELS[model].desc}
+                  >
+                    {MODEL_LABELS[model].label}
+                  </button>
                 </div>
                 {/* Submit */}
                 <button
@@ -228,18 +233,20 @@ export default function HomePage() {
           </form>
 
           {/* Prompt Chips */}
-          <div className={styles.promptChips}>
-            {promptExamples.map((example) => (
-              <button
-                key={example.text}
-                className={styles.chip}
-                onClick={() => handleQuickSend(example.text)}
-              >
-                <span className={styles.chipIcon}>{example.icon}</span>
-                {example.text}
-              </button>
-            ))}
-          </div>
+          {settingsLoaded && (
+            <div className={styles.promptChips}>
+              {promptExamples.map((example) => (
+                <button
+                  key={example.text}
+                  className={styles.chip}
+                  onClick={() => handleQuickSend(example.text)}
+                >
+                  <span className={styles.chipIcon}>{example.icon}</span>
+                  {example.text}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Tool Strip */}
           {sections.tools && (
@@ -288,15 +295,15 @@ export default function HomePage() {
             disabled={status === "streaming"}
           />
           <div className={styles.modelSwitchSmall}>
-            {MODEL_OPTIONS.map((opt) => (
+            {(Object.entries(MODEL_LABELS) as [ModelOption, { label: string; desc: string }][]).map(([id, info]) => (
               <button
-                key={opt.id}
+                key={id}
                 type="button"
-                className={`${styles.modelBtnSmall} ${model === opt.id ? styles.modelBtnActive : ""}`}
-                onClick={() => setModel(opt.id)}
-                title={opt.desc}
+                className={`${styles.modelBtnSmall} ${model === id ? styles.modelBtnActive : ""}`}
+                onClick={() => setModel(id)}
+                title={info.desc}
               >
-                {opt.label}
+                {info.label}
               </button>
             ))}
           </div>
