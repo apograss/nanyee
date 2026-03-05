@@ -368,17 +368,46 @@ export async function loginViaProxy(
     return cookies;
 }
 
+// ─── Cookie Login (reuse browser session, no SSO) ─────────────
+
+export async function cookieLoginViaProxy(
+    cookieText: string,
+): Promise<string[]> {
+    // Parse cookie string: "JSESSIONID=xxx" or "name=val; name2=val2" or bare value
+    let raw = cookieText.trim();
+    if (raw.toLowerCase().startsWith("cookie:")) raw = raw.slice(7).trim();
+    raw = raw.replace(/^;+|;+$/g, "").trim();
+
+    if (!raw) throw new Error("Cookie 为空");
+
+    // If no = sign, treat as bare JSESSIONID value
+    if (!raw.includes("=") && !raw.includes(";")) {
+        raw = `JSESSIONID=${raw}`;
+    }
+
+    const cookies = raw.split(";").map((p) => p.trim()).filter(Boolean).map((p) => p);
+
+    console.log("[cookie-login] Validating session with", cookies.length, "cookies");
+
+    // Verify session is valid by requesting welcome page
+    const res = await proxyFetch(`${ZHJW}${WELCOME_PATH}`, cookies, {
+        headers: { Accept: "text/html,*/*" },
+    });
+
+    if (res.body.includes("统一认证登录") || res.body.includes("扫码登录")) {
+        throw new Error("Cookie 会话无效（已过期或未登录）。请在浏览器重新登录后复制最新 Cookie。");
+    }
+
+    console.log("[cookie-login] Session valid, got", res.cookies.length, "cookies");
+    return res.cookies;
+}
+
 // ─── Course Categories ────────────────────────────────────────
 
 export async function getCategoriesViaProxy(
     cookies: string[],
 ): Promise<{ categories: CourseCategory[]; cookies: string[] }> {
-    // Visit welcome page
-    await proxyFetch(`${ZHJW}${WELCOME_PATH}`, cookies, {
-        headers: { Accept: "text/html,*/*" },
-    });
-
-    // Visit enrollment root
+    // Go directly to enrollment root (skip welcome page to save ~300ms RTT)
     const res = await proxyFetch(`${ZHJW}${XK_ROOT}`, cookies, {
         headers: { Accept: "text/html,*/*" },
     });
@@ -493,9 +522,10 @@ async function orderCourseViaProxy(
     kcrwdm: string,
     kcmc: string,
     categoryPath: string,
+    hlct: number = 0,
 ): Promise<{ code: number; message: string }> {
     const addPath = `${categoryPath}/add`;
-    const body = new URLSearchParams({ kcrwdm, kcmc, qz: "-1", xxyqdm: "", hlct: "0" });
+    const body = new URLSearchParams({ kcrwdm, kcmc, qz: "-1", xxyqdm: "", hlct: String(hlct) });
 
     // Use selected proxy node for enrollment (IP protection)
     let res;
@@ -584,6 +614,28 @@ export async function enrollJobViaProxy(
             if (msg === "超出选课要求门数(1.0门)") {
                 logger({ type: "success", message: "已达到选课上限" });
                 return { success: true, message: "已达到选课上限" };
+            }
+
+            // 检测冲突提示，自动确认（模拟点击弹窗"确定"按钮）
+            if (msg.includes("冲突")) {
+                logger({ type: "info", message: `检测到冲突提示，自动确认: ${msg}` });
+                try {
+                    const confirmResult = await orderCourseViaProxy(cookies, course.kcrwdm, course.kcmc, categoryPath, 1);
+                    const confirmMsg = confirmResult.message || "";
+                    lastMessage = confirmMsg || JSON.stringify(confirmResult);
+                    if (confirmResult.code === 0 || confirmMsg === "您已经选了该门课程") {
+                        logger({ type: "success", course: course.kcmc, message: `选课成功（忽略冲突）：${course.kcmc}` });
+                        return { success: true, message: `选课成功（忽略冲突）：${course.kcmc}`, courseName: course.kcmc };
+                    }
+                    if (confirmMsg === "超出选课要求门数(1.0门)") {
+                        logger({ type: "success", message: "已达到选课上限" });
+                        return { success: true, message: "已达到选课上限" };
+                    }
+                    logger({ type: "info", message: `确认冲突后仍失败: ${lastMessage}` });
+                } catch (confirmErr) {
+                    logger({ type: "error", message: `确认冲突请求异常: ${confirmErr instanceof Error ? confirmErr.message : String(confirmErr)}` });
+                }
+                continue;
             }
 
             if (i % 5 === 0) {
