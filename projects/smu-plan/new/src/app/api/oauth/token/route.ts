@@ -4,7 +4,7 @@ import { signIdToken } from "@/lib/oidc/keys";
 import { compare } from "bcryptjs";
 import { createHash, randomBytes, timingSafeEqual } from "crypto";
 
-const ISSUER = process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://nanyee.de";
+const ISSUER = "https://nanyee.de";
 
 const NO_STORE_HEADERS = {
   "Cache-Control": "no-store",

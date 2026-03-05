@@ -1,4 +1,4 @@
-const ISSUER = process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://nanyee.de";
+const ISSUER = "https://nanyee.de";
 
 export async function GET() {
   return Response.json({
