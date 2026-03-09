@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Nanyee API</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+
+:root{
+  --brand:#E8652B;
+  --brand-light:#FEF0EB;
+  --brand-mid:#FDDDD0;
+  --bg:#FFFFFF;
+  --bg2:#F7F7F8;
+  --card:#FFFFFF;
+  --t1:#111118;
+  --t2:#51525C;
+  --t3:#9394A1;
+  --border:#E4E4E7;
+  --border-h:#D1D1D6;
+  --green:#22C55E;--blue:#3B82F6;--purple:#8B5CF6;--amber:#F59E0B;
+  --teal:#14B8A6;--pink:#EC4899;
+  --r:14px;
+}
+
+html{scroll-behavior:smooth}
+body{
+  font-family:'Outfit','Noto Sans SC',system-ui,sans-serif;
+  background:var(--bg);color:var(--t1);
+  overflow-x:hidden;line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ═══ Scroll reveal ═══ */
+.reveal{opacity:0;transform:translateY(28px);transition:opacity .65s cubic-bezier(.22,1,.36,1),transform .65s cubic-bezier(.22,1,.36,1)}
+.reveal.visible{opacity:1;transform:none}
+.reveal-d1{transition-delay:.08s}
+.reveal-d2{transition-delay:.16s}
+.reveal-d3{transition-delay:.24s}
+
+/* ═══ Layout ═══ */
+.wrap{position:relative;z-index:1;max-width:880px;margin:0 auto;padding:0 24px}
+
+/* ═══ Nav ═══ */
+.nav{display:flex;align-items:center;justify-content:space-between;padding:18px 0}
+.nav-l{display:flex;align-items:center;gap:8px;text-decoration:none;color:var(--t1)}
+.nav-logo{
+  width:30px;height:30px;border-radius:8px;
+  background:var(--brand);color:#fff;
+  display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:.8rem;
+}
+.nav-name{font-size:1.1rem;font-weight:700;letter-spacing:-.01em}
+.nav-tag{
+  font-family:'JetBrains Mono',monospace;font-size:.58rem;font-weight:600;
+  color:var(--brand);background:var(--brand-light);
+  padding:2px 7px;border-radius:5px;letter-spacing:.05em;
+}
+.nav-r{display:flex;gap:2px;list-style:none}
+.nav-r a{
+  color:var(--t3);text-decoration:none;font-size:.82rem;font-weight:500;
+  padding:6px 14px;border-radius:8px;transition:all .2s;
+}
+.nav-r a:hover{color:var(--brand);background:var(--brand-light)}
+
+/* ═══ Hero ═══ */
+.hero{text-align:center;padding:72px 0 40px}
+.hero-inner{animation:hero-in .8s cubic-bezier(.22,1,.36,1) both}
+@keyframes hero-in{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
+
+.badge{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:5px 14px 5px 8px;border-radius:100px;
+  background:var(--bg);border:1.5px solid var(--border);
+  font-size:.78rem;color:var(--t2);font-weight:500;
+  margin-bottom:24px;
+}
+.badge-dot{width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0}
+.badge-dot::after{
+  content:'';display:block;width:7px;height:7px;border-radius:50%;
+  background:var(--green);animation:ping 2s cubic-bezier(0,0,.2,1) infinite;
+}
+@keyframes ping{75%,100%{transform:scale(2.2);opacity:0}}
+
+.hero h1{
+  font-size:clamp(2.6rem,7vw,4.5rem);font-weight:800;
+  letter-spacing:-.045em;line-height:1.05;margin-bottom:20px;
+}
+.accent{
+  position:relative;display:inline-block;
+  background:linear-gradient(135deg,var(--brand),var(--pink),var(--purple),var(--brand));
+  background-size:300% 300%;
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  animation:gradient-shift 6s ease infinite;
+}
+@keyframes gradient-shift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+
+.hero-desc{font-size:1.05rem;color:var(--t2);max-width:440px;margin:0 auto 34px;line-height:1.8;font-weight:400}
+
+/* Endpoint */
+.ep-wrap{margin-bottom:30px}
+.ep{
+  display:inline-flex;align-items:center;gap:0;
+  background:var(--bg);border:1.5px solid var(--border);
+  border-radius:11px;font-family:'JetBrains Mono',monospace;font-size:.85rem;
+  overflow:hidden;cursor:pointer;transition:all .35s cubic-bezier(.22,1,.36,1);
+}
+.ep:hover{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-light)}
+.ep-proto{padding:11px 0 11px 16px;color:var(--t3);font-weight:400}
+.ep-url{padding:11px 0;color:var(--brand);font-weight:600}
+.ep-btn{
+  display:flex;align-items:center;justify-content:center;
+  padding:0 14px;align-self:stretch;
+  border-left:1.5px solid var(--border);color:var(--t3);transition:all .25s;
+}
+.ep:hover .ep-btn{background:var(--brand);color:#fff;border-color:var(--brand)}
+
+/* Toast */
+.toast{
+  position:fixed;top:20px;left:50%;
+  transform:translateX(-50%) translateY(-16px);
+  background:var(--t1);color:#fff;padding:8px 20px;border-radius:10px;
+  font-size:.82rem;font-family:'Outfit','Noto Sans SC',sans-serif;
+  opacity:0;transition:all .35s cubic-bezier(.22,1,.36,1);pointer-events:none;z-index:999;
+  box-shadow:0 8px 30px rgba(0,0,0,.18);
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* CTAs */
+.cta{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.btn{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:11px 24px;font-size:.86rem;font-weight:600;border-radius:10px;
+  text-decoration:none;cursor:pointer;border:none;
+  font-family:inherit;transition:all .3s cubic-bezier(.22,1,.36,1);
+}
+.btn-p{background:var(--brand);color:#fff;box-shadow:0 2px 12px rgba(232,101,43,.2)}
+.btn-p:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(232,101,43,.28)}
+.btn-p:active{transform:translateY(0)}
+.btn-g{background:var(--bg);color:var(--t2);border:1.5px solid var(--border)}
+.btn-g:hover{color:var(--brand);border-color:var(--brand-mid);background:var(--brand-light)}
+
+/* ═══ Stats — counter anim ═══ */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:52px 0 64px}
+.stat{
+  background:var(--bg2);border-radius:14px;
+  padding:26px 18px;text-align:center;
+  transition:all .35s cubic-bezier(.22,1,.36,1);
+}
+.stat:hover{background:var(--brand-light);transform:translateY(-2px)}
+.stat-v{font-size:2rem;font-weight:800;letter-spacing:-.03em;margin-bottom:2px}
+.stat-v .hi{color:var(--brand);font-variant-numeric:tabular-nums}
+.stat-l{font-size:.76rem;color:var(--t3);font-weight:500}
+
+/* ═══ Section ═══ */
+.sec-h{text-align:center;margin-bottom:36px}
+.sec-tag{
+  display:inline-block;
+  font-family:'JetBrains Mono',monospace;font-size:.7rem;
+  color:var(--brand);background:var(--brand-light);
+  padding:4px 11px;border-radius:6px;
+  letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px;font-weight:600;
+}
+.sec-title{font-size:1.7rem;font-weight:800;letter-spacing:-.03em}
+
+/* ═══ Features — tilt card ═══ */
+.feats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:72px}
+.feat{
+  padding:28px 24px;background:var(--bg);border:1.5px solid var(--border);border-radius:14px;
+  transition:all .4s cubic-bezier(.22,1,.36,1);
+  transform-style:preserve-3d;perspective:800px;
+}
+.feat:hover{border-color:var(--border-h);box-shadow:0 12px 40px rgba(0,0,0,.05)}
+.feat-i{
+  width:40px;height:40px;border-radius:11px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.15rem;margin-bottom:14px;
+  transition:transform .4s cubic-bezier(.22,1,.36,1);
+}
+.feat:hover .feat-i{transform:scale(1.15) rotate(-4deg)}
+.feat-t{font-size:.92rem;font-weight:700;margin-bottom:5px}
+.feat-d{font-size:.8rem;color:var(--t3);line-height:1.75}
+
+/* ═══ Terminal — typing ═══ */
+.term-sec{margin-bottom:72px}
+.term{
+  background:#1A1B26;border-radius:14px;
+  overflow:hidden;max-width:640px;margin:0 auto;
+  box-shadow:0 24px 60px rgba(0,0,0,.1),0 2px 6px rgba(0,0,0,.06);
+}
+.term-bar{
+  display:flex;align-items:center;gap:7px;padding:13px 16px;
+  background:rgba(255,255,255,.03);border-bottom:1px solid rgba(255,255,255,.06);
+}
+.dot{width:11px;height:11px;border-radius:50%}
+.dot-r{background:#F7768E}.dot-y{background:#E0AF68}.dot-g{background:#9ECE6A}
+.term-t{flex:1;text-align:center;font-family:'JetBrains Mono',monospace;font-size:.65rem;color:#565F89}
+.term-body{
+  padding:20px 22px;font-family:'JetBrains Mono',monospace;font-size:.76rem;
+  line-height:1.9;overflow-x:auto;color:#A9B1D6;
+  position:relative;
+}
+/* Tokyo Night colors */
+.c-k{color:#BB9AF7}.c-s{color:#9ECE6A}.c-f{color:#7AA2F7}
+.c-p{color:#E0AF68}.c-x{color:#565F89}.c-v{color:#FF9E64}.c-b{color:#F7768E;font-weight:700}
+
+/* Typing cursor */
+.cursor-blink{
+  display:inline-block;width:2px;height:1em;background:#7AA2F7;
+  vertical-align:text-bottom;margin-left:2px;
+  animation:blink-cursor 1s step-end infinite;
+}
+@keyframes blink-cursor{0%,100%{opacity:1}50%{opacity:0}}
+
+/* ═══ Models — marquee ═══ */
+.models-sec{margin-bottom:72px}
+.marquee-wrap{overflow:hidden;mask-image:linear-gradient(90deg,transparent,black 8%,black 92%,transparent);-webkit-mask-image:linear-gradient(90deg,transparent,black 8%,black 92%,transparent)}
+.marquee{
+  display:flex;gap:8px;width:max-content;
+  animation:scroll-left 40s linear infinite;
+}
+.marquee:hover{animation-play-state:paused}
+@keyframes scroll-left{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.mc{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:8px 16px;background:var(--bg);border:1.5px solid var(--border);
+  border-radius:100px;font-size:.78rem;font-weight:500;color:var(--t2);
+  white-space:nowrap;flex-shrink:0;
+  transition:all .3s cubic-bezier(.22,1,.36,1);
+}
+.mc:hover{border-color:var(--brand-mid);color:var(--brand);transform:scale(1.04)}
+.mc-d{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.mc-more{
+  padding:8px 18px;
+  background:var(--brand-light);border:1.5px dashed var(--brand-mid);
+  border-radius:100px;font-size:.78rem;font-weight:600;color:var(--brand);
+  white-space:nowrap;flex-shrink:0;
+}
+
+/* ═══ Steps — connected ═══ */
+.steps-sec{margin-bottom:72px}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:0;position:relative}
+.step{text-align:center;padding:28px 16px;position:relative}
+.step-line{
+  position:absolute;top:36px;left:calc(50% + 24px);right:calc(-50% + 24px);
+  height:2px;background:repeating-linear-gradient(90deg,var(--border) 0 6px,transparent 6px 12px);
+}
+.step:last-child .step-line{display:none}
+.step-n{
+  width:36px;height:36px;border-radius:50%;
+  background:var(--brand);color:#fff;
+  font-family:'JetBrains Mono',monospace;font-size:.8rem;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+  margin:0 auto 16px;position:relative;z-index:1;
+  box-shadow:0 2px 10px rgba(232,101,43,.25);
+  transition:all .35s cubic-bezier(.22,1,.36,1);
+}
+.step:hover .step-n{transform:scale(1.15);box-shadow:0 4px 18px rgba(232,101,43,.35)}
+.step-t{font-size:.9rem;font-weight:700;margin-bottom:5px}
+.step-d{font-size:.78rem;color:var(--t3);line-height:1.75}
+
+/* ═══ Bottom ═══ */
+.bottom{text-align:center;padding:56px 0 72px;position:relative}
+.bottom::before{
+  content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);
+  width:80px;height:1.5px;background:var(--border);border-radius:1px;
+}
+.bottom h2{font-size:1.4rem;font-weight:800;margin-bottom:8px;letter-spacing:-.02em}
+.bottom-d{color:var(--t3);font-size:.86rem;margin-bottom:22px}
+.bottom-links{display:flex;justify-content:center;gap:24px;flex-wrap:wrap;margin-top:28px}
+.bottom-links a{
+  font-size:.78rem;color:var(--t3);text-decoration:none;
+  transition:color .2s;
+}
+.bottom-links a:hover{color:var(--brand)}
+
+.foot{text-align:center;padding:22px 0;color:var(--t3);font-size:.7rem}
+.foot a{color:var(--brand);text-decoration:none}
+
+/* ═══ Sparkle particles on hero ═══ */
+.sparkle-field{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.sparkle{
+  position:absolute;width:4px;height:4px;border-radius:50%;
+  background:var(--brand);opacity:0;
+}
+@keyframes sparkle-pop{
+  0%{opacity:0;transform:scale(0) rotate(0deg)}
+  40%{opacity:.6;transform:scale(1) rotate(90deg)}
+  100%{opacity:0;transform:scale(0) rotate(180deg)}
+}
+
+/* ═══ Responsive ═══ */
+@media(max-width:768px){
+  .hero{padding:44px 0 28px}
+  .stats{grid-template-columns:1fr;gap:8px}
+  .feats{grid-template-columns:1fr}
+  .steps{grid-template-columns:1fr;gap:8px}
+  .step-line{display:none}
+  .nav-r{display:none}
+  .marquee{animation-duration:25s}
+}
+@media(max-width:480px){
+  .hero h1{font-size:2rem}
+  .sec-title{font-size:1.35rem}
+  .term-body{font-size:.66rem;padding:14px}
+  .cta{flex-direction:column;align-items:center}
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <!-- Nav -->
+  <nav class="nav">
+    <a href="/" class="nav-l">
+      <div class="nav-logo">N</div>
+      <span class="nav-name">Nanyee</span>
+      <span class="nav-tag">API</span>
+    </a>
+    <ul class="nav-r">
+      <li><a href="https://nanyee.de" target="_blank">主站</a></li>
+      <li><a href="/console">密钥管理</a></li>
+      <li><a href="https://nanyee.de/kb" target="_blank">知识库</a></li>
+    </ul>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero" style="position:relative">
+    <div class="sparkle-field" id="sparkleField"></div>
+    <div class="hero-inner">
+      <div class="badge">
+        <span class="badge-dot"></span>
+        所有模型正常运行中
+      </div>
+      <h1>一个接口<br/><span class="accent">所有模型</span></h1>
+      <p class="hero-desc">Nanyee API 为南医大师生提供统一的大模型接口。<br/>OpenAI 兼容格式，更快的速度，零配置切换。</p>
+
+      <div class="ep-wrap">
+        <div class="ep" onclick="copyEndpoint()" title="点击复制">
+          <span class="ep-proto">https://</span><span class="ep-url">api.nanyee.de</span>
+          <span class="ep-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+          </span>
+        </div>
+      </div>
+      <div class="toast" id="toast">已复制 ✓</div>
+
+      <div class="cta">
+        <a href="https://api.nanyee.de/console" class="btn btn-p">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+          获取密钥
+        </a>
+        <a href="https://nanyee.de/kb" target="_blank" class="btn btn-g">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          查看文档
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Stats -->
+  <div class="stats reveal">
+    <div class="stat">
+      <div class="stat-v"><span class="hi counter" data-target="30">0</span>+</div>
+      <div class="stat-l">模型供应商</div>
+    </div>
+    <div class="stat">
+      <div class="stat-v"><span class="hi counter" data-target="200">0</span>+</div>
+      <div class="stat-l">可用模型</div>
+    </div>
+    <div class="stat">
+      <div class="stat-v"><span class="hi counter" data-target="99.9" data-decimal="1">0</span>%</div>
+      <div class="stat-l">可用性</div>
+    </div>
+  </div>
+
+  <!-- Features -->
+  <section>
+    <div class="sec-h reveal">
+      <div class="sec-tag">Features</div>
+      <h2 class="sec-title">为什么选择 Nanyee API</h2>
+    </div>
+    <div class="feats">
+      <div class="feat reveal reveal-d1" data-tilt>
+        <div class="feat-i" style="background:#DCFCE7;color:#16A34A">⚡</div>
+        <div class="feat-t">OpenAI 兼容格式</div>
+        <div class="feat-d">完全兼容 OpenAI API，现有代码只需替换 base_url，无需任何其他修改。</div>
+      </div>
+      <div class="feat reveal reveal-d2" data-tilt>
+        <div class="feat-i" style="background:#DBEAFE;color:#2563EB">🔀</div>
+        <div class="feat-t">多模型自由切换</div>
+        <div class="feat-d">GPT、Claude、Gemini、DeepSeek、Qwen……一个密钥调用所有模型。</div>
+      </div>
+      <div class="feat reveal reveal-d1" data-tilt>
+        <div class="feat-i" style="background:#EDE9FE;color:#7C3AED">🛡️</div>
+        <div class="feat-t">稳定可靠</div>
+        <div class="feat-d">多通道负载均衡 + 自动故障转移，Cloudflare 全球 CDN 加速。</div>
+      </div>
+      <div class="feat reveal reveal-d2" data-tilt>
+        <div class="feat-i" style="background:#FEF3C7;color:#D97706">🎁</div>
+        <div class="feat-t">南医专属福利</div>
+        <div class="feat-d">注册即享免费额度，永远公益免费，为南医师生量身定制。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Terminal -->
+  <section class="term-sec">
+    <div class="sec-h reveal">
+      <div class="sec-tag">Quick Start</div>
+      <h2 class="sec-title">三行代码，即刻上手</h2>
+    </div>
+    <div class="term reveal">
+      <div class="term-bar">
+        <span class="dot dot-r"></span>
+        <span class="dot dot-y"></span>
+        <span class="dot dot-g"></span>
+        <span class="term-t">python — nanyee_demo.py</span>
+      </div>
+      <div class="term-body" id="termBody"></div>
+    </div>
+  </section>
+
+  <!-- Models -->
+  <section class="models-sec">
+    <div class="sec-h reveal">
+      <div class="sec-tag">Models</div>
+      <h2 class="sec-title">支持的模型供应商</h2>
+    </div>
+    <div class="marquee-wrap reveal">
+      <div class="marquee" id="marquee">
+        <span class="mc"><span class="mc-d" style="background:#10a37f"></span>OpenAI</span>
+        <span class="mc"><span class="mc-d" style="background:#d4a27f"></span>Anthropic</span>
+        <span class="mc"><span class="mc-d" style="background:#4285f4"></span>Google</span>
+        <span class="mc"><span class="mc-d" style="background:#0668E1"></span>Meta</span>
+        <span class="mc"><span class="mc-d" style="background:#4D6BFE"></span>DeepSeek</span>
+        <span class="mc"><span class="mc-d" style="background:#615EFF"></span>Qwen</span>
+        <span class="mc"><span class="mc-d" style="background:#FF7000"></span>Mistral</span>
+        <span class="mc"><span class="mc-d" style="background:#555"></span>xAI</span>
+        <span class="mc"><span class="mc-d" style="background:#39594D"></span>Cohere</span>
+        <span class="mc"><span class="mc-d" style="background:#444"></span>Moonshot</span>
+        <span class="mc"><span class="mc-d" style="background:#3C6EF0"></span>智谱 GLM</span>
+        <span class="mc"><span class="mc-d" style="background:#3366FF"></span>Baichuan</span>
+        <span class="mc"><span class="mc-d" style="background:#E85D2A"></span>MiniMax</span>
+        <span class="mc"><span class="mc-d" style="background:#325AFF"></span>豆包</span>
+        <span class="mc"><span class="mc-d" style="background:#00D4AA"></span>零一万物</span>
+        <span class="mc"><span class="mc-d" style="background:#a855f7"></span>Stable Diffusion</span>
+        <span class="mc"><span class="mc-d" style="background:#777"></span>Midjourney</span>
+        <span class="mc"><span class="mc-d" style="background:#10a37f"></span>DALL·E</span>
+        <span class="mc"><span class="mc-d" style="background:#FF5A1F"></span>Suno</span>
+        <span class="mc"><span class="mc-d" style="background:#06b6d4"></span>Flux</span>
+        <span class="mc-more">30+ 持续接入中…</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Steps -->
+  <section class="steps-sec">
+    <div class="sec-h reveal">
+      <div class="sec-tag">How it works</div>
+      <h2 class="sec-title">三步开始</h2>
+    </div>
+    <div class="steps">
+      <div class="step reveal reveal-d1">
+        <div class="step-line"></div>
+        <div class="step-n">1</div>
+        <div class="step-t">注册账号</div>
+        <div class="step-d">使用南医邮箱注册<br/>立即获得免费额度</div>
+      </div>
+      <div class="step reveal reveal-d2">
+        <div class="step-line"></div>
+        <div class="step-n">2</div>
+        <div class="step-t">创建密钥</div>
+        <div class="step-d">在控制台生成 API Key<br/>一键复制即可使用</div>
+      </div>
+      <div class="step reveal reveal-d3">
+        <div class="step-n">3</div>
+        <div class="step-t">替换 Base URL</div>
+        <div class="step-d">api.openai.com 换成<br/>api.nanyee.de，搞定</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Bottom -->
+  <section class="bottom reveal">
+    <h2>准备好了吗？</h2>
+    <p class="bottom-d">开始使用 Nanyee API，体验统一的大模型接口。</p>
+    <a href="https://api.nanyee.de/console" class="btn btn-p">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+      立即开始
+    </a>
+    <div class="bottom-links">
+      <a href="https://nanyee.de" target="_blank">Nanyee.de 主站</a>
+      <a href="https://nanyee.de/kb" target="_blank">知识库</a>
+      <a href="https://github.com/nanyee" target="_blank">GitHub</a>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <p>Nanyee API · 南方医科大学 · Powered by <a href="https://nanyee.de" target="_blank">Nanyee.de</a></p>
+  </footer>
+
+</div>
+
+<script>
+/* ═══ Copy ═══ */
+function copyEndpoint(){
+  if(navigator.clipboard){
+    navigator.clipboard.writeText('https://api.nanyee.de');
+    var t=document.getElementById('toast');
+    t.classList.add('show');
+    setTimeout(function(){t.classList.remove('show')},1800);
+  }
+}
+
+/* ═══ Scroll reveal ═══ */
+(function(){
+  var els=document.querySelectorAll('.reveal');
+  var obs=new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){e.target.classList.add('visible');obs.unobserve(e.target)}
+    });
+  },{threshold:0.15,rootMargin:'0px 0px -40px 0px'});
+  els.forEach(function(el){obs.observe(el)});
+})();
+
+/* ═══ Counter animation ═══ */
+(function(){
+  var started=false;
+  var counters=document.querySelectorAll('.counter');
+  var obs=new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting&&!started){
+        started=true;
+        counters.forEach(function(c){
+          var target=parseFloat(c.dataset.target);
+          var dec=parseInt(c.dataset.decimal||'0');
+          var duration=1400;
+          var start=performance.now();
+          function tick(now){
+            var t=Math.min((now-start)/duration,1);
+            var ease=1-Math.pow(1-t,4);
+            c.textContent=(target*ease).toFixed(dec);
+            if(t<1)requestAnimationFrame(tick);
+            else c.textContent=dec>0?target.toFixed(dec):target.toString();
+          }
+          requestAnimationFrame(tick);
+        });
+      }
+    });
+  },{threshold:.3});
+  if(counters.length)obs.observe(counters[0].closest('.stats'));
+})();
+
+/* ═══ Terminal typing ═══ */
+(function(){
+  var code=[
+    {t:'k',v:'from'},{t:'t',v:' '},{t:'v',v:'openai'},{t:'t',v:' '},{t:'k',v:'import'},{t:'t',v:' '},{t:'f',v:'OpenAI'},
+    {t:'n'},{t:'n'},
+    {t:'v',v:'client'},{t:'t',v:' '},{t:'x',v:'='},{t:'t',v:' '},{t:'f',v:'OpenAI'},{t:'x',v:'('},
+    {t:'n'},
+    {t:'t',v:'    '},{t:'p',v:'base_url'},{t:'t',v:' '},{t:'x',v:'='},{t:'t',v:' '},{t:'s',v:'"https://'},{t:'b',v:'api.nanyee.de'},{t:'s',v:'/v1"'},{t:'x',v:','},
+    {t:'n'},
+    {t:'t',v:'    '},{t:'p',v:'api_key'},{t:'t',v:'  '},{t:'x',v:'='},{t:'t',v:' '},{t:'s',v:'"sk-your-nanyee-key"'},
+    {t:'n'},
+    {t:'x',v:')'},
+    {t:'n'},{t:'n'},
+    {t:'v',v:'resp'},{t:'t',v:' '},{t:'x',v:'='},{t:'t',v:' '},{t:'v',v:'client'},{t:'x',v:'.'},{t:'v',v:'chat'},{t:'x',v:'.'},{t:'v',v:'completions'},{t:'x',v:'.'},{t:'f',v:'create'},{t:'x',v:'('},
+    {t:'n'},
+    {t:'t',v:'    '},{t:'p',v:'model'},{t:'t',v:'    '},{t:'x',v:'='},{t:'t',v:' '},{t:'s',v:'"gpt-4o"'},{t:'x',v:','},
+    {t:'n'},
+    {t:'t',v:'    '},{t:'p',v:'messages'},{t:'t',v:' '},{t:'x',v:'='},{t:'t',v:' '},{t:'x',v:'[{'},{t:'s',v:'"role"'},{t:'x',v:':'},{t:'t',v:' '},{t:'s',v:'"user"'},{t:'x',v:','},{t:'t',v:' '},{t:'s',v:'"content"'},{t:'x',v:':'},{t:'t',v:' '},{t:'s',v:'"你好！"'},{t:'x',v:'}]'},
+    {t:'n'},
+    {t:'x',v:')'},
+    {t:'n'},{t:'n'},
+    {t:'f',v:'print'},{t:'x',v:'('},{t:'v',v:'resp'},{t:'x',v:'.'},{t:'v',v:'choices'},{t:'x',v:'['},{t:'v',v:'0'},{t:'x',v:'].'},{t:'v',v:'message'},{t:'x',v:'.'},{t:'v',v:'content'},{t:'x',v:')'}
+  ];
+
+  var body=document.getElementById('termBody');
+  var cursorEl=document.createElement('span');
+  cursorEl.className='cursor-blink';
+  var idx=0;var typed=false;
+
+  function typeNext(){
+    if(idx>=code.length){body.removeChild(cursorEl);return}
+    var c=code[idx];idx++;
+    if(c.t==='n'){
+      body.insertBefore(document.createElement('br'),cursorEl);
+      setTimeout(typeNext,40);
+    } else if(c.t==='t'){
+      body.insertBefore(document.createTextNode(c.v),cursorEl);
+      setTimeout(typeNext,15);
+    } else {
+      var span=document.createElement('span');
+      span.className='c-'+c.t;
+      span.textContent='';
+      body.insertBefore(span,cursorEl);
+      var ci=0;
+      function typeCh(){
+        if(ci<c.v.length){span.textContent+=c.v[ci];ci++;setTimeout(typeCh,22)}
+        else setTimeout(typeNext,10);
+      }
+      typeCh();
+    }
+  }
+
+  var obs=new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting&&!typed){
+        typed=true;
+        body.appendChild(cursorEl);
+        setTimeout(typeNext,400);
+      }
+    });
+  },{threshold:.3});
+  obs.observe(body.closest('.term'));
+})();
+
+/* ═══ Duplicate marquee for seamless loop ═══ */
+(function(){
+  var m=document.getElementById('marquee');
+  m.innerHTML+=m.innerHTML;
+})();
+
+/* ═══ Feature card tilt ═══ */
+(function(){
+  var cards=document.querySelectorAll('[data-tilt]');
+  cards.forEach(function(card){
+    card.addEventListener('mousemove',function(e){
+      var r=card.getBoundingClientRect();
+      var x=(e.clientX-r.left)/r.width-.5;
+      var y=(e.clientY-r.top)/r.height-.5;
+      card.style.transform='perspective(600px) rotateY('+x*6+'deg) rotateX('+(-y*6)+'deg) translateY(-3px)';
+    });
+    card.addEventListener('mouseleave',function(){
+      card.style.transform='';
+    });
+  });
+})();
+
+/* ═══ Hero sparkles on mouse ═══ */
+(function(){
+  var field=document.getElementById('sparkleField');
+  if(!field)return;
+  var hero=field.parentElement;
+  hero.addEventListener('mousemove',function(e){
+    if(Math.random()>.6)return;
+    var r=hero.getBoundingClientRect();
+    var s=document.createElement('div');
+    s.className='sparkle';
+    s.style.left=(e.clientX-r.left)+'px';
+    s.style.top=(e.clientY-r.top)+'px';
+    s.style.width=s.style.height=Math.random()*4+2+'px';
+    s.style.animation='sparkle-pop '+(Math.random()*.4+.4)+'s ease-out forwards';
+    field.appendChild(s);
+    s.addEventListener('animationend',function(){s.remove()});
+  });
+})();
+</script>
+</body>
+</html>
