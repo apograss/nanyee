@@ -3,7 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { compare, hash } from "bcryptjs";
 import { z } from "zod";
 import { requireUser, handleAuthError } from "@/lib/auth/guard";
-import { sendVerificationEmail } from "@/lib/mail/resend";
+import { isVerificationMailConfigured, sendVerificationEmail } from "@/lib/mail/resend";
+import { buildVerificationRecordInput } from "@/lib/auth/verification-records";
 
 const schema = z.object({
   newEmail: z.string().email(),
@@ -67,15 +68,6 @@ export async function POST(req: NextRequest) {
     const oldCodeHash = await hash(oldCode, 10);
     const newCodeHash = await hash(newCode, 10);
 
-    await prisma.$transaction([
-      prisma.emailVerification.create({
-        data: { email: user.email, codeHash: oldCodeHash, purpose: "register", expiresAt },
-      }),
-      prisma.emailVerification.create({
-        data: { email: data.newEmail, codeHash: newCodeHash, purpose: "register", expiresAt },
-      }),
-    ]);
-
     const request = await prisma.emailChangeRequest.create({
       data: {
         userId: ctx.userId,
@@ -87,8 +79,29 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    await prisma.$transaction([
+      prisma.emailVerification.create({
+        data: buildVerificationRecordInput({
+          email: user.email,
+          codeHash: oldCodeHash,
+          purpose: "change_old",
+          requestId: request.id,
+          expiresAt,
+        }),
+      }),
+      prisma.emailVerification.create({
+        data: buildVerificationRecordInput({
+          email: data.newEmail,
+          codeHash: newCodeHash,
+          purpose: "change_new",
+          requestId: request.id,
+          expiresAt,
+        }),
+      }),
+    ]);
+
     // Send both emails
-    if (process.env.RESEND_API_KEY) {
+    if (isVerificationMailConfigured()) {
       await Promise.all([
         sendVerificationEmail({ to: user.email, code: oldCode, purpose: "change_old" }),
         sendVerificationEmail({ to: data.newEmail, code: newCode, purpose: "change_new" }),

@@ -6,6 +6,7 @@ import {
   isVerificationMailConfigured,
   sendVerificationEmail,
 } from "@/lib/mail/resend";
+import { buildVerificationRecordInput } from "@/lib/auth/verification-records";
 import quizBank from "@/data/quiz-bank.json";
 
 const QUIZ_COUNT = 20;
@@ -62,17 +63,6 @@ export async function POST(req: NextRequest) {
       // Generate verification code
       const code = String(Math.floor(100000 + Math.random() * 900000));
 
-      // Store code hash in EmailVerification
-      const codeHash = await hash(code, 10);
-      await prisma.emailVerification.create({
-        data: {
-          email: data.email,
-          codeHash,
-          purpose: "register",
-          expiresAt,
-        },
-      });
-
       // Create challenge
       const challenge = await prisma.registrationChallenge.create({
         data: {
@@ -82,6 +72,18 @@ export async function POST(req: NextRequest) {
           ip: ip || null,
           userAgent: userAgent || null,
         },
+      });
+
+      // Store code hash after the challenge exists so we can scope the record
+      const codeHash = await hash(code, 10);
+      await prisma.emailVerification.create({
+        data: buildVerificationRecordInput({
+          email: data.email,
+          codeHash,
+          purpose: "register",
+          requestId: challenge.id,
+          expiresAt,
+        }),
       });
 
       // Send verification email

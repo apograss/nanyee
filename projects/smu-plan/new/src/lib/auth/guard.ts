@@ -1,10 +1,32 @@
 import { NextRequest } from "next/server";
 import { verifyAccessToken, type AccessTokenPayload } from "./jwt";
+import { prisma } from "@/lib/prisma";
 
 export interface AuthContext {
   userId: string;
   role: string;
   username: string;
+}
+
+interface UserAccessRecord {
+  id: string;
+  role: string;
+  status: string;
+  username: string;
+}
+
+export function coerceActiveUserContext(
+  user: UserAccessRecord | null,
+): AuthContext | null {
+  if (!user || user.status !== "active") {
+    return null;
+  }
+
+  return {
+    userId: user.id,
+    role: user.role,
+    username: user.username,
+  };
 }
 
 export async function getAuthContext(
@@ -16,11 +38,17 @@ export async function getAuthContext(
   const payload = await verifyAccessToken(token);
   if (!payload?.sub) return null;
 
-  return {
-    userId: payload.sub,
-    role: payload.role,
-    username: payload.username,
-  };
+  const user = await prisma.user.findUnique({
+    where: { id: payload.sub },
+    select: {
+      id: true,
+      role: true,
+      status: true,
+      username: true,
+    },
+  });
+
+  return coerceActiveUserContext(user);
 }
 
 export async function requireUser(req: NextRequest): Promise<AuthContext> {

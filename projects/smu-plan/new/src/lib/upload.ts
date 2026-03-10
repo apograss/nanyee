@@ -35,6 +35,21 @@ export class UploadError extends Error {
   }
 }
 
+export function isSafeUploadPath(
+  uploadDir: string,
+  segments: string[],
+): string | null {
+  const root = path.resolve(uploadDir);
+  const candidate = path.resolve(path.join(root, ...segments));
+  const rootPrefix = root.endsWith(path.sep) ? root : `${root}${path.sep}`;
+
+  if (candidate === root || candidate.startsWith(rootPrefix)) {
+    return candidate;
+  }
+
+  return null;
+}
+
 export function validateFile(file: File, rules: UploadRules): void {
   if (!file || !(file instanceof File)) {
     throw new UploadError("缺少文件", 400);

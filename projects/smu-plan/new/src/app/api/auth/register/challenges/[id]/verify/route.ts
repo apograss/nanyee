@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { compare } from "bcryptjs";
 import { z } from "zod";
 import quizBank from "@/data/quiz-bank.json";
+import { buildVerificationLookup } from "@/lib/auth/verification-records";
 
 const QUIZ_COUNT = 20;
 const QUIZ_PASS_RATE = 0.9;
@@ -78,12 +79,14 @@ export async function POST(
       const { code } = emailVerifySchema.parse(body);
 
       const verification = await prisma.emailVerification.findFirst({
-        where: {
-          email: challenge.email!,
-          purpose: "register",
-          usedAt: null,
-          expiresAt: { gt: new Date() },
-        },
+        where: buildVerificationLookup(
+          {
+            email: challenge.email!,
+            purpose: "register",
+            requestId: challenge.id,
+          },
+          new Date(),
+        ),
         orderBy: { createdAt: "desc" },
       });
 

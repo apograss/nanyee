@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireUser, handleAuthError } from "@/lib/auth/guard";
 import { revokeOtherSessions } from "@/lib/auth/session";
 import { verifyRefreshToken } from "@/lib/auth/jwt";
+import { buildVerificationLookup } from "@/lib/auth/verification-records";
 
 const schema = z.object({
   requestId: z.string().min(1),
@@ -61,11 +62,14 @@ export async function POST(req: NextRequest) {
 
     // Verify old email code
     const oldVerification = await prisma.emailVerification.findFirst({
-      where: {
-        email: request.currentEmail!,
-        usedAt: null,
-        expiresAt: { gt: new Date() },
-      },
+      where: buildVerificationLookup(
+        {
+          email: request.currentEmail!,
+          purpose: "change_old",
+          requestId: request.id,
+        },
+        new Date(),
+      ),
       orderBy: { createdAt: "desc" },
     });
 
@@ -86,11 +90,14 @@ export async function POST(req: NextRequest) {
 
     // Verify new email code
     const newVerification = await prisma.emailVerification.findFirst({
-      where: {
-        email: request.newEmail,
-        usedAt: null,
-        expiresAt: { gt: new Date() },
-      },
+      where: buildVerificationLookup(
+        {
+          email: request.newEmail,
+          purpose: "change_new",
+          requestId: request.id,
+        },
+        new Date(),
+      ),
       orderBy: { createdAt: "desc" },
     });
 

@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <title>nanyee.de | 维护中</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5efe3;
+      --paper: rgba(255, 252, 247, 0.92);
+      --panel: rgba(255, 255, 255, 0.82);
+      --ink: #183963;
+      --muted: #55738c;
+      --line: rgba(24, 57, 99, 0.18);
+      --accent: #eb6b2f;
+      --accent-soft: rgba(235, 107, 47, 0.12);
+      --shadow: #183963;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+        "Microsoft YaHei", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(235, 107, 47, 0.14), transparent 28%),
+        radial-gradient(circle at right 20%, rgba(24, 57, 99, 0.08), transparent 26%),
+        linear-gradient(180deg, #faf4e8 0%, var(--bg) 100%);
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(24, 57, 99, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(24, 57, 99, 0.035) 1px, transparent 1px);
+      background-size: 28px 28px;
+      mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.4), transparent 78%);
+    }
+
+    main {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 32px 20px;
+    }
+
+    .shell {
+      width: min(920px, 100%);
+      display: grid;
+      gap: 18px;
+    }
+
+    .card {
+      position: relative;
+      overflow: hidden;
+      border: 2px solid var(--ink);
+      border-radius: 28px;
+      background: var(--paper);
+      box-shadow: 12px 12px 0 var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+      gap: 28px;
+      padding: clamp(28px, 5vw, 44px);
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: auto -60px -120px auto;
+      width: 240px;
+      height: 240px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(235, 107, 47, 0.18), transparent 70%);
+      pointer-events: none;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 18px;
+      color: var(--muted);
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 0 6px var(--accent-soft);
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 18px 0 14px;
+      font-size: clamp(2.1rem, 4.6vw, 4rem);
+      line-height: 1.06;
+      letter-spacing: -0.04em;
+    }
+
+    .lead {
+      margin: 0;
+      max-width: 30em;
+      color: var(--muted);
+      font-size: clamp(1rem, 2vw, 1.18rem);
+      line-height: 1.9;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 28px;
+    }
+
+    .button,
+    .ghost {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 48px;
+      padding: 0 18px;
+      border-radius: 15px;
+      border: 2px solid var(--ink);
+      text-decoration: none;
+      font-weight: 800;
+      transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+    }
+
+    .button {
+      background: var(--accent);
+      color: #fffaf5;
+      box-shadow: 4px 4px 0 var(--ink);
+    }
+
+    .ghost {
+      background: rgba(255, 255, 255, 0.78);
+      color: var(--ink);
+    }
+
+    .button:hover,
+    .ghost:hover {
+      transform: translate(-2px, -2px);
+      box-shadow: 6px 6px 0 var(--ink);
+    }
+
+    .panel {
+      display: grid;
+      gap: 14px;
+      align-content: start;
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: var(--panel);
+    }
+
+    .panel h2 {
+      margin: 0;
+      font-size: 1.1rem;
+      line-height: 1.4;
+    }
+
+    .panel p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.75;
+      font-size: 0.98rem;
+    }
+
+    .list {
+      display: grid;
+      gap: 12px;
+      margin: 8px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .list li {
+      display: grid;
+      gap: 6px;
+      padding: 14px 16px;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.68);
+    }
+
+    .label {
+      font-size: 0.84rem;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .value {
+      font-size: 1rem;
+      line-height: 1.6;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    .sub {
+      color: var(--muted);
+      font-weight: 500;
+      font-size: 0.95rem;
+    }
+
+    .notice {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      padding: 18px;
+    }
+
+    .tile {
+      padding: 18px 18px 20px;
+      border-radius: 20px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.72);
+    }
+
+    .tile strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 1rem;
+    }
+
+    .tile p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 0.94rem;
+    }
+
+    .footnote {
+      padding: 0 24px 24px;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.7;
+    }
+
+    code {
+      padding: 0.15em 0.45em;
+      border-radius: 999px;
+      background: rgba(24, 57, 99, 0.07);
+      color: var(--ink);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.92em;
+    }
+
+    @media (max-width: 840px) {
+      .hero,
+      .notice {
+        grid-template-columns: 1fr;
+      }
+
+      .card {
+        box-shadow: 8px 8px 0 var(--shadow);
+      }
+
+      h1 {
+        max-width: 12em;
+      }
+    }
+
+    @media (max-width: 520px) {
+      main {
+        padding: 20px 14px;
+      }
+
+      .hero,
+      .notice,
+      .footnote {
+        padding-left: 18px;
+        padding-right: 18px;
+      }
+
+      .actions {
+        flex-direction: column;
+      }
+
+      .button,
+      .ghost {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="shell">
+      <section class="card hero">
+        <div>
+          <div class="brand">
+            <span class="dot" aria-hidden="true"></span>
+            nanyee.de
+          </div>
+          <div class="eyebrow">Maintenance Mode</div>
+          <h1>站点维护中</h1>
+          <p class="lead">
+            我们正在升级统一登录、CloudMail 验证邮件和论坛接入。前台内容暂时关闭，但认证与 OIDC
+            相关入口会继续保持可用，方便正在联调的服务正常接入。
+          </p>
+          <div class="actions">
+            <a class="button" href="/login">继续登录</a>
+            <a class="ghost" href="/.well-known/openid-configuration">查看 OIDC 配置</a>
+          </div>
+        </div>
+
+        <aside class="panel" aria-label="维护信息">
+          <h2>这段时间你仍然可以正常使用</h2>
+          <ul class="list">
+            <li>
+              <span class="label">认证入口</span>
+              <span class="value">登录、注册、授权确认页保持在线</span>
+              <span class="sub">适用于账号登录、授权跳转和联调回调。</span>
+            </li>
+            <li>
+              <span class="label">开放接口</span>
+              <span class="value">OIDC discovery 与 API 端点继续可访问</span>
+              <span class="sub">如 <code>api.nanyee.de</code>、后续的论坛单点登录接入。</span>
+            </li>
+            <li>
+              <span class="label">当前升级内容</span>
+              <span class="value">CloudMail、NewAPI OIDC、Flarum 论坛部署</span>
+              <span class="sub">我们会在主站恢复后同步更新整体状态。</span>
+            </li>
+          </ul>
+        </aside>
+      </section>
+
+      <section class="card notice" aria-label="维护说明">
+        <article class="tile">
+          <strong>前台内容暂时关闭</strong>
+          <p>首页内容、知识库浏览和普通前台页面会在维护期间统一返回维护页。</p>
+        </article>
+        <article class="tile">
+          <strong>认证服务不中断</strong>
+          <p>登录、注册、授权与 API 接口继续开放，避免影响现有单点登录调试流程。</p>
+        </article>
+        <article class="tile">
+          <strong>恢复后会直接切回</strong>
+          <p>当前不需要额外迁移操作，维护完成后会恢复正常入口并同步新的接入方式。</p>
+        </article>
+      </section>
+
+      <div class="footnote">
+        如果你是在对接 <code>api.nanyee.de</code> 或 <code>chat.nanyee.de</code>，请继续按正常认证流程操作。
+      </div>
+    </div>
+  </main>
+</body>
+</html>

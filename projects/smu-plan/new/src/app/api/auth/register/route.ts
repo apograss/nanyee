@@ -20,42 +20,14 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const data = registerSchema.parse(body);
 
-    // Atomically consume the challenge
-    const challenge = await prisma.$transaction(async (tx) => {
-      const ch = await tx.registrationChallenge.findUnique({
-        where: { id: data.challengeId },
-      });
-
-      if (!ch) return null;
-      if (ch.consumedAt) return { ...ch, _error: "already_consumed" as const };
-      if (ch.expiresAt < new Date()) return { ...ch, _error: "expired" as const };
-      if (!ch.verifiedAt) return { ...ch, _error: "not_verified" as const };
-
-      // Mark consumed
-      await tx.registrationChallenge.update({
-        where: { id: ch.id },
-        data: { consumedAt: new Date() },
-      });
-
-      return ch;
+    const challenge = await prisma.registrationChallenge.findUnique({
+      where: { id: data.challengeId },
     });
 
     if (!challenge) {
       return Response.json(
         { ok: false, error: { code: 404, message: "Challenge not found" } },
         { status: 404 }
-      );
-    }
-
-    if ("_error" in challenge) {
-      const messages: Record<string, string> = {
-        already_consumed: "Challenge already used",
-        expired: "Challenge expired",
-        not_verified: "Challenge not verified",
-      };
-      return Response.json(
-        { ok: false, error: { code: 400, message: messages[challenge._error] } },
-        { status: 400 }
       );
     }
 
@@ -85,16 +57,47 @@ export async function POST(req: NextRequest) {
 
     // Create user
     const passwordHash = await hash(data.password, 12);
-    const user = await prisma.user.create({
-      data: {
-        username: data.username,
-        passwordHash,
-        nickname: data.nickname || data.username,
-        email: challenge.method === "email" ? challenge.email : null,
-        emailVerifiedAt: challenge.method === "email" ? new Date() : null,
-        role: "contributor",
-        status: "active",
-      },
+
+    const user = await prisma.$transaction(async (tx) => {
+      const freshChallenge = await tx.registrationChallenge.findUnique({
+        where: { id: data.challengeId },
+      });
+
+      if (!freshChallenge) {
+        throw new Error("challenge_not_found");
+      }
+      if (freshChallenge.consumedAt) {
+        throw new Error("challenge_already_consumed");
+      }
+      if (freshChallenge.expiresAt < new Date()) {
+        throw new Error("challenge_expired");
+      }
+      if (!freshChallenge.verifiedAt) {
+        throw new Error("challenge_not_verified");
+      }
+
+      const createdUser = await tx.user.create({
+        data: {
+          username: data.username,
+          passwordHash,
+          nickname: data.nickname || data.username,
+          email: freshChallenge.method === "email" ? freshChallenge.email : null,
+          emailVerifiedAt: freshChallenge.method === "email" ? new Date() : null,
+          role: "contributor",
+          status: "active",
+        },
+      });
+
+      const consumeResult = await tx.registrationChallenge.updateMany({
+        where: { id: freshChallenge.id, consumedAt: null },
+        data: { consumedAt: new Date() },
+      });
+
+      if (consumeResult.count !== 1) {
+        throw new Error("challenge_already_consumed");
+      }
+
+      return createdUser;
     });
 
     // Issue session using shared utility (fixes the refresh token hash bug)
@@ -120,6 +123,21 @@ export async function POST(req: NextRequest) {
         { ok: false, error: { code: 400, message: err.errors[0]?.message || "Validation failed" } },
         { status: 400 }
       );
+    }
+    if (err instanceof Error) {
+      const challengeMessages: Record<string, { status: number; message: string }> = {
+        challenge_not_found: { status: 404, message: "Challenge not found" },
+        challenge_already_consumed: { status: 400, message: "Challenge already used" },
+        challenge_expired: { status: 400, message: "Challenge expired" },
+        challenge_not_verified: { status: 400, message: "Challenge not verified" },
+      };
+      const challengeError = challengeMessages[err.message];
+      if (challengeError) {
+        return Response.json(
+          { ok: false, error: { code: challengeError.status, message: challengeError.message } },
+          { status: challengeError.status }
+        );
+      }
     }
     console.error("Register error:", err);
     return Response.json(

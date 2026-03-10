@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { compare } from "bcryptjs";
 import { z } from "zod";
 import { requireUser, handleAuthError } from "@/lib/auth/guard";
+import { buildVerificationLookup } from "@/lib/auth/verification-records";
 
 const schema = z.object({
   requestId: z.string().min(1),
@@ -54,11 +55,14 @@ export async function POST(req: NextRequest) {
 
     // Verify code against EmailVerification
     const verification = await prisma.emailVerification.findFirst({
-      where: {
-        email: request.newEmail,
-        usedAt: null,
-        expiresAt: { gt: new Date() },
-      },
+      where: buildVerificationLookup(
+        {
+          email: request.newEmail,
+          purpose: "bind",
+          requestId: request.id,
+        },
+        new Date(),
+      ),
       orderBy: { createdAt: "desc" },
     });
 

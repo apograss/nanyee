@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { readFile, stat } from "fs/promises";
 import path from "path";
+import { isSafeUploadPath } from "@/lib/upload";
 
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), "data", "uploads");
 
@@ -17,11 +18,8 @@ export async function GET(
   { params }: { params: Promise<{ path: string[] }> }
 ) {
   const { path: segments } = await params;
-  const filePath = path.join(UPLOAD_DIR, ...segments);
-
-  // Security: prevent path traversal
-  const resolved = path.resolve(filePath);
-  if (!resolved.startsWith(path.resolve(UPLOAD_DIR))) {
+  const resolved = isSafeUploadPath(UPLOAD_DIR, segments);
+  if (!resolved) {
     return new Response("Forbidden", { status: 403 });
   }
 

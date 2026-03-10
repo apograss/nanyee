@@ -3,7 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { compare, hash } from "bcryptjs";
 import { z } from "zod";
 import { requireUser, handleAuthError } from "@/lib/auth/guard";
-import { sendVerificationEmail } from "@/lib/mail/resend";
+import { isVerificationMailConfigured, sendVerificationEmail } from "@/lib/mail/resend";
+import { buildVerificationRecordInput } from "@/lib/auth/verification-records";
 
 const schema = z.object({
   email: z.string().email(),
@@ -67,10 +68,6 @@ export async function POST(req: NextRequest) {
     const code = String(Math.floor(100000 + Math.random() * 900000));
     const codeHash = await hash(code, 10);
 
-    await prisma.emailVerification.create({
-      data: { email: data.email, codeHash, purpose: "register", expiresAt },
-    });
-
     const request = await prisma.emailChangeRequest.create({
       data: {
         userId: ctx.userId,
@@ -82,8 +79,18 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    await prisma.emailVerification.create({
+      data: buildVerificationRecordInput({
+        email: data.email,
+        codeHash,
+        purpose: "bind",
+        requestId: request.id,
+        expiresAt,
+      }),
+    });
+
     // Send verification email
-    if (process.env.RESEND_API_KEY) {
+    if (isVerificationMailConfigured()) {
       await sendVerificationEmail({ to: data.email, code, purpose: "bind" });
     } else {
       console.log(`[DEV] Email bind code for ${data.email}: ${code}`);

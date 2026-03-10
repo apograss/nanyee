@@ -60,11 +60,14 @@ model EmailVerification {
   email     String
   codeHash  String
   purpose   String    @default("register")
+  requestId String?
   expiresAt DateTime
   usedAt    DateTime?
   createdAt DateTime  @default(now())
 
   @@index([email])
+  @@index([email, purpose, requestId, usedAt, expiresAt])
+  @@index([requestId])
   @@index([expiresAt])
 }
 
