@@ -9,6 +9,7 @@ interface ArticleItem {
   tags?: string[];
   authorName?: string;
   viewCount?: number;
+  isPinned?: boolean;
 }
 
 interface ArticleListProps {

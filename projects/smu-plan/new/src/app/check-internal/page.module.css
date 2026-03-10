@@ -1,0 +1,575 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+}
+
+.progressShell {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(29, 53, 87, 0.08);
+}
+
+.progressBar {
+  height: 100%;
+  border-radius: inherit;
+}
+
+.progressBarLoading {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 36%;
+  background: linear-gradient(90deg, rgba(232, 101, 43, 0.18) 0%, rgba(69, 123, 157, 0.75) 45%, rgba(232, 101, 43, 0.18) 100%);
+  animation: progressSweep 1.25s ease-in-out infinite;
+}
+
+.hero {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.9fr);
+  gap: var(--space-lg);
+  padding: var(--space-xl);
+  border: var(--neo-border);
+  border-radius: calc(var(--neo-radius-lg) + 4px);
+  background:
+    radial-gradient(circle at top left, rgba(232, 101, 43, 0.18), transparent 34%),
+    radial-gradient(circle at bottom right, rgba(69, 123, 157, 0.16), transparent 30%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(255, 250, 237, 0.98));
+  box-shadow: 0 16px 32px rgba(29, 53, 87, 0.08);
+}
+
+.heroBackdrop {
+  position: absolute;
+  inset: auto -80px -120px auto;
+  width: 280px;
+  height: 280px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at center, rgba(168, 218, 220, 0.55), rgba(168, 218, 220, 0) 70%);
+  filter: blur(10px);
+  pointer-events: none;
+}
+
+.heroCopy,
+.heroStats {
+  position: relative;
+  z-index: 1;
+}
+
+.eyebrow,
+.sectionEyebrow,
+.providerLabel {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.heroTitle,
+.sectionTitle {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.heroTitle {
+  font-size: clamp(2.4rem, 4vw, 4.5rem);
+  line-height: 0.98;
+  letter-spacing: -0.04em;
+  max-width: 7ch;
+}
+
+.heroText,
+.sectionHint,
+.subtle,
+.incidentMeta,
+.metricNote,
+.metricLabel,
+.serviceProvider {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.heroText {
+  max-width: 62ch;
+  margin-top: var(--space-md);
+  font-size: var(--text-base);
+  line-height: 1.75;
+}
+
+.heroMetaRow {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  margin-top: var(--space-lg);
+}
+
+.heroPill,
+.heroPillMuted {
+  padding: 10px 14px;
+  border-radius: 999px;
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+}
+
+.heroPill {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(29, 53, 87, 0.12);
+}
+
+.heroPillMuted {
+  color: var(--text-secondary);
+  background: rgba(168, 218, 220, 0.18);
+  border: 1px solid rgba(69, 123, 157, 0.16);
+}
+
+.heroStats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-sm);
+  align-content: start;
+}
+
+.metricCard {
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(29, 53, 87, 0.12);
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 10px 20px rgba(29, 53, 87, 0.05);
+}
+
+.metricCardWarning {
+  background: linear-gradient(180deg, rgba(255, 243, 224, 0.95), rgba(255, 255, 255, 0.9));
+}
+
+.metricValue {
+  display: block;
+  margin-top: 10px;
+  font-size: clamp(1.55rem, 2vw, 2.2rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.metricNote {
+  margin-top: 12px;
+  line-height: 1.5;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.sectionHint {
+  max-width: 42ch;
+  text-align: right;
+}
+
+.providerGrid,
+.serviceGrid,
+.chartGrid,
+.loadingGrid {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.providerGrid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.serviceGrid {
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+
+.chartGrid {
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.providerCard,
+.serviceCard,
+.chartCard,
+.loadingCard,
+.loadingPage,
+.emptyState,
+.incident {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(29, 53, 87, 0.12);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 14px 28px rgba(29, 53, 87, 0.06);
+}
+
+.providerCard,
+.serviceCard,
+.chartCard,
+.loadingCard,
+.emptyState,
+.incident {
+  padding: var(--space-lg);
+}
+
+.providerCard::before,
+.serviceCard::before,
+.chartCard::before,
+.loadingCard::before,
+.incident::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: linear-gradient(90deg, rgba(232, 101, 43, 0.85), rgba(69, 123, 157, 0.85));
+}
+
+.providerCardChatgpt::before {
+  background: linear-gradient(90deg, #e8652b, #ffb36c);
+}
+
+.providerCardGrok::before {
+  background: linear-gradient(90deg, #1d3557, #457b9d);
+}
+
+.providerHeader,
+.serviceTop,
+.cardHeader,
+.chartHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  align-items: flex-start;
+}
+
+.providerValue {
+  margin: 10px 0 0;
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 0.95;
+  letter-spacing: -0.05em;
+}
+
+.providerValueMuted {
+  color: var(--text-muted);
+  font-size: 0.46em;
+  letter-spacing: normal;
+}
+
+.coverageBar {
+  display: flex;
+  overflow: hidden;
+  height: 10px;
+  margin: 20px 0 16px;
+  border-radius: 999px;
+  background: rgba(29, 53, 87, 0.08);
+}
+
+.coverageHealthy,
+.coverageUnknown,
+.coverageWarning,
+.coverageInvalid {
+  height: 100%;
+}
+
+.coverageHealthy {
+  background: linear-gradient(90deg, #2a9d8f, #68d5b9);
+}
+
+.coverageUnknown {
+  background: rgba(69, 123, 157, 0.22);
+}
+
+.coverageWarning {
+  background: #ffb703;
+}
+
+.coverageInvalid {
+  background: #e63946;
+}
+
+.providerStats,
+.providerFooter,
+.cardStats,
+.serviceMetrics {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.providerStats,
+.providerFooter {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.providerFooter {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed rgba(29, 53, 87, 0.15);
+}
+
+.serviceName {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+
+.serviceMetrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 16px;
+}
+
+.serviceMetrics div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.serviceMetrics strong,
+.metricLabel {
+  line-height: 1.3;
+}
+
+.serviceMetrics strong {
+  font-size: var(--text-base);
+  color: var(--text-primary);
+}
+
+.chartCard {
+  min-height: 360px;
+}
+
+.chartHeader h4 {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+
+.chartHeader p {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.incidentList {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.incident {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-md);
+}
+
+.incidentMarker {
+  width: 12px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #e8652b, #1d3557);
+}
+
+.incidentBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.errorText {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.65;
+  word-break: break-word;
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.emptyState strong {
+  font-size: var(--text-lg);
+}
+
+.emptyState p {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+
+.badge {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  font-weight: var(--font-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.badgeHealthy {
+  background: rgba(42, 157, 143, 0.14);
+  color: #1f8c7d;
+}
+
+.badgeDegraded {
+  background: rgba(255, 183, 3, 0.18);
+  color: #9f6700;
+}
+
+.badgeInvalid {
+  background: rgba(230, 57, 70, 0.14);
+  color: #d62839;
+}
+
+.badgeUnknown {
+  background: rgba(69, 123, 157, 0.12);
+  color: #456d88;
+}
+
+.loadingPage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  padding: var(--space-xl);
+}
+
+.loadingLine {
+  position: relative;
+  overflow: hidden;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(29, 53, 87, 0.08);
+}
+
+.loadingLine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.75) 50%, transparent 100%);
+  animation: shimmer 1.35s ease-in-out infinite;
+}
+
+.loadingLineHero {
+  height: 40px;
+  margin: var(--space-md) 0;
+}
+
+.loadingMetricGrid {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.chartPlaceholder {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  min-height: 280px;
+  padding-top: var(--space-sm);
+}
+
+.chartPlaceholderBody {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+  gap: var(--space-md);
+  flex: 1;
+}
+
+.chartPlaceholderAxis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-md);
+}
+
+.loadingLineMedium {
+  width: 72%;
+}
+
+.loadingLineShort {
+  width: 44%;
+}
+
+.loadingLineWide {
+  width: 100%;
+}
+
+.loadingLineTall {
+  width: 100%;
+  height: 180px;
+  border-radius: 24px 24px 10px 10px;
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes progressSweep {
+  0% {
+    transform: translateX(-110%);
+  }
+
+  100% {
+    transform: translateX(280%);
+  }
+}
+
+@media (max-width: 980px) {
+  .hero {
+    grid-template-columns: 1fr;
+  }
+
+  .heroTitle {
+    max-width: none;
+  }
+
+  .heroStats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sectionHint {
+    text-align: left;
+  }
+}
+
+@media (max-width: 720px) {
+  .hero,
+  .chartCard,
+  .providerCard,
+  .serviceCard,
+  .incident,
+  .loadingCard,
+  .emptyState {
+    padding: var(--space-md);
+  }
+
+  .heroStats,
+  .providerStats,
+  .providerFooter,
+  .serviceMetrics {
+    grid-template-columns: 1fr;
+  }
+
+  .incident {
+    grid-template-columns: 1fr;
+  }
+
+  .incidentMarker {
+    width: 100%;
+    height: 10px;
+  }
+}

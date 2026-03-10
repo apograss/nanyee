@@ -1,16 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyAccessToken } from "@/lib/auth/jwt";
-import { randomBytes } from "crypto";
+import { randomBytes, createHash } from "crypto";
+import { resolveOidcAppUrl } from "@/lib/oidc/config";
 
 /**
  * GET /api/oauth/authorize
  *
  * OIDC Authorization Endpoint.
- * Validates the request, checks user login, redirects to consent page.
+ * Validates the request, checks user login, creates an OAuthAuthorizationRequest,
+ * and redirects to the consent page with only request_id in the URL.
  */
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
+  const appBaseUrl = resolveOidcAppUrl("/", req.url, req.headers);
   const clientId = url.searchParams.get("client_id");
   const redirectUri = url.searchParams.get("redirect_uri");
   const responseType = url.searchParams.get("response_type");
@@ -67,31 +70,43 @@ export async function GET(req: NextRequest) {
 
   if (!payload) {
     // Not logged in — redirect to login with return URL
-    const loginUrl = new URL("/login", url.origin);
-    loginUrl.searchParams.set("redirect", req.url);
+    const loginUrl = new URL("/login", appBaseUrl);
+    const canonicalAuthorizeUrl = new URL(url.pathname, appBaseUrl);
+    canonicalAuthorizeUrl.search = url.search;
+    loginUrl.searchParams.set("redirect", canonicalAuthorizeUrl.toString());
     return Response.redirect(loginUrl.toString());
   }
 
-  // User is logged in — redirect to consent page
-  const consentUrl = new URL("/oauth/consent", url.origin);
-  consentUrl.searchParams.set("client_id", clientId);
-  consentUrl.searchParams.set("redirect_uri", redirectUri);
-  consentUrl.searchParams.set("scope", scope);
-  if (state) consentUrl.searchParams.set("state", state);
-  if (nonce) consentUrl.searchParams.set("nonce", nonce);
-  if (codeChallenge) consentUrl.searchParams.set("code_challenge", codeChallenge);
-  if (codeChallengeMethod) consentUrl.searchParams.set("code_challenge_method", codeChallengeMethod);
-
-  // [C2 FIX] Generate CSRF token and set as httpOnly cookie
+  // Generate CSRF token
   const csrfToken = randomBytes(32).toString("hex");
-  consentUrl.searchParams.set("csrf_token", csrfToken);
+  const csrfTokenHash = createHash("sha256").update(csrfToken).digest("hex");
+
+  // Create OAuthAuthorizationRequest (server-side state)
+  const authRequest = await prisma.oAuthAuthorizationRequest.create({
+    data: {
+      userId: payload.sub,
+      clientId,
+      redirectUri,
+      scope,
+      state: state || null,
+      nonce: nonce || null,
+      codeChallenge: codeChallenge || null,
+      codeChallengeMethod: codeChallengeMethod || null,
+      csrfTokenHash,
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes
+    },
+  });
+
+  // Redirect to consent page with only request_id
+  const consentUrl = new URL("/oauth/consent", appBaseUrl);
+  consentUrl.searchParams.set("request_id", authRequest.id);
 
   const res = NextResponse.redirect(consentUrl.toString());
   res.cookies.set("oauth_csrf", csrfToken, {
     httpOnly: true,
     sameSite: "strict",
     path: "/",
-    maxAge: 300, // 5 minutes — enough for consent flow
+    maxAge: 300,
     secure: process.env.NODE_ENV === "production",
   });
   return res;

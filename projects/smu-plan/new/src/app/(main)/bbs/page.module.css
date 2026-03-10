@@ -7,6 +7,18 @@
   gap: var(--space-lg);
 }
 
+.migrationNotice {
+  text-align: center;
+  padding: var(--space-3xl) var(--space-xl);
+  background: var(--bg-secondary);
+  border: var(--neo-border);
+  box-shadow: var(--neo-shadow);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-lg);
+}
+
 .header {
   display: flex;
   justify-content: space-between;

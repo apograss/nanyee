@@ -13,6 +13,7 @@ export async function GET(req: NextRequest) {
         id: true,
         username: true,
         nickname: true,
+        avatarUrl: true,
         email: true,
         role: true,
         emailVerifiedAt: true,

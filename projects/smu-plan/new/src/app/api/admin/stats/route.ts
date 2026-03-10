@@ -6,20 +6,11 @@ export async function GET(req: NextRequest) {
   try {
     await requireAdmin(req);
 
-    const [
-      totalUsers,
-      totalArticles,
-      totalSearches,
-      totalToolRuns,
-      activeKeys,
-      activeTokens,
-    ] = await Promise.all([
+    const [totalUsers, totalArticles, totalSearches, totalToolRuns] = await Promise.all([
       prisma.user.count(),
       prisma.article.count({ where: { status: "published" } }),
       prisma.searchLog.count(),
       prisma.toolRun.count(),
-      prisma.providerKey.count({ where: { status: "active" } }),
-      prisma.apiToken.count({ where: { status: "active" } }),
     ]);
 
     return Response.json({
@@ -29,8 +20,6 @@ export async function GET(req: NextRequest) {
         totalArticles,
         totalSearches,
         totalToolRuns,
-        activeKeys,
-        activeTokens,
       },
     });
   } catch (err) {

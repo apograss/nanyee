@@ -1,0 +1,279 @@
+﻿.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+}
+
+.progressShell {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
+}
+
+.progressBar {
+  height: 100%;
+  border-radius: inherit;
+}
+
+.progressBarRefresh {
+  background: linear-gradient(90deg, #2563eb 0%, #38bdf8 100%);
+  transition: width 0.35s ease;
+}
+
+.progressBarLoading {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 38%;
+  background: linear-gradient(90deg, rgba(37, 99, 235, 0.2) 0%, #60a5fa 50%, rgba(37, 99, 235, 0.2) 100%);
+  animation: progressSweep 1.2s ease-in-out infinite;
+}
+
+.header,
+.filterBar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.title,
+.sectionTitle {
+  margin: 0;
+}
+
+.subtitle,
+.meta {
+  margin: var(--space-xs) 0 0;
+  color: var(--text-secondary);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.grid,
+.loadingGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-md);
+}
+
+.card,
+.empty,
+.loadingCard,
+.loadingTable,
+.loadingPage {
+  padding: var(--space-lg);
+  border: var(--neo-border);
+  border-radius: var(--neo-radius);
+  background: var(--bg-primary);
+}
+
+.loadingPage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.loadingHeader {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+.metric {
+  margin: var(--space-md) 0;
+  font-size: 2rem;
+  font-weight: var(--font-bold);
+}
+
+.kv,
+.loadingMetricGrid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-xs) var(--space-sm);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.badge {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  font-weight: var(--font-bold);
+  text-transform: uppercase;
+}
+
+.badgeHealthy {
+  background: rgba(42, 157, 143, 0.16);
+  color: #2a9d8f;
+}
+
+.badgeDegraded {
+  background: rgba(255, 159, 28, 0.16);
+  color: #ff9f1c;
+}
+
+.badgeInvalid {
+  background: rgba(230, 57, 70, 0.16);
+  color: #e63946;
+}
+
+.badgeUnknown {
+  background: rgba(108, 117, 125, 0.16);
+  color: #6c757d;
+}
+
+.linkRow,
+.filters {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.linkButton,
+.select {
+  padding: var(--space-xs) var(--space-sm);
+  border: var(--neo-border);
+  border-radius: var(--neo-radius);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  text-decoration: none;
+  font: inherit;
+}
+
+.linkButton {
+  cursor: pointer;
+}
+
+.linkButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.refreshMeta,
+.refreshError {
+  margin: 0;
+  width: 100%;
+  font-size: var(--text-sm);
+}
+
+.refreshMeta {
+  color: var(--text-secondary);
+}
+
+.refreshError {
+  color: #e63946;
+}
+
+.tableWrap {
+  overflow-x: auto;
+  border: var(--neo-border);
+  border-radius: var(--neo-radius);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--bg-primary);
+}
+
+.table th,
+.table td {
+  padding: var(--space-sm);
+  border-bottom: 1px solid var(--border-color);
+  text-align: left;
+  vertical-align: top;
+  font-size: var(--text-sm);
+}
+
+.errorCell,
+.errorText {
+  color: var(--text-secondary);
+  word-break: break-word;
+}
+
+.incidentList {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.loadingTable {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.loadingTableHeader {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.loadingRow {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1.2fr 1fr;
+  gap: var(--space-sm);
+}
+
+.loadingLine {
+  position: relative;
+  overflow: hidden;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
+}
+
+.loadingLine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.7) 50%, transparent 100%);
+  animation: shimmer 1.35s ease-in-out infinite;
+}
+
+.loadingLineHero {
+  height: 36px;
+  margin: var(--space-md) 0;
+}
+
+.loadingLineWide {
+  width: 100%;
+}
+
+.loadingLineMedium {
+  width: 70%;
+}
+
+.loadingLineShort {
+  width: 46%;
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes progressSweep {
+  0% {
+    transform: translateX(-110%);
+  }
+
+  100% {
+    transform: translateX(270%);
+  }
+}

@@ -55,6 +55,7 @@ export function handleAuthError(err: unknown) {
       { status: err.status }
     );
   }
+  console.error("API Error caught by handleAuthError:", err);
   return Response.json(
     { ok: false, error: { code: 500, message: "Internal Server Error" } },
     { status: 500 }

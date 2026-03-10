@@ -22,8 +22,15 @@
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Greeting */
@@ -161,8 +168,15 @@
 }
 
 @keyframes dropdownIn {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .historyHeader {
@@ -485,7 +499,7 @@
 /* ═══ Responsive ═══ */
 @media (max-width: 768px) {
   .idle {
-    padding: var(--space-lg) var(--space-md) var(--space-2xl);
+    padding: var(--space-md) var(--space-md) var(--space-2xl);
   }
 
   .hero {
@@ -505,25 +519,36 @@
   }
 
   .promptChips {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    justify-content: flex-start;
-    padding-bottom: var(--space-xs);
-    -ms-overflow-style: none;
-    scrollbar-width: none;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-sm);
+    width: 100%;
   }
 
-  .promptChips::-webkit-scrollbar {
-    display: none;
+  .chip {
+    padding: 8px 10px;
+    font-size: var(--text-xs);
+    justify-content: center;
+    width: 100%;
   }
 
   .toolStrip {
+    display: flex;
     flex-direction: column;
-    align-items: stretch;
+    gap: var(--space-sm);
+    width: 100%;
+  }
+
+  .toolMini {
+    width: 100%;
+    padding: var(--space-md);
   }
 
   .toolMiniDesc {
-    display: inline;
+    display: block;
+    margin-top: 4px;
+    font-size: var(--text-xs);
+    color: var(--text-muted);
   }
 
   .chatBar {

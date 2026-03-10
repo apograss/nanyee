@@ -1,29 +1,42 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireUser, requireAdmin, handleAuthError } from "@/lib/auth/guard";
+import { getAuthContext, requireUser, requireAdmin, handleAuthError } from "@/lib/auth/guard";
+import { clearWikiSearchCache } from "@/lib/wiki/search-cache";
+import { sanitizeContent } from "@/lib/wiki/content";
+import { canEditArticle } from "@/lib/wiki/permissions";
+import { checkEditRateLimit } from "@/lib/wiki/edit-rate-limit";
+import { createRevision } from "@/lib/wiki/revisions";
+import { presentPublicUser } from "@/lib/user-presenter";
 import { z } from "zod";
 
-// GET /api/wiki/[slug] — article detail (lookup by slug)
+// GET /api/wiki/[slug] — article detail (lookup by slug or id)
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
+  const auth = await getAuthContext(req);
 
   // Try slug first, then fall back to id
   let article = await prisma.article.findUnique({
     where: { slug },
-    include: { author: { select: { username: true, nickname: true } } },
+    include: {
+      author: { select: { id: true, username: true, nickname: true, status: true } },
+      lastEditor: { select: { id: true, username: true, nickname: true, status: true } },
+    },
   });
 
   if (!article) {
     article = await prisma.article.findUnique({
       where: { id: slug },
-      include: { author: { select: { username: true, nickname: true } } },
+      include: {
+        author: { select: { id: true, username: true, nickname: true, status: true } },
+        lastEditor: { select: { id: true, username: true, nickname: true, status: true } },
+      },
     });
   }
 
-  if (!article || article.status !== "published") {
+  if (!article || (article.status !== "published" && auth?.role !== "admin")) {
     return Response.json(
       { ok: false, error: { code: 404, message: "Article not found" } },
       { status: 404 }
@@ -42,11 +55,16 @@ export async function GET(
       title: article.title,
       slug: article.slug,
       content: article.content,
+      format: article.format,
       summary: article.summary,
       category: article.category,
       tags: article.tags ? JSON.parse(article.tags) : [],
       viewCount: article.viewCount,
-      authorName: article.author.nickname || article.author.username,
+      authorId: article.author.id,
+      authorName: presentPublicUser(article.author).displayName,
+      lastEditorName: article.lastEditor ? presentPublicUser(article.lastEditor).displayName : null,
+      isLocked: article.isLocked,
+      lockedBy: article.lockedBy,
       publishedAt: article.publishedAt?.toISOString(),
       createdAt: article.createdAt.toISOString(),
       updatedAt: article.updatedAt.toISOString(),
@@ -57,12 +75,14 @@ export async function GET(
 const updateSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   content: z.string().min(1).optional(),
+  format: z.enum(["html", "markdown"]).optional(),
   summary: z.string().max(500).optional(),
   category: z.string().max(50).optional(),
   tags: z.array(z.string()).max(10).optional(),
+  editSummary: z.string().max(200).optional(),
 });
 
-// PUT /api/wiki/[slug] — update article (param is article id)
+// PUT /api/wiki/[slug] — collaborative edit (param is article id)
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
@@ -70,6 +90,15 @@ export async function PUT(
   try {
     const { slug: id } = await params;
     const auth = await requireUser(req);
+
+    const { allowed, retryAfterMs } = checkEditRateLimit(auth.userId);
+    if (!allowed) {
+      return Response.json(
+        { ok: false, error: { code: 429, message: "编辑过于频繁，请稍后再试" } },
+        { status: 429, headers: { "Retry-After": String(Math.ceil((retryAfterMs || 60000) / 1000)) } }
+      );
+    }
+
     const body = await req.json();
     const data = updateSchema.parse(body);
 
@@ -81,20 +110,44 @@ export async function PUT(
       );
     }
 
-    if (article.authorId !== auth.userId && auth.role !== "admin") {
+    if (!canEditArticle(article, auth)) {
       return Response.json(
-        { ok: false, error: { code: 403, message: "Forbidden" } },
+        { ok: false, error: { code: 403, message: "文章已锁定，无法编辑" } },
         { status: 403 }
       );
     }
 
+    // Create a revision snapshot of the current state before applying changes
+    await createRevision({
+      articleId: article.id,
+      title: article.title,
+      content: article.content,
+      format: article.format,
+      summary: article.summary,
+      editorId: auth.userId,
+      editSummary: data.editSummary,
+    });
+
+    // Sanitize HTML content
+    const format = data.format || article.format;
+    const content = data.content
+      ? (format === "html" ? sanitizeContent(data.content) : data.content)
+      : undefined;
+
     const updated = await prisma.article.update({
       where: { id },
       data: {
-        ...data,
-        tags: data.tags ? JSON.stringify(data.tags) : undefined,
+        ...(data.title && { title: data.title }),
+        ...(content && { content }),
+        ...(data.format && { format: data.format }),
+        ...(data.summary !== undefined && { summary: data.summary }),
+        ...(data.category !== undefined && { category: data.category }),
+        ...(data.tags && { tags: JSON.stringify(data.tags) }),
+        lastEditorId: auth.userId,
       },
     });
+
+    clearWikiSearchCache();
 
     return Response.json({
       ok: true,
@@ -111,37 +164,39 @@ export async function PUT(
   }
 }
 
-// POST /api/wiki/[slug] — submit article for review (param is article id)
-export async function POST(
+// DELETE /api/wiki/[slug] — admin-only hide article
+export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
     const { slug: id } = await params;
-    const auth = await requireUser(req);
+    const auth = await requireAdmin(req);
 
-    const article = await prisma.article.findUnique({ where: { id } });
-    if (!article) {
+    await prisma.article.update({
+      where: { id },
+      data: { status: "hidden" },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        actorId: auth.userId,
+        action: "article.hide",
+        targetType: "Article",
+        targetId: id,
+      },
+    });
+
+    clearWikiSearchCache();
+
+    return Response.json({ ok: true });
+  } catch (err) {
+    if ((err as { code?: string }).code === "P2025") {
       return Response.json(
         { ok: false, error: { code: 404, message: "Not found" } },
         { status: 404 }
       );
     }
-
-    if (article.authorId !== auth.userId && auth.role !== "admin") {
-      return Response.json(
-        { ok: false, error: { code: 403, message: "Forbidden" } },
-        { status: 403 }
-      );
-    }
-
-    await prisma.article.update({
-      where: { id },
-      data: { status: "pending" },
-    });
-
-    return Response.json({ ok: true });
-  } catch (err) {
     return handleAuthError(err);
   }
 }

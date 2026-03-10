@@ -1,59 +1,13 @@
 import { NextRequest } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { requireAdmin, handleAuthError } from "@/lib/auth/guard";
 
+// POST /api/admin/audit/[id]/[action] — RETIRED
+// The submit→review→publish workflow has been replaced by wiki-style open editing.
 export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string; action: string }> }
+  _req: NextRequest,
+  { params: _params }: { params: Promise<{ id: string; action: string }> }
 ) {
-  try {
-    const auth = await requireAdmin(req);
-    const { id, action } = await params;
-
-    const article = await prisma.article.findUnique({ where: { id } });
-    if (!article) {
-      return Response.json(
-        { ok: false, error: { code: 404, message: "Not found" } },
-        { status: 404 }
-      );
-    }
-
-    if (action === "publish") {
-      await prisma.article.update({
-        where: { id },
-        data: {
-          status: "published",
-          publishedAt: new Date(),
-          reviewerId: auth.userId,
-        },
-      });
-    } else if (action === "reject") {
-      await prisma.article.update({
-        where: { id },
-        data: {
-          status: "rejected",
-          reviewerId: auth.userId,
-        },
-      });
-    } else {
-      return Response.json(
-        { ok: false, error: { code: 400, message: "Invalid action" } },
-        { status: 400 }
-      );
-    }
-
-    // Audit log
-    await prisma.auditLog.create({
-      data: {
-        actorId: auth.userId,
-        action: `article.${action}`,
-        targetType: "article",
-        targetId: id,
-      },
-    });
-
-    return Response.json({ ok: true });
-  } catch (err) {
-    return handleAuthError(err);
-  }
+  return Response.json(
+    { ok: false, error: { code: 410, message: "审核工作流已停用。文章现在采用 Wiki 模式，登录用户可直接编辑。" } },
+    { status: 410 }
+  );
 }

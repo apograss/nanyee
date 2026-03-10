@@ -1,10 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { compare } from "bcryptjs";
 import { z } from "zod";
-import { signAccessToken, signRefreshToken } from "@/lib/auth/jwt";
-import { createSession } from "@/lib/auth/session";
-import { setAuthCookies } from "@/lib/auth/cookies";
+import { issueUserSession } from "@/lib/auth/session";
 
 const loginSchema = z.object({
   username: z.string().min(1),
@@ -33,61 +31,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (user.status === "banned") {
-      return Response.json(
-        { ok: false, error: { code: 403, message: "Account is banned" } },
-        { status: 403 }
-      );
-    }
-
     const valid = await compare(data.password, user.passwordHash);
-    if (!valid) {
+    if (!valid || user.status !== "active") {
       return Response.json(
         { ok: false, error: { code: 401, message: "Invalid credentials" } },
         { status: 401 }
       );
     }
 
-    // Create tokens
-    const accessToken = await signAccessToken({
-      userId: user.id,
-      role: user.role,
-      username: user.username,
-    });
-
-    const session = await createSession(user.id, "temp", {
-      ip: req.headers.get("x-forwarded-for") || undefined,
-      userAgent: req.headers.get("user-agent") || undefined,
-    });
-
-    const refreshToken = await signRefreshToken({
-      userId: user.id,
-      sessionId: session.id,
-    });
-
-    // Update session with real refresh token hash
-    const { hash } = await import("bcryptjs");
-    await prisma.session.update({
-      where: { id: session.id },
-      data: { refreshTokenHash: await hash(refreshToken, 10) },
-    });
-
-    const res = NextResponse.json(
-      {
-        ok: true,
-        data: {
-          user: {
-            id: user.id,
-            username: user.username,
-            nickname: user.nickname,
-            role: user.role,
-          },
+    return issueUserSession(req, user, {
+      ok: true,
+      data: {
+        user: {
+          id: user.id,
+          username: user.username,
+          nickname: user.nickname,
+          role: user.role,
         },
       },
-      { status: 200 }
-    );
-
-    return setAuthCookies(res, { accessToken, refreshToken });
+    });
   } catch (err) {
     if (err instanceof z.ZodError) {
       return Response.json(

@@ -3,10 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { compare, hash } from "bcryptjs";
 import { z } from "zod";
 import { requireUser, handleAuthError } from "@/lib/auth/guard";
+import { revokeOtherSessions } from "@/lib/auth/session";
+import { verifyRefreshToken } from "@/lib/auth/jwt";
 
 const schema = z.object({
   oldPassword: z.string().min(1),
   newPassword: z.string().min(6).max(100),
+  revokeOtherSessions: z.boolean().default(true),
 });
 
 export async function POST(req: NextRequest) {
@@ -34,7 +37,23 @@ export async function POST(req: NextRequest) {
       data: { passwordHash },
     });
 
-    return Response.json({ ok: true, data: { message: "密码修改成功" } });
+    let revokedCount = 0;
+    if (data.revokeOtherSessions) {
+      const refreshToken = req.cookies.get("refresh_token")?.value;
+      const payload = refreshToken ? await verifyRefreshToken(refreshToken) : null;
+      if (payload?.sid) {
+        revokedCount = await revokeOtherSessions(
+          ctx.userId,
+          payload.sid,
+          "password_changed"
+        );
+      }
+    }
+
+    return Response.json({
+      ok: true,
+      data: { message: "密码修改成功", revokedCount },
+    });
   } catch (err) {
     if (err instanceof z.ZodError) {
       return Response.json(

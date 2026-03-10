@@ -10,6 +10,7 @@ interface ArticleCardProps {
   tags?: string[];
   authorName?: string;
   viewCount?: number;
+  isPinned?: boolean;
 }
 
 export default function ArticleCard({
@@ -20,9 +21,11 @@ export default function ArticleCard({
   tags,
   authorName,
   viewCount,
+  isPinned,
 }: ArticleCardProps) {
   return (
-    <Link href={`/kb/${id}`} className={styles.card}>
+    <Link href={`/kb/${id}`} className={`${styles.card} ${isPinned ? styles.pinned : ""}`}>
+      {isPinned && <span className={styles.pinBadge}>&#x1F4CC; 置顶</span>}
       <h3 className={styles.title}>{title}</h3>
       {excerpt && <p className={styles.excerpt}>{excerpt}</p>}
       <div className={styles.meta}>
@@ -31,7 +34,7 @@ export default function ArticleCard({
           {new Date(date).toLocaleDateString("zh-CN")}
         </span>
         {viewCount !== undefined && (
-          <span className={styles.views}>{viewCount} views</span>
+          <span className={styles.views}>{viewCount} 次浏览</span>
         )}
       </div>
       {tags && tags.length > 0 && (

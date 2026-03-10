@@ -2,19 +2,12 @@
 
 import Link from "next/link";
 
+import styles from "./ArticleEditButton.module.css";
+
 export default function ArticleEditButton({ articleId }: { articleId: string }) {
   return (
-    <Link
-      href={`/editor?id=${articleId}`}
-      style={{
-        fontWeight: "bold",
-        fontSize: "var(--text-sm)",
-        color: "var(--color-brand)",
-        textDecoration: "underline",
-        cursor: "pointer",
-      }}
-    >
-      编辑
+    <Link href={`/editor?id=${articleId}`} className={styles.button}>
+      参与编辑
     </Link>
   );
 }

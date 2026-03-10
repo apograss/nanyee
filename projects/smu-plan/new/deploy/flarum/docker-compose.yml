@@ -1,0 +1,64 @@
+services:
+  mariadb:
+    image: mariadb:11.4
+    container_name: nanyee-flarum-db
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --transaction-isolation=READ-COMMITTED
+      - --binlog-format=ROW
+    environment:
+      MARIADB_DATABASE: ${DB_NAME}
+      MARIADB_USER: ${DB_USER}
+      MARIADB_PASSWORD: ${DB_PASS}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASS}
+      TZ: ${TZ:-Asia/Shanghai}
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "-h", "127.0.0.1", "-u${DB_USER}", "-p${DB_PASS}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  flarum:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: nanyee-flarum:oauth
+    container_name: nanyee-flarum
+    restart: unless-stopped
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "nanyee.de:host-gateway"
+    env_file:
+      - .env
+    environment:
+      DB_HOST: mariadb
+      DB_PORT: 3306
+      LOG_TO_STDOUT: "true"
+      PHP_MEMORY_LIMIT: 256M
+      OPCACHE_MEMORY_LIMIT: 192
+      UPLOAD_MAX_SIZE: 32M
+      FLARUM_PORT: 8888
+    ports:
+      - "127.0.0.1:${FLARUM_HOST_PORT:-8890}:8888"
+    volumes:
+      - flarum-assets:/flarum/app/public/assets
+      - flarum-extensions:/flarum/app/extensions
+      - flarum-logs:/flarum/app/storage/logs
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8888 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  mariadb-data:
+  flarum-assets:
+  flarum-extensions:
+  flarum-logs:

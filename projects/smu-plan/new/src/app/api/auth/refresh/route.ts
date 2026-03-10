@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { compare } from "bcryptjs";
 import { verifyRefreshToken, signAccessToken, signRefreshToken } from "@/lib/auth/jwt";
-import { findActiveSession, rotateSession } from "@/lib/auth/session";
+import { findActiveSession, rotateSession, revokeSession } from "@/lib/auth/session";
 import { setAuthCookies } from "@/lib/auth/cookies";
 
 export async function POST(req: NextRequest) {
@@ -27,6 +27,15 @@ export async function POST(req: NextRequest) {
       return Response.json(
         { ok: false, error: { code: 401, message: "Session expired or revoked" } },
         { status: 401 }
+      );
+    }
+
+    // Reject if user is no longer active (banned or deleted)
+    if (session.user.status !== "active") {
+      await revokeSession(session.id, "user_not_active");
+      return Response.json(
+        { ok: false, error: { code: 403, message: "Account is not active" } },
+        { status: 403 }
       );
     }
 

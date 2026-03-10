@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyAccessToken } from "@/lib/auth/jwt";
-import { randomBytes, timingSafeEqual } from "crypto";
+import { randomBytes, createHash, timingSafeEqual } from "crypto";
 
 /**
  * POST /api/oauth/authorize/confirm
  *
- * User has consented — generate authorization code and redirect back to client.
- * Protected by CSRF token (set as cookie by /api/oauth/authorize, validated here).
+ * User has consented — consume the OAuthAuthorizationRequest,
+ * generate authorization code, and redirect back to client.
+ * Protected by CSRF token stored hashed in the request record.
  */
 export async function POST(req: NextRequest) {
   // Verify user is logged in
@@ -22,80 +23,116 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const {
-    client_id: clientId,
-    redirect_uri: redirectUri,
-    scope = "openid",
-    state,
-    nonce,
-    code_challenge: codeChallenge,
-    code_challenge_method: codeChallengeMethod,
-    csrf_token: csrfToken,
-  } = body;
+  const { request_id: requestId, decision } = body;
 
-  // [C2 FIX] Validate CSRF token
+  if (!requestId) {
+    return Response.json(
+      { error: "invalid_request", error_description: "Missing request_id" },
+      { status: 400 }
+    );
+  }
+
+  // Validate CSRF token from cookie against the stored hash
   const csrfCookie = req.cookies.get("oauth_csrf")?.value;
-  if (!csrfCookie || !csrfToken) {
+  if (!csrfCookie) {
     return Response.json(
       { error: "invalid_request", error_description: "Missing CSRF token" },
       { status: 403 }
     );
   }
-  const csrfExpected = Buffer.from(csrfCookie, "utf8");
-  const csrfActual = Buffer.from(csrfToken, "utf8");
-  if (csrfExpected.length !== csrfActual.length || !timingSafeEqual(csrfExpected, csrfActual)) {
+
+  // Load the authorization request
+  const authRequest = await prisma.oAuthAuthorizationRequest.findUnique({
+    where: { id: requestId },
+  });
+
+  if (!authRequest) {
+    return Response.json(
+      { error: "invalid_request", error_description: "Request not found" },
+      { status: 404 }
+    );
+  }
+
+  // Verify this request belongs to the current user
+  if (authRequest.userId !== payload.sub) {
+    return Response.json(
+      { error: "invalid_request", error_description: "Request does not belong to current user" },
+      { status: 403 }
+    );
+  }
+
+  // Verify not already consumed or denied
+  if (authRequest.consumedAt || authRequest.deniedAt) {
+    return Response.json(
+      { error: "invalid_request", error_description: "Request already used" },
+      { status: 410 }
+    );
+  }
+
+  // Verify not expired
+  if (authRequest.expiresAt < new Date()) {
+    return Response.json(
+      { error: "invalid_request", error_description: "Request expired" },
+      { status: 410 }
+    );
+  }
+
+  // Verify CSRF token (timing-safe comparison of hashes)
+  const csrfHash = createHash("sha256").update(csrfCookie).digest("hex");
+  const expected = Buffer.from(authRequest.csrfTokenHash, "utf8");
+  const actual = Buffer.from(csrfHash, "utf8");
+  if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) {
     return Response.json(
       { error: "invalid_request", error_description: "CSRF token mismatch" },
       { status: 403 }
     );
   }
 
-  if (!clientId || !redirectUri) {
-    return Response.json(
-      { error: "invalid_request", error_description: "Missing required parameters" },
-      { status: 400 }
-    );
+  // Handle deny
+  if (decision === "deny") {
+    await prisma.oAuthAuthorizationRequest.update({
+      where: { id: requestId },
+      data: { deniedAt: new Date() },
+    });
+
+    const denyUrl = new URL(authRequest.redirectUri);
+    denyUrl.searchParams.set("error", "access_denied");
+    denyUrl.searchParams.set("error_description", "User denied the request");
+    if (authRequest.state) denyUrl.searchParams.set("state", authRequest.state);
+
+    const res = NextResponse.json({ redirect: denyUrl.toString() });
+    res.cookies.set("oauth_csrf", "", { maxAge: 0, path: "/" });
+    return res;
   }
 
-  // Re-validate client + redirect_uri
-  const client = await prisma.oAuthClient.findUnique({ where: { clientId } });
-  if (!client) {
-    return Response.json(
-      { error: "invalid_client", error_description: "Unknown client_id" },
-      { status: 400 }
-    );
-  }
-
-  const registeredUris: string[] = JSON.parse(client.redirectUris);
-  if (!registeredUris.includes(redirectUri)) {
-    return Response.json(
-      { error: "invalid_request", error_description: "redirect_uri not registered" },
-      { status: 400 }
-    );
-  }
-
-  // Generate authorization code
+  // Handle allow: generate authorization code
   const code = randomBytes(32).toString("hex");
-  const expiresAt = new Date(Date.now() + 2 * 60 * 1000); // 2 minutes
+  const codeExpiresAt = new Date(Date.now() + 2 * 60 * 1000); // 2 minutes
 
-  await prisma.oidcCode.create({
-    data: {
-      code,
-      clientId,
-      userId: payload.sub,
-      redirectUri,
-      scope,
-      nonce: nonce || null,
-      codeChallenge: codeChallenge || null,
-      codeChallengeMethod: codeChallengeMethod || null,
-      expiresAt,
-    },
-  });
+  await prisma.$transaction([
+    prisma.oAuthAuthorizationRequest.update({
+      where: { id: requestId },
+      data: { consumedAt: new Date() },
+    }),
+    prisma.oidcCode.create({
+      data: {
+        code,
+        clientId: authRequest.clientId,
+        userId: payload.sub,
+        redirectUri: authRequest.redirectUri,
+        scope: authRequest.scope,
+        nonce: authRequest.nonce,
+        codeChallenge: authRequest.codeChallenge,
+        codeChallengeMethod: authRequest.codeChallengeMethod,
+        expiresAt: codeExpiresAt,
+      },
+    }),
+  ]);
 
   // Build redirect URL
-  const callbackUrl = new URL(redirectUri);
+  const callbackUrl = new URL(authRequest.redirectUri);
   callbackUrl.searchParams.set("code", code);
-  if (state) callbackUrl.searchParams.set("state", state);
+  if (authRequest.state) callbackUrl.searchParams.set("state", authRequest.state);
 
   // Clear the CSRF cookie
   const res = NextResponse.json({ redirect: callbackUrl.toString() });

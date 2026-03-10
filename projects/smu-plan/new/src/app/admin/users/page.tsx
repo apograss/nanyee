@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import NeoButton from "@/components/atoms/NeoButton";
 import NeoInput from "@/components/atoms/NeoInput";
 import Badge from "@/components/atoms/Badge";
+import ConfirmDialog from "@/components/molecules/ConfirmDialog";
 import styles from "../audit/page.module.css";
 
 interface UserItem {
@@ -20,6 +21,8 @@ export default function UsersPage() {
   const [users, setUsers] = useState<UserItem[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [deleteTarget, setDeleteTarget] = useState<UserItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -67,6 +70,31 @@ export default function UsersPage() {
     }
   };
 
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/admin/users/${deleteTarget.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setUsers((prev) =>
+          prev.map((u) =>
+            u.id === deleteTarget.id ? { ...u, status: "deleted" } : u
+          )
+        );
+        setDeleteTarget(null);
+      } else {
+        alert(data.error?.message || "删除失败");
+      }
+    } catch {
+      alert("网络错误");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const roleColor = (role: string) => {
     switch (role) {
       case "admin":
@@ -79,7 +107,15 @@ export default function UsersPage() {
   };
 
   const statusColor = (status: string) => {
-    return status === "active" ? ("success" as const) : ("error" as const);
+    if (status === "active") return "success" as const;
+    if (status === "deleted") return "mint" as const;
+    return "error" as const;
+  };
+
+  const statusLabel = (status: string) => {
+    if (status === "active") return "正常";
+    if (status === "deleted") return "已注销";
+    return "封禁";
   };
 
   return (
@@ -117,7 +153,14 @@ export default function UsersPage() {
           </thead>
           <tbody>
             {users.map((user) => (
-              <tr key={user.id}>
+              <tr
+                key={user.id}
+                style={
+                  user.status === "deleted"
+                    ? { opacity: 0.5 }
+                    : undefined
+                }
+              >
                 <td style={{ fontWeight: 600 }}>{user.username}</td>
                 <td className={styles.mono}>{user.email || "—"}</td>
                 <td>{user.nickname || "—"}</td>
@@ -126,7 +169,7 @@ export default function UsersPage() {
                 </td>
                 <td>
                   <Badge
-                    text={user.status === "active" ? "正常" : "封禁"}
+                    text={statusLabel(user.status)}
                     colorVariant={statusColor(user.status)}
                   />
                 </td>
@@ -134,42 +177,55 @@ export default function UsersPage() {
                   {new Date(user.createdAt).toLocaleDateString("zh-CN")}
                 </td>
                 <td>
-                  <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
-                    {user.role !== "admin" && (
+                  {user.status === "deleted" ? (
+                    <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
+                      已注销
+                    </span>
+                  ) : (
+                    <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+                      {user.role !== "admin" && (
+                        <NeoButton
+                          size="sm"
+                          variant="primary"
+                          onClick={() => handleChangeRole(user.id, "admin")}
+                        >
+                          设为管理
+                        </NeoButton>
+                      )}
+                      {user.role !== "editor" && (
+                        <NeoButton
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => handleChangeRole(user.id, "editor")}
+                        >
+                          设为编辑
+                        </NeoButton>
+                      )}
+                      {user.role !== "contributor" && (
+                        <NeoButton
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => handleChangeRole(user.id, "contributor")}
+                        >
+                          设为用户
+                        </NeoButton>
+                      )}
                       <NeoButton
                         size="sm"
-                        variant="primary"
-                        onClick={() => handleChangeRole(user.id, "admin")}
+                        variant={user.status === "active" ? "danger" : "primary"}
+                        onClick={() => handleToggleStatus(user.id, user.status)}
                       >
-                        设为管理
+                        {user.status === "active" ? "封禁" : "解封"}
                       </NeoButton>
-                    )}
-                    {user.role !== "editor" && (
                       <NeoButton
                         size="sm"
-                        variant="secondary"
-                        onClick={() => handleChangeRole(user.id, "editor")}
+                        variant="danger"
+                        onClick={() => setDeleteTarget(user)}
                       >
-                        设为编辑
+                        删除
                       </NeoButton>
-                    )}
-                    {user.role !== "contributor" && (
-                      <NeoButton
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => handleChangeRole(user.id, "contributor")}
-                      >
-                        设为用户
-                      </NeoButton>
-                    )}
-                    <NeoButton
-                      size="sm"
-                      variant={user.status === "active" ? "danger" : "primary"}
-                      onClick={() => handleToggleStatus(user.id, user.status)}
-                    >
-                      {user.status === "active" ? "封禁" : "解封"}
-                    </NeoButton>
-                  </div>
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}
@@ -186,6 +242,16 @@ export default function UsersPage() {
           </tbody>
         </table>
       </div>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="删除用户"
+        message={`确定要删除用户「${deleteTarget?.nickname || deleteTarget?.username}」吗？该操作会注销账号、撤销所有登录会话，用户发布的内容将保留但显示为"已注销用户"。`}
+        confirmLabel="确认删除"
+        loading={deleting}
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

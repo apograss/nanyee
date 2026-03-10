@@ -18,6 +18,26 @@
   color: inherit;
 }
 
+.card:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+.pinned {
+  border-top: 3px solid var(--color-brand);
+  background: color-mix(in srgb, var(--color-brand) 5%, var(--bg-secondary));
+}
+
+.pinBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: var(--font-bold);
+  color: var(--color-brand);
+  margin-bottom: var(--space-xs);
+}
+
 .title {
   font-size: var(--text-base);
   font-weight: var(--font-bold);

@@ -6,6 +6,7 @@ export interface UserInfo {
   id: string;
   username: string;
   nickname: string | null;
+  avatarUrl: string | null;
   role: string;
 }
 

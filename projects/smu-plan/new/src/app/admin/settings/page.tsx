@@ -16,7 +16,7 @@ const DEFAULT_SETTINGS: SiteSettings = {
   site_name: "nanyee.de",
   site_description: "SMU Campus AI Platform",
   homepage_announcement: "",
-  default_ai_model: "LongCat-Flash-Chat",
+  default_ai_model: "longcat-flash-chat",
 };
 
 const SETTING_LABELS: Record<keyof SiteSettings, string> = {

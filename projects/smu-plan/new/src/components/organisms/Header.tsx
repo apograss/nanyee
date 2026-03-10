@@ -1,27 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useAuth } from "@/hooks/useAuth";
 import ThemeToggle from "@/components/atoms/ThemeToggle";
+import { useAuth } from "@/hooks/useAuth";
+import {
+  DEFAULT_NAV_LINKS,
+  type NavLinkConfig,
+  normalizeNavLinks,
+} from "@/lib/site/nav";
 import styles from "./Header.module.css";
-
-const DEFAULT_NAV_LINKS = [
-  { href: "/", label: "首页" },
-  { href: "/kb", label: "知识库" },
-  // { href: "/bbs", label: "论坛" },        // TODO: 登录系统完成后恢复
-  { href: "/tools", label: "工具" },
-  { href: "/links", label: "链接" },
-  // { href: "/guestbook", label: "留言板" }, // TODO: 登录系统完成后恢复
-  { href: "/about", label: "关于" },
-];
-
-interface NavLinkConfig {
-  href: string;
-  label: string;
-  external?: boolean;
-}
 
 export default function Header() {
   const pathname = usePathname();
@@ -31,18 +20,24 @@ export default function Header() {
 
   useEffect(() => {
     fetch("/api/settings")
-      .then((r) => r.json())
+      .then((response) => response.json())
       .then((data) => {
-        if (data.ok && data.data.settings.navLinks) {
-          try {
-            const parsed = JSON.parse(data.data.settings.navLinks);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              setNavLinks(parsed);
-            }
-          } catch { }
+        if (!data.ok || !data.data.settings.navLinks) {
+          return;
+        }
+
+        try {
+          const parsed = JSON.parse(data.data.settings.navLinks);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setNavLinks(normalizeNavLinks(parsed));
+          }
+        } catch {
+          // Ignore invalid custom nav JSON and keep the default links.
         }
       })
-      .catch(() => { });
+      .catch(() => {
+        // Keep the default nav when settings cannot be loaded.
+      });
   }, []);
 
   const handleLogout = async () => {
@@ -73,11 +68,13 @@ export default function Header() {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`${styles.navLink} ${pathname === link.href ? styles.active : ""}`}
+                className={`${styles.navLink} ${
+                  pathname === link.href ? styles.active : ""
+                }`}
               >
                 {link.label}
               </Link>
-            )
+            ),
           )}
         </nav>
 
@@ -104,11 +101,11 @@ export default function Header() {
                     </Link>
                   )}
                   <Link
-                    href="/profile"
+                    href="/settings"
                     className={styles.dropItem}
                     onClick={() => setMenuOpen(false)}
                   >
-                    个人中心
+                    账号设置
                   </Link>
                   <Link
                     href="/editor"
@@ -124,9 +121,9 @@ export default function Header() {
               )}
             </div>
           ) : (
-            <span className={styles.loginBtn} style={{ opacity: 0.5, cursor: "default" }} title="即将开放">
+            <Link href="/login" className={styles.loginBtn}>
               登录
-            </span>
+            </Link>
           )}
 
           <button
@@ -141,7 +138,6 @@ export default function Header() {
         </div>
       </div>
 
-      {/* Mobile nav overlay */}
       {menuOpen && (
         <div className={styles.mobileNav}>
           {navLinks.map((link) =>
@@ -160,12 +156,14 @@ export default function Header() {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`${styles.mobileLink} ${pathname === link.href ? styles.active : ""}`}
+                className={`${styles.mobileLink} ${
+                  pathname === link.href ? styles.active : ""
+                }`}
                 onClick={() => setMenuOpen(false)}
               >
                 {link.label}
               </Link>
-            )
+            ),
           )}
         </div>
       )}

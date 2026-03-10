@@ -1,0 +1,58 @@
+.shell {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(230, 57, 70, 0.12), transparent 28%),
+    radial-gradient(circle at top right, rgba(29, 53, 87, 0.12), transparent 24%),
+    var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-xl);
+  border-bottom: var(--neo-border);
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(1.75rem, 2vw, 2.5rem);
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.navLink {
+  text-decoration: none;
+  color: var(--text-primary);
+  font-weight: var(--font-semibold);
+  padding: var(--space-xs) var(--space-sm);
+  border: var(--neo-border);
+  border-radius: var(--neo-radius);
+  background: var(--bg-secondary);
+}
+
+.main {
+  padding: var(--space-xl);
+}
+
+@media (max-width: 800px) {
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

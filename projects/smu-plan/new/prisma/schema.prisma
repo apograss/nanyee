@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -17,17 +18,22 @@ model User {
   username        String    @unique
   passwordHash    String
   nickname        String?
+  avatarUrl       String?
   role            String    @default("contributor") // contributor | admin
-  status          String    @default("active") // active | banned
+  status          String    @default("active") // active | banned | deleted
   emailVerifiedAt DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
   messages     Message[]
-  articles     Article[]
+  articles     Article[]       @relation("ArticleAuthor")
+  editedArticles Article[]     @relation("ArticleLastEditor")
+  lockedArticles Article[]     @relation("ArticleLocker")
+  articleRevisions ArticleRevision[]
   quizAttempts QuizAttempt[]
   sessions     Session[]
   apiTokens    ApiToken[]
+  comments     Comment[]
 }
 
 model Session {
@@ -40,9 +46,13 @@ model Session {
   expiresAt        DateTime
   createdAt        DateTime  @default(now())
   revokedAt        DateTime?
+  lastSeenAt       DateTime  @default(now())
+  revokedReason    String?   // logout | revoke_other_sessions | password_changed | email_changed | token_replay | admin_revoke
 
   @@index([userId])
   @@index([expiresAt])
+  @@index([userId, revokedAt, expiresAt])
+  @@index([userId, lastSeenAt])
 }
 
 model EmailVerification {
@@ -78,30 +88,120 @@ model QuizAttempt {
   @@index([createdAt])
 }
 
+model RegistrationChallenge {
+  id              String    @id @default(cuid())
+  method          String    // email | quiz
+  email           String?
+  questionIdsJson String?   // quiz: JSON array of question IDs
+  verifiedAt      DateTime?
+  expiresAt       DateTime
+  consumedAt      DateTime?
+  verifyAttempts  Int       @default(0)
+  ip              String?
+  userAgent       String?
+  createdAt       DateTime  @default(now())
+
+  @@index([expiresAt])
+  @@index([method, expiresAt])
+  @@index([email, method, consumedAt])
+}
+
+model EmailChangeRequest {
+  id                 String    @id @default(cuid())
+  userId             String
+  currentEmail       String?
+  newEmail           String
+  oldEmailVerifiedAt DateTime?
+  newEmailVerifiedAt DateTime?
+  expiresAt          DateTime
+  consumedAt         DateTime?
+  cancelledAt        DateTime?
+  verifyAttemptsOld  Int       @default(0)
+  verifyAttemptsNew  Int       @default(0)
+  ip                 String?
+  userAgent          String?
+  createdAt          DateTime  @default(now())
+
+  @@index([userId, expiresAt])
+  @@index([newEmail, consumedAt])
+  @@index([expiresAt])
+}
+
+model OAuthAuthorizationRequest {
+  id                  String    @id @default(cuid())
+  userId              String
+  clientId            String
+  redirectUri         String
+  scope               String
+  state               String?
+  nonce               String?
+  codeChallenge       String?
+  codeChallengeMethod String?
+  csrfTokenHash       String
+  expiresAt           DateTime
+  consumedAt          DateTime?
+  deniedAt            DateTime?
+  createdAt           DateTime  @default(now())
+
+  @@index([userId, expiresAt])
+  @@index([clientId, expiresAt])
+  @@index([expiresAt])
+}
+
 // ═══════════════════════════════════════
 // 内容
 // ═══════════════════════════════════════
 
 model Article {
-  id          String    @id @default(cuid())
-  title       String
-  slug        String    @unique
-  content     String    // Markdown
-  summary     String?
-  category    String?
-  tags        String?   // JSON string
-  status      String    @default("draft") // draft | pending | published | rejected
-  viewCount   Int       @default(0)
-  authorId    String
-  author      User      @relation(fields: [authorId], references: [id])
-  reviewerId  String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  publishedAt DateTime?
+  id           String    @id @default(cuid())
+  title        String
+  slug         String    @unique
+  content      String    // HTML (new) or Markdown (legacy)
+  format       String    @default("html") // html | markdown
+  summary      String?
+  category     String?
+  tags         String?   // JSON string
+  status       String    @default("published") // published | hidden
+  viewCount    Int       @default(0)
+  authorId     String
+  author       User      @relation("ArticleAuthor", fields: [authorId], references: [id])
+  lastEditorId String?
+  lastEditor   User?     @relation("ArticleLastEditor", fields: [lastEditorId], references: [id])
+  isLocked     Boolean   @default(false)
+  lockedAt     DateTime?
+  lockedBy     String?
+  locker       User?     @relation("ArticleLocker", fields: [lockedBy], references: [id])
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  publishedAt  DateTime?
+
+  isPinned     Boolean   @default(false)
+  pinnedAt     DateTime?
+
+  revisions    ArticleRevision[]
+  comments     Comment[]
 
   @@index([status])
   @@index([category])
   @@index([publishedAt])
+  @@index([isPinned, pinnedAt, publishedAt])
+}
+
+model ArticleRevision {
+  id          String   @id @default(cuid())
+  articleId   String
+  article     Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  title       String
+  content     String
+  format      String   @default("html")
+  summary     String?
+  editorId    String
+  editor      User     @relation(fields: [editorId], references: [id])
+  editSummary String?
+  createdAt   DateTime @default(now())
+
+  @@index([articleId, createdAt])
+  @@index([editorId, createdAt])
 }
 
 model Message {
@@ -322,6 +422,75 @@ model SiteSetting {
   @@index([key])
 }
 
+model AiServiceHealth {
+  id        String   @id @default(cuid())
+  provider  String
+  service   String
+  status    String
+  latencyMs Int?
+  version   String?
+  lastError String?
+  checkedAt DateTime @default(now())
+
+  @@index([provider, checkedAt])
+  @@index([service, checkedAt])
+}
+
+model AiProviderSnapshot {
+  id                  String   @id @default(cuid())
+  provider            String
+  capturedAt          DateTime @default(now())
+  totalAccounts       Int      @default(0)
+  healthyAccounts     Int      @default(0)
+  rateLimitedAccounts Int      @default(0)
+  invalidAccounts     Int      @default(0)
+  staleAccounts       Int      @default(0)
+  unknownAccounts     Int      @default(0)
+  requests1h          Int      @default(0)
+  requests24h         Int      @default(0)
+  successRate1h       Int      @default(100)
+  successRate24h      Int      @default(100)
+
+  @@index([provider, capturedAt])
+}
+
+model AiAccountState {
+  id              String   @id @default(cuid())
+  provider        String
+  accountKey      String
+  displayLabel    String
+  status          String
+  lastUsedAt      DateTime?
+  lastSuccessAt   DateTime?
+  lastObservedAt  DateTime?
+  lastError       String?
+  requestCount24h Int      @default(0)
+  successRate24h  Int      @default(100)
+  metadataJson    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([provider, accountKey])
+  @@index([provider, status])
+  @@index([updatedAt])
+}
+
+model AiIncident {
+  id         String   @id @default(cuid())
+  provider   String
+  scope      String
+  severity   String
+  title      String
+  message    String
+  service    String?
+  accountKey String?
+  occurredAt DateTime @default(now())
+
+  @@index([provider, occurredAt])
+  @@index([scope, occurredAt])
+  @@index([service, occurredAt])
+}
+
 // ═══════════════════════════════════════
 // BBS 论坛
 // ═══════════════════════════════════════
@@ -404,4 +573,22 @@ model OidcToken {
 
   @@index([accessToken])
   @@index([expiresAt])
+}
+
+// ═══════════════════════════════════════
+// 百科评论
+// ═══════════════════════════════════════
+
+model Comment {
+  id             String   @id @default(cuid())
+  articleId      String
+  article        Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  paragraphIndex Int
+  content        String
+  authorId       String
+  author         User     @relation(fields: [authorId], references: [id])
+  createdAt      DateTime @default(now())
+
+  @@index([articleId, paragraphIndex, createdAt])
+  @@index([authorId])
 }

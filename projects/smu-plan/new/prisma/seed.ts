@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { hash } from "bcryptjs";
+import { DEFAULT_OAUTH_CLIENTS } from "../src/lib/oidc/clients";
 
 const prisma = new PrismaClient();
 
@@ -66,30 +67,31 @@ async function main() {
   });
   console.log("Created sample article:", article.slug);
 
-  // Create OAuth clients
-  await prisma.oAuthClient.upsert({
-    where: { clientId: "cloudmail" },
-    create: {
-      clientId: "cloudmail",
-      clientSecret: null, // Public client, uses PKCE
-      name: "CloudMail \u90AE\u7BB1",
-      redirectUris: JSON.stringify(["https://mail.nanyee.de/api/auth/oidc/callback"]),
-    },
-    update: {},
-  });
+  for (const client of DEFAULT_OAUTH_CLIENTS) {
+    await prisma.oAuthClient.upsert({
+      where: { clientId: client.clientId },
+      create: {
+        clientId: client.clientId,
+        clientSecret: client.clientSecret
+          ? await hash(client.clientSecret, 12)
+          : null,
+        name: client.name,
+        redirectUris: JSON.stringify(client.redirectUris),
+        grants: JSON.stringify(client.grants),
+        scopes: JSON.stringify(client.scopes),
+      },
+      update: {
+        name: client.name,
+        redirectUris: JSON.stringify(client.redirectUris),
+        grants: JSON.stringify(client.grants),
+        scopes: JSON.stringify(client.scopes),
+      },
+    });
+  }
 
-  await prisma.oAuthClient.upsert({
-    where: { clientId: "newapi" },
-    create: {
-      clientId: "newapi",
-      clientSecret: await hash("newapi-secret-change-me", 12),
-      name: "API \u670D\u52A1",
-      redirectUris: JSON.stringify(["https://api.nanyee.de/oauth/oidc/callback"]),
-    },
-    update: {},
-  });
-
-  console.log("Created OAuth clients: cloudmail, newapi");
+  console.log(
+    `Created OAuth clients: ${DEFAULT_OAUTH_CLIENTS.map((client) => client.clientId).join(", ")}`,
+  );
 
   await prisma.$disconnect();
 }

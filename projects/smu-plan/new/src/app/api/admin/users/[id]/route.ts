@@ -75,3 +75,60 @@ export async function PATCH(
     return handleAuthError(err);
   }
 }
+
+// DELETE /api/admin/users/[id] — soft delete user
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const admin = await requireAdmin(req);
+    const { id } = await params;
+
+    // Prevent self-delete
+    if (id === admin.userId) {
+      return Response.json(
+        { ok: false, error: { code: 400, message: "不能删除自己的账号" } },
+        { status: 400 }
+      );
+    }
+
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (!user) {
+      return Response.json(
+        { ok: false, error: { code: 404, message: "用户不存在" } },
+        { status: 404 }
+      );
+    }
+
+    // Idempotent: already deleted
+    if (user.status === "deleted") {
+      return Response.json({ ok: true, data: { id, status: "deleted" } });
+    }
+
+    // Soft delete: update status, clear avatar, revoke sessions, audit log
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id },
+        data: { status: "deleted", avatarUrl: null },
+      }),
+      prisma.session.updateMany({
+        where: { userId: id, revokedAt: null },
+        data: { revokedAt: new Date(), revokedReason: "admin_delete" },
+      }),
+      prisma.auditLog.create({
+        data: {
+          actorId: admin.userId,
+          action: "user.delete",
+          targetType: "User",
+          targetId: id,
+          payload: JSON.stringify({ previousStatus: user.status }),
+        },
+      }),
+    ]);
+
+    return Response.json({ ok: true, data: { id, status: "deleted" } });
+  } catch (err) {
+    return handleAuthError(err);
+  }
+}

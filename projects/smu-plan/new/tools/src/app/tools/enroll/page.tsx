@@ -6,6 +6,7 @@ import s from "./enroll.module.css";
 import {
     fetchCaptchaViaProxy,
     loginViaProxy,
+    cookieLoginViaProxy,
     getCategoriesViaProxy,
     getCoursesViaProxy,
     enrollJobViaProxy,
@@ -63,6 +64,8 @@ export default function EnrollPage() {
     const [uisCookies, setUisCookies] = useState<string[]>([]);
     const [cookies, setCookies] = useState<string[]>([]);
     const [rememberMe, setRememberMe] = useState(false);
+    const [loginMode, setLoginMode] = useState<"sso" | "cookie">("sso");
+    const [cookieInput, setCookieInput] = useState("");
 
     // Auto-login state
     const [autoLoginStatus, setAutoLoginStatus] = useState("");
@@ -199,6 +202,25 @@ export default function EnrollPage() {
         }
     };
 
+    // ─── Cookie Login ───────────────────────────────────────────
+    const handleCookieLogin = async () => {
+        setLoading(true);
+        setError("");
+        try {
+            const zhjwCookies = await cookieLoginViaProxy(cookieInput);
+            setCookies(zhjwCookies);
+
+            const { categories: cats, cookies: updatedCookies } =
+                await getCategoriesViaProxy(zhjwCookies);
+            setCookies(updatedCookies);
+            setCategories(cats);
+            setStep("categories");
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Cookie 登录失败");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     // ─── Select Category ────────────────────────────────────────
     const handleSelectCategory = async (code: string) => {
@@ -320,85 +342,135 @@ export default function EnrollPage() {
                     <div className={s.card}>
                         <h2>🔐 登录教务系统</h2>
 
-                        {autoLoginStatus && (
-                            <div className={s.autoLoginBanner}>
-                                <span className={s.spinner} /> {autoLoginStatus}
-                            </div>
+                        <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
+                            <button
+                                className={`${s.btn} ${loginMode === "sso" ? s.btnPrimary : s.btnSecondary}`}
+                                onClick={() => setLoginMode("sso")}
+                                style={{ flex: 1, padding: "0.5rem" }}
+                            >
+                                账号密码登录
+                            </button>
+                            <button
+                                className={`${s.btn} ${loginMode === "cookie" ? s.btnPrimary : s.btnSecondary}`}
+                                onClick={() => setLoginMode("cookie")}
+                                style={{ flex: 1, padding: "0.5rem" }}
+                            >
+                                🍪 Cookie 登录
+                            </button>
+                        </div>
+
+                        {loginMode === "sso" && (
+                            <>
+                                {autoLoginStatus && (
+                                    <div className={s.autoLoginBanner}>
+                                        <span className={s.spinner} /> {autoLoginStatus}
+                                    </div>
+                                )}
+
+                                <div className={s.formGroup}>
+                                    <label>学号</label>
+                                    <input
+                                        value={account}
+                                        onChange={(e) => setAccount(e.target.value)}
+                                        placeholder="请输入学号"
+                                        autoComplete="username"
+                                    />
+                                </div>
+                                <div className={s.formGroup}>
+                                    <label>密码</label>
+                                    <input
+                                        type="password"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        placeholder="请输入密码"
+                                        autoComplete="current-password"
+                                    />
+                                </div>
+                                <div className={s.formGroup}>
+                                    <label>验证码</label>
+                                    <div className={s.captchaRow}>
+                                        <input
+                                            value={captcha}
+                                            onChange={(e) => setCaptcha(e.target.value)}
+                                            placeholder="输入验证码"
+                                            onKeyDown={(e) =>
+                                                e.key === "Enter" && handleLogin()
+                                            }
+                                        />
+                                        {captchaImg && (
+                                            <img
+                                                src={captchaImg}
+                                                alt="验证码"
+                                                className={s.captchaImg}
+                                                onClick={loadCaptcha}
+                                                title="点击刷新"
+                                            />
+                                        )}
+                                    </div>
+                                    {ocrStatus && (
+                                        <span style={{ fontSize: "0.75rem", color: "#8bb4ff", marginTop: "0.3rem", display: "block" }}>
+                                            🤖 {ocrStatus}
+                                        </span>
+                                    )}
+                                </div>
+
+                                <label className={s.checkboxLabel}>
+                                    <input
+                                        type="checkbox"
+                                        checked={rememberMe}
+                                        onChange={(e) => setRememberMe(e.target.checked)}
+                                    />
+                                    记住我（下次自动识别验证码登录）
+                                </label>
+
+                                <button
+                                    className={`${s.btn} ${s.btnPrimary}`}
+                                    onClick={handleLogin}
+                                    disabled={loading || !account || !password || !captcha}
+                                >
+                                    {loading ? "登录中..." : "登录"}
+                                </button>
+
+                                {account && password && (
+                                    <button
+                                        className={`${s.btn} ${s.btnSecondary}`}
+                                        onClick={handleAutoLogin}
+                                        disabled={loading}
+                                        style={{ marginTop: "0.5rem" }}
+                                    >
+                                        {autoLoginStatus || "🤖 一键登录（自动识别验证码）"}
+                                    </button>
+                                )}
+                            </>
                         )}
 
-                        <div className={s.formGroup}>
-                            <label>学号</label>
-                            <input
-                                value={account}
-                                onChange={(e) => setAccount(e.target.value)}
-                                placeholder="请输入学号"
-                                autoComplete="username"
-                            />
-                        </div>
-                        <div className={s.formGroup}>
-                            <label>密码</label>
-                            <input
-                                type="password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                placeholder="请输入密码"
-                                autoComplete="current-password"
-                            />
-                        </div>
-                        <div className={s.formGroup}>
-                            <label>验证码</label>
-                            <div className={s.captchaRow}>
-                                <input
-                                    value={captcha}
-                                    onChange={(e) => setCaptcha(e.target.value)}
-                                    placeholder="输入验证码"
-                                    onKeyDown={(e) =>
-                                        e.key === "Enter" && handleLogin()
-                                    }
-                                />
-                                {captchaImg && (
-                                    <img
-                                        src={captchaImg}
-                                        alt="验证码"
-                                        className={s.captchaImg}
-                                        onClick={loadCaptcha}
-                                        title="点击刷新"
+                        {loginMode === "cookie" && (
+                            <>
+                                <div style={{ fontSize: "0.8rem", color: "#8bb4ff", marginBottom: "0.8rem", lineHeight: 1.5 }}>
+                                    💡 先在浏览器登录 <a href="https://zhjw.smu.edu.cn" target="_blank" rel="noreferrer" style={{ color: "#6ea8fe" }}>zhjw.smu.edu.cn</a>，
+                                    然后复制 Cookie（按 F12 → 应用/Application → Cookies → 复制 JSESSIONID 的值）。
+                                    <br />
+                                    <strong>优势</strong>：复用浏览器会话，不会把浏览器踢下线。
+                                </div>
+                                <div className={s.formGroup}>
+                                    <label>Cookie / JSESSIONID</label>
+                                    <input
+                                        value={cookieInput}
+                                        onChange={(e) => setCookieInput(e.target.value)}
+                                        placeholder="粘贴 JSESSIONID 值或完整 Cookie 字符串"
+                                        onKeyDown={(e) =>
+                                            e.key === "Enter" && handleCookieLogin()
+                                        }
                                     />
-                                )}
-                            </div>
-                            {ocrStatus && (
-                                <span style={{ fontSize: "0.75rem", color: "#8bb4ff", marginTop: "0.3rem", display: "block" }}>
-                                    🤖 {ocrStatus}
-                                </span>
-                            )}
-                        </div>
-
-                        <label className={s.checkboxLabel}>
-                            <input
-                                type="checkbox"
-                                checked={rememberMe}
-                                onChange={(e) => setRememberMe(e.target.checked)}
-                            />
-                            记住我（下次自动识别验证码登录）
-                        </label>
-
-                        <button
-                            className={`${s.btn} ${s.btnPrimary}`}
-                            onClick={handleLogin}
-                            disabled={loading || !account || !password || !captcha}
-                        >
-                            {loading ? "登录中..." : "登录"}
-                        </button>
-
-                        {account && password && (
-                            <button
-                                className={`${s.btn} ${s.btnSecondary}`}
-                                onClick={handleAutoLogin}
-                                disabled={loading}
-                                style={{ marginTop: "0.5rem" }}
-                            >
-                                {autoLoginStatus || "🤖 一键登录（自动识别验证码）"}
-                            </button>
+                                </div>
+                                <button
+                                    className={`${s.btn} ${s.btnPrimary}`}
+                                    onClick={handleCookieLogin}
+                                    disabled={loading || !cookieInput.trim()}
+                                >
+                                    {loading ? "验证中..." : "🍪 Cookie 登录"}
+                                </button>
+                            </>
                         )}
                     </div>
                 )}

@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getOidcEmailClaim } from "@/lib/oidc/claims";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -56,11 +57,15 @@ export async function GET(req: NextRequest) {
   if (scopes.includes("profile")) {
     claims.username = user.username;
     claims.nickname = user.nickname;
+    claims.preferred_username = user.username;
+    claims.name = user.nickname || user.username;
     claims.role = user.role;
   }
 
   if (scopes.includes("email")) {
-    claims.email = user.email;
+    const emailClaim = getOidcEmailClaim(user);
+    claims.email = emailClaim.email;
+    claims.email_verified = emailClaim.emailVerified;
   }
 
   return Response.json(claims, {

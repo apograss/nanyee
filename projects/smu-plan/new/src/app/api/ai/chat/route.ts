@@ -5,6 +5,7 @@ import { executeTool } from "@/lib/ai/executor";
 import { selectProviderKey, recordKeyUsage } from "@/lib/keys/selector";
 import { getAuthContext } from "@/lib/auth/guard";
 import { prisma } from "@/lib/prisma";
+import { normalizeAiRouteError } from "@/lib/ai/errors";
 import { z } from "zod";
 
 const chatSchema = z.object({
@@ -228,9 +229,10 @@ export async function POST(req: NextRequest) {
       );
     }
     console.error("Chat API error:", err);
+    const normalized = normalizeAiRouteError(err);
     return Response.json(
-      { ok: false, error: { code: 500, message: "Internal Server Error" } },
-      { status: 500 }
+      { ok: false, error: { code: normalized.code, message: normalized.message } },
+      { status: normalized.status }
     );
   }
 }

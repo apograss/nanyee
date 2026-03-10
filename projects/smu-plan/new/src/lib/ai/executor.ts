@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { ToolName } from "@/lib/ai/tools";
+import { searchWikiArticles } from "@/lib/wiki/search";
 
 const TOOL_CARDS: Record<string, { title: string; desc: string; icon: string; href: string }> = {
   schedule: {
@@ -45,61 +46,20 @@ export async function executeTool(
           return { result };
         }
 
-        // Extract meaningful keywords (2+ char segments) from the query
-        // Split on spaces, punctuation, and also extract overlapping 2-char grams for Chinese
-        const keywords = extractKeywords(query);
-
-        // Use LIKE-based search — FTS5 default tokenizer doesn't handle Chinese well
-        let articles: { id: string; title: string; summary: string | null; slug: string; score: number; contentSnippet: string }[] = [];
-
-        if (keywords.length > 0) {
-          // Build WHERE clause: each keyword must match title OR content OR summary
-          // Score = number of keyword matches (more matches = more relevant)
-          const allPublished = await prisma.article.findMany({
-            where: { status: "published" },
-            select: { id: true, title: true, summary: true, slug: true, content: true },
-          });
-
-          articles = allPublished
-            .map((a) => {
-              const searchable = `${a.title} ${a.summary || ""} ${a.content}`.toLowerCase();
-              let score = 0;
-              for (const kw of keywords) {
-                if (searchable.includes(kw.toLowerCase())) {
-                  score++;
-                }
-              }
-              // Extract a content snippet (strip markdown, take first 300 chars)
-              const contentSnippet = a.content
-                .replace(/[#*_\[\]()>`~|]/g, "")
-                .replace(/\n+/g, " ")
-                .trim()
-                .slice(0, 300);
-              return { id: a.id, title: a.title, summary: a.summary, slug: a.slug, score, contentSnippet };
-            })
-            .filter((a) => a.score > 0)
-            .sort((a, b) => b.score - a.score)
-            .slice(0, 5);
-        }
+        const { results: articles } = await searchWikiArticles(query, 5);
 
         const result =
           articles.length > 0
             ? articles
                 .map(
-                  (a) => {
-                    // Include a content snippet (first 300 chars) so the model can answer from it
-                    const snippet = a.contentSnippet
-                      ? `\n摘要: ${a.contentSnippet}`
-                      : "";
-                    return `【${a.title}】${a.summary || ""}${snippet}\n链接: /kb/${a.slug}`;
-                  }
+                  (a) => `【${a.title}】${a.summary || ""}\n摘要: ${a.snippet}\n链接: /kb/${a.slug}`
                 )
                 .join("\n\n")
             : "未找到相关文章。";
 
         const references: ToolReference[] = articles.map((a) => ({
           title: a.title,
-          source: a.summary || a.contentSnippet.slice(0, 80) || "知识库文章",
+          source: a.summary || a.snippet.slice(0, 80) || "知识库文章",
           url: `/kb/${a.slug}`,
         }));
 
@@ -168,32 +128,3 @@ async function logToolRun(
   });
 }
 
-/**
- * Extract search keywords from a Chinese/mixed query.
- * Strategy:
- * - Split on whitespace and common punctuation
- * - Keep tokens >= 2 chars (filters out noise)
- * - For long Chinese strings without spaces, also extract 2-char grams
- * - Deduplicate
- */
-function extractKeywords(query: string): string[] {
-  const keywords = new Set<string>();
-
-  // Split on spaces, commas, periods, question marks, and CJK punctuation
-  const tokens = query.split(/[\s,，。？?！!、；;：:·\-/\\]+/).filter(Boolean);
-
-  for (const token of tokens) {
-    if (token.length >= 2) {
-      keywords.add(token);
-    }
-    // For Chinese tokens longer than 2 chars, also add 2-char sliding window
-    // This helps match partial terms (e.g., "图书馆开放时间" → "图书", "书馆", "馆开", "开放", "放时", "时间")
-    if (/[\u4e00-\u9fff]/.test(token) && token.length > 2) {
-      for (let i = 0; i <= token.length - 2; i++) {
-        keywords.add(token.slice(i, i + 2));
-      }
-    }
-  }
-
-  return Array.from(keywords);
-}

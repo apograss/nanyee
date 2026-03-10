@@ -6,7 +6,7 @@ export const toolDefinitions: OpenAI.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "search_knowledge",
-      description: "搜索校园知识库文章。对于用户的任何提问，都应该先调用此工具搜索知识库。搜索时提取用户问题中的核心关键词（2-4个词），不要添加额外修饰词。",
+      description: "搜索校园知识库文章。当用户询问校园相关事实（人物、地点、设施、规则等）时调用。搜索时提取核心关键词（2-4个词），不要添加额外修饰词。",
       parameters: {
         type: "object",
         properties: {

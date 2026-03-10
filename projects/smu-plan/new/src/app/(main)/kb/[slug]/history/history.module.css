@@ -1,0 +1,88 @@
+.page {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: var(--space-xl) var(--space-md);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-xl);
+}
+
+.title {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-bold);
+}
+
+.backLink {
+  font-size: var(--text-sm);
+  font-weight: var(--font-bold);
+  color: var(--color-brand);
+  text-decoration: underline;
+}
+
+.empty {
+  text-align: center;
+  padding: var(--space-3xl);
+  font-weight: var(--font-bold);
+  color: var(--text-muted);
+  border: var(--neo-border);
+  background: var(--bg-secondary);
+  box-shadow: var(--neo-shadow-sm);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.revisionCard {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-secondary);
+  border: var(--neo-border);
+  padding: var(--space-md);
+  box-shadow: var(--neo-shadow-sm);
+  gap: var(--space-md);
+}
+
+.revisionMain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  flex: 1;
+}
+
+.revisionTitle {
+  font-weight: var(--font-bold);
+  font-size: var(--text-base);
+}
+
+.revisionMeta {
+  display: flex;
+  gap: var(--space-md);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.revisionSummary {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-md);
+  margin-top: var(--space-xl);
+}
+
+.pageInfo {
+  font-weight: var(--font-bold);
+}

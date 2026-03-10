@@ -2,6 +2,10 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hash } from "bcryptjs";
 import { z } from "zod";
+import {
+  isVerificationMailConfigured,
+  sendVerificationEmail,
+} from "@/lib/mail/resend";
 
 const sendSchema = z.object({
   email: z.string().email(),
@@ -51,37 +55,9 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Send email via SMTP
-    const smtpHost = process.env.SMTP_HOST;
-    const smtpPort = Number(process.env.SMTP_PORT || "465");
-    const smtpUser = process.env.SMTP_USER;
-    const smtpPass = process.env.SMTP_PASS;
-    const smtpFrom = process.env.SMTP_FROM || smtpUser;
-
-    if (smtpHost && smtpUser && smtpPass) {
-      // Dynamic import nodemailer only when SMTP is configured
+    if (isVerificationMailConfigured()) {
       try {
-        const nodemailer = await import("nodemailer");
-        const transporter = nodemailer.createTransport({
-          host: smtpHost,
-          port: smtpPort,
-          secure: smtpPort === 465,
-          auth: { user: smtpUser, pass: smtpPass },
-        });
-
-        await transporter.sendMail({
-          from: `"nanyee.de" <${smtpFrom}>`,
-          to: email,
-          subject: `[nanyee.de] 验证码: ${code}`,
-          text: `您的验证码是: ${code}\n\n10 分钟内有效。如非本人操作请忽略。`,
-          html: `
-            <div style="font-family: sans-serif; max-width: 400px; margin: 0 auto; padding: 24px;">
-              <h2 style="color: #1D3557;">nanyee.de 验证码</h2>
-              <p style="font-size: 32px; font-weight: bold; color: #E8652B; letter-spacing: 4px;">${code}</p>
-              <p style="color: #666;">10 分钟内有效。如非本人操作请忽略此邮件。</p>
-            </div>
-          `,
-        });
+        await sendVerificationEmail({ to: email, code, purpose });
       } catch (mailErr) {
         console.error("Failed to send email:", mailErr);
         return Response.json(

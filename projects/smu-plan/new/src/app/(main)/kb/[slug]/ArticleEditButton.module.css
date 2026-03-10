@@ -1,0 +1,23 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 18px;
+  border: var(--neo-border);
+  border-radius: var(--neo-radius);
+  background: var(--color-brand);
+  color: var(--text-inverse);
+  text-decoration: none;
+  font-size: var(--text-sm);
+  font-weight: var(--font-bold);
+  box-shadow: var(--neo-shadow-sm);
+  transition:
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.button:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: var(--neo-shadow);
+}

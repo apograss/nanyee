@@ -1,0 +1,33 @@
+.wrapper {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-3xl) 0;
+}
+
+.card {
+  width: min(100%, 420px);
+  padding: var(--space-xl);
+  border: var(--neo-border);
+  border-radius: var(--neo-radius);
+  background: var(--bg-secondary);
+}
+
+.title {
+  margin: 0 0 var(--space-sm);
+}
+
+.subtitle {
+  margin: 0 0 var(--space-lg);
+  color: var(--text-secondary);
+}
+
+.form {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.error {
+  margin: 0;
+  color: #e63946;
+  font-size: var(--text-sm);
+}

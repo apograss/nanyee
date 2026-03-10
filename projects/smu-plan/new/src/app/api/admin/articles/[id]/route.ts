@@ -2,12 +2,16 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import { requireAdmin, handleAuthError } from "@/lib/auth/guard";
+import { clearWikiSearchCache } from "@/lib/wiki/search-cache";
+import { sanitizeContent } from "@/lib/wiki/content";
+import { createRevision } from "@/lib/wiki/revisions";
 
 const patchSchema = z.object({
   title: z.string().min(1).optional(),
   content: z.string().min(1).optional(),
   tags: z.array(z.string()).optional(),
-  status: z.enum(["draft", "pending", "published", "rejected", "hidden"]).optional(),
+  status: z.enum(["published", "hidden"]).optional(),
+  isLocked: z.boolean().optional(),
 });
 
 export async function PATCH(
@@ -22,12 +26,33 @@ export async function PATCH(
 
     const updateData: Record<string, unknown> = {};
     if (data.title) updateData.title = data.title;
-    if (data.content) updateData.content = data.content;
+    if (data.content) {
+      // Fetch current article to create revision before update
+      const current = await prisma.article.findUnique({ where: { id } });
+      if (current) {
+        await createRevision({
+          articleId: id,
+          title: current.title,
+          content: current.content,
+          format: current.format,
+          summary: current.summary,
+          editorId: ctx.userId,
+          editSummary: "Admin edit",
+        });
+      }
+      updateData.content = current?.format === "html" ? sanitizeContent(data.content) : data.content;
+    }
     if (data.tags) updateData.tags = JSON.stringify(data.tags);
     if (data.status) {
       updateData.status = data.status;
       if (data.status === "published") updateData.publishedAt = new Date();
     }
+    if (data.isLocked !== undefined) {
+      updateData.isLocked = data.isLocked;
+      updateData.lockedAt = data.isLocked ? new Date() : null;
+      updateData.lockedBy = data.isLocked ? ctx.userId : null;
+    }
+    updateData.lastEditorId = ctx.userId;
 
     const [article] = await prisma.$transaction([
       prisma.article.update({ where: { id }, data: updateData }),
@@ -41,6 +66,8 @@ export async function PATCH(
         },
       }),
     ]);
+
+    clearWikiSearchCache();
 
     return Response.json({ ok: true, data: article });
   } catch (err) {
@@ -105,6 +132,8 @@ export async function DELETE(
         }),
       ]);
     }
+
+    clearWikiSearchCache();
 
     return Response.json({ ok: true });
   } catch (err) {

@@ -1,0 +1,1214 @@
+[
+    {
+        "content": "南方医科大学的前身是？",
+        "options": [
+            "中国人民解放军第一军医大学",
+            "广东军医学院",
+            "广州医学院",
+            "华南医科大学"
+        ],
+        "correctAnswer": 0,
+        "difficulty": 1,
+        "category": "校史"
+    },
+    {
+        "content": "南方医科大学的校训是？",
+        "options": [
+            "厚德博学，精诚济世",
+            "博学笃行，尚德济世",
+            "医道济世，明德自强",
+            "救死扶伤，大爱无疆"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 1,
+        "category": "校园文化"
+    },
+    {
+        "content": "南方医科大学于哪一年正式由军队移交广东省人民政府并更名？",
+        "options": [
+            "2000年",
+            "2003年",
+            "2004年",
+            "2006年"
+        ],
+        "correctAnswer": 2,
+        "difficulty": 1,
+        "category": "校史"
+    },
+    {
+        "content": "南方医科大学的建校时间是哪一年？",
+        "options": [
+            "1951年",
+            "1953年",
+            "1958年",
+            "1960年"
+        ],
+        "correctAnswer": 0,
+        "difficulty": 1,
+        "category": "校史"
+    },
+    {
+        "content": "南方医科大学最初建校时位于哪个城市？",
+        "options": [
+            "广州",
+            "北京",
+            "齐齐哈尔",
+            "长春"
+        ],
+        "correctAnswer": 2,
+        "difficulty": 2,
+        "category": "校史"
+    },
+    {
+        "content": "学校于哪一年整体迁至广东省广州市？",
+        "options": [
+            "1965年",
+            "1969年",
+            "1975年",
+            "1980年"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 2,
+        "category": "校史"
+    },
+    {
+        "content": "南方医科大学的主干校区（本部）位于广州市的哪个区？",
+        "options": [
+            "天河区",
+            "海珠区",
+            "白云区",
+            "越秀区"
+        ],
+        "correctAnswer": 2,
+        "difficulty": 1,
+        "category": "地理位置"
+    },
+    {
+        "content": "南方医科大学本部位于广州市白云区什么路？",
+        "options": [
+            "沙太南路",
+            "广州大道北",
+            "中山大道西",
+            "新港东路"
+        ],
+        "correctAnswer": 0,
+        "difficulty": 2,
+        "category": "地理位置"
+    },
+    {
+        "content": "南方医科大学顺德校区位于佛山市的哪个区？",
+        "options": [
+            "南海区",
+            "禅城区",
+            "顺德区",
+            "高明区"
+        ],
+        "correctAnswer": 2,
+        "difficulty": 1,
+        "category": "地理位置"
+    },
+    {
+        "content": "南方医科大学顺德校区标志性的建筑风格是？",
+        "options": [
+            "苏式红砖建筑",
+            "岭南水乡建筑",
+            "中国古典园林风格",
+            "现代极简玻璃幕墙"
+        ],
+        "correctAnswer": 2,
+        "difficulty": 1,
+        "category": "校园环境"
+    },
+    {
+        "content": "南方医科大学顺德校区中，那个著名的湖叫什么名字？",
+        "options": [
+            "雁栖湖",
+            "凌云湖",
+            "未名湖",
+            "南湖"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 1,
+        "category": "校园环境"
+    },
+    {
+        "content": "顺德校区内标志性的塔叫什么名字？",
+        "options": [
+            "凌云塔",
+            "博雅塔",
+            "尚德塔",
+            "知行塔"
+        ],
+        "correctAnswer": 0,
+        "difficulty": 1,
+        "category": "校园环境"
+    },
+    {
+        "content": "南方医科大学第一临床医学院通常对应的是哪家医院？",
+        "options": [
+            "珠江医院",
+            "南方医院",
+            "第三附属医院",
+            "中西医结合医院"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 1,
+        "category": "附属医院"
+    },
+    {
+        "content": "南方医科大学第二临床医学院通常对应的是哪家医院？",
+        "options": [
+            "南方医院",
+            "珠江医院",
+            "第五附属医院",
+            "深圳医院"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 1,
+        "category": "附属医院"
+    },
+    {
+        "content": "南方医科大学的校徽主体颜色是什么？",
+        "options": [
+            "红色和金色",
+            "蓝色和白色",
+            "绿色和白色",
+            "紫色和金色"
+        ],
+        "correctAnswer": 0,
+        "difficulty": 1,
+        "category": "校园文化"
+    },
+    {
+        "content": "南方医科大学校徽中心图案包含以下哪种植物？",
+        "options": [
+            "梅花",
+            "荷花",
+            "木棉花",
+            "牡丹花"
+        ],
+        "correctAnswer": 2,
+        "difficulty": 2,
+        "category": "校园文化"
+    },
+    {
+        "content": "医学界常用的双蛇杖或单蛇杖标志，在南方医科大学校徽中是否有体现？",
+        "options": [
+            "有体现，校徽中有蛇杖元素",
+            "没有体现，校徽仅有木棉花",
+            "有体现，校徽中有十字架",
+            "没有体现，校徽是一本书"
+        ],
+        "correctAnswer": 0,
+        "difficulty": 1,
+        "category": "校园文化"
+    },
+    {
+        "content": "南方医科大学的校歌名称是？",
+        "options": [
+            "《卓越的南方》",
+            "《南方医科大学校歌》（又名《爱在南方》）",
+            "《木棉花开》",
+            "《白衣天使之歌》"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 2,
+        "category": "校园文化"
+    },
+    {
+        "content": "以下哪一位是南方医科大学（原第一军医大学）著名的老院士、消化内科专家？",
+        "options": [
+            "钟南山",
+            "周宏灏",
+            "周殿元",
+            "张伯礼"
+        ],
+        "correctAnswer": 2,
+        "difficulty": 3,
+        "category": "杰出人物"
+    },
+    {
+        "content": "南方医科大学第三附属医院是一所以什么学科为特色的综合医院？",
+        "options": [
+            "骨科",
+            "眼科",
+            "口腔科",
+            "精神科"
+        ],
+        "correctAnswer": 0,
+        "difficulty": 2,
+        "category": "附属医院"
+    },
+    {
+        "content": "南方医科大学第五附属医院位于广州市的哪个区？",
+        "options": [
+            "从化区",
+            "花都区",
+            "增城区",
+            "南沙区"
+        ],
+        "correctAnswer": 0,
+        "difficulty": 2,
+        "category": "附属医院"
+    },
+    {
+        "content": "南方医科大学深圳医院位于深圳市的哪个区？",
+        "options": [
+            "福田区",
+            "南山区",
+            "宝安区",
+            "龙岗区"
+        ],
+        "correctAnswer": 2,
+        "difficulty": 2,
+        "category": "附属医院"
+    },
+    {
+        "content": "南方医科大学口腔医院（广东省口腔医院）本部位于广州哪个区？",
+        "options": [
+            "天河区",
+            "海珠区",
+            "越秀区",
+            "荔湾区"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 2,
+        "category": "附属医院"
+    },
+    {
+        "content": "南方医科大学皮肤病医院（广东省皮肤病医院）位于广州哪个区？",
+        "options": [
+            "天河区",
+            "海珠区",
+            "越秀区",
+            "白云区"
+        ],
+        "correctAnswer": 2,
+        "difficulty": 2,
+        "category": "附属医院"
+    },
+    {
+        "content": "南方医科大学中西医结合医院位于什么路附近？",
+        "options": [
+            "石榴岗路",
+            "新港中路",
+            "中山大道",
+            "黄埔大道"
+        ],
+        "correctAnswer": 0,
+        "difficulty": 3,
+        "category": "附属医院"
+    },
+    {
+        "content": "南方医科大学南方医院的门诊大楼通常被师生戏称为？",
+        "options": [
+            "白宫",
+            "亚洲第一门诊大楼",
+            "八角楼",
+            "回字楼"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 3,
+        "category": "校园常识"
+    },
+    {
+        "content": "南方医科大学的基础医学院涵盖了医学的前期基础课程，其中人体解剖学所属的学科类别是？",
+        "options": [
+            "基础医学",
+            "临床医学",
+            "预防医学",
+            "特种医学"
+        ],
+        "correctAnswer": 0,
+        "difficulty": 1,
+        "category": "学术常识"
+    },
+    {
+        "content": "南方医科大学的法医学系在国内享有盛誉，它是属于哪个学院的？",
+        "options": [
+            "基础医学院",
+            "公共卫生学院",
+            "法医学院",
+            "刑事司法学院"
+        ],
+        "correctAnswer": 2,
+        "difficulty": 2,
+        "category": "院系设置"
+    },
+    {
+        "content": "南方医科大学的“八年制”临床医学专业，毕业后授予的学位是？",
+        "options": [
+            "医学学士学位",
+            "医学硕士学位",
+            "医学博士学位",
+            "双学士学位"
+        ],
+        "correctAnswer": 2,
+        "difficulty": 1,
+        "category": "教学体制"
+    },
+    {
+        "content": "南方医科大学的图书馆在顺德校区的建筑名称是？",
+        "options": [
+            "图文信息中心",
+            "知识之塔",
+            "图书馆大楼",
+            "文献中心"
+        ],
+        "correctAnswer": 0,
+        "difficulty": 2,
+        "category": "校园环境"
+    },
+    {
+        "content": "南方医科大学是否入选了国家“双一流”建设高校名单？（截至2024年标准）",
+        "options": [
+            "是，双一流A类",
+            "是，双一流B类",
+            "尚未入选国家双一流，但为广东省高水平大学重点建设高校",
+            "是，一流学科建设高校"
+        ],
+        "correctAnswer": 2,
+        "difficulty": 2,
+        "category": "学校层次"
+    },
+    {
+        "content": "南方医科大学是全国首批开设什么专业的医科院校之一？",
+        "options": [
+            "临床医学八年制",
+            "中西医临床医学",
+            "生物医学工程",
+            "法医学"
+        ],
+        "correctAnswer": 0,
+        "difficulty": 3,
+        "category": "校史成就"
+    },
+    {
+        "content": "南方医科大学的英语缩写通常是？",
+        "options": [
+            "SFMU",
+            "SMU",
+            "NMU",
+            "NFU"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 1,
+        "category": "常识"
+    },
+    {
+        "content": "南方医科大学主办的全国知名外文期刊，涉及胃肠病学的是？",
+        "options": [
+            "Journal of Gastroenterology",
+            "Gastric Cancer",
+            "JCTO",
+            "Journal of Digestive Diseases"
+        ],
+        "correctAnswer": 3,
+        "difficulty": 3,
+        "category": "科研成就"
+    },
+    {
+        "content": "顺德校区学生的宿舍通常是几人间？（绝大部分本科生）",
+        "options": [
+            "2人间",
+            "4人间",
+            "6人间",
+            "8人间"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 1,
+        "category": "生活常识"
+    },
+    {
+        "content": "南方医科大学本部校园内，有一座山峰，师生常去爬山锻炼，这座山叫什么？",
+        "options": [
+            "白云山",
+            "越秀山",
+            "帽峰山",
+            "马头岗（或学校后山）"
+        ],
+        "correctAnswer": 3,
+        "difficulty": 2,
+        "category": "地理位置"
+    },
+    {
+        "content": "南方医科大学本部的运动场通常被称为什么？",
+        "options": [
+            "东区操场和西区操场",
+            "南操和北操",
+            "大操场和小操场",
+            "只有一座大型体育场"
+        ],
+        "correctAnswer": 2,
+        "difficulty": 3,
+        "category": "校园环境"
+    },
+    {
+        "content": "在第一军医大学时期，该校属于中国人民解放军哪个大军区（后改为战区前）或哪个总部的直属建制？",
+        "options": [
+            "广州军区",
+            "总后勤部",
+            "总参谋部",
+            "海军"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 3,
+        "category": "校史"
+    },
+    {
+        "content": "以下哪个学院不是南方医科大学的直属院系？",
+        "options": [
+            "公共卫生学院",
+            "中医药学院",
+            "生物医学工程学院",
+            "航空航天医学院"
+        ],
+        "correctAnswer": 3,
+        "difficulty": 1,
+        "category": "院系设置"
+    },
+    {
+        "content": "南方医科大学的“卓越创新班”通常选拔的是哪个专业的学生？",
+        "options": [
+            "药学",
+            "临床医学",
+            "护理学",
+            "生物技术"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 2,
+        "category": "教学体制"
+    },
+    {
+        "content": "南方医院的著名教授侯凡凡院士，主要研究领域是？",
+        "options": [
+            "心血管疾病",
+            "消化系统肿瘤",
+            "肾脏病",
+            "神经科学"
+        ],
+        "correctAnswer": 2,
+        "difficulty": 3,
+        "category": "杰出人物"
+    },
+    {
+        "content": "南方医科大学珠江医院的前身，曾经是一所军医学院的附属医院，它是？",
+        "options": [
+            "第一军医大学第二附属医院",
+            "第二军医大学附属医院",
+            "第三军医大学附属医院",
+            "第四军医大学附属医院"
+        ],
+        "correctAnswer": 0,
+        "difficulty": 1,
+        "category": "校史"
+    },
+    {
+        "content": "南方医科大学顺德校区最初启用并迎来第一批入住学生是在哪一年左右？",
+        "options": [
+            "2004年",
+            "2006年",
+            "2008年",
+            "2010年"
+        ],
+        "correctAnswer": 2,
+        "difficulty": 3,
+        "category": "校史"
+    },
+    {
+        "content": "南方医科大学开设的全国首个与世界卫生组织合作的国际培训中心是关于什么的？",
+        "options": [
+            "热带病",
+            "艾滋病培训",
+            "灾难医学培训中心",
+            "全科医学"
+        ],
+        "correctAnswer": 0,
+        "difficulty": 3,
+        "category": "科研成就"
+    },
+    {
+        "content": "南方医科大学的“大医精诚”理念出自古代哪位名医的著作？",
+        "options": [
+            "华佗",
+            "张仲景",
+            "孙思邈",
+            "李时珍"
+        ],
+        "correctAnswer": 2,
+        "difficulty": 1,
+        "category": "医学常识"
+    },
+    {
+        "content": "临床医学（八年制）学生在校期间，前两年的基础课程通常在哪里就读？",
+        "options": [
+            "本部（广州）",
+            "顺德校区",
+            "国防科技大学（长沙）",
+            "北京大学"
+        ],
+        "correctAnswer": 2,
+        "difficulty": 3,
+        "category": "教学体制"
+    },
+    {
+        "content": "除了临床医学八年制，南方医科大学还与国防科大有联合培养协议。上述提到前往长沙就读指的是？",
+        "options": [
+            "第一、二学年的通识教育",
+            "最后两年的临床实习",
+            "大五学年的专业基础重点授课",
+            "出国交换前的一年培训"
+        ],
+        "correctAnswer": 0,
+        "difficulty": 2,
+        "category": "教学体制"
+    },
+    {
+        "content": "南方医科大学的药学院的重点专业之一是？",
+        "options": [
+            "中草药栽培与鉴定",
+            "临床药学",
+            "海洋药学",
+            "蒙药学"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 2,
+        "category": "院系设置"
+    },
+    {
+        "content": "第一军医大学转制地方后，绝大多数教职工和学员脱下了军装，这一历史事件常被称为？",
+        "options": [
+            "退役",
+            "整体移交/转制",
+            "转业重组",
+            "军民融合"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 1,
+        "category": "校史"
+    },
+    {
+        "content": "顺德校区的学生如果在食堂吃腻了，通常会去校外哪条街聚餐？（曾经或现在的热门小吃街）",
+        "options": [
+            "大学城GOGO新天地",
+            "容桂步行街",
+            "华生园/南医小吃街",
+            "北京路"
+        ],
+        "correctAnswer": 2,
+        "difficulty": 2,
+        "category": "生活常识"
+    },
+    {
+        "content": "南方医科大学本部校园内有一家超市，是很多本部师生的共同回忆，它的名字是？（或曾用名）",
+        "options": [
+            "全家超市",
+            "军供超市/福娃",
+            "百佳超市",
+            "好日子超市"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 3,
+        "category": "生活常识"
+    },
+    {
+        "content": "南方医科大学护理学院培养的本科护理学生，毕业时获得的学位一般是？",
+        "options": [
+            "医学学士",
+            "理学学士",
+            "护理学学士（理学类）",
+            "文学学士"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 2,
+        "category": "教学体制"
+    },
+    {
+        "content": "南方医科大学的校园网，学生宿舍区普遍使用的是？",
+        "options": [
+            "三大运营商宽带直接接入",
+            "Dr.com 客户端拨号认证",
+            "直接连无需密码",
+            "网页Portal统一认证"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 2,
+        "category": "生活常识"
+    },
+    {
+        "content": "学校每年秋季新生入学后，通常会进行为期约多久的军训？",
+        "options": [
+            "一星期",
+            "两星期（约14天）",
+            "一个月",
+            "不军训"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 1,
+        "category": "生活常识"
+    },
+    {
+        "content": "目前南方医科大学的党委书记和校长分别是（以2023-2024最新公开资料为代表）？",
+        "options": [
+            "陈敏生、黎孟枫",
+            "张玉润、黎孟枫",
+            "黎孟枫、陈敏生",
+            "胡海岩、张玉润"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 3,
+        "category": "行政常识"
+    },
+    {
+        "content": "南方医科大学公共卫生学院在抗击新冠疫情期间做出了巨大贡献，公共卫生与预防医学在全国学科评估中的等级通常在什么范围内？",
+        "options": [
+            "A+或A",
+            "B+",
+            "C+",
+            "未参评"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 2,
+        "category": "科研成就"
+    },
+    {
+        "content": "位于广州本部的南方医院，其地铁站是哪一条线？",
+        "options": [
+            "1号线",
+            "3号线",
+            "5号线",
+            "6号线"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 1,
+        "category": "地理位置"
+    },
+    {
+        "content": "前往南方医院/南方医科大学本部，乘坐广州地铁3号线北延段应该在哪个站下车？",
+        "options": [
+            "京溪南方医院站",
+            "同和站",
+            "梅花园站",
+            "天河客运站"
+        ],
+        "correctAnswer": 0,
+        "difficulty": 1,
+        "category": "地理位置"
+    },
+    {
+        "content": "顺德校区到本部校区，学校通常有提供什么交通工具服务师生？",
+        "options": [
+            "免费高铁穿梭",
+            "跨市直升机",
+            "校园直达大巴车（校车）",
+            "共享单车"
+        ],
+        "correctAnswer": 2,
+        "difficulty": 1,
+        "category": "生活常识"
+    },
+    {
+        "content": "在顺德校区，晚上学生自习最喜欢去的地方通常是哪里？",
+        "options": [
+            "凌云塔内",
+            "图文信息中心",
+            "食堂二楼",
+            "操场看台"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 1,
+        "category": "生活常识"
+    },
+    {
+        "content": "南方医科大学康复医学院的专业特色是物理治疗和什么治疗？",
+        "options": [
+            "化学治疗",
+            "作业治疗 (Occupational Therapy)",
+            "心理治疗",
+            "放射治疗"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 2,
+        "category": "院系设置"
+    },
+    {
+        "content": "南方治平奖学金是南方医科大学的哪类奖项？",
+        "options": [
+            "专为贫困生设立的助学金",
+            "最高级别的综合类奖学金",
+            "仅限研究生评选的奖学金",
+            "退役军人专属奖金"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 3,
+        "category": "校园文化"
+    },
+    {
+        "content": "南方医科大学的基础医学院中，主要研究病原微生物的学科带头人团队，属于哪个教研室/系？",
+        "options": [
+            "病原生物学系",
+            "生理学教研室",
+            "免疫学系",
+            "药理学系"
+        ],
+        "correctAnswer": 0,
+        "difficulty": 2,
+        "category": "院系设置"
+    },
+    {
+        "content": "顺德校区的建筑群中，行政楼前有一个巨大的广场，通常举办开学典礼，被称为？",
+        "options": [
+            "红旗广场",
+            "仲景广场",
+            "行政楼南广场/大草坪",
+            "白求恩广场"
+        ],
+        "correctAnswer": 2,
+        "difficulty": 2,
+        "category": "校园环境"
+    },
+    {
+        "content": "临床医学实习阶段，学生在医院进行轮转，这种学习形式被称作？",
+        "options": [
+            "见习或实习",
+            "住培",
+            "博后",
+            "旁听"
+        ],
+        "correctAnswer": 0,
+        "difficulty": 1,
+        "category": "教学体制"
+    },
+    {
+        "content": "以下哪一个是南方医科大学的官方公众号名称？",
+        "options": [
+            "南医大发布",
+            "南方医科大学",
+            "南方医科大学(SMU)",
+            "南医资讯"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 2,
+        "category": "网络常识"
+    },
+    {
+        "content": "南方医科大学有几所直属附属医院（大致数量级）？",
+        "options": [
+            "2-3所",
+            "5-7所",
+            "10所以上",
+            "只有1所"
+        ],
+        "correctAnswer": 2,
+        "difficulty": 1,
+        "category": "附属医院"
+    },
+    {
+        "content": "钟世镇院士是南方医科大学的著名教授，他被誉为中国什么学科的奠基人之一？",
+        "options": [
+            "法医学",
+            "数字人/临床解剖学",
+            "肿瘤学",
+            "内分泌学"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 2,
+        "category": "杰出人物"
+    },
+    {
+        "content": "姚开泰院士在南方医科大学期间，主要从事哪个领域的致病机制和防治研究？",
+        "options": [
+            "鼻咽癌",
+            "肝癌",
+            "肺结核",
+            "白血病"
+        ],
+        "correctAnswer": 0,
+        "difficulty": 3,
+        "category": "杰出人物"
+    },
+    {
+        "content": "南方医科大学生物医学工程学院在国内的学科地位很高，它的主要研究方向不包括以下哪项？",
+        "options": [
+            "医学图像处理",
+            "医疗仪器",
+            "中医针灸针法",
+            "生物材料"
+        ],
+        "correctAnswer": 2,
+        "difficulty": 2,
+        "category": "院系设置"
+    },
+    {
+        "content": "南方医科大学中医药学院开设的特色专业中除了中医学，还有？",
+        "options": [
+            "针灸推拿学",
+            "汉语言文学",
+            "历史学",
+            "宗教学"
+        ],
+        "correctAnswer": 0,
+        "difficulty": 1,
+        "category": "院系设置"
+    },
+    {
+        "content": "南方医科大学开设了医学检验技术专业，它通常属于哪个学院管理？",
+        "options": [
+            "基础医学院",
+            "检验与生物技术学院",
+            "临床医学院",
+            "公共卫生学院"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 2,
+        "category": "院系设置"
+    },
+    {
+        "content": "南方医科大学是广东省高水平大学建设计划中的一部分吗？",
+        "options": [
+            "是，重点建设高校",
+            "不是，是普通高校",
+            "是，高职高专重点",
+            "仅是民办重点"
+        ],
+        "correctAnswer": 0,
+        "difficulty": 1,
+        "category": "学校层次"
+    },
+    {
+        "content": "南方医院的“驼鸟医生”雕像，其寓意主要表达的是？",
+        "options": [
+            "遇到困难就躲避",
+            "医务工作者任劳任怨、默默奉献的精神",
+            "保护野生动物",
+            "跑得像鸵鸟一样快"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 3,
+        "category": "校园文化"
+    },
+    {
+        "content": "南方医科大学本部的中心地带，一排有着浓郁历史气息的建筑，原为军医大时期的行政和教学重地，现被保留，红色的外墙砖。师生常称之为？",
+        "options": [
+            "老红楼",
+            "苏联宫",
+            "红楼建筑群",
+            "白楼"
+        ],
+        "correctAnswer": 2,
+        "difficulty": 3,
+        "category": "校园环境"
+    },
+    {
+        "content": "学校为了保障医学实验动物的质量与伦理规范，设有专门的动物实验中心。实验开始前，医学生通常需要对实验动物进行什么仪式以表达敬意？",
+        "options": [
+            "祭奠仪式/默哀",
+            "喂食仪式",
+            "放生仪式",
+            "清洗仪式"
+        ],
+        "correctAnswer": 0,
+        "difficulty": 2,
+        "category": "医学常识"
+    },
+    {
+        "content": "南方医科大学的教务管理系统网站通常供学生进行什么样的操作？",
+        "options": [
+            "订外卖",
+            "选课、查成绩",
+            "看电影",
+            "买二手商品"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 1,
+        "category": "生活常识"
+    },
+    {
+        "content": "在南方医科大学的期末考试周，图书馆的座位通常会？",
+        "options": [
+            "空空如也",
+            "供不应求，需要早起“占座”",
+            "禁止临床专业进入",
+            "关闭不开放"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 1,
+        "category": "生活常识"
+    },
+    {
+        "content": "临床医学大一新生学习系统解剖学时，第一次进解剖实验室面对大体老师，通常需要穿戴？",
+        "options": [
+            "西装打领带",
+            "便装即可",
+            "白大衣，戴口罩、帽子和手套",
+            "防化服"
+        ],
+        "correctAnswer": 2,
+        "difficulty": 1,
+        "category": "医学常识"
+    },
+    {
+        "content": "南方医科大学的前身第一军医大学，曾经与以下哪所军医大学并称“四大军医大”？",
+        "options": [
+            "第二、三、四军医大学",
+            "北京大学医学部",
+            "协和医学院",
+            "复旦大学上海医学院"
+        ],
+        "correctAnswer": 0,
+        "difficulty": 1,
+        "category": "校史"
+    },
+    {
+        "content": "原第二军医大学现在更名为了什么？（横向校史知识）",
+        "options": [
+            "海军军医大学",
+            "空军军医大学",
+            "陆军军医大学",
+            "战略支援部队医科大学"
+        ],
+        "correctAnswer": 0,
+        "difficulty": 2,
+        "category": "横向常识"
+    },
+    {
+        "content": "原第四军医大学现在更名为？",
+        "options": [
+            "空军军医大学",
+            "陆军军医大学",
+            "武警医学院",
+            "海军军医大学"
+        ],
+        "correctAnswer": 0,
+        "difficulty": 2,
+        "category": "横向常识"
+    },
+    {
+        "content": "原第三军医大学的主校区位于哪个城市？",
+        "options": [
+            "上海",
+            "西安",
+            "重庆",
+            "广州"
+        ],
+        "correctAnswer": 2,
+        "difficulty": 2,
+        "category": "横向常识"
+    },
+    {
+        "content": "南方医科大学的录取通知书近年来常常附带什么样的设计特色以体现岭南与医学文化？",
+        "options": [
+            "附带一把手术刀",
+            "精致的封套、立体校园纸雕或校徽盲盒",
+            "一瓶药水",
+            "纯电子版本没有实体"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 2,
+        "category": "校园文化"
+    },
+    {
+        "content": "南方医科大学设有多个国家重点实验室，其中一个是专门研究什么脏器的衰竭问题的？",
+        "options": [
+            "器官衰竭防治国家重点实验室",
+            "呼吸疾病国家重点实验室",
+            "肿瘤生物学国家重点实验室",
+            "眼科学国家重点实验室"
+        ],
+        "correctAnswer": 0,
+        "difficulty": 2,
+        "category": "科研成就"
+    },
+    {
+        "content": "以下哪个社团是南方医科大学极具临床医学特色的学术社团？",
+        "options": [
+            "电竞社",
+            "南方医科大学急救协会 (First Aid Association)",
+            "动漫社",
+            "吉他社"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 2,
+        "category": "校园文化"
+    },
+    {
+        "content": "对于八年制学生来说，通常在第几年需要进行博士论文答辩？",
+        "options": [
+            "第5年",
+            "第6年",
+            "第8年",
+            "不用答辩"
+        ],
+        "correctAnswer": 2,
+        "difficulty": 1,
+        "category": "教学体制"
+    },
+    {
+        "content": "南方医科大学的“OSCE”中心，全称对应的是什么？（医学考试名词）",
+        "options": [
+            "客观结构化临床考试",
+            "英语综合能力考试",
+            "在线外科测试中心",
+            "计算机科学考试中心"
+        ],
+        "correctAnswer": 0,
+        "difficulty": 2,
+        "category": "学术常识"
+    },
+    {
+        "content": "医学生常常说的“执医”，指的是？",
+        "options": [
+            "执业中药师考试",
+            "国家执业医师资格考试",
+            "执着的医学态度",
+            "执业护士考试"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 1,
+        "category": "医学常识"
+    },
+    {
+        "content": "在我国，医学生本科毕业后，通常还需要进行为期几年的住院医师规范化培训（规培）？",
+        "options": [
+            "1年",
+            "2年",
+            "3年",
+            "5年"
+        ],
+        "correctAnswer": 2,
+        "difficulty": 1,
+        "category": "医学常识"
+    },
+    {
+        "content": "南方医科大学顺德校区被称为“具有岭南水乡特色”，以下哪一种树木在校园内容易见到，且花开时一片火红？",
+        "options": [
+            "樱花",
+            "木棉",
+            "梧桐",
+            "银杏"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 1,
+        "category": "校园环境"
+    },
+    {
+        "content": "南方医科大学本部的家属区通常被称为什么大院？",
+        "options": [
+            "南方大院",
+            "沙太路大院",
+            "京溪大院",
+            "军医大院"
+        ],
+        "correctAnswer": 0,
+        "difficulty": 2,
+        "category": "地理位置"
+    },
+    {
+        "content": "医学影像学专业学生学习看片子，主要学的是哪些片？",
+        "options": [
+            "动画片",
+            "X光片、CT、MRI等",
+            "照片底片",
+            "纪录片"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 1,
+        "category": "医学常识"
+    },
+    {
+        "content": "麻醉学专业在南方医科大学属于哪个学院的教学范畴（或作为临床专业单独设立系/由第一/第二临床医学院承担）？",
+        "options": [
+            "基础医学院",
+            "公共卫生学院",
+            "第一/第二临床医学院等临床单位",
+            "法医学院"
+        ],
+        "correctAnswer": 2,
+        "difficulty": 2,
+        "category": "院系设置"
+    },
+    {
+        "content": "检验专业的学生在实验室经常接触的样本通常是？",
+        "options": [
+            "水和土壤",
+            "血液、尿液等体液样本",
+            "岩石",
+            "植物标本"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 1,
+        "category": "学术常识"
+    },
+    {
+        "content": "“大体老师”是医学生对于用于解剖学的什么的尊称？",
+        "options": [
+            "资深教授",
+            "遗体捐献者",
+            "模型用具",
+            "动物骨骼"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 1,
+        "category": "医学常识"
+    },
+    {
+        "content": "南方医科大学本科招生时，代码通常分为两类：普通类和什么类？（涉及农村/地方专项或不同地区录取政策）",
+        "options": [
+            "艺术类",
+            "体艺类",
+            "地方专项/国家专项",
+            "飞行员类"
+        ],
+        "correctAnswer": 2,
+        "difficulty": 2,
+        "category": "生活常识"
+    },
+    {
+        "content": "药学专业的学生，实验课上使用极为频繁的一门仪器可能是什么？",
+        "options": [
+            "天文望远镜",
+            "高效液相色谱仪(HPLC)",
+            "心电图机",
+            "核磁共振(全身)"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 2,
+        "category": "学术常识"
+    },
+    {
+        "content": "在我国的高考志愿填报中，南方医科大学是属于本科哪个批次录取的高校？",
+        "options": [
+            "专科批次",
+            "本科提前批（部分中外合作或专硕）及本科第一批（现为本科批/重点线以上）",
+            "民办院校批次",
+            "艺术类批次"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 1,
+        "category": "常识"
+    },
+    {
+        "content": "如果南方医科大学的学生想要查阅中外文医学文献，最常登录的数据库系统是？",
+        "options": [
+            "优酷",
+            "PubMed、CNKI(知网)等",
+            "淘宝",
+            "GitHub"
+        ],
+        "correctAnswer": 1,
+        "difficulty": 1,
+        "category": "常识"
+    },
+    {
+        "content": "对于新生，熟悉校园环境时，哪项不是必须掌握的地图点？",
+        "options": [
+            "教学楼位置",
+            "食堂位置",
+            "宿舍区",
+            "教职工私家车位"
+        ],
+        "correctAnswer": 3,
+        "difficulty": 1,
+        "category": "生活常识"
+    }
+]

@@ -2,12 +2,10 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hash } from "bcryptjs";
 import { z } from "zod";
-import { signAccessToken, signRefreshToken } from "@/lib/auth/jwt";
-import { createSession } from "@/lib/auth/session";
-import { setAuthCookies } from "@/lib/auth/cookies";
-import slugify from "slugify";
+import { issueUserSession } from "@/lib/auth/session";
 
 const registerSchema = z.object({
+  challengeId: z.string().min(1),
   username: z
     .string()
     .min(2)
@@ -15,10 +13,6 @@ const registerSchema = z.object({
     .regex(/^[a-zA-Z0-9_]+$/),
   password: z.string().min(6).max(100),
   nickname: z.string().min(1).max(30).optional(),
-  method: z.enum(["email", "quiz"]),
-  email: z.string().email().optional(),
-  emailCode: z.string().optional(),
-  quizAnswers: z.array(z.number()).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -26,7 +20,46 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const data = registerSchema.parse(body);
 
-    // Check if username taken
+    // Atomically consume the challenge
+    const challenge = await prisma.$transaction(async (tx) => {
+      const ch = await tx.registrationChallenge.findUnique({
+        where: { id: data.challengeId },
+      });
+
+      if (!ch) return null;
+      if (ch.consumedAt) return { ...ch, _error: "already_consumed" as const };
+      if (ch.expiresAt < new Date()) return { ...ch, _error: "expired" as const };
+      if (!ch.verifiedAt) return { ...ch, _error: "not_verified" as const };
+
+      // Mark consumed
+      await tx.registrationChallenge.update({
+        where: { id: ch.id },
+        data: { consumedAt: new Date() },
+      });
+
+      return ch;
+    });
+
+    if (!challenge) {
+      return Response.json(
+        { ok: false, error: { code: 404, message: "Challenge not found" } },
+        { status: 404 }
+      );
+    }
+
+    if ("_error" in challenge) {
+      const messages: Record<string, string> = {
+        already_consumed: "Challenge already used",
+        expired: "Challenge expired",
+        not_verified: "Challenge not verified",
+      };
+      return Response.json(
+        { ok: false, error: { code: 400, message: messages[challenge._error] } },
+        { status: 400 }
+      );
+    }
+
+    // Check username taken
     const existing = await prisma.user.findUnique({
       where: { username: data.username },
     });
@@ -37,86 +70,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify registration method
-    if (data.method === "email") {
-      if (!data.email || !data.emailCode) {
-        return Response.json(
-          { ok: false, error: { code: 400, message: "Email and code required" } },
-          { status: 400 }
-        );
-      }
-
-      // Check email not taken
-      const emailUser = await prisma.user.findUnique({ where: { email: data.email } });
+    // For email challenges, check email not taken
+    if (challenge.method === "email" && challenge.email) {
+      const emailUser = await prisma.user.findUnique({
+        where: { email: challenge.email },
+      });
       if (emailUser) {
         return Response.json(
           { ok: false, error: { code: 409, message: "Email already registered" } },
           { status: 409 }
-        );
-      }
-
-      // Verify email code
-      const verification = await prisma.emailVerification.findFirst({
-        where: {
-          email: data.email,
-          purpose: "register",
-          usedAt: null,
-          expiresAt: { gt: new Date() },
-        },
-        orderBy: { createdAt: "desc" },
-      });
-
-      if (!verification) {
-        return Response.json(
-          { ok: false, error: { code: 400, message: "Invalid or expired code" } },
-          { status: 400 }
-        );
-      }
-
-      const { compare } = await import("bcryptjs");
-      const valid = await compare(data.emailCode, verification.codeHash);
-      if (!valid) {
-        return Response.json(
-          { ok: false, error: { code: 400, message: "Invalid verification code" } },
-          { status: 400 }
-        );
-      }
-
-      // Mark verification as used
-      await prisma.emailVerification.update({
-        where: { id: verification.id },
-        data: { usedAt: new Date() },
-      });
-    } else if (data.method === "quiz") {
-      if (!data.quizAnswers || data.quizAnswers.length < 4) {
-        return Response.json(
-          { ok: false, error: { code: 400, message: "4 quiz answers required" } },
-          { status: 400 }
-        );
-      }
-
-      // Verify quiz answers
-      const questions = await prisma.quizQuestion.findMany({
-        where: { active: true },
-        take: 4,
-      });
-
-      if (questions.length < 4) {
-        return Response.json(
-          { ok: false, error: { code: 500, message: "Not enough quiz questions" } },
-          { status: 500 }
-        );
-      }
-
-      let score = 0;
-      for (let i = 0; i < questions.length; i++) {
-        if (data.quizAnswers[i] === questions[i].answer) score++;
-      }
-
-      if (score < 4) {
-        return Response.json(
-          { ok: false, error: { code: 400, message: `Quiz failed: ${score}/4` } },
-          { status: 400 }
         );
       }
     }
@@ -128,36 +90,17 @@ export async function POST(req: NextRequest) {
         username: data.username,
         passwordHash,
         nickname: data.nickname || data.username,
-        email: data.method === "email" ? data.email : null,
-        emailVerifiedAt: data.method === "email" ? new Date() : null,
+        email: challenge.method === "email" ? challenge.email : null,
+        emailVerifiedAt: challenge.method === "email" ? new Date() : null,
         role: "contributor",
         status: "active",
       },
     });
 
-    // Create session and tokens
-    const accessToken = await signAccessToken({
-      userId: user.id,
-      role: user.role,
-      username: user.username,
-    });
-    const refreshToken = await signRefreshToken({
-      userId: user.id,
-      sessionId: "", // will be set below
-    });
-
-    const session = await createSession(user.id, refreshToken, {
-      ip: req.headers.get("x-forwarded-for") || undefined,
-      userAgent: req.headers.get("user-agent") || undefined,
-    });
-
-    // Re-sign refresh token with session ID
-    const finalRefreshToken = await signRefreshToken({
-      userId: user.id,
-      sessionId: session.id,
-    });
-
-    const res = Response.json(
+    // Issue session using shared utility (fixes the refresh token hash bug)
+    return issueUserSession(
+      req,
+      user,
       {
         ok: true,
         data: {
@@ -169,14 +112,8 @@ export async function POST(req: NextRequest) {
           },
         },
       },
-      { status: 201 }
+      201
     );
-
-    const nextRes = new (await import("next/server")).NextResponse(res.body, res);
-    return setAuthCookies(nextRes, {
-      accessToken,
-      refreshToken: finalRefreshToken,
-    });
   } catch (err) {
     if (err instanceof z.ZodError) {
       return Response.json(

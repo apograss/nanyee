@@ -1,6 +1,9 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getOidcEmailClaim } from "@/lib/oidc/claims";
 import { signIdToken } from "@/lib/oidc/keys";
+import { resolveOAuthClientCredentials } from "@/lib/oidc/client-auth";
+import { parseOAuthTokenParams } from "@/lib/oidc/token-params";
 import { compare } from "bcryptjs";
 import { createHash, randomBytes, timingSafeEqual } from "crypto";
 
@@ -19,21 +22,18 @@ const NO_STORE_HEADERS = {
  */
 export async function POST(req: NextRequest) {
   const contentType = req.headers.get("content-type") || "";
-  let params: Record<string, string>;
+  const rawBody = await req.text();
+  const params = parseOAuthTokenParams(rawBody, contentType);
 
-  if (contentType.includes("application/x-www-form-urlencoded")) {
-    const text = await req.text();
-    params = Object.fromEntries(new URLSearchParams(text));
-  } else {
-    params = await req.json();
-  }
+  const { clientId, clientSecret } = resolveOAuthClientCredentials(
+    params,
+    req.headers.get("authorization"),
+  );
 
   const {
     grant_type: grantType,
     code,
     redirect_uri: redirectUri,
-    client_id: clientId,
-    client_secret: clientSecret,
     code_verifier: codeVerifier,
   } = params;
 
@@ -209,10 +209,14 @@ export async function POST(req: NextRequest) {
       if (scopes.includes("profile")) {
         idTokenPayload.username = user.username;
         idTokenPayload.nickname = user.nickname;
+        idTokenPayload.preferred_username = user.username;
+        idTokenPayload.name = user.nickname || user.username;
         idTokenPayload.role = user.role;
       }
       if (scopes.includes("email")) {
-        idTokenPayload.email = user.email;
+        const emailClaim = getOidcEmailClaim(user);
+        idTokenPayload.email = emailClaim.email;
+        idTokenPayload.email_verified = emailClaim.emailVerified;
       }
     }
   }

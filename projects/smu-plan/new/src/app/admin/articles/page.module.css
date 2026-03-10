@@ -21,6 +21,8 @@
 .statusBadge[data-status="draft"] { color: var(--text-muted); background: var(--bg-muted); }
 .statusBadge[data-status="rejected"] { color: #c62828; background: #ffebee; }
 .statusBadge[data-status="hidden"] { color: #757575; background: #eeeeee; }
+.statusBadge[data-status="locked"] { color: #8a5a00; background: #fff4d6; }
+.statusBadge[data-status="unlocked"] { color: #1565c0; background: #e3f2fd; }
 
 .formOverlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 100; }
 .form { background: var(--bg-primary); border: var(--neo-border); box-shadow: var(--neo-shadow); padding: var(--space-lg); width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: var(--space-md); }
