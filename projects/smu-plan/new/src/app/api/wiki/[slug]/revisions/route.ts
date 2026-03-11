@@ -20,7 +20,7 @@ export async function GET(
 
   if (!article) {
     return Response.json(
-      { ok: false, error: { code: 404, message: "Article not found" } },
+      { ok: false, error: { code: 404, message: "文章不存在" } },
       { status: 404 }
     );
   }

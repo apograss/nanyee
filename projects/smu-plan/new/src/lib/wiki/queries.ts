@@ -414,7 +414,7 @@ export async function getHomePreview(): Promise<HomePreview> {
   const cached = getCached<HomePreview>(HOME_CACHE_KEY);
   if (cached) return cached;
 
-  const [articles, stats, latestForumPosts] = await Promise.all([
+  const [articles, stats] = await Promise.all([
     prisma.article.findMany({
       where: { status: "published" },
       orderBy: { publishedAt: "desc" },
@@ -422,8 +422,16 @@ export async function getHomePreview(): Promise<HomePreview> {
       include: { author: { select: AUTHOR_SELECT } },
     }),
     getKBStats(),
-    getLatestForumPosts().catch(() => []),
   ]);
+
+  let latestForumPosts: ForumPreviewItem[] = [];
+  let shouldCache = true;
+
+  try {
+    latestForumPosts = await getLatestForumPosts();
+  } catch {
+    shouldCache = false;
+  }
 
   const preview: HomePreview = {
     latestArticles: articles.map((a) => ({
@@ -440,6 +448,9 @@ export async function getHomePreview(): Promise<HomePreview> {
     },
   };
 
-  setCached(HOME_CACHE_KEY, preview);
+  if (shouldCache || latestForumPosts.length > 0) {
+    setCached(HOME_CACHE_KEY, preview);
+  }
+
   return preview;
 }

@@ -51,6 +51,19 @@ export async function listRevisions(
   return { revisions, total };
 }
 
+/** Get a single revision for an article. */
+export async function getRevisionDetail(articleId: string, revisionId: string) {
+  return prisma.articleRevision.findFirst({
+    where: {
+      id: revisionId,
+      articleId,
+    },
+    include: {
+      editor: { select: { username: true, nickname: true } },
+    },
+  });
+}
+
 /** Revert an article to a specific revision. Creates a pre-revert snapshot first. */
 export async function revertToRevision(
   articleId: string,

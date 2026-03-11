@@ -69,6 +69,13 @@
   gap: var(--space-md);
 }
 
+.revisionActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .revisionMain {
   display: flex;
   flex-direction: column;
@@ -104,4 +111,15 @@
 
 .pageInfo {
   font-weight: var(--font-bold);
+}
+
+@media (max-width: 768px) {
+  .revisionCard {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .revisionActions {
+    justify-content: flex-start;
+  }
 }

@@ -1,15 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import NeoButton from "@/components/atoms/NeoButton";
 import ConfirmDialog from "@/components/molecules/ConfirmDialog";
+import WikiDiffView, {
+  type WikiDiffVersion,
+} from "@/components/organisms/WikiDiffView/WikiDiffView";
 import styles from "./history.module.css";
 
 interface Revision {
   id: string;
   title: string;
+  format: string;
+  summary: string | null;
   editorName: string;
   editSummary: string | null;
   createdAt: string;
@@ -26,6 +31,16 @@ interface NoticeState {
   message: string;
 }
 
+interface RevisionDetail {
+  id: string;
+  title: string;
+  content: string;
+  format: string;
+  summary: string | null;
+  editorName: string;
+  createdAt: string;
+}
+
 export default function HistoryPage() {
   const params = useParams<{ slug: string }>();
   const slug = params.slug;
@@ -37,21 +52,111 @@ export default function HistoryPage() {
   const [reverting, setReverting] = useState<string | null>(null);
   const [pendingRevision, setPendingRevision] = useState<Revision | null>(null);
   const [notice, setNotice] = useState<NoticeState | null>(null);
+  const [diffingRevisionId, setDiffingRevisionId] = useState<string | null>(null);
+  const [diffData, setDiffData] = useState<{
+    current: WikiDiffVersion;
+    revision: WikiDiffVersion;
+  } | null>(null);
+
+  const readApiPayload = useCallback(async (response: Response) => {
+    const raw = await response.text();
+
+    try {
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {
+        ok: false,
+        error: {
+          message: raw.trim() || `请求失败（${response.status}）`,
+        },
+      };
+    }
+  }, []);
+
+  const loadRevisions = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/wiki/${slug}/revisions?page=${page}`);
+      const data = await readApiPayload(res);
+      if (res.ok && data.ok) {
+        setRevisions(data.data.revisions);
+        setPagination(data.data.pagination);
+        setNotice(null);
+      } else {
+        setNotice({
+          tone: "error",
+          message: data.error?.message || "加载历史版本失败",
+        });
+      }
+    } catch {
+      setNotice({ tone: "error", message: "网络错误，请稍后重试。" });
+    }
+    setLoading(false);
+  }, [page, readApiPayload, slug]);
 
   useEffect(() => {
-    (async () => {
-      setLoading(true);
+    loadRevisions();
+  }, [loadRevisions]);
+
+  const handleOpenDiff = useCallback(
+    async (revision: Revision) => {
+      if (diffingRevisionId === revision.id && diffData) {
+        setDiffingRevisionId(null);
+        setDiffData(null);
+        return;
+      }
+
+      setDiffingRevisionId(revision.id);
+      setDiffData(null);
+      setNotice(null);
+
       try {
-        const res = await fetch(`/api/wiki/${slug}/revisions?page=${page}`);
-        const data = await res.json();
-        if (data.ok) {
-          setRevisions(data.data.revisions);
-          setPagination(data.data.pagination);
+        const [currentRes, revisionRes] = await Promise.all([
+          fetch(`/api/wiki/${slug}`),
+          fetch(`/api/wiki/${slug}/revisions/${revision.id}`),
+        ]);
+        const [currentData, revisionData] = await Promise.all([
+          readApiPayload(currentRes),
+          readApiPayload(revisionRes),
+        ]);
+
+        if (!currentRes.ok || !currentData.ok) {
+          throw new Error(currentData.error?.message || "当前版本加载失败");
         }
-      } catch {}
-      setLoading(false);
-    })();
-  }, [slug, page]);
+        if (!revisionRes.ok || !revisionData.ok) {
+          throw new Error(revisionData.error?.message || "历史版本加载失败");
+        }
+
+        setDiffData({
+          current: {
+            label: "当前版本",
+            title: currentData.data.title,
+            summary: currentData.data.summary,
+            content: currentData.data.content,
+            format: currentData.data.format,
+          },
+          revision: {
+            label: new Date(revision.createdAt).toLocaleString("zh-CN"),
+            title: revisionData.data.revision.title,
+            summary: revisionData.data.revision.summary,
+            content: revisionData.data.revision.content,
+            format: revisionData.data.revision.format,
+            editorName: revisionData.data.revision.editorName,
+            createdAt: revisionData.data.revision.createdAt,
+          },
+        });
+      } catch (error) {
+        setDiffingRevisionId(null);
+        setDiffData(null);
+        setNotice({
+          tone: "error",
+          message:
+            error instanceof Error ? error.message : "加载版本对比失败，请稍后重试。",
+        });
+      }
+    },
+    [diffData, diffingRevisionId, readApiPayload, slug],
+  );
 
   const handleRevert = async () => {
     if (!pendingRevision) return;
@@ -64,7 +169,13 @@ export default function HistoryPage() {
       if (data.ok) {
         setNotice({ tone: "success", message: "已回退到所选版本。" });
         setPendingRevision(null);
-        setPage(1);
+        setDiffData(null);
+        setDiffingRevisionId(null);
+        if (page === 1) {
+          await loadRevisions();
+        } else {
+          setPage(1);
+        }
       } else {
         setNotice({
           tone: "error",
@@ -106,6 +217,8 @@ export default function HistoryPage() {
         <div className={styles.empty}>暂无编辑历史</div>
       ) : (
         <>
+          {diffData ? <WikiDiffView current={diffData.current} revision={diffData.revision} /> : null}
+
           <div className={styles.list}>
             {revisions.map((rev) => (
               <div key={rev.id} className={styles.revisionCard}>
@@ -119,14 +232,24 @@ export default function HistoryPage() {
                     <div className={styles.revisionSummary}>{rev.editSummary}</div>
                   )}
                 </div>
-                <NeoButton
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => setPendingRevision(rev)}
-                  isLoading={reverting === rev.id}
-                >
-                  回退
-                </NeoButton>
+                <div className={styles.revisionActions}>
+                  <NeoButton
+                    size="sm"
+                    variant={diffingRevisionId === rev.id && diffData ? "primary" : "secondary"}
+                    onClick={() => handleOpenDiff(rev)}
+                    isLoading={diffingRevisionId === rev.id && !diffData}
+                  >
+                    对比
+                  </NeoButton>
+                  <NeoButton
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setPendingRevision(rev)}
+                    isLoading={reverting === rev.id}
+                  >
+                    回退
+                  </NeoButton>
+                </div>
               </div>
             ))}
           </div>

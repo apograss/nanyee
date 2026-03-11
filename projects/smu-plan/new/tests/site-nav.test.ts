@@ -9,7 +9,7 @@ import {
 
 test("default nav includes the API link after the forum entry", () => {
   const forumIndex = DEFAULT_NAV_LINKS.findIndex(
-    (link) => link.href === "https://chat.nanyee.de",
+    (link) => link.href === "/bbs",
   );
   const apiIndex = DEFAULT_NAV_LINKS.findIndex(
     (link) => link.href === API_NAV_LINK.href,
@@ -29,7 +29,7 @@ test("normalizeNavLinks injects the API link after forum when missing", () => {
 
   assert.deepEqual(
     links.map((link) => link.href),
-    ["/", "https://chat.nanyee.de", "https://api.nanyee.de", "/tools"],
+    ["/", "/bbs", "https://api.nanyee.de", "/tools"],
   );
 });
 

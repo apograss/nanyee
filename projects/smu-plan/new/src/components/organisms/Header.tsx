@@ -3,13 +3,15 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+
 import ThemeToggle from "@/components/atoms/ThemeToggle";
 import { useAuth } from "@/hooks/useAuth";
 import {
   DEFAULT_NAV_LINKS,
-  type NavLinkConfig,
   normalizeNavLinks,
+  type NavLinkConfig,
 } from "@/lib/site/nav";
+
 import styles from "./Header.module.css";
 
 export default function Header() {
@@ -59,7 +61,6 @@ export default function Header() {
                 key={link.href}
                 href={link.href}
                 className={styles.navLink}
-                target="_blank"
                 rel="noopener noreferrer"
               >
                 {link.label}
@@ -89,9 +90,9 @@ export default function Header() {
               >
                 {user.nickname || user.username}
               </button>
-              {menuOpen && (
+              {menuOpen ? (
                 <div className={styles.dropdown}>
-                  {user.role === "admin" && (
+                  {user.role === "admin" ? (
                     <Link
                       href="/admin"
                       className={styles.dropItem}
@@ -99,7 +100,7 @@ export default function Header() {
                     >
                       管理后台
                     </Link>
-                  )}
+                  ) : null}
                   <Link
                     href="/settings"
                     className={styles.dropItem}
@@ -112,13 +113,13 @@ export default function Header() {
                     className={styles.dropItem}
                     onClick={() => setMenuOpen(false)}
                   >
-                    投稿
+                    发起共建
                   </Link>
                   <button onClick={handleLogout} className={styles.dropItem}>
                     退出登录
                   </button>
                 </div>
-              )}
+              ) : null}
             </div>
           ) : (
             <Link href="/login" className={styles.loginBtn}>
@@ -129,7 +130,7 @@ export default function Header() {
           <button
             className={styles.hamburger}
             onClick={() => setMenuOpen(!menuOpen)}
-            aria-label="Toggle menu"
+            aria-label="切换菜单"
           >
             <span />
             <span />
@@ -138,7 +139,7 @@ export default function Header() {
         </div>
       </div>
 
-      {menuOpen && (
+      {menuOpen ? (
         <div className={styles.mobileNav}>
           {navLinks.map((link) =>
             link.external ? (
@@ -146,7 +147,6 @@ export default function Header() {
                 key={link.href}
                 href={link.href}
                 className={styles.mobileLink}
-                target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => setMenuOpen(false)}
               >
@@ -166,7 +166,7 @@ export default function Header() {
             ),
           )}
         </div>
-      )}
+      ) : null}
     </header>
   );
 }

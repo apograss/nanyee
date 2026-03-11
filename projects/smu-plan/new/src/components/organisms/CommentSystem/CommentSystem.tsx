@@ -44,21 +44,48 @@ export default function CommentSystem({
   const [activeParagraph, setActiveParagraph] = useState<number | null>(null);
   const [inputValue, setInputValue] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [requestError, setRequestError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+
+  const readApiPayload = useCallback(async (response: Response) => {
+    const raw = await response.text();
+
+    try {
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {
+        ok: false,
+        error: {
+          message: raw.trim() || `请求失败（${response.status}）`,
+        },
+      };
+    }
+  }, []);
 
   const loadComments = useCallback(async () => {
     try {
       const res = await fetch(`/api/wiki/${articleSlug}/comments`);
-      const data = await res.json();
-      if (data.ok) {
+      const data = await readApiPayload(res);
+      if (res.ok && data.ok) {
         setGroups(data.data.groups);
+        setRequestError(null);
+      } else {
+        setRequestError(data.error?.message || "评论加载失败，请稍后重试。");
       }
-    } catch {}
-  }, [articleSlug]);
+    } catch {
+      setRequestError("评论加载失败，请检查网络后重试。");
+    }
+  }, [articleSlug, readApiPayload]);
 
   useEffect(() => {
     loadComments();
   }, [loadComments]);
+
+  useEffect(() => {
+    if (activeParagraph !== null) {
+      setRequestError(null);
+    }
+  }, [activeParagraph]);
 
   // Index paragraphs + inject persistent icon buttons (once on mount)
   useEffect(() => {
@@ -84,6 +111,7 @@ export default function CommentSystem({
       icon.onclick = (e) => {
         e.preventDefault();
         e.stopPropagation();
+        setRequestError(null);
         setActiveParagraph(idx);
       };
 
@@ -134,6 +162,7 @@ export default function CommentSystem({
   const handleSubmit = async () => {
     if (!inputValue.trim() || activeParagraph === null || submitting) return;
     setSubmitting(true);
+    setRequestError(null);
     try {
       const res = await fetch(`/api/wiki/${articleSlug}/comments`, {
         method: "POST",
@@ -143,26 +172,35 @@ export default function CommentSystem({
           content: inputValue.trim(),
         }),
       });
-      const data = await res.json();
-      if (data.ok) {
+      const data = await readApiPayload(res);
+      if (res.ok && data.ok) {
         setInputValue("");
         await loadComments();
+      } else {
+        setRequestError(data.error?.message || "评论发布失败，请稍后再试。");
       }
-    } catch {}
+    } catch {
+      setRequestError("评论发布失败，请检查网络后重试。");
+    }
     setSubmitting(false);
   };
 
   const handleDelete = async (commentId: string) => {
     if (!confirm("确定要删除这条评论吗？")) return;
+    setRequestError(null);
     try {
       const res = await fetch(`/api/wiki/${articleSlug}/comments/${commentId}`, {
         method: "DELETE",
       });
-      const data = await res.json();
-      if (data.ok) {
+      const data = await readApiPayload(res);
+      if (res.ok && data.ok) {
         await loadComments();
+      } else {
+        setRequestError(data.error?.message || "删除评论失败，请稍后再试。");
       }
-    } catch {}
+    } catch {
+      setRequestError("删除评论失败，请检查网络后重试。");
+    }
   };
 
   if (activeParagraph === null) return null;
@@ -185,6 +223,11 @@ export default function CommentSystem({
         </div>
 
         <div className={styles.panelBody}>
+          {requestError ? (
+            <div className={styles.requestError} role="alert">
+              {requestError}
+            </div>
+          ) : null}
           {!activeGroup || activeGroup.items.length === 0 ? (
             <div className={styles.panelEmpty}>暂无评论，成为第一个评论的人</div>
           ) : (

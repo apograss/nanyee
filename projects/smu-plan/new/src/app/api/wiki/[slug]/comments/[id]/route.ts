@@ -16,7 +16,7 @@ export async function DELETE(
     const article = await resolveArticle(slug);
     if (!article) {
       return Response.json(
-        { ok: false, error: { code: 404, message: "Article not found" } },
+        { ok: false, error: { code: 404, message: "文章不存在" } },
         { status: 404 }
       );
     }
@@ -26,7 +26,7 @@ export async function DELETE(
     });
     if (!comment) {
       return Response.json(
-        { ok: false, error: { code: 404, message: "Comment not found" } },
+        { ok: false, error: { code: 404, message: "评论不存在" } },
         { status: 404 }
       );
     }
@@ -34,7 +34,7 @@ export async function DELETE(
     // Only author or admin can delete
     if (comment.authorId !== auth.userId && auth.role !== "admin") {
       return Response.json(
-        { ok: false, error: { code: 403, message: "Forbidden" } },
+        { ok: false, error: { code: 403, message: "你没有权限删除这条评论" } },
         { status: 403 }
       );
     }

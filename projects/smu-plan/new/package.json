@@ -30,6 +30,7 @@
     "@tiptap/starter-kit": "^3.20.1",
     "@types/sanitize-html": "^2.16.1",
     "bcryptjs": "^2.4.3",
+    "diff": "^8.0.3",
     "jose": "^6.0.11",
     "lowlight": "^3.3.0",
     "marked": "^15.0.0",

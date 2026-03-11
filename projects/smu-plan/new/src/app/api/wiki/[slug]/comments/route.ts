@@ -14,7 +14,7 @@ export async function GET(
   const article = await resolveArticle(slug);
   if (!article || article.status !== "published") {
     return Response.json(
-      { ok: false, error: { code: 404, message: "Article not found" } },
+      { ok: false, error: { code: 404, message: "文章不存在或暂未发布" } },
       { status: 404 }
     );
   }
@@ -68,7 +68,7 @@ export async function POST(
     const article = await resolveArticle(slug);
     if (!article || article.status !== "published") {
       return Response.json(
-        { ok: false, error: { code: 404, message: "Article not found" } },
+        { ok: false, error: { code: 404, message: "文章不存在或暂未发布" } },
         { status: 404 }
       );
     }
