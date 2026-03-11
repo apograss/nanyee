@@ -1,13 +1,9 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef, FormEvent } from "react";
+import { useState, useCallback, useEffect, FormEvent } from "react";
 import Link from "next/link";
 import { recognizeCaptcha } from "@/lib/captcha-ocr";
 import s from "../tools.module.css";
-
-function saveCredentials(a: string, p: string) { try { localStorage.setItem("smu_account", a); localStorage.setItem("smu_password", btoa(p)); } catch {} }
-function loadCredentials(): { account: string; password: string } | null { try { const a = localStorage.getItem("smu_account"); const p = localStorage.getItem("smu_password"); if (a && p) return { account: a, password: atob(p) }; } catch {} return null; }
-function clearCredentials() { try { localStorage.removeItem("smu_account"); localStorage.removeItem("smu_password"); } catch {} }
 
 export default function SchedulePage() {
   const [account, setAccount] = useState("");
@@ -22,9 +18,7 @@ export default function SchedulePage() {
   const [sessionId, setSessionId] = useState("");
   const [captchaLoading, setCaptchaLoading] = useState(false);
   const [ocrStatus, setOcrStatus] = useState("");
-  const [rememberMe, setRememberMe] = useState(false);
   const [autoLoginStatus, setAutoLoginStatus] = useState("");
-  const loadedFromStorage = useRef(false);
 
   const [loading, setLoading] = useState(false);
   const [loadingText, setLoadingText] = useState("");
@@ -37,16 +31,6 @@ export default function SchedulePage() {
     error?: string;
   } | null>(null);
   const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    const creds = loadCredentials();
-    if (creds) {
-      setAccount(creds.account);
-      setPassword(creds.password);
-      setRememberMe(true);
-      loadedFromStorage.current = true;
-    }
-  }, []);
 
   const loadCaptcha = useCallback(async () => {
     setCaptchaLoading(true);
@@ -81,8 +65,6 @@ export default function SchedulePage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!account || !password || !captcha || !sessionId) return;
-    if (rememberMe) saveCredentials(account, password);
-    else clearCredentials();
     setLoading(true);
     setResult(null);
     setCopied(false);
@@ -163,8 +145,6 @@ export default function SchedulePage() {
           if (data.error) { setAutoLoginStatus(`${data.error}，重试...`); continue; }
           setResult({ success: true, shareCode: data.shareCode, shareMessage: data.shareMessage, courseCount: data.courseCount, eventCount: data.eventCount });
         }
-        if (rememberMe) saveCredentials(account, password);
-        else clearCredentials();
         setAutoLoginStatus(""); setLoading(false); setLoadingText(""); return;
       } catch { setAutoLoginStatus("网络错误，重试..."); }
     }
@@ -209,11 +189,6 @@ export default function SchedulePage() {
               </div>
               {ocrStatus && <span className={s.ocrStatus}>🤖 {ocrStatus}</span>}
             </div>
-
-            <label className={s.checkboxRow}>
-              <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
-              记住我（下次自动识别验证码登录）
-            </label>
 
             <div className={s.inlineRow}>
               <div className={s.formGroup}>

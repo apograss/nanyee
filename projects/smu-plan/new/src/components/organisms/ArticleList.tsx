@@ -6,10 +6,16 @@ interface ArticleItem {
   title: string;
   excerpt?: string | null;
   date: string;
+  categoryName?: string | null;
+  categoryIcon?: string | null;
+  parentCategoryName?: string | null;
+  parentCategoryIcon?: string | null;
   tags?: string[];
   authorName?: string;
+  authorAvatar?: string | null;
   viewCount?: number;
   isPinned?: boolean;
+  isNew?: boolean;
 }
 
 interface ArticleListProps {

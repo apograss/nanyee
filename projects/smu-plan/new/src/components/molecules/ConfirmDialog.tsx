@@ -11,6 +11,11 @@ interface ConfirmDialogProps {
   confirmLabel?: string;
   cancelLabel?: string;
   loading?: boolean;
+  confirmDisabled?: boolean;
+  inputLabel?: string;
+  inputPlaceholder?: string;
+  inputValue?: string;
+  onInputChange?: (value: string) => void;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -22,10 +27,16 @@ export default function ConfirmDialog({
   confirmLabel = "确认",
   cancelLabel = "取消",
   loading,
+  confirmDisabled,
+  inputLabel,
+  inputPlaceholder,
+  inputValue,
+  onInputChange,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const messageId = "confirm-dialog-message";
 
   // Focus trap + Escape handler
@@ -60,10 +71,14 @@ export default function ConfirmDialog({
 
   useEffect(() => {
     if (!open) return;
-    dialogRef.current?.focus();
+    if (inputLabel && inputRef.current) {
+      inputRef.current.focus();
+    } else {
+      dialogRef.current?.focus();
+    }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [open, handleKeyDown]);
+  }, [open, handleKeyDown, inputLabel]);
 
   if (!open) return null;
 
@@ -81,11 +96,30 @@ export default function ConfirmDialog({
       >
         <h2 className={styles.title}>{title}</h2>
         <p id={messageId} className={styles.message}>{message}</p>
+        {inputLabel && onInputChange ? (
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>{inputLabel}</span>
+            <input
+              ref={inputRef}
+              className={styles.input}
+              type="text"
+              value={inputValue ?? ""}
+              onChange={(event) => onInputChange(event.target.value)}
+              placeholder={inputPlaceholder}
+              spellCheck={false}
+            />
+          </label>
+        ) : null}
         <div className={styles.actions}>
           <NeoButton variant="secondary" onClick={onCancel} disabled={loading}>
             {cancelLabel}
           </NeoButton>
-          <NeoButton variant="danger" onClick={onConfirm} isLoading={loading}>
+          <NeoButton
+            variant="danger"
+            onClick={onConfirm}
+            isLoading={loading}
+            disabled={confirmDisabled}
+          >
             {confirmLabel}
           </NeoButton>
         </div>

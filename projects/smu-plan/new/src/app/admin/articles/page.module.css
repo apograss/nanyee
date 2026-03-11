@@ -3,6 +3,10 @@
 .title { font-size: var(--text-2xl); font-weight: var(--font-bold); margin: 0; }
 .empty { text-align: center; padding: var(--space-3xl); color: var(--text-muted); font-weight: var(--font-bold); border: var(--neo-border); background: var(--bg-secondary); }
 .error { background: #ffe0e0; color: #cc0000; border: var(--neo-border); padding: var(--space-sm); font-weight: var(--font-bold); text-align: center; margin-bottom: var(--space-md); }
+.notice { border: var(--neo-border); padding: var(--space-sm) var(--space-md); font-weight: var(--font-semibold); margin-bottom: var(--space-md); }
+.noticeSuccess { background: #edf9f0; color: #1f6b38; }
+.noticeInfo { background: #eef5ff; color: #194f90; }
+.noticeError { background: #fff0f0; color: #a22929; }
 
 .filters { display: flex; gap: var(--space-md); align-items: center; margin-bottom: var(--space-lg); flex-wrap: wrap; }
 .searchForm { display: flex; gap: var(--space-sm); align-items: center; }

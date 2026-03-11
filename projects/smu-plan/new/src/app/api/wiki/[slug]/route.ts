@@ -7,6 +7,7 @@ import { canEditArticle } from "@/lib/wiki/permissions";
 import { checkEditRateLimit } from "@/lib/wiki/edit-rate-limit";
 import { createRevision } from "@/lib/wiki/revisions";
 import { presentPublicUser } from "@/lib/user-presenter";
+import { resolveWikiCategorySelection } from "@/lib/wiki/categories";
 import { z } from "zod";
 
 // GET /api/wiki/[slug] — article detail (lookup by slug or id)
@@ -23,6 +24,11 @@ export async function GET(
     include: {
       author: { select: { id: true, username: true, nickname: true, status: true } },
       lastEditor: { select: { id: true, username: true, nickname: true, status: true } },
+      categoryRef: {
+        include: {
+          parent: { select: { id: true, name: true, slug: true, icon: true } },
+        },
+      },
     },
   });
 
@@ -32,6 +38,11 @@ export async function GET(
       include: {
         author: { select: { id: true, username: true, nickname: true, status: true } },
         lastEditor: { select: { id: true, username: true, nickname: true, status: true } },
+        categoryRef: {
+          include: {
+            parent: { select: { id: true, name: true, slug: true, icon: true } },
+          },
+        },
       },
     });
   }
@@ -57,7 +68,19 @@ export async function GET(
       content: article.content,
       format: article.format,
       summary: article.summary,
+      categoryId: article.categoryId,
       category: article.category,
+      categoryMeta: article.categoryRef
+        ? {
+            id: article.categoryRef.id,
+            name: article.categoryRef.name,
+            slug: article.categoryRef.slug,
+            icon: article.categoryRef.icon,
+            parentName: article.categoryRef.parent?.name ?? null,
+            parentSlug: article.categoryRef.parent?.slug ?? null,
+            parentIcon: article.categoryRef.parent?.icon ?? null,
+          }
+        : null,
       tags: article.tags ? JSON.parse(article.tags) : [],
       viewCount: article.viewCount,
       authorId: article.author.id,
@@ -77,6 +100,7 @@ const updateSchema = z.object({
   content: z.string().min(1).optional(),
   format: z.enum(["html", "markdown"]).optional(),
   summary: z.string().max(500).optional(),
+  categoryId: z.string().optional(),
   category: z.string().max(50).optional(),
   tags: z.array(z.string()).max(10).optional(),
   editSummary: z.string().max(200).optional(),
@@ -101,6 +125,17 @@ export async function PUT(
 
     const body = await req.json();
     const data = updateSchema.parse(body);
+    const resolvedCategory = await resolveWikiCategorySelection({
+      categoryId: data.categoryId,
+      category: data.category,
+    });
+
+    if (data.categoryId && !resolvedCategory) {
+      return Response.json(
+        { ok: false, error: { code: 400, message: "分类不存在" } },
+        { status: 400 },
+      );
+    }
 
     const article = await prisma.article.findUnique({ where: { id } });
     if (!article) {
@@ -141,7 +176,12 @@ export async function PUT(
         ...(content && { content }),
         ...(data.format && { format: data.format }),
         ...(data.summary !== undefined && { summary: data.summary }),
-        ...(data.category !== undefined && { category: data.category }),
+        ...(data.category !== undefined || data.categoryId !== undefined
+          ? {
+              category: resolvedCategory?.name ?? data.category?.trim() ?? null,
+              categoryId: resolvedCategory?.id ?? null,
+            }
+          : {}),
         ...(data.tags && { tags: JSON.stringify(data.tags) }),
         lastEditorId: auth.userId,
       },

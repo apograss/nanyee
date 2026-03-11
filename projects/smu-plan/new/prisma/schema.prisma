@@ -34,6 +34,8 @@ model User {
   sessions     Session[]
   apiTokens    ApiToken[]
   comments     Comment[]
+  createdWikiCategories WikiCategory[] @relation("WikiCategoryCreatedBy")
+  updatedWikiCategories WikiCategory[] @relation("WikiCategoryUpdatedBy")
 }
 
 model Session {
@@ -163,6 +165,8 @@ model Article {
   format       String    @default("html") // html | markdown
   summary      String?
   category     String?
+  categoryId   String?
+  categoryRef  WikiCategory? @relation("ArticleCategory", fields: [categoryId], references: [id], onDelete: SetNull)
   tags         String?   // JSON string
   status       String    @default("published") // published | hidden
   viewCount    Int       @default(0)
@@ -186,8 +190,30 @@ model Article {
 
   @@index([status])
   @@index([category])
+  @@index([categoryId])
   @@index([publishedAt])
   @@index([isPinned, pinnedAt, publishedAt])
+}
+
+model WikiCategory {
+  id          String         @id @default(cuid())
+  name        String
+  slug        String         @unique
+  icon        String?
+  parentId    String?
+  parent      WikiCategory?  @relation("WikiCategoryTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children    WikiCategory[] @relation("WikiCategoryTree")
+  sortOrder   Int            @default(0)
+  createdById String?
+  createdBy   User?          @relation("WikiCategoryCreatedBy", fields: [createdById], references: [id])
+  updatedById String?
+  updatedBy   User?          @relation("WikiCategoryUpdatedBy", fields: [updatedById], references: [id])
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  articles    Article[]      @relation("ArticleCategory")
+
+  @@index([parentId, sortOrder])
 }
 
 model ArticleRevision {

@@ -34,29 +34,6 @@ type Step = "login" | "categories" | "courses" | "enroll";
 
 /* ─── Credential Helpers ──────────────────────────── */
 
-function saveCredentials(a: string, p: string) {
-  try {
-    localStorage.setItem("smu_account", a);
-    localStorage.setItem("smu_password", btoa(p));
-  } catch { }
-}
-
-function loadCredentials(): { account: string; password: string } | null {
-  try {
-    const a = localStorage.getItem("smu_account");
-    const p = localStorage.getItem("smu_password");
-    if (a && p) return { account: a, password: atob(p) };
-  } catch { }
-  return null;
-}
-
-function clearCredentials() {
-  try {
-    localStorage.removeItem("smu_account");
-    localStorage.removeItem("smu_password");
-  } catch { }
-}
-
 /* ─── Step Indicator Helper ───────────────────────── */
 
 const STEPS: Step[] = ["login", "categories", "courses", "enroll"];
@@ -80,7 +57,6 @@ export default function EnrollPage() {
   const [captchaImg, setCaptchaImg] = useState("");
   const [uisCookies, setUisCookies] = useState<string[]>([]);
   const [cookies, setCookies] = useState<string[]>([]);
-  const [rememberMe, setRememberMe] = useState(false);
   const [loginMode, setLoginMode] = useState<"sso" | "cookie">("sso");
   const [cookieInput, setCookieInput] = useState("");
 
@@ -105,7 +81,6 @@ export default function EnrollPage() {
   const [ocrStatus, setOcrStatus] = useState("");
 
   const logRef = useRef<HTMLDivElement>(null);
-  const loadedFromStorage = useRef(false);
 
   /* ── proxy node ── */
   const [proxyId, setProxyId] = useState(PROXY_NODES[0].id);
@@ -116,16 +91,6 @@ export default function EnrollPage() {
   };
 
   /* ── load saved credentials on mount ── */
-  useEffect(() => {
-    const creds = loadCredentials();
-    if (creds) {
-      setAccount(creds.account);
-      setPassword(creds.password);
-      setRememberMe(true);
-      loadedFromStorage.current = true;
-    }
-  }, []);
-
   /* ── auto-scroll log console ── */
   useEffect(() => {
     if (logRef.current) {
@@ -217,9 +182,6 @@ export default function EnrollPage() {
     setError("");
 
     try {
-      if (rememberMe) saveCredentials(account, password);
-      else clearCredentials();
-
       const sessionCookies = await loginViaProxy(account, password, captcha, uisCookies);
       setCookies(sessionCookies);
 
@@ -294,9 +256,6 @@ export default function EnrollPage() {
       setAutoLoginStatus(`识别: ${ocrText}，提交中...`);
 
       try {
-        if (rememberMe) saveCredentials(account, password);
-        else clearCredentials();
-
         const sessionCookies = await loginViaProxy(account, password, ocrText, captchaCookies);
         setCookies(sessionCookies);
 
@@ -597,15 +556,6 @@ export default function EnrollPage() {
                     </span>
                   )}
                 </div>
-
-                <label className={s.checkboxLabel}>
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                  />
-                  记住我（下次自动识别验证码登录）
-                </label>
 
                 <button
                   className={s.btnPrimary}

@@ -1,15 +1,19 @@
+/* ═══ Article Card — matches kb-redesign.html ═══ */
+
 .card {
-  display: block;
-  padding: var(--space-md) var(--space-lg);
+  display: flex;
+  flex-direction: column;
   background: var(--bg-secondary);
   border: var(--neo-border);
   border-radius: var(--neo-radius);
-  box-shadow: var(--neo-shadow-sm);
+  box-shadow: 1px 1px 0 var(--border-color);
+  overflow: hidden;
+  transition: all var(--transition-base);
+  cursor: pointer;
+  position: relative;
   text-decoration: none;
   color: inherit;
-  transition:
-    transform var(--transition-fast),
-    box-shadow var(--transition-fast);
+  animation: fadeUp 0.3s ease both;
 }
 
 .card:hover {
@@ -23,48 +27,194 @@
   outline-offset: 2px;
 }
 
-.pinned {
-  border-top: 3px solid var(--color-brand);
-  background: color-mix(in srgb, var(--color-brand) 5%, var(--bg-secondary));
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.pinBadge {
-  display: inline-flex;
+/* Staggered animation delays */
+.card:nth-child(1) { animation-delay: 0.04s; }
+.card:nth-child(2) { animation-delay: 0.08s; }
+.card:nth-child(3) { animation-delay: 0.12s; }
+.card:nth-child(4) { animation-delay: 0.16s; }
+.card:nth-child(5) { animation-delay: 0.20s; }
+.card:nth-child(6) { animation-delay: 0.24s; }
+.card:nth-child(7) { animation-delay: 0.28s; }
+.card:nth-child(8) { animation-delay: 0.32s; }
+
+/* ─── Pinned ─── */
+.pinned {
+  border-color: var(--color-brand);
+  background: var(--color-brand-lighter);
+}
+
+.pinned .thumb {
+  background: var(--color-brand-light);
+}
+
+.pinIcon {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  font-size: 13px;
+  z-index: 1;
+}
+
+/* ─── Emoji Thumbnail ─── */
+.thumb {
+  width: 100%;
+  height: 60px;
+  display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  font-weight: var(--font-bold);
-  color: var(--color-brand);
-  margin-bottom: var(--space-xs);
+  justify-content: center;
+  font-size: 26px;
+  background: var(--bg-muted);
+  border-bottom: 1.5px solid var(--border-light);
+}
+
+/* ─── Body ─── */
+.body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 16px 16px 16px;
+}
+
+/* ─── Title row ─── */
+.titleRow {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.35;
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .title {
-  font-size: var(--text-base);
-  font-weight: var(--font-bold);
-  line-height: var(--leading-tight);
-  margin-bottom: var(--space-xs);
+  margin: 0;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  flex: 1;
+  min-width: 0;
 }
 
-.excerpt {
-  font-size: var(--text-sm);
+.newBadge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--color-success-light);
+  color: var(--color-success);
+  flex-shrink: 0;
+}
+
+.pinnedBadge {
+  composes: newBadge;
+  background: var(--color-brand-light);
+  color: var(--color-brand);
+}
+
+.categoryTrail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.categoryPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-brand) 10%, var(--bg-primary));
   color: var(--text-secondary);
-  line-height: var(--leading-normal);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* ─── Description ─── */
+.excerpt {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  margin: 0;
 }
 
+/* ─── Meta bar ─── */
 .meta {
   display: flex;
-  gap: var(--space-md);
-  margin-top: var(--space-sm);
-  font-size: var(--text-xs);
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
   color: var(--text-muted);
+  flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-light);
 }
 
+.author {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-weight: 600;
+}
+
+.authorDot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-inverse);
+  flex-shrink: 0;
+}
+
+.authorAvatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.views {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* ─── Tags ─── */
 .tags {
   display: flex;
-  gap: var(--space-xs);
-  margin-top: var(--space-sm);
+  gap: 3px;
+  margin-left: auto;
+}
+
+.tagBadge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: var(--neo-radius-pill);
+  background: var(--color-brand-light);
+  color: var(--color-brand);
+}
+
+.tagMint {
+  background: var(--color-mint-light);
+  color: #5FA8AB;
+}
+
+.tagBlue {
+  background: var(--color-info-light);
+  color: var(--text-secondary);
 }

@@ -1,13 +1,14 @@
+/* ═══ Article List — matches kb-redesign.html grid ═══ */
+
 .list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-lg);
 }
 
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: var(--space-md);
+  gap: 18px;
 }
 
 .empty {
@@ -15,40 +16,35 @@
   padding: var(--space-3xl);
   font-size: var(--text-lg);
   color: var(--text-muted);
+  grid-column: 1 / -1;
 }
 
 .moreRow {
-  display: flex;
-  justify-content: center;
-  padding: var(--space-md);
+  text-align: center;
+  margin-top: 20px;
+  grid-column: 1 / -1;
 }
 
 .moreBtn {
-  font-size: var(--text-sm);
-  font-weight: var(--font-semibold);
-  padding: var(--space-sm) var(--space-xl);
-  background: var(--bg-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 9px 24px;
   border: var(--neo-border);
   border-radius: var(--neo-radius);
-  box-shadow: var(--neo-shadow-sm);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
   cursor: pointer;
-  transition:
-    transform var(--transition-fast),
-    box-shadow var(--transition-fast);
+  box-shadow: var(--neo-shadow-sm);
+  font-family: inherit;
+  transition: all var(--transition-base);
 }
 
 .moreBtn:hover {
-  transform: translate(-2px, -2px);
+  transform: translate(-1px, -1px);
   box-shadow: var(--neo-shadow);
 }
 
 .moreBtn:active {
-  transform: translate(1px, 1px);
+  transform: translate(0, 0);
   box-shadow: var(--neo-shadow-active);
-}
-
-@media (max-width: 768px) {
-  .grid {
-    grid-template-columns: 1fr;
-  }
 }

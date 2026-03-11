@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
+import ConfirmDialog from "@/components/molecules/ConfirmDialog";
 import styles from "./links.module.css";
 
 /* ── Types ── */
@@ -18,6 +19,11 @@ interface LinkItem {
 interface CategoryMeta {
   icon?: string;
   order?: number;
+}
+
+interface NoticeState {
+  tone: "info" | "success" | "error";
+  message: string;
 }
 
 /* ── Default links shown when DB is empty ── */
@@ -65,6 +71,8 @@ export default function LinksPage() {
   const [categoryMeta, setCategoryMeta] = useState<Record<string, CategoryMeta>>({});
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
+  const [notice, setNotice] = useState<NoticeState | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   // Edit form state
   const [editId, setEditId] = useState<string | null>(null);
@@ -122,6 +130,10 @@ export default function LinksPage() {
     return categoryMeta[cat]?.icon || DEFAULT_ICONS[cat] || "📎";
   };
 
+  const showNotice = (tone: NoticeState["tone"], message: string) => {
+    setNotice({ tone, message });
+  };
+
   const resetForm = () => {
     setEditId(null);
     setFormTitle("");
@@ -174,11 +186,15 @@ export default function LinksPage() {
       if (data.ok) {
         resetForm();
         loadData();
+        showNotice("success", "链接已保存。");
       } else {
-        alert(data.error?.message || data.error || "保存失败");
+        showNotice("error", data.error?.message || data.error || "保存失败");
       }
     } catch (err) {
-      alert(`保存失败: ${err instanceof Error ? err.message : "网络错误"}`);
+      showNotice(
+        "error",
+        `保存失败：${err instanceof Error ? err.message : "网络错误"}`,
+      );
     } finally {
       setSaving(false);
     }
@@ -186,20 +202,33 @@ export default function LinksPage() {
 
   const handleDelete = async (id: string) => {
     if (id.startsWith("default-")) {
-      alert("这是默认链接，请先添加到数据库再管理");
+      showNotice("info", "这是默认链接，请先添加到数据库再管理。");
       return;
     }
-    if (!confirm("确定要删除该链接吗？")) return;
+    setPendingDeleteId(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDeleteId) {
+      return;
+    }
     try {
-      const res = await fetch(`/api/admin/links/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/links/${pendingDeleteId}`, {
+        method: "DELETE",
+      });
       const data = await res.json();
       if (data.ok) {
+        setPendingDeleteId(null);
         loadData();
+        showNotice("success", "链接已删除。");
       } else {
-        alert(data.error?.message || data.error || "删除失败");
+        showNotice("error", data.error?.message || data.error || "删除失败");
       }
     } catch (err) {
-      alert(`删除失败: ${err instanceof Error ? err.message : "网络错误"}`);
+      showNotice(
+        "error",
+        `删除失败：${err instanceof Error ? err.message : "网络错误"}`,
+      );
     }
   };
 
@@ -229,7 +258,7 @@ export default function LinksPage() {
         });
         const data = await res.json();
         if (!data.ok) {
-          alert(data.error?.message || "重命名失败");
+          showNotice("error", data.error?.message || "重命名失败");
           setCatSaving(false);
           return;
         }
@@ -253,15 +282,19 @@ export default function LinksPage() {
       });
       const data = await res.json();
       if (!data.ok) {
-        alert(data.error?.message || "保存分类设置失败");
+        showNotice("error", data.error?.message || "保存分类设置失败");
         setCatSaving(false);
         return;
       }
 
       cancelCatEdit();
       loadData();
+      showNotice("success", "分类设置已更新。");
     } catch (err) {
-      alert(`保存失败: ${err instanceof Error ? err.message : "网络错误"}`);
+      showNotice(
+        "error",
+        `保存失败：${err instanceof Error ? err.message : "网络错误"}`,
+      );
     } finally {
       setCatSaving(false);
     }
@@ -296,6 +329,24 @@ export default function LinksPage() {
           )}
         </div>
       </div>
+
+      {notice ? (
+        <div
+          className={`${styles.notice} ${styles[`notice${notice.tone[0].toUpperCase()}${notice.tone.slice(1)}`]}`}
+          role="status"
+          aria-live="polite"
+        >
+          <span>{notice.message}</span>
+          <button
+            type="button"
+            className={styles.noticeClose}
+            onClick={() => setNotice(null)}
+            aria-label="关闭提示"
+          >
+            ×
+          </button>
+        </div>
+      ) : null}
 
       {/* Edit form (shown inline when editing a link or adding) */}
       {editing && editId && (
@@ -433,6 +484,15 @@ export default function LinksPage() {
           </button>
         </div>
       )}
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        title="删除链接"
+        message="删除后该链接会立刻从页面中移除。确认继续吗？"
+        confirmLabel="删除"
+        cancelLabel="取消"
+        onCancel={() => setPendingDeleteId(null)}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

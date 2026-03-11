@@ -1,34 +1,11 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef, FormEvent } from "react";
+import { useState, useCallback, useEffect, FormEvent } from "react";
 import Link from "next/link";
 import { recognizeCaptcha } from "@/lib/captcha-ocr";
 import s from "../tools.module.css";
 
 // ─── Credential Helpers ──────────────────────────────────────
-
-function saveCredentials(a: string, p: string) {
-  try {
-    localStorage.setItem("smu_account", a);
-    localStorage.setItem("smu_password", btoa(p));
-  } catch {}
-}
-
-function loadCredentials(): { account: string; password: string } | null {
-  try {
-    const a = localStorage.getItem("smu_account");
-    const p = localStorage.getItem("smu_password");
-    if (a && p) return { account: a, password: atob(p) };
-  } catch {}
-  return null;
-}
-
-function clearCredentials() {
-  try {
-    localStorage.removeItem("smu_account");
-    localStorage.removeItem("smu_password");
-  } catch {}
-}
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -110,25 +87,12 @@ export default function GradesPage() {
   const [sessionId, setSessionId] = useState("");
   const [captchaLoading, setCaptchaLoading] = useState(false);
   const [ocrStatus, setOcrStatus] = useState("");
-  const [rememberMe, setRememberMe] = useState(false);
   const [autoLoginStatus, setAutoLoginStatus] = useState("");
-  const loadedFromStorage = useRef(false);
 
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<GradeSummary | null>(null);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState("all");
-
-  // Load saved credentials on mount
-  useEffect(() => {
-    const creds = loadCredentials();
-    if (creds) {
-      setAccount(creds.account);
-      setPassword(creds.password);
-      setRememberMe(true);
-      loadedFromStorage.current = true;
-    }
-  }, []);
 
   // ─── Captcha Loading ────────────────────────────────────────
 
@@ -172,9 +136,6 @@ export default function GradesPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!account || !password || !captcha || !sessionId) return;
-
-    if (rememberMe) saveCredentials(account, password);
-    else clearCredentials();
 
     setLoading(true);
     setResult(null);
@@ -259,8 +220,6 @@ export default function GradesPage() {
         }
 
         setResult(data);
-        if (rememberMe) saveCredentials(account, password);
-        else clearCredentials();
         setAutoLoginStatus("");
         setLoading(false);
         return;
@@ -363,15 +322,6 @@ export default function GradesPage() {
                   <span className={s.ocrStatus}>🤖 {ocrStatus}</span>
                 )}
               </div>
-
-              <label className={s.checkboxRow}>
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                />
-                记住我（下次自动识别验证码登录）
-              </label>
 
               <button
                 type="submit"
@@ -510,16 +460,6 @@ export default function GradesPage() {
                 </div>
               </div>
             </div>
-
-            {/* Remember Me checkbox (visible in results view) */}
-            <label className={s.checkboxRow}>
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-              />
-              记住我
-            </label>
 
             {/* Filter Chips */}
             <div className={s.filterChips}>

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import NeoButton from "@/components/atoms/NeoButton";
+import ConfirmDialog from "@/components/molecules/ConfirmDialog";
 import styles from "./history.module.css";
 
 interface Revision {
@@ -20,6 +21,11 @@ interface Pagination {
   total: number;
 }
 
+interface NoticeState {
+  tone: "success" | "error";
+  message: string;
+}
+
 export default function HistoryPage() {
   const params = useParams<{ slug: string }>();
   const slug = params.slug;
@@ -29,6 +35,8 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [reverting, setReverting] = useState<string | null>(null);
+  const [pendingRevision, setPendingRevision] = useState<Revision | null>(null);
+  const [notice, setNotice] = useState<NoticeState | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -45,20 +53,26 @@ export default function HistoryPage() {
     })();
   }, [slug, page]);
 
-  const handleRevert = async (revId: string) => {
-    if (!window.confirm("确定要回退到此版本吗？当前内容将被保存为一个新版本记录。")) return;
-    setReverting(revId);
+  const handleRevert = async () => {
+    if (!pendingRevision) return;
+    setReverting(pendingRevision.id);
     try {
-      const res = await fetch(`/api/wiki/${slug}/revert/${revId}`, { method: "POST" });
+      const res = await fetch(`/api/wiki/${slug}/revert/${pendingRevision.id}`, {
+        method: "POST",
+      });
       const data = await res.json();
       if (data.ok) {
-        alert("已回退成功");
+        setNotice({ tone: "success", message: "已回退到所选版本。" });
+        setPendingRevision(null);
         setPage(1);
       } else {
-        alert(data.error?.message || "回退失败");
+        setNotice({
+          tone: "error",
+          message: data.error?.message || "回退失败",
+        });
       }
     } catch {
-      alert("网络错误");
+      setNotice({ tone: "error", message: "网络错误，请稍后重试。" });
     }
     setReverting(null);
   };
@@ -73,6 +87,18 @@ export default function HistoryPage() {
           返回文章
         </Link>
       </div>
+
+      {notice ? (
+        <div
+          className={`${styles.notice} ${
+            notice.tone === "success" ? styles.noticeSuccess : styles.noticeError
+          }`}
+          role="status"
+          aria-live="polite"
+        >
+          {notice.message}
+        </div>
+      ) : null}
 
       {loading ? (
         <div className={styles.empty}>加载中...</div>
@@ -96,7 +122,7 @@ export default function HistoryPage() {
                 <NeoButton
                   size="sm"
                   variant="secondary"
-                  onClick={() => handleRevert(rev.id)}
+                  onClick={() => setPendingRevision(rev)}
                   isLoading={reverting === rev.id}
                 >
                   回退
@@ -130,6 +156,17 @@ export default function HistoryPage() {
           )}
         </>
       )}
+
+      <ConfirmDialog
+        open={pendingRevision !== null}
+        title="回退版本"
+        message="当前内容会被保存成一个新版本记录，然后回退到你选择的历史版本。确认继续吗？"
+        confirmLabel="确认回退"
+        cancelLabel="取消"
+        loading={pendingRevision ? reverting === pendingRevision.id : false}
+        onCancel={() => setPendingRevision(null)}
+        onConfirm={handleRevert}
+      />
     </div>
   );
 }

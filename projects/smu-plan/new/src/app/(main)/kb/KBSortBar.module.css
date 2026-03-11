@@ -1,0 +1,30 @@
+/* ═══ KB Sort Tabs — matches kb-redesign.html ═══ */
+
+.tabs {
+  display: flex;
+  gap: 3px;
+}
+
+.tab {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1.5px solid var(--border-light);
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  font-family: inherit;
+}
+
+.tab:hover {
+  color: var(--text-secondary);
+  border-color: var(--border-color);
+}
+
+.active {
+  background: var(--color-dark);
+  color: var(--text-inverse);
+  border-color: var(--color-dark);
+}

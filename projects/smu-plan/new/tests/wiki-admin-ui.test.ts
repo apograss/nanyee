@@ -76,11 +76,11 @@ test("renderArticleBody converts markdown and preserves safe html", async () => 
     format: "markdown",
   });
   const html = await renderArticleBody({
-    content: "<h2>标题</h2><p>这里是 <strong>正文</strong>。</p>",
+    content: "<h2>标题</h2><p>这里是<strong>正文</strong>。</p>",
     format: "html",
   });
 
-  assert.ok(markdown.includes("<h2>标题</h2>"));
+  assert.match(markdown, /<h2 id="[^"]+">标题<\/h2>/);
   assert.ok(markdown.includes("<strong>正文</strong>"));
   assert.ok(html.includes("<h2>标题</h2>"));
   assert.ok(html.includes("<strong>正文</strong>"));

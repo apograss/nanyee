@@ -8,6 +8,7 @@ export interface AdminNavItem {
 export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { href: "/admin", label: "概览", icon: "📊" },
   { href: "/admin/articles", label: "Wiki 管理", icon: "📚" },
+  { href: "/admin/wiki-categories", label: "Wiki 分类", icon: "🗂️" },
   { href: "/admin/guestbook", label: "留言管理", icon: "📨" },
   { href: "/admin/bbs", label: "论坛管理", icon: "🗣️" },
   { href: "/admin/tools", label: "工具管理", icon: "🛠️" },

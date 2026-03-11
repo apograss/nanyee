@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import NeoButton from "@/components/atoms/NeoButton";
 import NeoInput from "@/components/atoms/NeoInput";
+import ConfirmDialog from "@/components/molecules/ConfirmDialog";
 
 import styles from "./page.module.css";
 
@@ -28,6 +29,11 @@ interface Pagination {
   totalPages: number;
 }
 
+interface NoticeState {
+  tone: "success" | "error" | "info";
+  message: string;
+}
+
 const STATUS_OPTIONS = ["", "published", "hidden"];
 const STATUS_LABELS: Record<string, string> = {
   "": "全部状态",
@@ -48,6 +54,10 @@ export default function AdminArticlesPage() {
   const [editTags, setEditTags] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState<NoticeState | null>(null);
+  const [pendingHide, setPendingHide] = useState<ArticleItem | null>(null);
+  const [pendingHardDelete, setPendingHardDelete] = useState<ArticleItem | null>(null);
+  const [hardDeleteInput, setHardDeleteInput] = useState("");
 
   async function loadArticles() {
     setLoading(true);
@@ -92,6 +102,10 @@ export default function AdminArticlesPage() {
     setError("");
   }
 
+  function showNotice(tone: NoticeState["tone"], message: string) {
+    setNotice({ tone, message });
+  }
+
   async function handleSave() {
     if (!editItem) {
       return;
@@ -116,6 +130,7 @@ export default function AdminArticlesPage() {
       if (data.ok) {
         setEditItem(null);
         loadArticles();
+        showNotice("success", "文章设置已保存。");
       } else {
         setError(data.error?.message || "保存失败");
       }
@@ -136,11 +151,12 @@ export default function AdminArticlesPage() {
       const data = await res.json();
       if (data.ok) {
         loadArticles();
+        showNotice("success", item.isLocked ? "文章已解锁。" : "文章已锁定。");
       } else {
-        alert(data.error?.message || "切换锁定状态失败");
+        showNotice("error", data.error?.message || "切换锁定状态失败");
       }
     } catch {
-      alert("网络错误");
+      showNotice("error", "网络错误，请稍后重试。");
     }
   }
 
@@ -154,56 +170,75 @@ export default function AdminArticlesPage() {
       const data = await res.json();
       if (data.ok) {
         loadArticles();
+        showNotice("success", item.isPinned ? "文章已取消置顶。" : "文章已置顶。");
       } else {
-        alert(data.error?.message || "切换置顶状态失败");
+        showNotice("error", data.error?.message || "切换置顶状态失败");
       }
     } catch {
-      alert("网络错误");
+      showNotice("error", "网络错误，请稍后重试。");
     }
   }
 
   async function handleDelete(id: string, title: string) {
-    if (!window.confirm(`确定要隐藏文章“${title}”吗？`)) {
+    const item = items.find((candidate) => candidate.id === id) ?? null;
+    if (!item) {
       return;
     }
-
-    try {
-      const res = await fetch(`/api/admin/articles/${id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (data.ok) {
-        loadArticles();
-      } else {
-        alert(data.error?.message || "操作失败");
-      }
-    } catch {
-      alert("网络错误");
-    }
+    setPendingHide(item);
   }
 
-  async function handleHardDelete(id: string, title: string) {
-    const input = window.prompt(
-      `危险操作：永久删除不可恢复。\n请输入文章标题“${title}”确认：`,
-    );
-    if (input === null) {
+  async function confirmHide() {
+    if (!pendingHide) {
       return;
     }
-    if (input !== title) {
-      alert("标题不匹配，操作已取消。");
-      return;
-    }
-
     try {
-      const res = await fetch(`/api/admin/articles/${id}?permanent=true`, {
+      const res = await fetch(`/api/admin/articles/${pendingHide.id}`, {
         method: "DELETE",
       });
       const data = await res.json();
       if (data.ok) {
+        setPendingHide(null);
         loadArticles();
+        showNotice("success", "文章已隐藏。");
       } else {
-        alert(data.error?.message || "永久删除失败");
+        showNotice("error", data.error?.message || "操作失败");
       }
     } catch {
-      alert("网络错误");
+      showNotice("error", "网络错误，请稍后重试。");
+    }
+  }
+
+  async function handleHardDelete(id: string, title: string) {
+    const item = items.find((candidate) => candidate.id === id) ?? null;
+    if (!item) {
+      return;
+    }
+    setHardDeleteInput("");
+    setPendingHardDelete(item);
+  }
+
+  async function confirmHardDelete() {
+    if (!pendingHardDelete) {
+      return;
+    }
+    try {
+      const res = await fetch(
+        `/api/admin/articles/${pendingHardDelete.id}?permanent=true`,
+        {
+          method: "DELETE",
+        },
+      );
+      const data = await res.json();
+      if (data.ok) {
+        setPendingHardDelete(null);
+        setHardDeleteInput("");
+        loadArticles();
+        showNotice("success", "文章已永久删除。");
+      } else {
+        showNotice("error", data.error?.message || "永久删除失败");
+      }
+    } catch {
+      showNotice("error", "网络错误，请稍后重试。");
     }
   }
 
@@ -248,6 +283,22 @@ export default function AdminArticlesPage() {
           ))}
         </select>
       </div>
+
+      {notice ? (
+        <div
+          className={`${styles.notice} ${
+            notice.tone === "success"
+              ? styles.noticeSuccess
+              : notice.tone === "info"
+                ? styles.noticeInfo
+                : styles.noticeError
+          }`}
+          role="status"
+          aria-live="polite"
+        >
+          {notice.message}
+        </div>
+      ) : null}
 
       {editItem && (
         <div
@@ -397,6 +448,44 @@ export default function AdminArticlesPage() {
           )}
         </>
       )}
+
+      <ConfirmDialog
+        open={pendingHide !== null}
+        title="隐藏文章"
+        message={
+          pendingHide
+            ? `文章“${pendingHide.title}”会从前台列表中隐藏，但仍保留在后台。确认继续吗？`
+            : ""
+        }
+        confirmLabel="确认隐藏"
+        cancelLabel="取消"
+        onCancel={() => setPendingHide(null)}
+        onConfirm={confirmHide}
+      />
+
+      <ConfirmDialog
+        open={pendingHardDelete !== null}
+        title="永久删除文章"
+        message={
+          pendingHardDelete
+            ? `永久删除后无法恢复。请输入文章标题“${pendingHardDelete.title}”确认操作。`
+            : ""
+        }
+        confirmLabel="永久删除"
+        cancelLabel="取消"
+        inputLabel="确认标题"
+        inputPlaceholder={pendingHardDelete?.title ?? ""}
+        inputValue={hardDeleteInput}
+        onInputChange={setHardDeleteInput}
+        confirmDisabled={
+          !pendingHardDelete || hardDeleteInput.trim() !== pendingHardDelete.title
+        }
+        onCancel={() => {
+          setPendingHardDelete(null);
+          setHardDeleteInput("");
+        }}
+        onConfirm={confirmHardDelete}
+      />
     </div>
   );
 }

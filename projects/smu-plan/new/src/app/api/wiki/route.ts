@@ -1,79 +1,27 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthContext, requireUser, handleAuthError } from "@/lib/auth/guard";
-import { searchWikiArticles } from "@/lib/wiki/search";
+import { requireUser, handleAuthError } from "@/lib/auth/guard";
 import { sanitizeContent } from "@/lib/wiki/content";
 import { checkEditRateLimit } from "@/lib/wiki/edit-rate-limit";
 import { clearWikiSearchCache } from "@/lib/wiki/search-cache";
-import { presentPublicUser } from "@/lib/user-presenter";
+import { listArticles, type SortMode } from "@/lib/wiki/queries";
+import { resolveWikiCategorySelection } from "@/lib/wiki/categories";
 import { z } from "zod";
 import slugify from "slugify";
 
 // GET /api/wiki — list published articles
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
-  const page = Math.max(1, Number(url.searchParams.get("page") || "1"));
-  const limit = Math.min(50, Math.max(1, Number(url.searchParams.get("limit") || "20")));
-  const category = url.searchParams.get("category");
-  const search = url.searchParams.get("q");
+  const page = Number(url.searchParams.get("page") || "1");
+  const limit = Number(url.searchParams.get("limit") || "20");
+  const sort = (url.searchParams.get("sort") || "newest") as SortMode;
+  const category = url.searchParams.get("category") || undefined;
+  const tag = url.searchParams.get("tag") || undefined;
+  const q = url.searchParams.get("q") || undefined;
 
-  const where: Record<string, unknown> = { status: "published" };
-  if (category) where.category = category;
+  const result = await listArticles({ page, limit, sort, category, tag, q });
 
-  let articles;
-  let total;
-
-  if (search) {
-    // Use shared FTS5 search service
-    const { results: ftsResults, total: ftsTotal } = await searchWikiArticles(search, limit, (page - 1) * limit);
-    const ids = ftsResults.map((r) => r.id);
-
-    articles = ids.length > 0
-      ? await prisma.article.findMany({
-          where: { id: { in: ids }, status: "published" },
-          include: { author: { select: { id: true, username: true, nickname: true, status: true } } },
-        })
-      : [];
-    // Preserve FTS ranking order
-    const orderMap = new Map(ids.map((id, i) => [id, i]));
-    articles.sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
-    total = ftsTotal;
-  } else {
-    [articles, total] = await Promise.all([
-      prisma.article.findMany({
-        where,
-        orderBy: [
-          { isPinned: "desc" },
-          { pinnedAt: "desc" },
-          { publishedAt: "desc" },
-        ],
-        skip: (page - 1) * limit,
-        take: limit,
-        include: { author: { select: { id: true, username: true, nickname: true, status: true } } },
-      }),
-      prisma.article.count({ where }),
-    ]);
-  }
-
-  return Response.json({
-    ok: true,
-    data: {
-      articles: articles.map((a) => ({
-        id: a.id,
-        title: a.title,
-        slug: a.slug,
-        summary: a.summary,
-        category: a.category,
-        tags: a.tags ? JSON.parse(a.tags) : [],
-        viewCount: a.viewCount,
-        isPinned: a.isPinned,
-        authorName: presentPublicUser(a.author).displayName,
-        publishedAt: a.publishedAt?.toISOString(),
-        createdAt: a.createdAt.toISOString(),
-      })),
-      pagination: { page, limit, total },
-    },
-  });
+  return Response.json({ ok: true, data: result });
 }
 
 const createSchema = z.object({
@@ -81,6 +29,7 @@ const createSchema = z.object({
   content: z.string().min(1),
   format: z.enum(["html", "markdown"]).default("html"),
   summary: z.string().max(500).optional(),
+  categoryId: z.string().optional(),
   category: z.string().max(50).optional(),
   tags: z.array(z.string()).max(10).optional(),
 });
@@ -100,6 +49,17 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const data = createSchema.parse(body);
+    const resolvedCategory = await resolveWikiCategorySelection({
+      categoryId: data.categoryId,
+      category: data.category,
+    });
+
+    if (data.categoryId && !resolvedCategory) {
+      return Response.json(
+        { ok: false, error: { code: 400, message: "分类不存在" } },
+        { status: 400 },
+      );
+    }
 
     const slug = slugify(data.title, { lower: true, strict: true }) +
       "-" + Date.now().toString(36);
@@ -113,7 +73,8 @@ export async function POST(req: NextRequest) {
         content,
         format: data.format,
         summary: data.summary,
-        category: data.category,
+        category: resolvedCategory?.name ?? data.category?.trim() ?? null,
+        categoryId: resolvedCategory?.id ?? null,
         tags: data.tags ? JSON.stringify(data.tags) : null,
         authorId: auth.userId,
         lastEditorId: auth.userId,

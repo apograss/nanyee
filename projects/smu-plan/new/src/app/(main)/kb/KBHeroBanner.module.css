@@ -1,0 +1,101 @@
+/* ═══ KB Hero Banner — matches kb-redesign.html ═══ */
+
+.banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 22px;
+  padding: 20px 24px;
+  border: var(--neo-border);
+  border-radius: var(--neo-radius-lg);
+  background: var(--bg-secondary);
+  box-shadow: var(--neo-shadow-sm);
+  position: relative;
+  overflow: hidden;
+  animation: fadeUp 0.4s ease;
+}
+
+.banner::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--color-brand);
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.text {
+  padding-left: 14px;
+}
+
+.kicker {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-brand);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+
+.title {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+  margin: 0 0 5px;
+}
+
+.desc {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 9px 14px;
+  border: var(--neo-border);
+  border-radius: var(--neo-radius);
+  background: var(--bg-primary);
+  box-shadow: 1px 1px 0 var(--border-color);
+}
+
+.statValue {
+  font-size: 22px;
+  color: var(--color-brand);
+  line-height: 1;
+}
+
+.statLabel {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .banner {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 14px 16px;
+  }
+
+  .actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
