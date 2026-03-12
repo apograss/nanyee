@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
+import SkeletonBlock from "@/components/atoms/SkeletonBlock";
 import ConfirmDialog from "@/components/molecules/ConfirmDialog";
 import styles from "./links.module.css";
 
@@ -70,6 +71,7 @@ export default function LinksPage() {
   const [items, setItems] = useState<LinkItem[]>([]);
   const [categoryMeta, setCategoryMeta] = useState<Record<string, CategoryMeta>>({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [editing, setEditing] = useState(false);
   const [notice, setNotice] = useState<NoticeState | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -89,9 +91,10 @@ export default function LinksPage() {
   const [catNewIcon, setCatNewIcon] = useState("");
   const [catSaving, setCatSaving] = useState(false);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (signal?: AbortSignal) => {
     try {
-      const res = await fetch("/api/links");
+      setLoadError(false);
+      const res = await fetch("/api/links", { signal });
       const data = await res.json();
       if (data.ok && data.data.links.length > 0) {
         setItems(data.data.links);
@@ -101,14 +104,27 @@ export default function LinksPage() {
       if (data.ok && data.data.categoryMeta) {
         setCategoryMeta(data.data.categoryMeta);
       }
-    } catch {
+    } catch (error) {
+      if ((error as Error).name === "AbortError") {
+        setLoadError(true);
+      }
       setItems(DEFAULTS.map((d, i) => ({ ...d, id: `default-${i}` })));
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+
+    loadData(controller.signal).finally(() => clearTimeout(timer));
+
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [loadData]);
 
   // Group by category
   const grouped = items.reduce<Record<string, LinkItem[]>>((acc, item) => {
@@ -305,7 +321,27 @@ export default function LinksPage() {
       <div className={styles.page}>
         <div className={styles.header}>
           <h1 className={styles.title}>链接推荐</h1>
-          <p className={styles.desc}>加载中...</p>
+          <p className={styles.desc}>常用资源正在整理中...</p>
+        </div>
+        <div className={styles.loadingGroups}>
+          {[0, 1, 2].map((group) => (
+            <section key={group} className={styles.category}>
+              <div className={styles.categoryHeader}>
+                <SkeletonBlock width="36px" height="36px" radius="12px" />
+                <SkeletonBlock width="128px" height="26px" />
+              </div>
+              <div className={styles.grid}>
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <div key={index} className={styles.loadingCard}>
+                    <SkeletonBlock width="65%" height="18px" />
+                    <SkeletonBlock width="100%" height="14px" />
+                    <SkeletonBlock width="78%" height="14px" />
+                    <SkeletonBlock width="40%" height="12px" />
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
         </div>
       </div>
     );
@@ -345,6 +381,12 @@ export default function LinksPage() {
           >
             ×
           </button>
+        </div>
+      ) : null}
+
+      {loadError ? (
+        <div className={`${styles.notice} ${styles.noticeError}`} role="status" aria-live="polite">
+          <span>链接列表加载超时，当前先展示本地兜底链接。</span>
         </div>
       ) : null}
 

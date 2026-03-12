@@ -7,6 +7,7 @@ interface Tool {
   icon: React.ReactNode;
   href: string;
   tag?: string;
+  disabled?: boolean;
 }
 
 interface ToolGridProps {

@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, FormEvent } from "react";
 import Link from "next/link";
+import OcrFeedbackPrompt from "@/components/molecules/OcrFeedbackPrompt";
 import { recognizeCaptcha } from "@/lib/captcha-ocr";
 import s from "../tools.module.css";
 
@@ -188,6 +189,13 @@ export default function SchedulePage() {
                 </div>
               </div>
               {ocrStatus && <span className={s.ocrStatus}>🤖 {ocrStatus}</span>}
+              {captchaImage ? (
+                <OcrFeedbackPrompt
+                  imageBase64={captchaImage}
+                  correctedText={captcha}
+                  sourcePage="schedule"
+                />
+              ) : null}
             </div>
 
             <div className={s.inlineRow}>

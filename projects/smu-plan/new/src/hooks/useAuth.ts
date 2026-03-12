@@ -8,6 +8,7 @@ export interface UserInfo {
   nickname: string | null;
   avatarUrl: string | null;
   role: string;
+  lastReadAnnouncementAt?: string | null;
 }
 
 interface AuthState {

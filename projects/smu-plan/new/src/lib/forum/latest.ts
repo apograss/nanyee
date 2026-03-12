@@ -68,6 +68,27 @@ function getForumFetchBaseUrl(): string {
   return getForumBaseUrl();
 }
 
+export async function getForumComposeUrl() {
+  const forumBaseUrl = getForumBaseUrl();
+  const composeUrl = `${forumBaseUrl}/compose`;
+
+  try {
+    const response = await fetch(composeUrl, {
+      method: "HEAD",
+      redirect: "manual",
+      cache: "no-store",
+    });
+
+    if (response.ok || response.status === 405) {
+      return composeUrl;
+    }
+  } catch {
+    // Fall back to the forum home page when compose probing fails.
+  }
+
+  return forumBaseUrl;
+}
+
 function getAuthorColor(name: string): string {
   let hash = 0;
   for (let i = 0; i < name.length; i += 1) {

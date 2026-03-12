@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, FormEvent } from "react";
 import Link from "next/link";
+import OcrFeedbackPrompt from "@/components/molecules/OcrFeedbackPrompt";
 import { recognizeCaptcha } from "@/lib/captcha-ocr";
 import s from "../tools.module.css";
 
@@ -321,6 +322,13 @@ export default function GradesPage() {
                 {ocrStatus && (
                   <span className={s.ocrStatus}>🤖 {ocrStatus}</span>
                 )}
+                {captchaImage ? (
+                  <OcrFeedbackPrompt
+                    imageBase64={captchaImage}
+                    correctedText={captcha}
+                    sourcePage="grades"
+                  />
+                ) : null}
               </div>
 
               <button

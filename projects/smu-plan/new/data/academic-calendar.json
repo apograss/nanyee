@@ -1,0 +1,26 @@
+[
+  {
+    "id": "spring-midterm",
+    "title": "春季期中周",
+    "date": "2026-04-13",
+    "description": "本周课程和实验安排通常会更密集，适合提前规划复习。"
+  },
+  {
+    "id": "english-level",
+    "title": "英语四六级报名截止",
+    "date": "2026-04-20",
+    "description": "关注教务通知，尽量在截止前确认报名信息。"
+  },
+  {
+    "id": "final-review",
+    "title": "期末复习周开始",
+    "date": "2026-06-15",
+    "description": "知识库和论坛会同步整理复习资料与经验帖。"
+  },
+  {
+    "id": "summer-holiday",
+    "title": "暑假开始",
+    "date": "2026-07-11",
+    "description": "适合作课程总结、科研记录和下学期规划。"
+  }
+]

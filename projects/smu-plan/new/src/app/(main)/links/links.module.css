@@ -63,6 +63,21 @@
   cursor: pointer;
 }
 
+.loadingGroups {
+  display: grid;
+  gap: var(--space-2xl);
+}
+
+.loadingCard {
+  display: grid;
+  gap: var(--space-xs);
+  padding: var(--space-md);
+  background: var(--bg-secondary);
+  border: var(--neo-border);
+  border-radius: var(--neo-radius);
+  box-shadow: var(--neo-shadow-sm);
+}
+
 /* --- Category Section --- */
 .category {
   margin-bottom: var(--space-2xl);

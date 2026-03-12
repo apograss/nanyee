@@ -29,7 +29,7 @@ test("normalizeNavLinks injects the API link after forum when missing", () => {
 
   assert.deepEqual(
     links.map((link) => link.href),
-    ["/", "/bbs", "https://api.nanyee.de", "/tools"],
+    ["/", "/bbs", "https://api.nanyee.de", "/tools", "/guestbook"],
   );
 });
 

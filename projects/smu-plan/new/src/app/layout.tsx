@@ -1,5 +1,23 @@
 import type { Metadata, Viewport } from "next";
+import { Inter, JetBrains_Mono, Noto_Sans_SC } from "next/font/google";
 import "./globals.css";
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+});
+
+const notoSansSC = Noto_Sans_SC({
+  subsets: ["latin"],
+  weight: ["400", "500", "700"],
+  variable: "--font-noto-sans-sc",
+});
+
+const jetBrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "700"],
+  variable: "--font-jetbrains-mono",
+});
 
 export const metadata: Metadata = {
   title: {
@@ -28,7 +46,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="zh-CN" suppressHydrationWarning>
+    <html
+      lang="zh-CN"
+      suppressHydrationWarning
+      className={`${inter.variable} ${notoSansSC.variable} ${jetBrainsMono.variable}`}
+    >
       <head>
         {/* Prevent FOUC: read theme from localStorage before paint */}
         <script

@@ -7,6 +7,13 @@ import { getAuthContext } from "@/lib/auth/guard";
 import { prisma } from "@/lib/prisma";
 import { normalizeAiRouteError } from "@/lib/ai/errors";
 import { z } from "zod";
+import type {
+  ChatCompletionAssistantMessageParam,
+  ChatCompletionMessageParam,
+  ChatCompletionToolMessageParam,
+} from "openai/resources/chat/completions";
+
+const AI_VISION_MODEL = process.env.AI_VISION_MODEL?.trim() || "";
 
 const chatSchema = z.object({
   messages: z.array(
@@ -16,6 +23,7 @@ const chatSchema = z.object({
     })
   ),
   model: z.string().optional(),
+  imageBase64: z.string().startsWith("data:image/").optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -23,9 +31,16 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { messages, model: requestedModel } = chatSchema.parse(body);
+    const { messages, model: requestedModel, imageBase64 } = chatSchema.parse(body);
 
-    const model = requestedModel || DEFAULT_MODEL;
+    if (imageBase64 && !AI_VISION_MODEL) {
+      return Response.json(
+        { ok: false, error: { code: 400, message: "Vision model is not configured" } },
+        { status: 400 },
+      );
+    }
+
+    const model = imageBase64 ? AI_VISION_MODEL : requestedModel || DEFAULT_MODEL;
 
     // Select a provider key
     const keyInfo = await selectProviderKey();
@@ -39,9 +54,30 @@ export async function POST(req: NextRequest) {
     const client = createAIClient(keyInfo.apiKey);
 
     // Build messages with system prompt
-    const chatMessages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
+    const lastUserIndex = imageBase64
+      ? messages.reduce((latest, message, index) => (
+          message.role === "user" ? index : latest
+        ), -1)
+      : -1;
+
+    const chatMessages: ChatCompletionMessageParam[] = [
       { role: "system", content: SYSTEM_PROMPT },
-      ...messages,
+      ...messages.map((message, index) => {
+        if (index === lastUserIndex && imageBase64) {
+          return {
+            role: "user" as const,
+            content: [
+              { type: "text" as const, text: message.content },
+              { type: "image_url" as const, image_url: { url: imageBase64 } },
+            ],
+          };
+        }
+
+        return {
+          role: message.role === "assistant" ? ("assistant" as const) : ("user" as const),
+          content: message.content,
+        };
+      }),
     ];
 
     // Log search query
@@ -115,11 +151,7 @@ export async function POST(req: NextRequest) {
             // Finish reason
             if (chunk.choices[0]?.finish_reason === "tool_calls") {
               // Execute tools and get second response
-              const toolResults: Array<{
-                role: "tool";
-                tool_call_id: string;
-                content: string;
-              }> = [];
+              const toolResults: ChatCompletionToolMessageParam[] = [];
 
               for (const [, tc] of toolCallsAccum) {
                 send("tool_start", { name: tc.name });
@@ -153,9 +185,9 @@ export async function POST(req: NextRequest) {
               }
 
               // Second call with tool results
-              const assistantMsg = {
-                role: "assistant" as const,
-                content: fullContent || null,
+              const assistantMsg: ChatCompletionAssistantMessageParam = {
+                role: "assistant",
+                content: fullContent || "",
                 tool_calls: Array.from(toolCallsAccum.values()).map((tc) => ({
                   id: tc.id,
                   type: "function" as const,

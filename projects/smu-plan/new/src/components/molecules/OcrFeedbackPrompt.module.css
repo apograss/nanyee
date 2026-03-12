@@ -1,0 +1,27 @@
+.wrap {
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 0.92rem;
+  color: var(--text-secondary);
+}
+
+.button {
+  border: none;
+  background: transparent;
+  color: var(--color-brand);
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.success {
+  color: #2b8a3e;
+}

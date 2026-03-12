@@ -108,6 +108,13 @@
   box-shadow: var(--neo-shadow-sm);
 }
 
+.contentLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 24px;
+  align-items: start;
+}
+
 .markdown {
   position: relative;
   overflow: visible;
@@ -243,6 +250,10 @@
     padding-inline: 16px;
   }
 
+  .contentLayout {
+    grid-template-columns: 1fr;
+  }
+
   .bodyCard,
   .header {
     padding: 20px;
@@ -250,5 +261,9 @@
 
   .markdown {
     font-size: 16px;
+  }
+
+  .contentLayout > aside {
+    display: none;
   }
 }

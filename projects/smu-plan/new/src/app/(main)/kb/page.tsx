@@ -1,13 +1,16 @@
 import { Suspense } from "react";
+
+import ArticleList from "@/components/organisms/ArticleList";
 import {
-  listArticles,
   getArticleMeta,
   getKBStats,
+  getWikiLeaderboard,
+  listArticles,
   type SortMode,
 } from "@/lib/wiki/queries";
-import ArticleList from "@/components/organisms/ArticleList";
-import KBSidebar from "./KBSidebar";
+
 import KBHeroBanner from "./KBHeroBanner";
+import KBSidebar from "./KBSidebar";
 import KBSortBar from "./KBSortBar";
 import styles from "./page.module.css";
 
@@ -29,36 +32,37 @@ export default async function KBPage({
   const sortMode = (["newest", "popular", "recommended"].includes(sort ?? "")
     ? sort
     : "newest") as SortMode;
+  const showLeaderboard = !q && !category && !tag;
 
-  const [result, meta, stats] = await Promise.all([
+  const [result, meta, stats, leaderboard] = await Promise.all([
     listArticles({ q, sort: sortMode, category, tag, page: 1, limit: 20 }),
     getArticleMeta(),
     getKBStats(),
+    showLeaderboard ? getWikiLeaderboard() : Promise.resolve(null),
   ]);
 
   const now = Date.now();
-  const data = result.articles.map((a) => ({
-    id: a.slug,
-    title: a.title,
-    excerpt: a.summary,
-    date: a.publishedAt || a.createdAt,
-    categoryName: a.category,
-    categoryIcon: a.categoryIcon,
-    parentCategoryName: a.categoryParentName,
-    parentCategoryIcon: a.categoryParentIcon,
-    tags: a.tags,
-    authorName: a.authorName,
-    authorAvatar: a.authorAvatar,
-    viewCount: a.viewCount,
-    isPinned: a.isPinned,
-    isNew: a.createdAt
-      ? now - new Date(a.createdAt).getTime() < SEVEN_DAYS_MS
+  const data = result.articles.map((article) => ({
+    id: article.slug,
+    title: article.title,
+    excerpt: article.summary,
+    date: article.publishedAt || article.createdAt,
+    categoryName: article.category,
+    categoryIcon: article.categoryIcon,
+    parentCategoryName: article.categoryParentName,
+    parentCategoryIcon: article.categoryParentIcon,
+    tags: article.tags,
+    authorName: article.authorName,
+    authorAvatar: article.authorAvatar,
+    viewCount: article.viewCount,
+    isPinned: article.isPinned,
+    isNew: article.createdAt
+      ? now - new Date(article.createdAt).getTime() < SEVEN_DAYS_MS
       : false,
   }));
 
-  // Build heading for sort info
   const headingLabel = q
-    ? `搜索 "${q}"`
+    ? `搜索 “${q}”`
     : category
       ? category
       : tag
@@ -74,17 +78,59 @@ export default async function KBPage({
       <main className={styles.main}>
         <KBHeroBanner stats={stats} />
 
-        <div className={styles.sortRow}>
-          <div className={styles.sortInfo}>
-            {headingLabel}
-            <span className={styles.sortInfoCount}>· {data.length} 篇</span>
-          </div>
-          <Suspense>
-            <KBSortBar currentSort={sortMode} />
-          </Suspense>
-        </div>
+        <div className={styles.contentArea}>
+          <section className={styles.primaryColumn}>
+            <div className={styles.sortRow}>
+              <div className={styles.sortInfo}>
+                {headingLabel}
+                <span className={styles.sortInfoCount}>· {data.length} 篇</span>
+              </div>
+              <Suspense>
+                <KBSortBar currentSort={sortMode} />
+              </Suspense>
+            </div>
 
-        <ArticleList articles={data} />
+            <ArticleList articles={data} />
+          </section>
+
+          {showLeaderboard ? (
+            <aside className={styles.insights}>
+              <section className={styles.insightCard}>
+                <h2 className={styles.insightTitle}>本周热门</h2>
+                <div className={styles.insightList}>
+                  {leaderboard?.hotArticles.map((article, index) => (
+                    <a key={article.slug} href={`/kb/${article.slug}`} className={styles.insightItem}>
+                      <span className={styles.insightIndex}>{index + 1}</span>
+                      <span aria-hidden="true" />
+                      <span className={styles.insightText}>{article.title}</span>
+                      <span className={styles.insightMeta}>{article.viewCount}</span>
+                    </a>
+                  ))}
+                </div>
+              </section>
+
+              <section className={styles.insightCard}>
+                <h2 className={styles.insightTitle}>贡献者排行</h2>
+                <div className={styles.insightList}>
+                  {leaderboard?.contributors.map((contributor, index) => (
+                    <div key={contributor.id} className={styles.insightItem}>
+                      <span className={styles.insightIndex}>{index + 1}</span>
+                      <span className={styles.contributorAvatar}>
+                        {contributor.avatar ? (
+                          <img src={contributor.avatar} alt={contributor.name} />
+                        ) : (
+                          contributor.name.charAt(0)
+                        )}
+                      </span>
+                      <span className={styles.insightText}>{contributor.name}</span>
+                      <span className={styles.insightMeta}>{contributor.editCount}</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </aside>
+          ) : null}
+        </div>
       </main>
     </div>
   );

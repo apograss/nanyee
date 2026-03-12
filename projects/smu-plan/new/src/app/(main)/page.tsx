@@ -3,9 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import SkeletonBlock from "@/components/atoms/SkeletonBlock";
+import ConversationSidebar from "@/components/organisms/ConversationSidebar/ConversationSidebar";
 import ChatStream from "@/components/organisms/ChatStream";
 import AIDemoCard from "@/components/molecules/AIDemoCard";
 import { useChat } from "@/hooks/useChat";
+import { useAuth } from "@/hooks/useAuth";
 import { useSearchHistory } from "@/hooks/useSearchHistory";
 import {
   CHAT_MODEL_LABELS as MODEL_LABELS,
@@ -51,7 +54,8 @@ type SearchMode = "ai" | "kb" | "bbs";
 
 export default function HomePage() {
   const router = useRouter();
-  const { messages, status, send, stop, reset } = useChat();
+  const { user } = useAuth();
+  const { messages, status, send, stop, reset, conversationId, hydrateConversation } = useChat();
   const {
     history,
     add: addHistory,
@@ -67,11 +71,17 @@ export default function HomePage() {
   const [promptExamples, setPromptExamples] = useState([...DEFAULT_PROMPT_EXAMPLES]);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [preview, setPreview] = useState<HomePreview | null>(null);
+  const [visionEnabled, setVisionEnabled] = useState(false);
+  const [imageAttachment, setImageAttachment] = useState<{
+    name: string;
+    dataUrl: string;
+  } | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
   const searchBoxRef = useRef<HTMLFormElement>(null);
   const hasMountedRef = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isIdle = status === "idle" && messages.length === 0;
 
@@ -113,6 +123,13 @@ export default function HomePage() {
       })
       .catch(() => {});
 
+    fetch("/api/ai/capabilities")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.ok) setVisionEnabled(Boolean(data.data.visionEnabled));
+      })
+      .catch(() => {});
+
     return () => clearTimeout(timeout);
   }, []);
 
@@ -139,23 +156,86 @@ export default function HomePage() {
     if (!isIdle) chatInputRef.current?.focus();
   }, [isIdle]);
 
+  useEffect(() => {
+    if (searchMode !== "ai" && imageAttachment) {
+      setImageAttachment(null);
+    }
+  }, [imageAttachment, searchMode]);
+
+  const readImageFile = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === "string") {
+          resolve(reader.result);
+          return;
+        }
+        reject(new Error("Unsupported file reader result"));
+      };
+      reader.onerror = () => reject(reader.error ?? new Error("Failed to read file"));
+      reader.readAsDataURL(file);
+    });
+
+  const attachImageFile = async (file: File | null | undefined) => {
+    if (!file || !file.type.startsWith("image/")) {
+      return;
+    }
+
+    const dataUrl = await readImageFile(file);
+    setImageAttachment({
+      name: file.name,
+      dataUrl,
+    });
+  };
+
+  const handlePasteImage = async (event: React.ClipboardEvent<HTMLInputElement>) => {
+    if (!visionEnabled || searchMode !== "ai") {
+      return;
+    }
+
+    const imageFile = Array.from(event.clipboardData.items)
+      .find((item) => item.type.startsWith("image/"))
+      ?.getAsFile();
+
+    if (!imageFile) {
+      return;
+    }
+
+    event.preventDefault();
+    await attachImageFile(imageFile);
+  };
+
+  const handleDropImage = async (event: React.DragEvent<HTMLFormElement>) => {
+    if (!visionEnabled || searchMode !== "ai") {
+      return;
+    }
+
+    event.preventDefault();
+    const imageFile = Array.from(event.dataTransfer.files).find((file) =>
+      file.type.startsWith("image/"),
+    );
+    await attachImageFile(imageFile);
+  };
+
   const submitQuery = (query: string) => {
     const trimmed = query.trim();
-    if (!trimmed) return;
+    const finalQuery = trimmed || (imageAttachment ? "请帮我分析这张图片。" : "");
+    if (!finalQuery) return;
 
     if (searchMode === "kb") {
-      router.push(`/kb?q=${encodeURIComponent(trimmed)}`);
+      router.push(`/kb?q=${encodeURIComponent(finalQuery)}`);
       return;
     }
     if (searchMode === "bbs") {
-      router.push(`/bbs?q=${encodeURIComponent(trimmed)}`);
+      router.push(`/bbs?q=${encodeURIComponent(finalQuery)}`);
       return;
     }
 
-    addHistory(trimmed);
+    addHistory(finalQuery);
     setInput("");
     setFocused(false);
-    send(trimmed, model);
+    send(finalQuery, model, imageAttachment?.dataUrl);
+    setImageAttachment(null);
   };
 
   const handleSubmit = (event: React.FormEvent) => {
@@ -201,6 +281,12 @@ export default function HomePage() {
               className={styles.searchWrap}
               onSubmit={handleSubmit}
               ref={searchBoxRef}
+              onDragOver={(event) => {
+                if (visionEnabled && searchMode === "ai") {
+                  event.preventDefault();
+                }
+              }}
+              onDrop={handleDropImage}
             >
               <div className={styles.searchBox}>
                 <input
@@ -212,6 +298,7 @@ export default function HomePage() {
                   value={input}
                   onChange={(event) => setInput(event.target.value)}
                   onFocus={() => setFocused(true)}
+                  onPaste={handlePasteImage}
                 />
                 <div className={styles.searchModes}>
                   {SEARCH_MODES.map((mode) => (
@@ -228,10 +315,32 @@ export default function HomePage() {
                     </button>
                   ))}
                 </div>
+                {visionEnabled && searchMode === "ai" ? (
+                  <>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      hidden
+                      onChange={async (event) => {
+                        await attachImageFile(event.target.files?.[0]);
+                        event.currentTarget.value = "";
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className={styles.attachBtn}
+                      aria-label="上传图片"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      图片
+                    </button>
+                  </>
+                ) : null}
                 <button
                   type="submit"
                   className={styles.searchGo}
-                  disabled={!input.trim()}
+                  disabled={!input.trim() && !imageAttachment}
                   aria-label="发送"
                 >
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -240,6 +349,19 @@ export default function HomePage() {
                   </svg>
                 </button>
               </div>
+
+              {imageAttachment && searchMode === "ai" ? (
+                <div className={styles.attachmentChip}>
+                  <span>图片：{imageAttachment.name}</span>
+                  <button
+                    type="button"
+                    className={styles.attachmentRemove}
+                    onClick={() => setImageAttachment(null)}
+                  >
+                    ×
+                  </button>
+                </div>
+              ) : null}
 
               {showHistory && (
                 <div className={styles.historyDropdown}>
@@ -279,6 +401,19 @@ export default function HomePage() {
             </form>
 
             {/* Chips */}
+            {!settingsLoaded && searchMode === "ai" && (
+              <div className={styles.chips} aria-hidden="true">
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <SkeletonBlock
+                    key={index}
+                    width={index % 2 === 0 ? "124px" : "96px"}
+                    height="42px"
+                    radius="999px"
+                  />
+                ))}
+              </div>
+            )}
+
             {settingsLoaded && searchMode === "ai" && (
               <div className={styles.chips}>
                 {promptExamples.map((example) => (
@@ -461,58 +596,112 @@ export default function HomePage() {
   // ═══ Chat Mode ═══
   return (
     <div className={styles.chatLayout}>
-      <div className={styles.chatStream}>
-        <ChatStream
-          messages={messages}
-          isLoading={status === "streaming"}
-          onStop={stop}
+      {user ? (
+        <ConversationSidebar
+          activeConversationId={conversationId}
+          onSelectConversation={hydrateConversation}
+          onCreateConversation={handleNewChat}
         />
-      </div>
+      ) : null}
 
-      <div className={styles.chatBar}>
-        <button
-          className={styles.newChatBtn}
-          onClick={handleNewChat}
-          title="新对话"
-          aria-label="开始新对话"
-        >
-          +
-        </button>
-        <form className={styles.chatForm} onSubmit={handleSubmit}>
-          <input
-            ref={chatInputRef}
-            className={styles.chatInput}
-            type="text"
-            placeholder="继续提问..."
-            aria-label="继续追问"
-            value={input}
-            onChange={(event) => setInput(event.target.value)}
-            disabled={status === "streaming"}
+      <div className={styles.chatMain}>
+        <div className={styles.chatStream}>
+          <ChatStream
+            messages={messages}
+            isLoading={status === "streaming"}
+            onStop={stop}
           />
-          <div className={styles.modelSwitchSmall}>
-            {CHAT_MODEL_OPTIONS.map((id) => (
-              <button
-                key={id}
-                type="button"
-                className={`${styles.modelBtnSmall} ${model === id ? styles.modelBtnActive : ""}`}
-                onClick={() => setModel(id)}
-                title={MODEL_LABELS[id].desc}
-              >
-                {MODEL_LABELS[id].label}
-              </button>
-            ))}
-          </div>
+        </div>
+
+        <div className={styles.chatBar}>
           <button
-            type="submit"
-            className={styles.sendBtn}
-            disabled={status === "streaming" || !input.trim()}
-            aria-label="发送消息"
+            className={styles.newChatBtn}
+            onClick={handleNewChat}
+            title="新对话"
+            aria-label="开始新对话"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
-            </svg>
+            +
           </button>
-        </form>
+          <form
+            className={styles.chatForm}
+            onSubmit={handleSubmit}
+            onDragOver={(event) => {
+              if (visionEnabled) {
+                event.preventDefault();
+              }
+            }}
+            onDrop={handleDropImage}
+          >
+            <input
+              ref={chatInputRef}
+              className={styles.chatInput}
+              type="text"
+              placeholder="继续提问..."
+              aria-label="继续追问"
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              disabled={status === "streaming"}
+              onPaste={handlePasteImage}
+            />
+            {visionEnabled ? (
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  onChange={async (event) => {
+                    await attachImageFile(event.target.files?.[0]);
+                    event.currentTarget.value = "";
+                  }}
+                />
+                <button
+                  type="button"
+                  className={styles.attachBtn}
+                  aria-label="上传图片"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  图片
+                </button>
+              </>
+            ) : null}
+            <div className={styles.modelSwitchSmall}>
+              {CHAT_MODEL_OPTIONS.map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={`${styles.modelBtnSmall} ${model === id ? styles.modelBtnActive : ""}`}
+                  onClick={() => setModel(id)}
+                  title={MODEL_LABELS[id].desc}
+                >
+                  {MODEL_LABELS[id].label}
+                </button>
+              ))}
+            </div>
+            <button
+              type="submit"
+              className={styles.sendBtn}
+              disabled={status === "streaming" || (!input.trim() && !imageAttachment)}
+              aria-label="发送消息"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
+              </svg>
+            </button>
+          </form>
+          {imageAttachment ? (
+            <div className={styles.attachmentChip}>
+              <span>图片：{imageAttachment.name}</span>
+              <button
+                type="button"
+                className={styles.attachmentRemove}
+                onClick={() => setImageAttachment(null)}
+              >
+                ×
+              </button>
+            </div>
+          ) : null}
+        </div>
       </div>
     </div>
   );

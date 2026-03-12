@@ -21,6 +21,7 @@ export async function GET(req: NextRequest) {
       email: true,
       role: true,
       status: true,
+      lastReadAnnouncementAt: true,
       createdAt: true,
     },
   });

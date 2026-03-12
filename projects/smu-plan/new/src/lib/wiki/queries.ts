@@ -82,6 +82,20 @@ export interface KBStats {
   weeklyNew: number;
 }
 
+export interface WikiLeaderboard {
+  hotArticles: {
+    slug: string;
+    title: string;
+    viewCount: number;
+  }[];
+  contributors: {
+    id: string;
+    name: string;
+    avatar: string | null;
+    editCount: number;
+  }[];
+}
+
 // ─── Helpers ─────────────────────────────────────────────────
 
 const AUTHOR_SELECT = {
@@ -363,6 +377,7 @@ export async function getArticleMeta(
 // ─── getKBStats ─────────────────────────────────────────────
 
 const STATS_CACHE_KEY = "wiki:stats";
+const LEADERBOARD_CACHE_KEY = "wiki:leaderboard";
 
 export async function getKBStats(): Promise<KBStats> {
   const cached = getCached<KBStats>(STATS_CACHE_KEY);
@@ -406,6 +421,67 @@ export interface HomePreview {
   }[];
   latestForumPosts: ForumPreviewItem[];
   kbStats: { totalArticles: number; weeklyNew: number };
+}
+
+export async function getWikiLeaderboard(): Promise<WikiLeaderboard> {
+  const cached = getCached<WikiLeaderboard>(LEADERBOARD_CACHE_KEY);
+  if (cached) return cached;
+
+  const [hotArticles, revisions] = await Promise.all([
+    prisma.article.findMany({
+      where: { status: "published" },
+      orderBy: [{ viewCount: "desc" }, { publishedAt: "desc" }],
+      take: 5,
+      select: {
+        slug: true,
+        title: true,
+        viewCount: true,
+      },
+    }),
+    prisma.articleRevision.findMany({
+      orderBy: [{ articleId: "asc" }, { createdAt: "asc" }],
+      include: {
+        editor: { select: AUTHOR_SELECT },
+      },
+    }),
+  ]);
+
+  const previousLengthByArticle = new Map<string, number>();
+  const contributorCounts = new Map<string, { count: number; user: typeof revisions[number]["editor"] }>();
+
+  for (const revision of revisions) {
+    const previousLength = previousLengthByArticle.get(revision.articleId) ?? 0;
+    const currentLength = revision.content.length;
+    previousLengthByArticle.set(revision.articleId, currentLength);
+
+    if (Math.abs(currentLength - previousLength) <= 50) {
+      continue;
+    }
+
+    const current = contributorCounts.get(revision.editorId);
+    contributorCounts.set(revision.editorId, {
+      count: (current?.count ?? 0) + 1,
+      user: revision.editor,
+    });
+  }
+
+  const contributors = [...contributorCounts.entries()]
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 10)
+    .map(([id, value]) => ({
+      id,
+      name: presentPublicUser(value.user).displayName,
+      avatar: presentPublicUser(value.user).avatarUrl,
+      editCount: value.count,
+    }));
+
+  const leaderboard = {
+    hotArticles,
+    contributors,
+  };
+
+  setCached(LEADERBOARD_CACHE_KEY, leaderboard);
+  return leaderboard;
 }
 
 const HOME_CACHE_KEY = "wiki:home-preview";

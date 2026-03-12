@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import ThemeToggle from "@/components/atoms/ThemeToggle";
+import AnnouncementBell from "@/components/organisms/AnnouncementBell/AnnouncementBell";
 import { useAuth } from "@/hooks/useAuth";
 import {
   DEFAULT_NAV_LINKS,
@@ -14,11 +15,24 @@ import {
 
 import styles from "./Header.module.css";
 
+const TOOL_MENU_ITEMS = [
+  { href: "/tools/schedule", label: "课表导出" },
+  { href: "/tools/grades", label: "成绩查询" },
+  { href: "/tools/enroll", label: "自动选课" },
+  { href: "/links", label: "校园导航" },
+  { href: "/tools/countdown", label: "考试倒计时" },
+];
+
 export default function Header() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [toolsMenuOpen, setToolsMenuOpen] = useState(false);
   const [navLinks, setNavLinks] = useState<NavLinkConfig[]>(DEFAULT_NAV_LINKS);
+  const navToggleRef = useRef<HTMLButtonElement | null>(null);
+  const mobileNavRef = useRef<HTMLDivElement | null>(null);
+  const userMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     fetch("/api/settings")
@@ -44,8 +58,46 @@ export default function Header() {
 
   const handleLogout = async () => {
     await logout();
-    setMenuOpen(false);
+    setUserMenuOpen(false);
+    setNavOpen(false);
+    setToolsMenuOpen(false);
   };
+
+  useEffect(() => {
+    function handleDocumentClick(event: MouseEvent) {
+      const target = event.target as Node;
+
+      if (
+        navOpen &&
+        mobileNavRef.current &&
+        navToggleRef.current &&
+        !mobileNavRef.current.contains(target) &&
+        !navToggleRef.current.contains(target)
+      ) {
+        setNavOpen(false);
+      }
+
+      if (
+        userMenuOpen &&
+        userMenuRef.current &&
+        !userMenuRef.current.contains(target)
+      ) {
+        setUserMenuOpen(false);
+      }
+
+      if (navOpen && !mobileNavRef.current?.contains(target)) {
+        setToolsMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("click", handleDocumentClick);
+    return () => document.removeEventListener("click", handleDocumentClick);
+  }, [navOpen, userMenuOpen]);
+
+  const isActiveLink = (href: string) =>
+    href === "/"
+      ? pathname === "/"
+      : pathname === href || pathname.startsWith(`${href}/`);
 
   return (
     <header className={styles.header}>
@@ -56,6 +108,25 @@ export default function Header() {
 
         <nav className={styles.nav}>
           {navLinks.map((link) =>
+            !link.external && link.href === "/tools" ? (
+              <div key={link.href} className={styles.navDropdown}>
+                <Link
+                  href={link.href}
+                  className={`${styles.navLink} ${
+                    isActiveLink(link.href) ? styles.active : ""
+                  }`}
+                >
+                  {link.label}
+                </Link>
+                <div className={styles.navDropdownMenu}>
+                  {TOOL_MENU_ITEMS.map((item) => (
+                    <Link key={item.href} href={item.href} className={styles.navDropdownItem}>
+                      {item.label}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ) :
             link.external ? (
               <a
                 key={link.href}
@@ -70,33 +141,39 @@ export default function Header() {
                 key={link.href}
                 href={link.href}
                 className={`${styles.navLink} ${
-                  pathname === link.href ? styles.active : ""
+                  isActiveLink(link.href) ? styles.active : ""
                 }`}
               >
                 {link.label}
               </Link>
-            ),
+            )
           )}
         </nav>
 
         <div className={styles.actions}>
+          <AnnouncementBell />
           <ThemeToggle />
 
           {user ? (
-            <div className={styles.userMenu}>
+            <div className={styles.userMenu} ref={userMenuRef}>
               <button
                 className={styles.userBtn}
-                onClick={() => setMenuOpen(!menuOpen)}
+                aria-expanded={userMenuOpen}
+                onClick={() => {
+                  setUserMenuOpen((open) => !open);
+                  setNavOpen(false);
+                  setToolsMenuOpen(false);
+                }}
               >
                 {user.nickname || user.username}
               </button>
-              {menuOpen ? (
+              {userMenuOpen ? (
                 <div className={styles.dropdown}>
                   {user.role === "admin" ? (
                     <Link
                       href="/admin"
                       className={styles.dropItem}
-                      onClick={() => setMenuOpen(false)}
+                      onClick={() => setUserMenuOpen(false)}
                     >
                       管理后台
                     </Link>
@@ -104,14 +181,14 @@ export default function Header() {
                   <Link
                     href="/settings"
                     className={styles.dropItem}
-                    onClick={() => setMenuOpen(false)}
+                    onClick={() => setUserMenuOpen(false)}
                   >
                     账号设置
                   </Link>
                   <Link
                     href="/editor"
                     className={styles.dropItem}
-                    onClick={() => setMenuOpen(false)}
+                    onClick={() => setUserMenuOpen(false)}
                   >
                     发起共建
                   </Link>
@@ -128,9 +205,16 @@ export default function Header() {
           )}
 
           <button
+            ref={navToggleRef}
             className={styles.hamburger}
-            onClick={() => setMenuOpen(!menuOpen)}
-            aria-label="切换菜单"
+            onClick={() => {
+              setNavOpen((open) => !open);
+              setUserMenuOpen(false);
+              setToolsMenuOpen(false);
+            }}
+            aria-label="导航菜单"
+            aria-expanded={navOpen}
+            aria-controls="mobile-nav"
           >
             <span />
             <span />
@@ -139,16 +223,49 @@ export default function Header() {
         </div>
       </div>
 
-      {menuOpen ? (
-        <div className={styles.mobileNav}>
+      {navOpen ? (
+        <div className={styles.mobileNav} id="mobile-nav" ref={mobileNavRef}>
           {navLinks.map((link) =>
+            !link.external && link.href === "/tools" ? (
+              <div key={link.href} className={styles.mobileTools}>
+                <button
+                  type="button"
+                  className={`${styles.mobileLink} ${
+                    isActiveLink(link.href) ? styles.active : ""
+                  }`}
+                  onClick={() => setToolsMenuOpen((open) => !open)}
+                  aria-expanded={toolsMenuOpen}
+                >
+                  {link.label}
+                </button>
+                {toolsMenuOpen ? (
+                  <div className={styles.mobileSubnav}>
+                    {TOOL_MENU_ITEMS.map((item) => (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={`${styles.mobileSubLink} ${
+                          isActiveLink(item.href) ? styles.active : ""
+                        }`}
+                        onClick={() => {
+                          setToolsMenuOpen(false);
+                          setNavOpen(false);
+                        }}
+                      >
+                        {item.label}
+                      </Link>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) :
             link.external ? (
               <a
                 key={link.href}
                 href={link.href}
                 className={styles.mobileLink}
                 rel="noopener noreferrer"
-                onClick={() => setMenuOpen(false)}
+                onClick={() => setNavOpen(false)}
               >
                 {link.label}
               </a>
@@ -157,13 +274,13 @@ export default function Header() {
                 key={link.href}
                 href={link.href}
                 className={`${styles.mobileLink} ${
-                  pathname === link.href ? styles.active : ""
+                  isActiveLink(link.href) ? styles.active : ""
                 }`}
-                onClick={() => setMenuOpen(false)}
+                onClick={() => setNavOpen(false)}
               >
                 {link.label}
               </Link>
-            ),
+            )
           )}
         </div>
       ) : null}

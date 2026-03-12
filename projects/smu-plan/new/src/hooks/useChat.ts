@@ -1,35 +1,124 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
+
 import type { ChatMessage } from "@/components/organisms/ChatStream";
+import { useAuth } from "@/hooks/useAuth";
+import type { StoredConversationMessage } from "@/lib/conversations";
 
 type ChatStatus = "idle" | "streaming" | "done" | "error";
+const ACTIVE_CONVERSATION_STORAGE_KEY = "nanyee_active_conversation_id";
 
 interface UseChatReturn {
   messages: ChatMessage[];
   status: ChatStatus;
-  send: (content: string, model?: string) => void;
+  conversationId: string | null;
+  send: (content: string, model?: string, imageBase64?: string | null) => void;
   stop: () => void;
   reset: () => void;
+  hydrateConversation: (id: string, messages: ChatMessage[]) => void;
+}
+
+function buildConversationPayload(messages: ChatMessage[]): StoredConversationMessage[] {
+  return messages.map((message) => ({
+    id: message.id,
+    role: message.role,
+    content: message.content,
+    references: message.references,
+    toolCards: message.toolCards,
+  }));
 }
 
 export function useChat(): UseChatReturn {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [status, setStatus] = useState<ChatStatus>("idle");
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const msgIdCounter = useRef(0);
 
-  const nextId = () => String(++msgIdCounter.current);
+  const nextId = () =>
+    globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${++msgIdCounter.current}`;
+
+  const persistConversation = useCallback(
+    async (nextMessages: ChatMessage[], currentConversationId: string | null) => {
+      if (!user) {
+        return currentConversationId;
+      }
+
+      const payload = {
+        messages: buildConversationPayload(nextMessages),
+      };
+
+      if (currentConversationId) {
+        await fetch(`/api/conversations/${currentConversationId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }).catch(() => {});
+
+        return currentConversationId;
+      }
+
+      const response = await fetch("/api/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }).catch(() => null);
+
+      const data = await response?.json().catch(() => null);
+      const nextConversationId = data?.data?.conversation?.id ?? null;
+      if (nextConversationId) {
+        setConversationId(nextConversationId);
+      }
+      return nextConversationId;
+    },
+    [user],
+  );
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    const activeConversationId = localStorage.getItem(ACTIVE_CONVERSATION_STORAGE_KEY);
+    if (!activeConversationId || messages.length > 0 || conversationId) {
+      return;
+    }
+
+    fetch(`/api/conversations/${activeConversationId}`)
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.ok) {
+          setConversationId(data.data.conversation.id);
+          setMessages(data.data.conversation.messages);
+          setStatus("done");
+        } else {
+          localStorage.removeItem(ACTIVE_CONVERSATION_STORAGE_KEY);
+        }
+      })
+      .catch(() => {});
+  }, [conversationId, messages.length, user]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    if (conversationId) {
+      localStorage.setItem(ACTIVE_CONVERSATION_STORAGE_KEY, conversationId);
+    } else {
+      localStorage.removeItem(ACTIVE_CONVERSATION_STORAGE_KEY);
+    }
+  }, [conversationId, user]);
 
   const send = useCallback(
-    async (content: string, model?: string) => {
+    async (content: string, model?: string, imageBase64?: string | null) => {
       const userMsg: ChatMessage = {
         id: nextId(),
         role: "user",
         content,
       };
 
-      const aiMsg: ChatMessage = {
+      let finalAiMessage: ChatMessage = {
         id: nextId(),
         role: "ai",
         content: "",
@@ -37,14 +126,22 @@ export function useChat(): UseChatReturn {
         toolCards: [],
       };
 
-      setMessages((prev) => [...prev, userMsg, aiMsg]);
+      const optimisticMessages = [...messages, userMsg, finalAiMessage];
+      setMessages(optimisticMessages);
       setStatus("streaming");
+
+      let currentConversationId = conversationId;
+      if (user) {
+        currentConversationId = await persistConversation(
+          [...messages, userMsg],
+          conversationId,
+        );
+      }
 
       const abortController = new AbortController();
       abortRef.current = abortController;
 
       try {
-        // Build history (exclude current aiMsg which is empty)
         const history = [...messages, userMsg].map((m) => ({
           role: m.role === "ai" ? ("assistant" as const) : ("user" as const),
           content: m.content,
@@ -53,7 +150,7 @@ export function useChat(): UseChatReturn {
         const res = await fetch("/api/ai/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: history, model }),
+          body: JSON.stringify({ messages: history, model, imageBase64 }),
           signal: abortController.signal,
         });
 
@@ -73,8 +170,6 @@ export function useChat(): UseChatReturn {
           if (done) break;
 
           buffer += decoder.decode(value, { stream: true });
-
-          // Parse SSE events
           const lines = buffer.split("\n");
           buffer = lines.pop() || "";
 
@@ -89,44 +184,40 @@ export function useChat(): UseChatReturn {
 
                 switch (eventType) {
                   case "delta":
+                    finalAiMessage = {
+                      ...finalAiMessage,
+                      content: finalAiMessage.content + (data.content || ""),
+                    };
                     setMessages((prev) => {
                       const updated = [...prev];
-                      const last = updated[updated.length - 1];
-                      if (last && last.role === "ai") {
-                        updated[updated.length - 1] = {
-                          ...last,
-                          content: last.content + (data.content || ""),
-                        };
-                      }
+                      updated[updated.length - 1] = finalAiMessage;
                       return updated;
                     });
                     break;
 
                   case "tool_card":
+                    finalAiMessage = {
+                      ...finalAiMessage,
+                      toolCards: [...(finalAiMessage.toolCards || []), data],
+                    };
                     setMessages((prev) => {
                       const updated = [...prev];
-                      const last = updated[updated.length - 1];
-                      if (last && last.role === "ai") {
-                        updated[updated.length - 1] = {
-                          ...last,
-                          toolCards: [...(last.toolCards || []), data],
-                        };
-                      }
+                      updated[updated.length - 1] = finalAiMessage;
                       return updated;
                     });
                     break;
 
                   case "tool_references":
+                    finalAiMessage = {
+                      ...finalAiMessage,
+                      references: [
+                        ...(finalAiMessage.references || []),
+                        ...(Array.isArray(data) ? data : [data]),
+                      ],
+                    };
                     setMessages((prev) => {
                       const updated = [...prev];
-                      const last = updated[updated.length - 1];
-                      if (last && last.role === "ai") {
-                        const refs = Array.isArray(data) ? data : [data];
-                        updated[updated.length - 1] = {
-                          ...last,
-                          references: [...(last.references || []), ...refs],
-                        };
-                      }
+                      updated[updated.length - 1] = finalAiMessage;
                       return updated;
                     });
                     break;
@@ -136,17 +227,14 @@ export function useChat(): UseChatReturn {
                     break;
 
                   case "error":
+                    finalAiMessage = {
+                      ...finalAiMessage,
+                      content: finalAiMessage.content || `出错了: ${data.message || "未知错误"}`,
+                    };
                     setStatus("error");
                     setMessages((prev) => {
                       const updated = [...prev];
-                      const last = updated[updated.length - 1];
-                      if (last && last.role === "ai") {
-                        updated[updated.length - 1] = {
-                          ...last,
-                          content:
-                            last.content || `出错了: ${data.message || "未知错误"}`,
-                        };
-                      }
+                      updated[updated.length - 1] = finalAiMessage;
                       return updated;
                     });
                     break;
@@ -161,29 +249,48 @@ export function useChat(): UseChatReturn {
         if (status !== "error") {
           setStatus("done");
         }
+
+        if (user) {
+          await persistConversation(
+            [...messages, userMsg, finalAiMessage],
+            currentConversationId,
+          );
+        }
       } catch (err) {
         if ((err as Error).name === "AbortError") {
           setStatus("done");
           return;
         }
+
+        finalAiMessage = {
+          ...finalAiMessage,
+          content: `请求失败: ${(err as Error).message}`,
+        };
         setStatus("error");
         setMessages((prev) => {
           const updated = [...prev];
-          const last = updated[updated.length - 1];
-          if (last && last.role === "ai") {
-            updated[updated.length - 1] = {
-              ...last,
-              content: `请求失败: ${(err as Error).message}`,
-            };
-          }
+          updated[updated.length - 1] = finalAiMessage;
           return updated;
         });
+
+        if (user) {
+          await persistConversation(
+            [...messages, userMsg, finalAiMessage],
+            currentConversationId,
+          );
+        }
       } finally {
         abortRef.current = null;
       }
     },
-    [messages, status]
+    [conversationId, messages, persistConversation, status, user],
   );
+
+  const hydrateConversation = useCallback((id: string, nextMessages: ChatMessage[]) => {
+    setConversationId(id);
+    setMessages(nextMessages);
+    setStatus("done");
+  }, []);
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
@@ -195,9 +302,11 @@ export function useChat(): UseChatReturn {
     abortRef.current?.abort();
     abortRef.current = null;
     setMessages([]);
+    setConversationId(null);
     setStatus("idle");
+    localStorage.removeItem(ACTIVE_CONVERSATION_STORAGE_KEY);
     msgIdCounter.current = 0;
   }, []);
 
-  return { messages, status, send, stop, reset };
+  return { messages, status, conversationId, send, stop, reset, hydrateConversation };
 }

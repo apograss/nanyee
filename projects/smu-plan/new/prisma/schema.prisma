@@ -22,10 +22,12 @@ model User {
   role            String    @default("contributor") // contributor | admin
   status          String    @default("active") // active | banned | deleted
   emailVerifiedAt DateTime?
+  lastReadAnnouncementAt DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
   messages     Message[]
+  conversations Conversation[]
   articles     Article[]       @relation("ArticleAuthor")
   editedArticles Article[]     @relation("ArticleLastEditor")
   lockedArticles Article[]     @relation("ArticleLocker")
@@ -36,6 +38,7 @@ model User {
   comments     Comment[]
   createdWikiCategories WikiCategory[] @relation("WikiCategoryCreatedBy")
   updatedWikiCategories WikiCategory[] @relation("WikiCategoryUpdatedBy")
+  ocrSamples   OcrSample[]
 }
 
 model Session {
@@ -243,6 +246,18 @@ model Message {
   @@index([createdAt])
 }
 
+model Conversation {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String?
+  messagesJson String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, updatedAt])
+}
+
 // ═══════════════════════════════════════
 // AI 与工具
 // ═══════════════════════════════════════
@@ -272,6 +287,22 @@ model ToolRun {
   createdAt DateTime @default(now())
 
   @@index([toolName])
+  @@index([createdAt])
+}
+
+model OcrSample {
+  id            String   @id @default(cuid())
+  sourcePage    String
+  imageBase64   String
+  correctedText String
+  ocrText       String?
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  ip            String?
+  createdAt     DateTime @default(now())
+
+  @@index([sourcePage, createdAt])
+  @@index([userId, createdAt])
   @@index([createdAt])
 }
 

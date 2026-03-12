@@ -1,0 +1,45 @@
+.card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(19, 48, 92, 0.16);
+  background: rgba(255, 255, 255, 0.72);
+  text-decoration: none;
+  color: inherit;
+}
+
+.index {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  color: var(--color-brand);
+  background: rgba(232, 101, 43, 0.12);
+}
+
+.body {
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-weight: 700;
+}
+
+.source {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+}
+
+.arrow {
+  margin-left: auto;
+  color: var(--color-brand);
+  font-weight: 700;
+}

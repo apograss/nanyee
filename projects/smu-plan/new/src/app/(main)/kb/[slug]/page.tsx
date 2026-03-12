@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { renderArticleBody } from "@/lib/wiki/render";
 import { presentPublicUser } from "@/lib/user-presenter";
 import CommentSystem from "@/components/organisms/CommentSystem/CommentSystem";
+import TableOfContents from "@/components/organisms/TableOfContents/TableOfContents";
 
 import ArticleEditButton from "./ArticleEditButton";
 import styles from "./article.module.css";
@@ -112,12 +113,15 @@ export default async function ArticleDetailPage({ params }: Props) {
           </div>
         </header>
 
-        <div className={styles.bodyCard}>
-          <div
-            className={styles.markdown}
-            data-article-body
-            dangerouslySetInnerHTML={{ __html: html }}
-          />
+        <div className={styles.contentLayout}>
+          <div className={styles.bodyCard}>
+            <div
+              className={styles.markdown}
+              data-article-body
+              dangerouslySetInnerHTML={{ __html: html }}
+            />
+          </div>
+          <TableOfContents html={html} />
         </div>
 
         <CommentSystem

@@ -1,0 +1,15 @@
+.skeleton {
+  display: block;
+  width: var(--skeleton-width, 100%);
+  height: var(--skeleton-height, 16px);
+  border-radius: var(--skeleton-radius, 12px);
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--bg-muted) 88%, white 12%) 0%,
+      color-mix(in srgb, var(--bg-hover) 80%, white 20%) 50%,
+      color-mix(in srgb, var(--bg-muted) 88%, white 12%) 100%
+    );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s linear infinite;
+}

@@ -2,7 +2,7 @@
 
 import { useRef, useEffect } from "react";
 import ChatBubble from "@/components/molecules/ChatBubble";
-import ReferenceCard from "@/components/molecules/ReferenceCard";
+import SourceCard from "@/components/molecules/SourceCard";
 import ToolCard from "@/components/molecules/ToolCard";
 import styles from "./ChatStream.module.css";
 
@@ -41,6 +41,7 @@ export default function ChatStream({ messages, isLoading, onStop }: ChatStreamPr
           <ChatBubble
             role={msg.role}
             content={msg.content}
+            references={msg.references}
             isStreaming={isLoading && i === messages.length - 1 && msg.role === "ai"}
           />
 
@@ -48,7 +49,7 @@ export default function ChatStream({ messages, isLoading, onStop }: ChatStreamPr
           {msg.references && msg.references.length > 0 && (
             <div className={styles.refs}>
               {msg.references.map((ref, ri) => (
-                <ReferenceCard key={ri} {...ref} />
+                <SourceCard key={ri} index={ri + 1} {...ref} />
               ))}
             </div>
           )}

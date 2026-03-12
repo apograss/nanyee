@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import SkeletonBlock from "@/components/atoms/SkeletonBlock";
 import MessageItem from "@/components/molecules/MessageItem";
 import DanmakuOverlay from "@/components/organisms/DanmakuOverlay";
 import NeoButton from "@/components/atoms/NeoButton";
@@ -18,6 +19,7 @@ export default function GuestbookPage() {
   const [messages, setMessages] = useState<GuestMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [messagesLoading, setMessagesLoading] = useState(true);
   const [danmakuOn, setDanmakuOn] = useState(true);
   const [user, setUser] = useState<{ id: string; role: string } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -39,12 +41,13 @@ export default function GuestbookPage() {
       .then((data) => {
         if (data.ok) setMessages(data.data.messages);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setMessagesLoading(false));
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim() || input.trim().length > 500) return;
     setLoading(true);
 
     try {
@@ -137,13 +140,30 @@ export default function GuestbookPage() {
           rows={3}
           maxLength={500}
         />
+        <div
+          className={`${styles.charCount} ${input.length > 450 ? styles.charCountWarning : ""}`}
+        >
+          {input.length} / 500
+        </div>
         <NeoButton type="submit" isLoading={loading} disabled={!input.trim()}>
           发布
         </NeoButton>
       </form>
 
       <div className={styles.messages}>
-        {messages.map((msg) => (
+        {messagesLoading ? (
+          <div className={styles.skeletonList}>
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div key={index} className={styles.skeletonItem}>
+                <SkeletonBlock width="28%" height="16px" />
+                <SkeletonBlock width="100%" height="18px" />
+                <SkeletonBlock width="72%" height="18px" />
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {!messagesLoading && messages.map((msg) => (
           <div key={msg.id}>
             {editingId === msg.id ? (
               <div className={styles.editRow}>
@@ -193,7 +213,7 @@ export default function GuestbookPage() {
             )}
           </div>
         ))}
-        {messages.length === 0 && (
+        {!messagesLoading && messages.length === 0 && (
           <p className={styles.empty}>还没有留言，来第一个吧</p>
         )}
       </div>

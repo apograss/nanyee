@@ -18,6 +18,7 @@ import {
   type CourseItem,
   type LogCallback,
 } from "@/lib/enroll-client";
+import OcrFeedbackPrompt from "@/components/molecules/OcrFeedbackPrompt";
 import { recognizeCaptcha } from "@/lib/captcha-ocr";
 import s from "./enroll.module.css";
 
@@ -555,6 +556,13 @@ export default function EnrollPage() {
                       {ocrStatus}
                     </span>
                   )}
+                  {captchaImg ? (
+                    <OcrFeedbackPrompt
+                      imageBase64={captchaImg}
+                      correctedText={captcha}
+                      sourcePage="enroll"
+                    />
+                  ) : null}
                 </div>
 
                 <button

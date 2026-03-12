@@ -15,6 +15,11 @@ export const API_NAV_LINK: NavLinkConfig = {
   external: true,
 };
 
+export const GUESTBOOK_NAV_LINK: NavLinkConfig = {
+  href: "/guestbook",
+  label: "留言板",
+};
+
 export const DEFAULT_NAV_LINKS: NavLinkConfig[] = [
   { href: "/", label: "首页" },
   { href: "/kb", label: "知识库" },
@@ -22,6 +27,7 @@ export const DEFAULT_NAV_LINKS: NavLinkConfig[] = [
   API_NAV_LINK,
   { href: "/tools", label: "工具" },
   { href: "/links", label: "链接" },
+  GUESTBOOK_NAV_LINK,
   { href: "/about", label: "关于" },
 ];
 
@@ -44,13 +50,24 @@ function normalizeForumLink(link: NavLinkConfig): NavLinkConfig {
 export function normalizeNavLinks(links: NavLinkConfig[]): NavLinkConfig[] {
   const normalized = links.map(normalizeForumLink);
 
-  if (normalized.some((link) => link.href === API_NAV_LINK.href)) {
-    return normalized;
+  const nextLinks = [...normalized];
+
+  if (!nextLinks.some((link) => link.href === API_NAV_LINK.href)) {
+    const forumIndex = nextLinks.findIndex((link) => link.href === FORUM_NAV_LINK.href);
+    const insertIndex = forumIndex >= 0 ? forumIndex + 1 : nextLinks.length;
+    nextLinks.splice(insertIndex, 0, API_NAV_LINK);
   }
 
-  const forumIndex = normalized.findIndex((link) => link.href === FORUM_NAV_LINK.href);
-  const nextLinks = [...normalized];
-  const insertIndex = forumIndex >= 0 ? forumIndex + 1 : nextLinks.length;
-  nextLinks.splice(insertIndex, 0, API_NAV_LINK);
+  if (!nextLinks.some((link) => link.href === GUESTBOOK_NAV_LINK.href)) {
+    const linksIndex = nextLinks.findIndex((link) => link.href === "/links");
+    const aboutIndex = nextLinks.findIndex((link) => link.href === "/about");
+    const insertIndex = linksIndex >= 0
+      ? linksIndex + 1
+      : aboutIndex >= 0
+        ? aboutIndex
+        : nextLinks.length;
+    nextLinks.splice(insertIndex, 0, GUESTBOOK_NAV_LINK);
+  }
+
   return nextLinks;
 }

@@ -25,6 +25,18 @@
   box-shadow: var(--neo-shadow-active);
 }
 
+.cardDisabled {
+  opacity: 0.72;
+  cursor: default;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--bg-secondary) 82%, var(--bg-muted) 18%);
+}
+
+.cardDisabled:hover {
+  transform: none;
+  box-shadow: var(--neo-shadow-sm);
+}
+
 .icon {
   font-size: 2rem;
   flex-shrink: 0;
@@ -54,6 +66,11 @@
   border: 1px solid var(--border-color);
   border-radius: var(--neo-radius);
   color: var(--text-primary);
+}
+
+.tagMuted {
+  background: color-mix(in srgb, var(--bg-muted) 70%, white 30%);
+  color: var(--text-secondary);
 }
 
 .desc {

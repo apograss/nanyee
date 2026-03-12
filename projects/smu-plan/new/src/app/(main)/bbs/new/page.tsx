@@ -1,12 +1,14 @@
 import Link from "next/link";
 
 import NeoButton from "@/components/atoms/NeoButton";
-import { getForumBaseUrl } from "@/lib/forum/latest";
+import { getForumBaseUrl, getForumComposeUrl } from "@/lib/forum/latest";
 
 import styles from "../page.module.css";
 
-export default function NewTopicPage() {
+export default async function NewTopicPage() {
   const forumUrl = getForumBaseUrl();
+  const composeUrl = await getForumComposeUrl();
+  const directCompose = composeUrl !== forumUrl;
 
   return (
     <div className={styles.page}>
@@ -22,9 +24,9 @@ export default function NewTopicPage() {
             首次使用时直接点击 OAuth 登录即可自动建号。
           </p>
           <div className={styles.actions}>
-            <a href={forumUrl}>
+            <a href={composeUrl}>
               <NeoButton variant="primary" size="lg">
-                进入论坛后发布主题
+                {directCompose ? "直接进入发帖页" : "进入论坛后发布主题"}
               </NeoButton>
             </a>
             <Link href="/bbs" className={styles.secondaryLink}>
@@ -48,6 +50,14 @@ export default function NewTopicPage() {
                 如果内容是可长期复用的经验，优先整理成知识库文章；如果是实时交流，再发到论坛。
               </p>
             </div>
+            {!directCompose ? (
+              <div className={styles.tipCard}>
+                <h3 className={styles.tipTitle}>当前论坛不支持直达发帖页</h3>
+                <p className={styles.tipText}>
+                  我们会先把你带到论坛首页，请登录后点击“发布主题”继续。
+                </p>
+              </div>
+            ) : null}
           </div>
         </section>
       </div>

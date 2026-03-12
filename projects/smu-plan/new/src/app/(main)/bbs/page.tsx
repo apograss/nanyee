@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import NeoButton from "@/components/atoms/NeoButton";
@@ -7,6 +8,9 @@ import { relativeTime } from "@/lib/relative-time";
 import styles from "./page.module.css";
 
 export const revalidate = 120;
+export const metadata: Metadata = {
+  title: "校园论坛",
+};
 
 export default async function BBSPage() {
   const forumUrl = getForumBaseUrl();
