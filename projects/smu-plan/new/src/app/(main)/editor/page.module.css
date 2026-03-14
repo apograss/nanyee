@@ -406,6 +406,21 @@
   border: var(--neo-border);
 }
 
+.interactivePreviewWrap {
+  border: var(--neo-border);
+  border-radius: calc(var(--neo-radius) * 1.1);
+  background: #0b1220;
+  box-shadow: var(--neo-shadow-sm);
+  overflow: hidden;
+}
+
+.interactivePreviewFrame {
+  width: 100%;
+  min-height: 720px;
+  border: none;
+  display: block;
+}
+
 .formActions {
   display: flex;
   gap: var(--space-sm);
@@ -443,5 +458,9 @@
   .editorTools {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .interactivePreviewFrame {
+    min-height: 480px;
   }
 }

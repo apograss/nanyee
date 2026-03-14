@@ -2,11 +2,13 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 
 import Badge from "@/components/atoms/Badge";
-import { prisma } from "@/lib/prisma";
-import { renderArticleBody } from "@/lib/wiki/render";
-import { presentPublicUser } from "@/lib/user-presenter";
+import InteractiveHtmlFrame from "@/components/molecules/InteractiveHtmlFrame";
 import CommentSystem from "@/components/organisms/CommentSystem/CommentSystem";
 import TableOfContents from "@/components/organisms/TableOfContents/TableOfContents";
+import { prisma } from "@/lib/prisma";
+import { presentPublicUser } from "@/lib/user-presenter";
+import { isInteractiveHtmlFormat, type ArticleFormat } from "@/lib/wiki/formats";
+import { renderArticleBody } from "@/lib/wiki/render";
 
 import ArticleEditButton from "./ArticleEditButton";
 import styles from "./article.module.css";
@@ -57,11 +59,16 @@ export default async function ArticleDetailPage({ params }: Props) {
     }
   } catch {}
 
+  const format = article.format as ArticleFormat;
+  const isInteractiveArticle = isInteractiveHtmlFormat(format);
+  const html = isInteractiveArticle
+    ? ""
+    : await renderArticleBody({
+        content: article.content,
+        format,
+      });
+
   const canEdit = isLoggedIn && (!article.isLocked || isAdmin);
-  const html = await renderArticleBody({
-    content: article.content,
-    format: article.format as "html" | "markdown",
-  });
   const tags: string[] = article.tags ? JSON.parse(article.tags) : [];
   const publishedDate = (article.publishedAt || article.createdAt).toLocaleDateString("zh-CN");
   const author = presentPublicUser(article.author).displayName;
@@ -72,64 +79,82 @@ export default async function ArticleDetailPage({ params }: Props) {
   return (
     <div className={styles.page}>
       <article className={styles.shell}>
-        <header className={styles.header}>
-          <p className={styles.kicker}>知识库 Wiki</p>
-          <h1 className={styles.title}>{article.title}</h1>
-          {article.summary ? <p className={styles.summary}>{article.summary}</p> : null}
+        <div className={styles.mainColumn}>
+          <header className={styles.header}>
+            <p className={styles.kicker}>知识库 Wiki</p>
+            <h1 className={styles.title}>{article.title}</h1>
+            {article.summary ? <p className={styles.summary}>{article.summary}</p> : null}
 
-          <div className={styles.meta}>
-            <span className={styles.metaItem}>作者：{author}</span>
-            {lastEditor ? <span className={styles.metaItem}>最后编辑：{lastEditor}</span> : null}
-            <span className={styles.metaItem}>发布日期：{publishedDate}</span>
-            <span className={styles.metaItem}>{article.viewCount} 次浏览</span>
-            {article.isLocked ? (
-              <span className={`${styles.metaItem} ${styles.locked}`}>已锁定</span>
-            ) : null}
-          </div>
+            <div className={styles.meta}>
+              <span className={styles.metaItem}>作者：{author}</span>
+              {lastEditor ? <span className={styles.metaItem}>最后编辑：{lastEditor}</span> : null}
+              <span className={styles.metaItem}>发布日期：{publishedDate}</span>
+              <span className={styles.metaItem}>{article.viewCount} 次浏览</span>
+              {article.isLocked ? (
+                <span className={`${styles.metaItem} ${styles.locked}`}>已锁定</span>
+              ) : null}
+            </div>
 
-          <div className={styles.categoryBar}>
-            {article.categoryRef?.parent ? (
-              <span className={styles.categoryPill}>
-                {article.categoryRef.parent.icon || "📚"} {article.categoryRef.parent.name}
-              </span>
-            ) : null}
-            {article.categoryRef ? (
-              <span className={styles.categoryPill}>
-                {article.categoryRef.icon || "📄"} {article.categoryRef.name}
-              </span>
-            ) : article.category ? (
-              <span className={styles.categoryPill}>📄 {article.category}</span>
-            ) : null}
-            {tags.map((tag) => (
-              <Badge key={tag} text={tag} colorVariant="mint" />
-            ))}
-          </div>
+            <div className={styles.categoryBar}>
+              {article.categoryRef?.parent ? (
+                <span className={styles.categoryPill}>
+                  {article.categoryRef.parent.icon || "📚"} {article.categoryRef.parent.name}
+                </span>
+              ) : null}
+              {article.categoryRef ? (
+                <span className={styles.categoryPill}>
+                  {article.categoryRef.icon || "🧩"} {article.categoryRef.name}
+                </span>
+              ) : article.category ? (
+                <span className={styles.categoryPill}>🧩 {article.category}</span>
+              ) : null}
+              {tags.map((tag) => (
+                <Badge key={tag} text={tag} colorVariant="mint" />
+              ))}
+            </div>
 
-          <div className={styles.actions}>
-            {canEdit ? <ArticleEditButton articleId={article.id} /> : null}
-            <a href={`/kb/${slug}/history`} className={styles.historyLink}>
-              查看版本历史
-            </a>
-          </div>
-        </header>
+            <div className={styles.actions}>
+              {canEdit ? <ArticleEditButton articleId={article.id} /> : null}
+              <a href={`/kb/${slug}/history`} className={styles.historyLink}>
+                查看版本历史
+              </a>
+            </div>
+          </header>
 
-        <div className={styles.contentLayout}>
           <div className={styles.bodyCard}>
-            <div
-              className={styles.markdown}
-              data-article-body
-              dangerouslySetInnerHTML={{ __html: html }}
-            />
+            {isInteractiveArticle ? (
+              <div className={styles.interactiveWrap}>
+                <InteractiveHtmlFrame
+                  html={article.content}
+                  title={article.title}
+                  className={styles.interactiveFrame}
+                />
+              </div>
+            ) : (
+              <div
+                className={styles.markdown}
+                data-article-body
+                dangerouslySetInnerHTML={{ __html: html }}
+              />
+            )}
           </div>
-          <TableOfContents html={html} />
         </div>
 
-        <CommentSystem
-          articleSlug={slug}
-          isLoggedIn={isLoggedIn}
-          currentUserId={currentUserId}
-          isAdmin={isAdmin}
-        />
+        <aside className={styles.sideRail}>
+          {!isInteractiveArticle ? <TableOfContents html={html} /> : null}
+          {isInteractiveArticle ? (
+            <div className={styles.sideNote}>
+              互动 HTML 会在沙箱 iframe 中运行。为了保持隔离和安全，这类文章暂不提供段落评论。
+            </div>
+          ) : (
+            <CommentSystem
+              articleSlug={slug}
+              isLoggedIn={isLoggedIn}
+              currentUserId={currentUserId}
+              isAdmin={isAdmin}
+            />
+          )}
+        </aside>
       </article>
     </div>
   );

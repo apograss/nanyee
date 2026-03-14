@@ -1,22 +1,26 @@
-/* Icon injected as child of each paragraph, absolute-positioned to the right */
 .commentIcon {
   position: absolute;
-  right: 10px;
-  top: 6px;
-  width: 28px;
-  height: 28px;
+  right: 6px;
+  top: 8px;
+  width: 26px;
+  height: 26px;
   display: flex;
   align-items: center;
   justify-content: center;
   border: var(--neo-border);
-  border-radius: 50%;
+  border-radius: 999px;
   background: var(--bg-secondary);
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--text-muted);
-  opacity: 0.35;
+  opacity: 0.48;
   z-index: 10;
-  transition: opacity 0.15s, background 0.15s, color 0.15s, border-color 0.15s;
+  transition:
+    opacity 0.15s,
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s,
+    transform 0.15s;
   padding: 0;
   line-height: 1;
 }
@@ -26,6 +30,7 @@
   background: var(--color-brand);
   color: white;
   border-color: var(--color-brand);
+  transform: translateY(-1px);
 }
 
 .commentIconHasComments {
@@ -42,7 +47,7 @@
 
 .commentBadge {
   position: absolute;
-  top: -6px;
+  top: -5px;
   right: 0;
   min-width: 16px;
   height: 16px;
@@ -58,40 +63,26 @@
   pointer-events: none;
 }
 
-/* Panel overlay */
-.panelOverlay {
-  position: fixed;
-  inset: 0;
-  z-index: 999;
-  background: rgba(0, 0, 0, 0.3);
-}
-
-/* Panel - desktop (right side) */
 .panel {
-  position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 360px;
-  z-index: 1000;
-  background: var(--bg-primary);
-  border-left: var(--neo-border);
-  box-shadow: var(--neo-shadow);
+  position: sticky;
+  top: calc(var(--header-height) + 18px);
   display: flex;
   flex-direction: column;
-  animation: slideIn 0.2s ease-out;
-}
-
-@keyframes slideIn {
-  from { transform: translateX(100%); }
-  to { transform: translateX(0); }
+  min-height: 320px;
+  max-height: calc(100vh - var(--header-height) - 36px);
+  border: var(--neo-border);
+  border-radius: var(--neo-radius-lg);
+  background: var(--bg-primary);
+  box-shadow: var(--neo-shadow-sm);
+  overflow: hidden;
 }
 
 .panelHeader {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  padding: var(--space-md) var(--space-lg);
+  gap: 12px;
+  padding: 16px 18px;
   border-bottom: 1px solid var(--border-light);
   flex-shrink: 0;
 }
@@ -99,6 +90,13 @@
 .panelTitle {
   font-size: var(--text-base);
   font-weight: var(--font-bold);
+  color: var(--text-primary);
+}
+
+.panelSubtitle {
+  margin-top: 4px;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
 }
 
 .panelClose {
@@ -123,18 +121,18 @@
 .panelBody {
   flex: 1;
   overflow-y: auto;
-  padding: var(--space-md) var(--space-lg);
+  padding: 14px 18px;
 }
 
 .panelEmpty {
-  text-align: center;
-  padding: var(--space-2xl);
+  padding: 12px 0;
   color: var(--text-muted);
   font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
 }
 
 .requestError {
-  margin-bottom: var(--space-md);
+  margin-bottom: 12px;
   padding: 10px 12px;
   border-radius: var(--neo-radius);
   border: 1px solid color-mix(in srgb, var(--color-error) 45%, transparent);
@@ -144,11 +142,10 @@
   line-height: 1.55;
 }
 
-/* Comment item */
 .commentItem {
   display: flex;
-  gap: var(--space-sm);
-  padding: var(--space-sm) 0;
+  gap: 10px;
+  padding: 12px 0;
 }
 
 .commentItem + .commentItem {
@@ -163,8 +160,8 @@
 .commentMeta {
   display: flex;
   align-items: center;
-  gap: var(--space-xs);
-  margin-bottom: 2px;
+  gap: 6px;
+  margin-bottom: 4px;
 }
 
 .commentAuthor {
@@ -201,29 +198,28 @@
   background: color-mix(in srgb, var(--color-error) 10%, transparent);
 }
 
-/* Comment input (at bottom of panel) */
 .panelFooter {
   border-top: 1px solid var(--border-light);
-  padding: var(--space-md) var(--space-lg);
+  padding: 14px 18px;
   flex-shrink: 0;
 }
 
 .inputWrap {
-  display: flex;
-  gap: var(--space-sm);
+  display: grid;
+  gap: 10px;
 }
 
 .inputField {
-  flex: 1;
-  padding: var(--space-sm) var(--space-md);
+  width: 100%;
+  padding: 10px 12px;
   border: var(--neo-border);
   border-radius: var(--neo-radius);
   font-size: var(--text-sm);
   background: var(--bg-secondary);
   color: var(--text-primary);
-  resize: none;
-  min-height: 36px;
-  max-height: 100px;
+  resize: vertical;
+  min-height: 72px;
+  max-height: 180px;
   font-family: inherit;
 }
 
@@ -239,34 +235,22 @@
 .loginHint {
   font-size: var(--text-xs);
   color: var(--text-muted);
-  text-align: center;
-  padding: var(--space-sm);
+  line-height: var(--leading-relaxed);
 }
 
-/* Mobile */
+@media (max-width: 1100px) {
+  .panel {
+    position: static;
+    max-height: none;
+  }
+}
+
 @media (max-width: 768px) {
   .commentIcon {
     right: 4px;
-    top: -2px;
+    top: 4px;
     width: 24px;
     height: 24px;
     font-size: 12px;
-  }
-
-  .panel {
-    top: auto;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    height: 60vh;
-    border-left: none;
-    border-top: var(--neo-border);
-    border-radius: 16px 16px 0 0;
-    animation: slideUp 0.2s ease-out;
-  }
-
-  @keyframes slideUp {
-    from { transform: translateY(100%); }
-    to { transform: translateY(0); }
   }
 }

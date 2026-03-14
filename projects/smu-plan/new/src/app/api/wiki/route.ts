@@ -6,6 +6,7 @@ import { checkEditRateLimit } from "@/lib/wiki/edit-rate-limit";
 import { clearWikiSearchCache } from "@/lib/wiki/search-cache";
 import { listArticles, type SortMode } from "@/lib/wiki/queries";
 import { resolveWikiCategorySelection } from "@/lib/wiki/categories";
+import { ARTICLE_FORMATS, canUseInteractiveHtml } from "@/lib/wiki/formats";
 import { z } from "zod";
 import slugify from "slugify";
 
@@ -27,7 +28,7 @@ export async function GET(req: NextRequest) {
 const createSchema = z.object({
   title: z.string().min(1).max(200),
   content: z.string().min(1),
-  format: z.enum(["html", "markdown"]).default("html"),
+  format: z.enum(ARTICLE_FORMATS).default("html"),
   summary: z.string().max(500).optional(),
   categoryId: z.string().optional(),
   category: z.string().max(50).optional(),
@@ -49,6 +50,14 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const data = createSchema.parse(body);
+
+    if (data.format === "interactive-html" && !canUseInteractiveHtml(auth.role)) {
+      return Response.json(
+        { ok: false, error: { code: 403, message: "只有管理员可以发布互动 HTML" } },
+        { status: 403 },
+      );
+    }
+
     const resolvedCategory = await resolveWikiCategorySelection({
       categoryId: data.categoryId,
       category: data.category,

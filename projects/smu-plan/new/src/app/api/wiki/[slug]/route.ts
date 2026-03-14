@@ -8,6 +8,7 @@ import { checkEditRateLimit } from "@/lib/wiki/edit-rate-limit";
 import { createRevision } from "@/lib/wiki/revisions";
 import { presentPublicUser } from "@/lib/user-presenter";
 import { resolveWikiCategorySelection } from "@/lib/wiki/categories";
+import { ARTICLE_FORMATS, canUseInteractiveHtml } from "@/lib/wiki/formats";
 import { z } from "zod";
 
 // GET /api/wiki/[slug] — article detail (lookup by slug or id)
@@ -98,7 +99,7 @@ export async function GET(
 const updateSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   content: z.string().min(1).optional(),
-  format: z.enum(["html", "markdown"]).optional(),
+  format: z.enum(ARTICLE_FORMATS).optional(),
   summary: z.string().max(500).optional(),
   categoryId: z.string().optional(),
   category: z.string().max(50).optional(),
@@ -125,6 +126,14 @@ export async function PUT(
 
     const body = await req.json();
     const data = updateSchema.parse(body);
+
+    if (data.format === "interactive-html" && !canUseInteractiveHtml(auth.role)) {
+      return Response.json(
+        { ok: false, error: { code: 403, message: "只有管理员可以保存互动 HTML" } },
+        { status: 403 },
+      );
+    }
+
     const resolvedCategory = await resolveWikiCategorySelection({
       categoryId: data.categoryId,
       category: data.category,

@@ -8,6 +8,8 @@ import {
   useMemo,
   useRef,
   useState,
+  type ChangeEvent,
+  type FormEvent,
 } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -15,7 +17,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import NeoButton from "@/components/atoms/NeoButton";
 import NeoInput from "@/components/atoms/NeoInput";
+import InteractiveHtmlFrame from "@/components/molecules/InteractiveHtmlFrame";
 import { useAuth } from "@/hooks/useAuth";
+import { canUseInteractiveHtml, type ArticleFormat } from "@/lib/wiki/formats";
 import { renderArticleBody } from "@/lib/wiki/render";
 
 import { KB_EDITOR_MODES, type KbEditorMode } from "./config";
@@ -25,14 +29,15 @@ const WikiEditor = dynamic(
   () => import("@/components/organisms/WikiEditor/WikiEditor"),
   {
     ssr: false,
-    loading: () => <div className={styles.editorLoading}>加载编辑器中...</div>,
+    loading: () => <div className={styles.editorLoading}>编辑器加载中...</div>,
   },
 );
 
 const CONTENT_FORMAT_OPTIONS = [
   { id: "html", label: "富文本 / HTML" },
   { id: "markdown", label: "Markdown" },
-] as const;
+  { id: "interactive-html", label: "互动 HTML" },
+] as const satisfies ReadonlyArray<{ id: ArticleFormat; label: string }>;
 
 interface WikiCategoryNode {
   id: string;
@@ -67,7 +72,7 @@ function EditorInner() {
   const [tagsInput, setTagsInput] = useState("");
   const [content, setContent] = useState("");
   const [editSummary, setEditSummary] = useState("");
-  const [format, setFormat] = useState<"html" | "markdown">("html");
+  const [format, setFormat] = useState<ArticleFormat>("html");
   const [mode, setMode] = useState<KbEditorMode>("edit");
   const [previewHtml, setPreviewHtml] = useState("");
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -91,6 +96,10 @@ function EditorInner() {
   const deferredContent = useDeferredValue(content);
   const deferredFormat = useDeferredValue(format);
   const isAdmin = user?.role === "admin";
+  const canEditInteractive = canUseInteractiveHtml(user?.role);
+  const visibleFormatOptions = canEditInteractive
+    ? CONTENT_FORMAT_OPTIONS
+    : CONTENT_FORMAT_OPTIONS.filter((item) => item.id !== "interactive-html");
   const tags = tagsInput
     .split(",")
     .map((tag) => tag.trim())
@@ -104,6 +113,7 @@ function EditorInner() {
     ?? categoryTree.find((parent) => parent.id === parentCategoryId)
     ?? null;
   const childOptions = activeParent?.children ?? [];
+  const isSourceMode = format !== "html";
 
   async function loadCategories() {
     setCategoryLoading(true);
@@ -112,6 +122,8 @@ function EditorInner() {
       const data = await res.json();
       if (data.ok) {
         setCategoryTree(data.data.categories || []);
+      } else {
+        setCategoryTree([]);
       }
     } catch {
       setCategoryTree([]);
@@ -133,6 +145,7 @@ function EditorInner() {
     if (match) {
       setParentCategoryId(match.parent.id);
       setChildCategoryId(match.child.id);
+      setPendingCategoryId(null);
     }
   }, [pendingCategoryId, categoryTree]);
 
@@ -153,7 +166,7 @@ function EditorInner() {
           setSummary(article.summary || "");
           setTagsInput(Array.isArray(article.tags) ? article.tags.join(", ") : "");
           setContent(article.content || "");
-          setFormat(article.format || "html");
+          setFormat((article.format || "html") as ArticleFormat);
           setIsLocked(Boolean(article.isLocked));
           setPendingCategoryId(article.categoryId || null);
         } else {
@@ -171,11 +184,20 @@ function EditorInner() {
     let cancelled = false;
 
     async function refreshPreview() {
+      if (deferredFormat === "interactive-html") {
+        if (!cancelled) {
+          setPreviewHtml("");
+          setPreviewLoading(false);
+        }
+        return;
+      }
+
       setPreviewLoading(true);
       const html = await renderArticleBody({
         content: deferredContent || "<p></p>",
         format: deferredFormat,
       });
+
       if (!cancelled) {
         setPreviewHtml(html);
         setPreviewLoading(false);
@@ -199,10 +221,12 @@ function EditorInner() {
       setError("请先选择一个母分类，再创建子分类。");
       return;
     }
+
     setCategoryEditorMode("create");
     setCategoryNameDraft("");
     setCategoryIconDraft("");
     setCategoryEditorOpen(true);
+    setError("");
   }
 
   function openEditChildCategory() {
@@ -210,10 +234,12 @@ function EditorInner() {
       setError("请先选择一个子分类。");
       return;
     }
+
     setCategoryEditorMode("edit");
     setCategoryNameDraft(selectedCategory.child.name);
     setCategoryIconDraft(selectedCategory.child.icon || "");
     setCategoryEditorOpen(true);
+    setError("");
   }
 
   async function handleSaveCategory() {
@@ -261,25 +287,37 @@ function EditorInner() {
     }
   }
 
-  function handleFormatChange(nextFormat: "html" | "markdown") {
+  function handleFormatChange(nextFormat: ArticleFormat) {
     if (nextFormat === format) {
+      return;
+    }
+
+    if (nextFormat === "interactive-html" && !canEditInteractive) {
+      setError("只有管理员可以使用互动 HTML 模式。");
       return;
     }
 
     startTransition(() => {
       setFormat(nextFormat);
+      if (nextFormat !== "html") {
+        setMode("edit");
+      }
     });
-    setFormatNotice("切换内容格式不会自动转换已有内容，发布前请先看预览。");
+
+    if (nextFormat === "interactive-html") {
+      setFormatNotice("互动 HTML 会通过沙箱 iframe 运行，适合小游戏、演示页和交互实验。");
+    } else if (nextFormat === "markdown") {
+      setFormatNotice("Markdown 会按源码保存，并在文章页渲染成常规排版。");
+    } else {
+      setFormatNotice("富文本 / HTML 适合普通图文内容，发布时会做安全净化。");
+    }
   }
 
   function handleOpenHtmlImport() {
-    if (format !== "html") {
-      handleFormatChange("html");
-    }
     htmlImportRef.current?.click();
   }
 
-  function handleHtmlImport(event: React.ChangeEvent<HTMLInputElement>) {
+  function handleHtmlImport(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
 
@@ -296,13 +334,28 @@ function EditorInner() {
       return;
     }
 
+    const currentFormat = format;
     const reader = new FileReader();
     reader.onload = () => {
       const nextContent = typeof reader.result === "string" ? reader.result : "";
-      setFormat("html");
+      const looksInteractive = /<script[\s>]|<canvas[\s>]|requestAnimationFrame/i.test(
+        nextContent,
+      );
+
+      if (currentFormat === "interactive-html" || (looksInteractive && canEditInteractive)) {
+        setFormat("interactive-html");
+        setFormatNotice(`已导入互动 HTML 文件：${file.name}`);
+      } else {
+        setFormat("html");
+        setFormatNotice(
+          looksInteractive && canEditInteractive
+            ? `已导入 HTML 文件：${file.name}。检测到可执行内容，如需直接运行，请切换到“互动 HTML”。`
+            : `已导入 HTML 文件：${file.name}`,
+        );
+      }
+
       setContent(nextContent);
       setError("");
-      setFormatNotice(`已导入 HTML 文件：${file.name}`);
     };
     reader.onerror = () => {
       setError("HTML 文件读取失败，请换一个文件再试。");
@@ -310,8 +363,8 @@ function EditorInner() {
     reader.readAsText(file, "utf-8");
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
     setError("");
     setLoading(true);
 
@@ -361,7 +414,9 @@ function EditorInner() {
         <div className={styles.noticeCard}>
           <p className={styles.noticeKicker}>先登录再参与共建</p>
           <h1 className={styles.title}>需要登录</h1>
-          <p className={styles.desc}>登录后你就可以新建词条、补充经验，或修正文档中的过期信息。</p>
+          <p className={styles.desc}>
+            登录后你就可以新建词条、补充经验，或修正文档中的过期信息。
+          </p>
           <Link href={`/login?redirect=${encodeURIComponent(redirect)}`}>
             <NeoButton>前往登录</NeoButton>
           </Link>
@@ -416,7 +471,7 @@ function EditorInner() {
           <NeoInput
             label="标题"
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(event) => setTitle(event.target.value)}
             required
           />
 
@@ -428,8 +483,8 @@ function EditorInner() {
                 <select
                   className={styles.categorySelect}
                   value={parentCategoryId}
-                  onChange={(e) => {
-                    setParentCategoryId(e.target.value);
+                  onChange={(event) => {
+                    setParentCategoryId(event.target.value);
                     setChildCategoryId("");
                   }}
                   disabled={categoryLoading || categoryTree.length === 0}
@@ -449,7 +504,7 @@ function EditorInner() {
                 <select
                   className={styles.categorySelect}
                   value={childCategoryId}
-                  onChange={(e) => setChildCategoryId(e.target.value)}
+                  onChange={(event) => setChildCategoryId(event.target.value)}
                   disabled={!activeParent || childOptions.length === 0}
                 >
                   <option value="">
@@ -490,14 +545,14 @@ function EditorInner() {
                 <NeoInput
                   label={categoryEditorMode === "create" ? "子分类名称" : "修改子分类名称"}
                   value={categoryNameDraft}
-                  onChange={(e) => setCategoryNameDraft(e.target.value)}
+                  onChange={(event) => setCategoryNameDraft(event.target.value)}
                   placeholder="例如：本科生学习指南"
                 />
                 <NeoInput
                   label="图标"
                   value={categoryIconDraft}
-                  onChange={(e) => setCategoryIconDraft(e.target.value)}
-                  placeholder="例如：📘"
+                  onChange={(event) => setCategoryIconDraft(event.target.value)}
+                  placeholder="例如：📚"
                   maxLength={8}
                 />
                 <div className={styles.categoryActions}>
@@ -529,7 +584,7 @@ function EditorInner() {
                 </strong>
                 {" / "}
                 <strong>
-                  {selectedCategory.child.icon || "📄"} {selectedCategory.child.name}
+                  {selectedCategory.child.icon || "🧩"} {selectedCategory.child.name}
                 </strong>
               </div>
             ) : (
@@ -543,15 +598,16 @@ function EditorInner() {
             <NeoInput
               label="摘要"
               value={summary}
-              onChange={(e) => setSummary(e.target.value)}
+              onChange={(event) => setSummary(event.target.value)}
               placeholder="用一句话告诉读者，这篇文章能帮他解决什么问题"
             />
           </div>
+
           <div className={styles.metaWide}>
             <NeoInput
               label="标签"
               value={tagsInput}
-              onChange={(e) => setTagsInput(e.target.value)}
+              onChange={(event) => setTagsInput(event.target.value)}
               placeholder="例如：选课, 实习, 转专业, 图书馆"
             />
           </div>
@@ -562,7 +618,7 @@ function EditorInner() {
             <div>
               <p className={styles.surfaceTitle}>正文内容</p>
               <p className={styles.surfaceHint}>
-                富文本模式适合所见即所得，Markdown 模式适合手写文档；预览会按真实发布效果渲染。
+                富文本适合普通图文；Markdown 适合源码写作；互动 HTML 适合沙箱运行的小工具和小游戏。
               </p>
             </div>
 
@@ -570,7 +626,7 @@ function EditorInner() {
               <div className={styles.controlGroup}>
                 <span className={styles.controlLabel}>内容格式</span>
                 <div className={styles.formatSwitch}>
-                  {CONTENT_FORMAT_OPTIONS.map((item) => (
+                  {visibleFormatOptions.map((item) => (
                     <button
                       key={item.id}
                       type="button"
@@ -603,49 +659,58 @@ function EditorInner() {
 
           <div className={styles.surfaceMeta}>
             <p className={styles.formatNote}>
-              {formatNotice || "切换内容格式不会自动转换已有内容；HTML 模式支持导入 .html 文件。"}
+              {formatNotice || "切换内容格式不会自动转换已有内容，发布前请先看一遍预览。"}
             </p>
           </div>
 
           {mode === "edit" ? (
             <div className={styles.editorStage}>
-              {format === "markdown" ? (
+              {format !== "markdown" ? (
+                <div className={styles.editorTools}>
+                  <p className={styles.editorHint}>
+                    {format === "interactive-html"
+                      ? "互动 HTML 会在沙箱 iframe 中运行，不会直接进入主站上下文。"
+                      : "富文本 / HTML 模式适合普通文章；导入完整 HTML 文件后，预览仍会按安全文章模式显示。"}
+                  </p>
+                  <input
+                    ref={htmlImportRef}
+                    type="file"
+                    accept=".html,text/html"
+                    className={styles.hiddenFileInput}
+                    onChange={handleHtmlImport}
+                  />
+                  <NeoButton
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleOpenHtmlImport}
+                  >
+                    导入 HTML 文件
+                  </NeoButton>
+                </div>
+              ) : null}
+
+              {isSourceMode ? (
                 <div className={styles.sourceWrap}>
                   <p className={styles.editorHint}>
-                    当前是 Markdown 模式，文章详情页会按 Markdown 渲染展示。
+                    {format === "interactive-html"
+                      ? "这里保存的是完整 HTML 源码。发布后文章页会用沙箱 iframe 运行它。"
+                      : "这里保存的是 Markdown 源码。文章页会按常规 Markdown 排版渲染。"}
                   </p>
                   <textarea
                     className={styles.sourceEditor}
                     value={content}
-                    onChange={(e) => setContent(e.target.value)}
-                    placeholder={"使用 Markdown 编写正文，例如：\n# 标题\n\n- 要点一\n- 要点二"}
+                    onChange={(event) => setContent(event.target.value)}
+                    placeholder={
+                      format === "interactive-html"
+                        ? "<!DOCTYPE html>\n<html>\n  <head>\n    <meta charset=\"utf-8\" />\n    <title>小游戏</title>\n  </head>\n  <body>...</body>\n</html>"
+                        : "# 标题\n\n- 要点一\n- 要点二"
+                    }
                     spellCheck={false}
                   />
                 </div>
               ) : (
-                <>
-                  <div className={styles.editorTools}>
-                    <p className={styles.editorHint}>
-                      当前是富文本 / HTML 模式。你可以直接可视化编辑，也可以导入现成 HTML 文件。
-                    </p>
-                    <input
-                      ref={htmlImportRef}
-                      type="file"
-                      accept=".html,text/html"
-                      className={styles.hiddenFileInput}
-                      onChange={handleHtmlImport}
-                    />
-                    <NeoButton
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      onClick={handleOpenHtmlImport}
-                    >
-                      导入 HTML 文件
-                    </NeoButton>
-                  </div>
-                  <WikiEditor content={content} onChange={setContent} />
-                </>
+                <WikiEditor content={content} onChange={setContent} />
               )}
             </div>
           ) : (
@@ -663,7 +728,7 @@ function EditorInner() {
                       ) : null}
                       {selectedCategory?.child ? (
                         <span className={styles.previewBadge}>
-                          {selectedCategory.child.icon || "📄"} {selectedCategory.child.name}
+                          {selectedCategory.child.icon || "🧩"} {selectedCategory.child.name}
                         </span>
                       ) : null}
                       {tags.map((tag) => (
@@ -676,7 +741,15 @@ function EditorInner() {
                 ) : null}
               </div>
 
-              {previewLoading ? (
+              {format === "interactive-html" ? (
+                <div className={styles.interactivePreviewWrap}>
+                  <InteractiveHtmlFrame
+                    html={content}
+                    title={title || "互动 HTML 预览"}
+                    className={styles.interactivePreviewFrame}
+                  />
+                </div>
+              ) : previewLoading ? (
                 <div className={styles.previewLoading}>正在生成预览...</div>
               ) : (
                 <article
@@ -692,8 +765,8 @@ function EditorInner() {
           <NeoInput
             label="本次修改说明"
             value={editSummary}
-            onChange={(e) => setEditSummary(e.target.value)}
-            placeholder="例如：补充奖学金申报时间，修正选课入口说明"
+            onChange={(event) => setEditSummary(event.target.value)}
+            placeholder="例如：补充奖学金申请时间，修正选课入口说明"
           />
         ) : null}
 

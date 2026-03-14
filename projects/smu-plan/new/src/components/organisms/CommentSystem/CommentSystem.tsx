@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+
 import Avatar from "@/components/atoms/Avatar/Avatar";
 import NeoButton from "@/components/atoms/NeoButton";
 import { relativeTime } from "@/lib/relative-time";
+
 import styles from "./CommentSystem.module.css";
 
 interface CommentAuthor {
@@ -32,7 +34,7 @@ interface CommentSystemProps {
   isAdmin?: boolean;
 }
 
-const PARAGRAPH_SELECTOR = "p, h1, h2, h3, h4, h5, h6, li, blockquote";
+const PARAGRAPH_SELECTOR = "p, h2, h3, blockquote, pre, table";
 
 export default function CommentSystem({
   articleSlug,
@@ -56,7 +58,7 @@ export default function CommentSystem({
       return {
         ok: false,
         error: {
-          message: raw.trim() || `请求失败（${response.status}）`,
+          message: raw.trim() || `请求失败，状态码 ${response.status}`,
         },
       };
     }
@@ -87,54 +89,60 @@ export default function CommentSystem({
     }
   }, [activeParagraph]);
 
-  // Index paragraphs + inject persistent icon buttons (once on mount)
   useEffect(() => {
     const body = document.querySelector("[data-article-body]");
     if (!body) return;
     containerRef.current = body as HTMLDivElement;
 
-    const paragraphs = body.querySelectorAll(PARAGRAPH_SELECTOR);
-    paragraphs.forEach((p, idx) => {
-      p.setAttribute("data-pi", String(idx));
-      (p as HTMLElement).style.position = "relative";
+    body.querySelectorAll("[data-comment-icon]").forEach((node) => node.remove());
+
+    const commentableBlocks = Array.from(body.querySelectorAll(PARAGRAPH_SELECTOR)).filter((node) => {
+      const element = node as HTMLElement;
+      if (element.closest("table") && element.tagName !== "TABLE") {
+        return false;
+      }
+      return true;
+    });
+
+    commentableBlocks.forEach((block, idx) => {
+      block.setAttribute("data-pi", String(idx));
+      (block as HTMLElement).style.position = "relative";
 
       const icon = document.createElement("button");
       icon.setAttribute("data-comment-icon", "true");
       icon.className = styles.commentIcon;
-      icon.setAttribute("aria-label", "添加评论");
+      icon.setAttribute("aria-label", "添加段落评论");
 
       const emoji = document.createElement("span");
       emoji.textContent = "💬";
       emoji.setAttribute("aria-hidden", "true");
       icon.appendChild(emoji);
 
-      icon.onclick = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
+      icon.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
         setRequestError(null);
         setActiveParagraph(idx);
       };
 
-      p.appendChild(icon);
+      block.appendChild(icon);
     });
 
     return () => {
-      body.querySelectorAll("[data-comment-icon]").forEach((el) => el.remove());
+      body.querySelectorAll("[data-comment-icon]").forEach((node) => node.remove());
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Update icon badges when comment groups change
   useEffect(() => {
     const body = containerRef.current;
     if (!body) return;
 
     body.querySelectorAll("[data-comment-icon]").forEach((icon) => {
-      const p = icon.parentElement;
-      if (!p) return;
-      const idx = Number(p.getAttribute("data-pi"));
-      const group = groups.find((g) => g.paragraphIndex === idx);
+      const parent = icon.parentElement;
+      if (!parent) return;
+      const idx = Number(parent.getAttribute("data-pi"));
+      const group = groups.find((item) => item.paragraphIndex === idx);
 
-      // Remove old badge
       icon.querySelector("[data-comment-badge]")?.remove();
 
       if (group && group.count > 0) {
@@ -144,25 +152,24 @@ export default function CommentSystem({
         badge.textContent = String(group.count);
         icon.appendChild(badge);
         icon.classList.add(styles.commentIconHasComments);
-        (icon as HTMLElement).setAttribute("aria-label", `${group.count} 条评论`);
+        (icon as HTMLElement).setAttribute("aria-label", `${group.count} 条段落评论`);
       } else {
         icon.classList.remove(styles.commentIconHasComments);
-        (icon as HTMLElement).setAttribute("aria-label", "添加评论");
+        (icon as HTMLElement).setAttribute("aria-label", "添加段落评论");
       }
     });
   }, [groups]);
 
-  const getGroupForParagraph = useCallback(
-    (idx: number) => groups.find((g) => g.paragraphIndex === idx),
-    [groups]
-  );
-
-  const activeGroup = activeParagraph !== null ? getGroupForParagraph(activeParagraph) : null;
+  const activeGroup = activeParagraph !== null
+    ? groups.find((group) => group.paragraphIndex === activeParagraph)
+    : null;
 
   const handleSubmit = async () => {
     if (!inputValue.trim() || activeParagraph === null || submitting) return;
+
     setSubmitting(true);
     setRequestError(null);
+
     try {
       const res = await fetch(`/api/wiki/${articleSlug}/comments`, {
         method: "POST",
@@ -181,12 +188,14 @@ export default function CommentSystem({
       }
     } catch {
       setRequestError("评论发布失败，请检查网络后重试。");
+    } finally {
+      setSubmitting(false);
     }
-    setSubmitting(false);
   };
 
   const handleDelete = async (commentId: string) => {
-    if (!confirm("确定要删除这条评论吗？")) return;
+    if (!window.confirm("确定要删除这条评论吗？")) return;
+
     setRequestError(null);
     try {
       const res = await fetch(`/api/wiki/${articleSlug}/comments/${commentId}`, {
@@ -203,92 +212,101 @@ export default function CommentSystem({
     }
   };
 
-  if (activeParagraph === null) return null;
-
   return (
-    <>
-      <div className={styles.panelOverlay} onClick={() => setActiveParagraph(null)} />
-      <div className={styles.panel}>
-        <div className={styles.panelHeader}>
-          <span className={styles.panelTitle}>
-            评论 {activeGroup ? `(${activeGroup.count})` : ""}
-          </span>
+    <aside className={styles.panel}>
+      <div className={styles.panelHeader}>
+        <div>
+          <div className={styles.panelTitle}>段落评论</div>
+          <div className={styles.panelSubtitle}>
+            {activeParagraph === null
+              ? "点击正文里的评论按钮后，这里会显示对应段落的讨论。"
+              : `当前段落：第 ${activeParagraph + 1} 段`}
+          </div>
+        </div>
+        {activeParagraph !== null ? (
           <button
             className={styles.panelClose}
             onClick={() => setActiveParagraph(null)}
-            aria-label="关闭"
+            aria-label="关闭评论面板"
           >
             ×
           </button>
-        </div>
-
-        <div className={styles.panelBody}>
-          {requestError ? (
-            <div className={styles.requestError} role="alert">
-              {requestError}
-            </div>
-          ) : null}
-          {!activeGroup || activeGroup.items.length === 0 ? (
-            <div className={styles.panelEmpty}>暂无评论，成为第一个评论的人</div>
-          ) : (
-            activeGroup.items.map((comment) => (
-              <div key={comment.id} className={styles.commentItem}>
-                <Avatar
-                  src={comment.author.avatarUrl}
-                  fallback={comment.author.displayName}
-                  size="sm"
-                />
-                <div className={styles.commentBody}>
-                  <div className={styles.commentMeta}>
-                    <span className={styles.commentAuthor}>{comment.author.displayName}</span>
-                    <span className={styles.commentTime}>{relativeTime(comment.createdAt)}</span>
-                    {(comment.author.id === currentUserId || isAdmin) && (
-                      <button
-                        className={styles.commentDelete}
-                        onClick={() => handleDelete(comment.id)}
-                      >
-                        删除
-                      </button>
-                    )}
-                  </div>
-                  <div className={styles.commentContent}>{comment.content}</div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
-        <div className={styles.panelFooter}>
-          {isLoggedIn ? (
-            <div className={styles.inputWrap}>
-              <textarea
-                className={styles.inputField}
-                placeholder="写下你的评论..."
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSubmit();
-                  }
-                }}
-                rows={1}
-              />
-              <NeoButton
-                size="sm"
-                variant="primary"
-                onClick={handleSubmit}
-                isLoading={submitting}
-                disabled={!inputValue.trim()}
-              >
-                发送
-              </NeoButton>
-            </div>
-          ) : (
-            <div className={styles.loginHint}>登录后即可评论</div>
-          )}
-        </div>
+        ) : null}
       </div>
-    </>
+
+      <div className={styles.panelBody}>
+        {requestError ? (
+          <div className={styles.requestError} role="alert">
+            {requestError}
+          </div>
+        ) : null}
+
+        {activeParagraph === null ? (
+          <div className={styles.panelEmpty}>
+            选中文章里的评论按钮后，这里会显示对应段落的评论和输入框。
+          </div>
+        ) : !activeGroup || activeGroup.items.length === 0 ? (
+          <div className={styles.panelEmpty}>这个段落还没有评论，来写第一条吧。</div>
+        ) : (
+          activeGroup.items.map((comment) => (
+            <div key={comment.id} className={styles.commentItem}>
+              <Avatar
+                src={comment.author.avatarUrl}
+                fallback={comment.author.displayName}
+                size="sm"
+              />
+              <div className={styles.commentBody}>
+                <div className={styles.commentMeta}>
+                  <span className={styles.commentAuthor}>{comment.author.displayName}</span>
+                  <span className={styles.commentTime}>{relativeTime(comment.createdAt)}</span>
+                  {(comment.author.id === currentUserId || isAdmin) ? (
+                    <button
+                      className={styles.commentDelete}
+                      onClick={() => handleDelete(comment.id)}
+                    >
+                      删除
+                    </button>
+                  ) : null}
+                </div>
+                <div className={styles.commentContent}>{comment.content}</div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className={styles.panelFooter}>
+        {activeParagraph === null ? (
+          <div className={styles.loginHint}>先点选一个段落，再开始讨论。</div>
+        ) : isLoggedIn ? (
+          <div className={styles.inputWrap}>
+            <textarea
+              className={styles.inputField}
+              placeholder="写下你的评论..."
+              value={inputValue}
+              onChange={(event) => setInputValue(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  handleSubmit();
+                }
+              }}
+              rows={2}
+            />
+            <NeoButton
+              size="sm"
+              variant="primary"
+              onClick={handleSubmit}
+              isLoading={submitting}
+              disabled={!inputValue.trim()}
+            >
+              发布
+            </NeoButton>
+          </div>
+        ) : (
+          <div className={styles.loginHint}>登录后即可评论。</div>
+        )}
+      </div>
+    </aside>
   );
 }

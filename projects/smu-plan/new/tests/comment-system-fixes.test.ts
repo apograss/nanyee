@@ -28,4 +28,7 @@ test("comment icons stay inside the article frame and comment failures are surfa
   assert.doesNotMatch(commentCss, /right:\s*-\d+px/);
   assert.match(commentTsx, /setRequestError|requestError/);
   assert.match(commentTsx, /data\.error\?\.message/);
+  assert.match(commentTsx, /closest\("table"\)/);
+  assert.doesNotMatch(commentTsx, /p, h1, h2, h3, h4, h5, h6, li, blockquote/);
+  assert.doesNotMatch(commentCss, /position:\s*fixed/);
 });
