@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireUser, handleAuthError } from "@/lib/auth/guard";
 
 /**
  * POST /api/tools/proxy
  *
  * Server-side proxy for UIS and ZHJW requests.
  * Replaces the CF Worker proxy when it can't reach Chinese university servers.
+ * Requires authentication to prevent abuse.
  *
  * Body JSON: {
  *   url: string,       // target URL (e.g. "https://uis.smu.edu.cn/login/login.do")
@@ -31,6 +33,8 @@ function cookieString(cookies: string[]): string {
 
 export async function POST(request: NextRequest) {
     try {
+        await requireUser(request);
+
         const req = await request.json();
         const { url, method = "GET", headers = {}, body, cookies = [] } = req;
 
@@ -94,6 +98,11 @@ export async function POST(request: NextRequest) {
             dateHeader: res.headers.get("date") || undefined,
         });
     } catch (err) {
+        // Auth errors are handled by handleAuthError
+        const authResponse = handleAuthError(err);
+        if (authResponse.status === 401 || authResponse.status === 403) {
+            return authResponse;
+        }
         console.error("[proxy] Error:", err);
         return NextResponse.json(
             { error: err instanceof Error ? err.message : "Proxy request failed" },

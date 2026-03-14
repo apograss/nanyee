@@ -12,17 +12,25 @@ import slugify from "slugify";
 
 // GET /api/wiki — list published articles
 export async function GET(req: NextRequest) {
-  const url = new URL(req.url);
-  const page = Number(url.searchParams.get("page") || "1");
-  const limit = Number(url.searchParams.get("limit") || "20");
-  const sort = (url.searchParams.get("sort") || "newest") as SortMode;
-  const category = url.searchParams.get("category") || undefined;
-  const tag = url.searchParams.get("tag") || undefined;
-  const q = url.searchParams.get("q") || undefined;
+  try {
+    const url = new URL(req.url);
+    const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(url.searchParams.get("limit") || "20", 10) || 20));
+    const sort = (url.searchParams.get("sort") || "newest") as SortMode;
+    const category = url.searchParams.get("category") || undefined;
+    const tag = url.searchParams.get("tag") || undefined;
+    const q = url.searchParams.get("q") || undefined;
 
-  const result = await listArticles({ page, limit, sort, category, tag, q });
+    const result = await listArticles({ page, limit, sort, category, tag, q });
 
-  return Response.json({ ok: true, data: result });
+    return Response.json({ ok: true, data: result });
+  } catch (err) {
+    console.error("Wiki list error:", err);
+    return Response.json(
+      { ok: false, error: { code: 500, message: "Internal Server Error" } },
+      { status: 500 }
+    );
+  }
 }
 
 const createSchema = z.object({

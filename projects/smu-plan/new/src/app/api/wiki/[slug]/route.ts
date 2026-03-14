@@ -19,34 +19,21 @@ export async function GET(
   const { slug } = await params;
   const auth = await getAuthContext(req);
 
-  // Try slug first, then fall back to id
-  let article = await prisma.article.findUnique({
-    where: { slug },
-    include: {
-      author: { select: { id: true, username: true, nickname: true, status: true } },
-      lastEditor: { select: { id: true, username: true, nickname: true, status: true } },
-      categoryRef: {
-        include: {
-          parent: { select: { id: true, name: true, slug: true, icon: true } },
-        },
+  // Look up by slug or id in a single query
+  const articleInclude = {
+    author: { select: { id: true, username: true, nickname: true, status: true } },
+    lastEditor: { select: { id: true, username: true, nickname: true, status: true } },
+    categoryRef: {
+      include: {
+        parent: { select: { id: true, name: true, slug: true, icon: true } },
       },
     },
-  });
+  } as const;
 
-  if (!article) {
-    article = await prisma.article.findUnique({
-      where: { id: slug },
-      include: {
-        author: { select: { id: true, username: true, nickname: true, status: true } },
-        lastEditor: { select: { id: true, username: true, nickname: true, status: true } },
-        categoryRef: {
-          include: {
-            parent: { select: { id: true, name: true, slug: true, icon: true } },
-          },
-        },
-      },
-    });
-  }
+  const article = await prisma.article.findFirst({
+    where: { OR: [{ slug }, { id: slug }] },
+    include: articleInclude,
+  });
 
   if (!article || (article.status !== "published" && auth?.role !== "admin")) {
     return Response.json(

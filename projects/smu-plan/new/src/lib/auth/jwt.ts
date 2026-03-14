@@ -1,11 +1,18 @@
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 
-const ACCESS_SECRET = new TextEncoder().encode(
-  process.env.JWT_ACCESS_SECRET || "dev-access-secret-change-in-production!!"
-);
-const REFRESH_SECRET = new TextEncoder().encode(
-  process.env.JWT_REFRESH_SECRET || "dev-refresh-secret-change-in-production!"
-);
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(
+      `Missing required environment variable: ${name}. ` +
+      `Set it in your .env file or environment.`
+    );
+  }
+  return value;
+}
+
+const ACCESS_SECRET = new TextEncoder().encode(requireEnv("JWT_ACCESS_SECRET"));
+const REFRESH_SECRET = new TextEncoder().encode(requireEnv("JWT_REFRESH_SECRET"));
 
 const ACCESS_TTL = "15m";
 const REFRESH_TTL = "30d";

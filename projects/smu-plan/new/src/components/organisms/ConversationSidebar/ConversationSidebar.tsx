@@ -95,7 +95,8 @@ export default function ConversationSidebar({
                 {new Date(conversation.updatedAt).toLocaleString("zh-CN")}
               </div>
               <div className={styles.itemActions}>
-                <span
+                <button
+                  type="button"
                   className={styles.deleteBtn}
                   onClick={(event) => {
                     event.stopPropagation();
@@ -103,7 +104,7 @@ export default function ConversationSidebar({
                   }}
                 >
                   删除
-                </span>
+                </button>
               </div>
             </button>
           ))

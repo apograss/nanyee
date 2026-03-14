@@ -39,12 +39,14 @@ model User {
   createdWikiCategories WikiCategory[] @relation("WikiCategoryCreatedBy")
   updatedWikiCategories WikiCategory[] @relation("WikiCategoryUpdatedBy")
   ocrSamples   OcrSample[]
+  bbsTopics    BbsTopic[]  @relation("BbsTopicAuthor")
+  bbsReplies   BbsReply[]  @relation("BbsReplyAuthor")
 }
 
 model Session {
   id               String    @id @default(cuid())
   userId           String
-  user             User      @relation(fields: [userId], references: [id])
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   refreshTokenHash String
   ip               String?
   userAgent        String?
@@ -240,7 +242,7 @@ model Message {
   id        String   @id @default(cuid())
   content   String
   authorId  String
-  author    User     @relation(fields: [authorId], references: [id])
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 
   @@index([createdAt])
@@ -445,6 +447,7 @@ model AuditLog {
   createdAt  DateTime @default(now())
 
   @@index([action, createdAt])
+  @@index([actorId, createdAt])
 }
 
 // ═══════════════════════════════════════
@@ -478,8 +481,6 @@ model SiteSetting {
   id    String @id @default(cuid())
   key   String @unique
   value String
-
-  @@index([key])
 }
 
 model AiServiceHealth {
@@ -561,6 +562,7 @@ model BbsTopic {
   content   String
   category  String   @default("general") // general | study | life | trade | question
   authorId  String
+  author    User     @relation("BbsTopicAuthor", fields: [authorId], references: [id])
   pinned    Boolean  @default(false)
   locked    Boolean  @default(false)
   viewCount Int      @default(0)
@@ -573,6 +575,7 @@ model BbsTopic {
 
   @@index([category])
   @@index([pinned, createdAt])
+  @@index([pinned, lastReplyAt])
   @@index([authorId])
 }
 
@@ -580,6 +583,7 @@ model BbsReply {
   id        String   @id @default(cuid())
   content   String
   authorId  String
+  author    User     @relation("BbsReplyAuthor", fields: [authorId], references: [id])
   topicId   String
   topic     BbsTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
@@ -618,7 +622,6 @@ model OidcCode {
   consumedAt          DateTime?
   createdAt           DateTime  @default(now())
 
-  @@index([code])
   @@index([expiresAt])
 }
 
@@ -631,7 +634,6 @@ model OidcToken {
   expiresAt   DateTime
   createdAt   DateTime @default(now())
 
-  @@index([accessToken])
   @@index([expiresAt])
 }
 

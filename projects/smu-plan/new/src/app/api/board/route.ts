@@ -5,33 +5,41 @@ import { z } from "zod";
 
 // GET /api/board — list messages
 export async function GET(req: NextRequest) {
-  const url = new URL(req.url);
-  const page = Math.max(1, Number(url.searchParams.get("page") || "1"));
-  const limit = Math.min(50, Math.max(1, Number(url.searchParams.get("limit") || "20")));
+  try {
+    const url = new URL(req.url);
+    const page = Math.max(1, Number(url.searchParams.get("page") || "1"));
+    const limit = Math.min(50, Math.max(1, Number(url.searchParams.get("limit") || "20")));
 
-  const [messages, total] = await Promise.all([
-    prisma.message.findMany({
-      orderBy: { createdAt: "desc" },
-      skip: (page - 1) * limit,
-      take: limit,
-      include: { author: { select: { username: true, nickname: true } } },
-    }),
-    prisma.message.count(),
-  ]);
+    const [messages, total] = await Promise.all([
+      prisma.message.findMany({
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: { author: { select: { username: true, nickname: true } } },
+      }),
+      prisma.message.count(),
+    ]);
 
-  return Response.json({
-    ok: true,
-    data: {
-      messages: messages.map((m) => ({
-        id: m.id,
-        content: m.content,
-        authorId: m.authorId,
-        author: m.author.nickname || m.author.username,
-        createdAt: m.createdAt.toISOString(),
-      })),
-      pagination: { page, limit, total },
-    },
-  });
+    return Response.json({
+      ok: true,
+      data: {
+        messages: messages.map((m) => ({
+          id: m.id,
+          content: m.content,
+          authorId: m.authorId,
+          author: m.author.nickname || m.author.username,
+          createdAt: m.createdAt.toISOString(),
+        })),
+        pagination: { page, limit, total },
+      },
+    });
+  } catch (err) {
+    console.error("Board list error:", err);
+    return Response.json(
+      { ok: false, error: { code: 500, message: "Internal Server Error" } },
+      { status: 500 }
+    );
+  }
 }
 
 const messageSchema = z.object({

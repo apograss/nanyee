@@ -81,7 +81,7 @@ export default function ChatStream({ messages, isLoading, onStop }: ChatStreamPr
 
       {isLoading && onStop && (
         <div className={styles.stopRow}>
-          <button className={styles.stopBtn} onClick={onStop}>
+          <button type="button" className={styles.stopBtn} onClick={onStop}>
             停止生成
           </button>
         </div>

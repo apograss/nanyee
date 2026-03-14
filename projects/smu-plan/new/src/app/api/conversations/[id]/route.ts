@@ -6,20 +6,13 @@ import { prisma } from "@/lib/prisma";
 import {
   deriveConversationTitle,
   parseConversationMessages,
+  conversationMessageSchema,
   type StoredConversationMessage,
 } from "@/lib/conversations";
 
 const updateConversationSchema = z.object({
   title: z.string().max(80).optional(),
-  messages: z.array(
-    z.object({
-      id: z.string(),
-      role: z.enum(["user", "ai"]),
-      content: z.string(),
-      references: z.array(z.any()).optional(),
-      toolCards: z.array(z.any()).optional(),
-    }),
-  ).min(1),
+  messages: z.array(conversationMessageSchema).min(1),
 });
 
 export async function GET(

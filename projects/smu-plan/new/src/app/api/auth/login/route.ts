@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { compare } from "bcryptjs";
 import { z } from "zod";
 import { issueUserSession } from "@/lib/auth/session";
+import { checkAuthRateLimit } from "@/lib/rate-limiter";
 
 const loginSchema = z.object({
   username: z.string().min(1),
@@ -11,6 +12,15 @@ const loginSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    const { allowed, retryAfterMs } = checkAuthRateLimit(ip);
+    if (!allowed) {
+      return Response.json(
+        { ok: false, error: { code: 429, message: "Too many login attempts, please try later" } },
+        { status: 429, headers: { "Retry-After": String(Math.ceil((retryAfterMs || 60000) / 1000)) } }
+      );
+    }
+
     const body = await req.json();
     const data = loginSchema.parse(body);
 

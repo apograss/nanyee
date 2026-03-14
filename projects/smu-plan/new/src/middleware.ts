@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 
 const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_ACCESS_SECRET || "dev-access-secret-change-in-production!!"
+  process.env.JWT_ACCESS_SECRET ?? ""
 );
 const CHECK_HOST = process.env.CHECK_PUBLIC_HOST || "check.nanyee.de";
 const CHECK_PREFIX = "/check-internal";

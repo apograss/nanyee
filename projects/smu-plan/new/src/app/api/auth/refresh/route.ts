@@ -3,9 +3,19 @@ import { compare } from "bcryptjs";
 import { verifyRefreshToken, signAccessToken, signRefreshToken } from "@/lib/auth/jwt";
 import { findActiveSession, rotateSession, revokeSession } from "@/lib/auth/session";
 import { setAuthCookies } from "@/lib/auth/cookies";
+import { checkAuthRateLimit } from "@/lib/rate-limiter";
 
 export async function POST(req: NextRequest) {
   try {
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    const { allowed, retryAfterMs } = checkAuthRateLimit(ip);
+    if (!allowed) {
+      return Response.json(
+        { ok: false, error: { code: 429, message: "Too many requests, please try later" } },
+        { status: 429, headers: { "Retry-After": String(Math.ceil((retryAfterMs || 60000) / 1000)) } }
+      );
+    }
+
     const refreshTokenCookie = req.cookies.get("refresh_token")?.value;
     if (!refreshTokenCookie) {
       return Response.json(

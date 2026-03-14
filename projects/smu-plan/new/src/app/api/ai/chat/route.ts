@@ -80,16 +80,16 @@ export async function POST(req: NextRequest) {
       }),
     ];
 
-    // Log search query
+    // Log search query (fire-and-forget, non-blocking)
     const lastUserMsg = messages.filter((m) => m.role === "user").pop();
     if (lastUserMsg) {
-      await prisma.searchLog.create({
+      prisma.searchLog.create({
         data: {
           query: lastUserMsg.content.slice(0, 500),
           userId: auth?.userId,
           ip: req.headers.get("x-forwarded-for") || undefined,
         },
-      });
+      }).catch(() => {});
     }
 
     const startMs = Date.now();

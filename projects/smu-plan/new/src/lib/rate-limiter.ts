@@ -70,12 +70,62 @@ export function recordStudentRequest(studentId: string): void {
     studentLastRequest.set(studentId, Date.now());
 }
 
-// Clean up old entries every 30 minutes
-setInterval(() => {
-    const now = Date.now();
-    for (const [id, time] of studentLastRequest) {
-        if (now - time > STUDENT_COOLDOWN * 2) {
-            studentLastRequest.delete(id);
+// Clean up old entries every 30 minutes (save reference for cleanup)
+let _cleanupTimer: ReturnType<typeof setInterval> | null = null;
+function ensureCleanupTimer() {
+    if (_cleanupTimer) return;
+    _cleanupTimer = setInterval(() => {
+        const now = Date.now();
+        for (const [id, time] of studentLastRequest) {
+            if (now - time > STUDENT_COOLDOWN * 2) {
+                studentLastRequest.delete(id);
+            }
         }
+        // Also clean up auth rate limit entries
+        for (const [ip, timestamps] of authRateLimitStore) {
+            const recent = timestamps.filter((t) => t > now - AUTH_RATE_WINDOW_MS);
+            if (recent.length === 0) {
+                authRateLimitStore.delete(ip);
+            } else {
+                authRateLimitStore.set(ip, recent);
+            }
+        }
+    }, 30 * 60 * 1000);
+    // Prevent the timer from keeping the process alive
+    if (_cleanupTimer && typeof _cleanupTimer === "object" && "unref" in _cleanupTimer) {
+        _cleanupTimer.unref();
     }
-}, 30 * 60 * 1000);
+}
+
+ensureCleanupTimer();
+
+// ═══════════════════════════════════════
+// Auth endpoint rate limiting (IP-based)
+// ═══════════════════════════════════════
+
+const authRateLimitStore = new Map<string, number[]>();
+const AUTH_RATE_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+const AUTH_MAX_ATTEMPTS = 20; // max 20 attempts per 15 min per IP
+
+/**
+ * Check if an IP is rate-limited for auth endpoints (login/register/refresh).
+ * Returns { allowed, retryAfterMs }.
+ */
+export function checkAuthRateLimit(ip: string): { allowed: boolean; retryAfterMs?: number } {
+    const now = Date.now();
+    const cutoff = now - AUTH_RATE_WINDOW_MS;
+
+    let timestamps = authRateLimitStore.get(ip) || [];
+    timestamps = timestamps.filter((t) => t > cutoff);
+
+    if (timestamps.length >= AUTH_MAX_ATTEMPTS) {
+        const oldest = timestamps[0]!;
+        const retryAfterMs = oldest + AUTH_RATE_WINDOW_MS - now;
+        authRateLimitStore.set(ip, timestamps);
+        return { allowed: false, retryAfterMs: Math.max(1000, retryAfterMs) };
+    }
+
+    timestamps.push(now);
+    authRateLimitStore.set(ip, timestamps);
+    return { allowed: true };
+}

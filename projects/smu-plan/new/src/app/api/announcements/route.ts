@@ -17,7 +17,8 @@ export async function GET() {
         announcements,
       },
     });
-  } catch {
+  } catch (err) {
+    console.error("Failed to fetch announcements:", err);
     return NextResponse.json({ ok: true, data: { announcement: null, announcements: [] } });
   }
 }
