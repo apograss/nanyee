@@ -16,6 +16,7 @@ interface TableOfContentsProps {
 
 export default function TableOfContents({ html }: TableOfContentsProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState(false);
 
   const items = useMemo<TocItem[]>(() => {
     if (typeof window === "undefined") {
@@ -64,20 +65,30 @@ export default function TableOfContents({ html }: TableOfContentsProps) {
 
   return (
     <aside className={styles.toc} aria-label="文章目录">
-      <div className={styles.title}>文章目录</div>
-      <nav className={styles.list}>
-        {items.map((item) => (
-          <a
-            key={item.id}
-            href={`#${item.id}`}
-            className={`${styles.item} ${
-              item.level === 3 ? styles.itemLevel3 : ""
-            } ${activeId === item.id ? styles.itemActive : ""}`.trim()}
-          >
-            {item.text}
-          </a>
-        ))}
-      </nav>
+      <button
+        type="button"
+        className={styles.titleButton}
+        onClick={() => setCollapsed((prev) => !prev)}
+        aria-expanded={!collapsed}
+      >
+        <span>文章目录</span>
+        <span className={`${styles.chevron} ${collapsed ? styles.chevronCollapsed : ""}`} aria-hidden="true">▾</span>
+      </button>
+      {!collapsed && (
+        <nav className={styles.list}>
+          {items.map((item) => (
+            <a
+              key={item.id}
+              href={`#${item.id}`}
+              className={`${styles.item} ${
+                item.level === 3 ? styles.itemLevel3 : ""
+              } ${activeId === item.id ? styles.itemActive : ""}`.trim()}
+            >
+              {item.text}
+            </a>
+          ))}
+        </nav>
+      )}
     </aside>
   );
 }

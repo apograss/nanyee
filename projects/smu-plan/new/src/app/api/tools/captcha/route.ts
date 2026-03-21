@@ -1,7 +1,7 @@
 /**
  * GET /api/tools/captcha
- * Fetches a CAPTCHA from UIS, stores the cookies in session store,
- * returns { sessionId, image } to the client.
+ * Fetches a CAPTCHA from UIS and returns { sessionId, image }.
+ * OCR is handled client-side via onnxruntime-web.
  */
 
 import { NextResponse } from "next/server";
@@ -16,7 +16,6 @@ export async function GET() {
         return NextResponse.json({
             sessionId,
             image: imageBase64,
-            rawCookies: cookies,
         });
     } catch (error) {
         console.error("Captcha fetch error:", error);

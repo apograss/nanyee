@@ -41,6 +41,25 @@ model User {
   ocrSamples   OcrSample[]
   bbsTopics    BbsTopic[]  @relation("BbsTopicAuthor")
   bbsReplies   BbsReply[]  @relation("BbsReplyAuthor")
+  evalTask     EvalTask?
+}
+
+model EvalTask {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  smuAccount      String
+  smuPasswordEnc  String
+  enabled         Boolean   @default(true)
+  lastRunAt       DateTime?
+  lastRunStatus   String?
+  lastRunLog      String?
+  totalRuns       Int       @default(0)
+  totalEvaluated  Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([enabled, lastRunAt])
 }
 
 model Session {

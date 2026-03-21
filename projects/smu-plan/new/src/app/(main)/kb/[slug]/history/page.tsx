@@ -217,39 +217,44 @@ export default function HistoryPage() {
         <div className={styles.empty}>暂无编辑历史</div>
       ) : (
         <>
-          {diffData ? <WikiDiffView current={diffData.current} revision={diffData.revision} /> : null}
-
           <div className={styles.list}>
             {revisions.map((rev) => (
-              <div key={rev.id} className={styles.revisionCard}>
-                <div className={styles.revisionMain}>
-                  <div className={styles.revisionTitle}>{rev.title}</div>
-                  <div className={styles.revisionMeta}>
-                    <span>{rev.editorName}</span>
-                    <span>{new Date(rev.createdAt).toLocaleString("zh-CN")}</span>
+              <div key={rev.id}>
+                <div className={styles.revisionCard}>
+                  <div className={styles.revisionMain}>
+                    <div className={styles.revisionTitle}>{rev.title}</div>
+                    <div className={styles.revisionMeta}>
+                      <span>{rev.editorName}</span>
+                      <span>{new Date(rev.createdAt).toLocaleString("zh-CN")}</span>
+                    </div>
+                    {rev.editSummary && (
+                      <div className={styles.revisionSummary}>{rev.editSummary}</div>
+                    )}
                   </div>
-                  {rev.editSummary && (
-                    <div className={styles.revisionSummary}>{rev.editSummary}</div>
-                  )}
+                  <div className={styles.revisionActions}>
+                    <NeoButton
+                      size="sm"
+                      variant={diffingRevisionId === rev.id && diffData ? "primary" : "secondary"}
+                      onClick={() => handleOpenDiff(rev)}
+                      isLoading={diffingRevisionId === rev.id && !diffData}
+                    >
+                      对比
+                    </NeoButton>
+                    <NeoButton
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setPendingRevision(rev)}
+                      isLoading={reverting === rev.id}
+                    >
+                      回退
+                    </NeoButton>
+                  </div>
                 </div>
-                <div className={styles.revisionActions}>
-                  <NeoButton
-                    size="sm"
-                    variant={diffingRevisionId === rev.id && diffData ? "primary" : "secondary"}
-                    onClick={() => handleOpenDiff(rev)}
-                    isLoading={diffingRevisionId === rev.id && !diffData}
-                  >
-                    对比
-                  </NeoButton>
-                  <NeoButton
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => setPendingRevision(rev)}
-                    isLoading={reverting === rev.id}
-                  >
-                    回退
-                  </NeoButton>
-                </div>
+                {diffingRevisionId === rev.id && diffData ? (
+                  <div className={styles.inlineDiff}>
+                    <WikiDiffView current={diffData.current} revision={diffData.revision} />
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>

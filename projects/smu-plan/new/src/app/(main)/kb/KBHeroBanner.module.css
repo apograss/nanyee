@@ -4,9 +4,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
-  margin-bottom: 22px;
-  padding: 20px 24px;
+  gap: 16px;
+  margin-bottom: 18px;
+  padding: 16px 20px;
   border: var(--neo-border);
   border-radius: var(--neo-radius-lg);
   background: var(--bg-secondary);
@@ -32,27 +32,27 @@
 }
 
 .text {
-  padding-left: 14px;
+  padding-left: 12px;
 }
 
 .kicker {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   color: var(--color-brand);
   letter-spacing: 1px;
   text-transform: uppercase;
-  margin-bottom: 5px;
+  margin-bottom: 4px;
 }
 
 .title {
-  font-size: 22px;
+  font-size: 19px;
   font-weight: 800;
   letter-spacing: -0.4px;
-  margin: 0 0 5px;
+  margin: 0 0 4px;
 }
 
 .desc {
-  font-size: 14px;
+  font-size: 13px;
   color: var(--text-secondary);
   margin: 0;
 }
@@ -68,7 +68,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 9px 14px;
+  padding: 7px 12px;
   border: var(--neo-border);
   border-radius: var(--neo-radius);
   background: var(--bg-primary);
@@ -76,13 +76,13 @@
 }
 
 .statValue {
-  font-size: 22px;
+  font-size: 19px;
   color: var(--color-brand);
   line-height: 1;
 }
 
 .statLabel {
-  font-size: 10px;
+  font-size: 9px;
   color: var(--text-muted);
   font-weight: 600;
 }

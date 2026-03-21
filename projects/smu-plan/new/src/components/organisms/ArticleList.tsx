@@ -32,7 +32,11 @@ export default function ArticleList({
   return (
     <div className={styles.list}>
       {articles.length === 0 && (
-        <p className={styles.empty}>暂无文章</p>
+        <div className={styles.emptyState}>
+          <span className={styles.emptyIcon}>📝</span>
+          <p className={styles.emptyTitle}>暂无文章</p>
+          <p className={styles.emptyHint}>这个分类下还没有文章，快来写第一篇吧</p>
+        </div>
       )}
 
       <div className={styles.grid}>

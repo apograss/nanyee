@@ -56,8 +56,7 @@ export default function EnrollPage() {
   const [password, setPassword] = useState("");
   const [captcha, setCaptcha] = useState("");
   const [captchaImg, setCaptchaImg] = useState("");
-  const [uisCookies, setUisCookies] = useState<string[]>([]);
-  const [cookies, setCookies] = useState<string[]>([]);
+  const [sessionId, setSessionId] = useState("");
   const [loginMode, setLoginMode] = useState<"sso" | "cookie">("sso");
   const [cookieInput, setCookieInput] = useState("");
 
@@ -117,8 +116,9 @@ export default function EnrollPage() {
     try {
       const data = await fetchCaptchaViaProxy();
       setCaptchaImg(data.imageBase64);
-      setUisCookies(data.cookies);
+      setSessionId(data.sessionId);
 
+      // Browser-side OCR
       setOcrStatus("识别验证码中...");
       try {
         const ocrResult = await recognizeCaptcha(data.imageBase64);
@@ -135,7 +135,7 @@ export default function EnrollPage() {
       }
     } catch {
       setCaptchaImg("");
-      setUisCookies([]);
+      setSessionId("");
     }
   }, []);
 
@@ -158,11 +158,10 @@ export default function EnrollPage() {
           setLoading(true);
           setError("");
           try {
-            const sessionCookies = await cookieLoginViaProxy(raw);
-            setCookies(sessionCookies);
-            const catResult = await getCategoriesViaProxy(sessionCookies);
+            const nextSessionId = await cookieLoginViaProxy(raw);
+            setSessionId(nextSessionId);
+            const catResult = await getCategoriesViaProxy(nextSessionId);
             setCategories(catResult.categories);
-            setCookies(catResult.cookies);
             setStep("categories");
           } catch (err) {
             setError(err instanceof Error ? err.message : "Cookie 自动登录失败");
@@ -183,12 +182,10 @@ export default function EnrollPage() {
     setError("");
 
     try {
-      const sessionCookies = await loginViaProxy(account, password, captcha, uisCookies);
-      setCookies(sessionCookies);
-
-      const catResult = await getCategoriesViaProxy(sessionCookies);
+      const nextSessionId = await loginViaProxy(account, password, captcha, sessionId);
+      setSessionId(nextSessionId);
+      const catResult = await getCategoriesViaProxy(nextSessionId);
       setCategories(catResult.categories);
-      setCookies(catResult.cookies);
       setStep("categories");
     } catch (err) {
       setError(err instanceof Error ? err.message : "登录失败");
@@ -207,12 +204,10 @@ export default function EnrollPage() {
     setError("");
 
     try {
-      const sessionCookies = await cookieLoginViaProxy(cookieInput);
-      setCookies(sessionCookies);
-
-      const catResult = await getCategoriesViaProxy(sessionCookies);
+      const nextSessionId = await cookieLoginViaProxy(cookieInput);
+      setSessionId(nextSessionId);
+      const catResult = await getCategoriesViaProxy(nextSessionId);
       setCategories(catResult.categories);
-      setCookies(catResult.cookies);
       setStep("categories");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Cookie 登录失败");
@@ -234,19 +229,17 @@ export default function EnrollPage() {
       setAutoLoginStatus(`尝试自动登录 (${attempt}/3)...`);
 
       let ocrText: string | null = null;
-      let captchaCookies: string[] = [];
+      let nextSessionId = "";
 
       try {
         const data = await fetchCaptchaViaProxy();
         setCaptchaImg(data.imageBase64);
-        captchaCookies = data.cookies;
-        setUisCookies(data.cookies);
+        nextSessionId = data.sessionId;
+        setSessionId(data.sessionId);
 
         const ocrResult = await recognizeCaptcha(data.imageBase64);
-        if (ocrResult) {
-          ocrText = ocrResult.text;
-          setCaptcha(ocrText);
-        }
+        if (ocrResult) ocrText = ocrResult.text;
+        if (ocrText) setCaptcha(ocrText);
       } catch { }
 
       if (!ocrText) {
@@ -257,12 +250,10 @@ export default function EnrollPage() {
       setAutoLoginStatus(`识别: ${ocrText}，提交中...`);
 
       try {
-        const sessionCookies = await loginViaProxy(account, password, ocrText, captchaCookies);
-        setCookies(sessionCookies);
-
-        const catResult = await getCategoriesViaProxy(sessionCookies);
+        const loggedInSessionId = await loginViaProxy(account, password, ocrText, nextSessionId);
+        setSessionId(loggedInSessionId);
+        const catResult = await getCategoriesViaProxy(loggedInSessionId);
         setCategories(catResult.categories);
-        setCookies(catResult.cookies);
 
         setAutoLoginStatus("");
         setLoading(false);
@@ -288,10 +279,9 @@ export default function EnrollPage() {
     setError("");
 
     try {
-      const result = await getCoursesViaProxy(cookies, code);
+      const result = await getCoursesViaProxy(sessionId, code);
       setCourses(result.courses);
       setCategoryUrl(result.categoryUrl);
-      setCookies(result.cookies);
       setStep("courses");
     } catch (err) {
       setError(err instanceof Error ? err.message : "获取课程列表失败");
@@ -338,7 +328,7 @@ export default function EnrollPage() {
 
       /* 2. Calibrate time */
       logger({ type: "calibrating", message: "正在校准服务器时间..." });
-      const timeDiff = await calibrateTimeViaProxy(cookies);
+      const timeDiff = await calibrateTimeViaProxy(sessionId);
       logger({
         type: "calibrating",
         message: `时间校准完成: 本地与服务器差 ${timeDiff > 0 ? "+" : ""}${timeDiff}ms`,
@@ -360,7 +350,7 @@ export default function EnrollPage() {
       }
 
       /* 3. Execute enrollment */
-      const result = await enrollJobViaProxy(preferences, courses, categoryUrl, cookies, logger);
+      const result = await enrollJobViaProxy(preferences, courses, categoryUrl, sessionId, logger);
 
       if (result.success) {
         logger({ type: "success", message: result.message });

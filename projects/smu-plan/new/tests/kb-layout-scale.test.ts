@@ -18,7 +18,7 @@ test("knowledge base layout is enlarged and sidebar sits flush to the left edge"
   assert.match(pageCss, /\.layout\s*\{[\s\S]*max-width:\s*none;/);
   assert.match(pageCss, /\.layout\s*\{[\s\S]*margin:\s*0;/);
   assert.match(sidebarCss, /\.sidebar\s*\{[\s\S]*width:\s*252px;/);
-  assert.match(cardCss, /\.thumb\s*\{[\s\S]*height:\s*60px;/);
-  assert.match(cardCss, /\.titleRow\s*\{[\s\S]*font-size:\s*17px;/);
-  assert.match(heroCss, /\.title\s*\{[\s\S]*font-size:\s*22px;/);
+  assert.match(cardCss, /\.thumb\s*\{[\s\S]*height:\s*48px;/);
+  assert.match(cardCss, /\.titleRow\s*\{[\s\S]*font-size:\s*15px;/);
+  assert.match(heroCss, /\.title\s*\{[\s\S]*font-size:\s*19px;/);
 });

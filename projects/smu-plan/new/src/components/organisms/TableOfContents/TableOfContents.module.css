@@ -10,11 +10,32 @@
   box-shadow: var(--neo-shadow-sm);
 }
 
-.title {
+.titleButton {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
   font-size: var(--text-sm);
   font-weight: var(--font-bold);
   color: var(--text-secondary);
   letter-spacing: 0.04em;
+}
+
+.titleButton:hover {
+  color: var(--text-primary);
+}
+
+.chevron {
+  transition: transform 0.2s;
+  font-size: 12px;
+}
+
+.chevronCollapsed {
+  transform: rotate(-90deg);
 }
 
 .list {
@@ -47,4 +68,25 @@
   background: color-mix(in srgb, var(--color-brand) 12%, var(--bg-primary));
   color: var(--color-brand);
   font-weight: var(--font-semibold);
+}
+
+@media (max-width: 1100px) {
+  .toc {
+    position: static;
+  }
+}
+
+@media (max-width: 768px) {
+  .toc {
+    padding: 12px;
+  }
+
+  .item {
+    min-height: 28px;
+    font-size: 12px;
+  }
+
+  .itemLevel3 {
+    font-size: 11px;
+  }
 }

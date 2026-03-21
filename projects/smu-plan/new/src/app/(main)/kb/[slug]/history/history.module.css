@@ -123,3 +123,11 @@
     justify-content: flex-start;
   }
 }
+
+.inlineDiff {
+  margin-top: var(--space-sm);
+  margin-bottom: var(--space-md);
+  border: var(--neo-border);
+  border-radius: var(--neo-radius);
+  overflow: hidden;
+}

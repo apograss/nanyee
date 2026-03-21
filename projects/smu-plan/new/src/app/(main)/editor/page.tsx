@@ -95,6 +95,43 @@ function EditorInner() {
 
   const deferredContent = useDeferredValue(content);
   const deferredFormat = useDeferredValue(format);
+
+  // Auto-save drafts to localStorage
+  const draftKey = editId ? `wiki-draft-${editId}` : "wiki-draft-new";
+  const draftLoaded = useRef(false);
+
+  useEffect(() => {
+    if (draftLoaded.current || initialLoading) return;
+    draftLoaded.current = true;
+    try {
+      const saved = localStorage.getItem(draftKey);
+      if (!saved) return;
+      const draft = JSON.parse(saved) as { title?: string; content?: string; summary?: string; tagsInput?: string; format?: string; ts?: number };
+      // Only restore if draft is less than 7 days old
+      if (draft.ts && Date.now() - draft.ts > 7 * 24 * 3600_000) {
+        localStorage.removeItem(draftKey);
+        return;
+      }
+      // Don't overwrite data loaded from the server for edit mode
+      if (editId) return;
+      if (draft.title) setTitle(draft.title);
+      if (draft.content) setContent(draft.content);
+      if (draft.summary) setSummary(draft.summary);
+      if (draft.tagsInput) setTagsInput(draft.tagsInput);
+      if (draft.format) setFormat(draft.format as ArticleFormat);
+    } catch {}
+  }, [draftKey, initialLoading, editId]);
+
+  useEffect(() => {
+    if (!draftLoaded.current) return;
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem(draftKey, JSON.stringify({ title, content, summary, tagsInput, format, ts: Date.now() }));
+      } catch {}
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [title, content, summary, tagsInput, format, draftKey]);
+
   const isAdmin = user?.role === "admin";
   const canEditInteractive = canUseInteractiveHtml(user?.role);
   const visibleFormatOptions = canEditInteractive
@@ -183,36 +220,37 @@ function EditorInner() {
   useEffect(() => {
     let cancelled = false;
 
-    async function refreshPreview() {
-      if (deferredFormat === "interactive-html") {
-        if (!cancelled) {
-          setPreviewHtml("");
-          setPreviewLoading(false);
-        }
-        return;
-      }
-
-      setPreviewLoading(true);
-      const html = await renderArticleBody({
-        content: deferredContent || "<p></p>",
-        format: deferredFormat,
-      });
-
-      if (!cancelled) {
-        setPreviewHtml(html);
-        setPreviewLoading(false);
-      }
+    if (deferredFormat === "interactive-html") {
+      setPreviewHtml("");
+      setPreviewLoading(false);
+      return;
     }
 
-    refreshPreview().catch(() => {
-      if (!cancelled) {
-        setPreviewHtml("<p>预览生成失败，请返回编辑后重试。</p>");
-        setPreviewLoading(false);
-      }
-    });
+    setPreviewLoading(true);
+
+    // Debounce preview rendering to reduce CPU overhead from marked + sanitize-html
+    const timer = setTimeout(() => {
+      renderArticleBody({
+        content: deferredContent || "<p></p>",
+        format: deferredFormat,
+      })
+        .then((html) => {
+          if (!cancelled) {
+            setPreviewHtml(html);
+            setPreviewLoading(false);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setPreviewHtml("<p>预览生成失败，请返回编辑后重试。</p>");
+            setPreviewLoading(false);
+          }
+        });
+    }, 400);
 
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
   }, [deferredContent, deferredFormat]);
 
@@ -391,6 +429,8 @@ function EditorInner() {
         return;
       }
 
+      // Clear draft on successful save
+      try { localStorage.removeItem(draftKey); } catch {}
       router.push(`/kb/${data.data.slug}`);
     } catch {
       setError("网络错误，请稍后再试。");

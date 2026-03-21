@@ -98,9 +98,10 @@ function cookieString(cookies: string[]): string {
 
 async function proxyFetch(
     url: string,
-    cookies: string[],
+    sessionId: string,
     options: RequestInit = {},
-): Promise<{ status: number; body: string; cookies: string[]; location?: string; dateHeader?: string }> {
+    proxyBaseUrl?: string,
+): Promise<{ status: number; body: string; location?: string; dateHeader?: string }> {
     const method = (options.method as string) || "GET";
     const headers = (options.headers as Record<string, string>) || {};
     const body = typeof options.body === "string" ? options.body : undefined;
@@ -110,7 +111,7 @@ async function proxyFetch(
     const res = await fetch("/api/tools/proxy", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, method, headers, body, cookies }),
+        body: JSON.stringify({ url, method, headers, body, sessionId, proxyBaseUrl }),
     });
 
     const data = await res.json();
@@ -122,11 +123,9 @@ async function proxyFetch(
 
     console.log(`[proxy] → ${data.status}`);
 
-    const merged = mergeCookies(cookies, data.cookies || []);
     return {
         status: data.status,
         body: data.body || "",
-        cookies: merged,
         location: data.location,
         dateHeader: data.dateHeader,
     };
@@ -136,45 +135,11 @@ async function proxyFetch(
 
 async function enrollProxyFetch(
     targetUrl: string,
-    cookies: string[],
+    sessionId: string,
     options: RequestInit = {},
-): Promise<{ status: number; body: string; cookies: string[]; location?: string }> {
-    if (!activeProxyUrl) throw new Error("未选择代理节点");
-
-    // Convert target URL to proxy URL: https://zhjw.smu.edu.cn/path → PROXY/zhjw/path
-    const url = new URL(targetUrl);
-    let proxyPath = "";
-    if (url.host === "zhjw.smu.edu.cn") proxyPath = `/zhjw${url.pathname}${url.search}`;
-    else if (url.host === "uis.smu.edu.cn") proxyPath = `/uis${url.pathname}${url.search}`;
-    else throw new Error(`Unknown host: ${url.host}`);
-
-    const proxyUrl = `${activeProxyUrl}${proxyPath}`;
-    const method = (options.method as string) || "GET";
-    const headers: Record<string, string> = {
-        "X-Cookie": cookieString(cookies),
-        ...((options.headers as Record<string, string>) || {}),
-    };
-
-    console.log(`[enroll-proxy] ${method} ${proxyUrl}`);
-    const res = await fetch(proxyUrl, {
-        method,
-        headers,
-        body: options.body,
-    });
-
-    const body = await res.text();
-
-    let newCookies: string[] = [];
-    const xSetCookie = res.headers.get("X-Set-Cookie");
-    if (xSetCookie) {
-        try { newCookies = JSON.parse(xSetCookie); } catch { /* */ }
-    }
-
-    const merged = mergeCookies(cookies, newCookies);
-    const location = res.headers.get("X-Location") || undefined;
-    console.log(`[enroll-proxy] → ${res.status}`);
-
-    return { status: res.status, body, cookies: merged, location };
+): Promise<{ status: number; body: string; location?: string }> {
+    if (!activeProxyUrl) throw new Error("\u672a\u9009\u62e9\u4ee3\u7406\u8282\u70b9");
+    return proxyFetch(targetUrl, sessionId, options, activeProxyUrl);
 }
 
 // ─── Login ────────────────────────────────────────────────────
@@ -275,7 +240,7 @@ function md5Browser(input: string): string {
 
 export async function fetchCaptchaViaProxy(): Promise<{
     imageBase64: string;
-    cookies: string[];
+    sessionId: string;
 }> {
     const res = await fetch("/api/tools/captcha");
     const data = await res.json();
@@ -283,7 +248,7 @@ export async function fetchCaptchaViaProxy(): Promise<{
 
     return {
         imageBase64: data.image,
-        cookies: data.rawCookies || [],
+        sessionId: data.sessionId,
     };
 }
 
@@ -293,22 +258,22 @@ export async function loginViaProxy(
     account: string,
     password: string,
     captcha: string,
-    uisCookies: string[],
-): Promise<string[]> {
+    sessionId: string,
+): Promise<string> {
     const passwordMd5 = md5Browser(password);
 
     const body = new URLSearchParams({
         loginName: account,
         password: passwordMd5,
         randcodekey: captcha,
-        locationBrowser: "谷歌浏览器[Chrome]",
+        locationBrowser: "?????[Chrome]",
         appid: "3550176",
         redirect: "https://zhjw.smu.edu.cn/new/ssoLogin",
         strength: "3",
     });
 
     console.log("[login] Sending login POST...");
-    const loginRes = await proxyFetch(`${UIS}/login/login.do`, uisCookies, {
+    const loginRes = await proxyFetch(`${UIS}/login/login.do`, sessionId, {
         method: "POST",
         headers: {
             "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
@@ -319,36 +284,33 @@ export async function loginViaProxy(
 
     console.log("[login] Response:", loginRes.status, loginRes.body.slice(0, 200));
 
-    if (loginRes.status !== 200 || !loginRes.body.includes("成功")) {
-        let errorMsg = "登录失败";
+    if (loginRes.status !== 200 || !loginRes.body.includes("\u6210\u529f")) {
+        let errorMsg = "\u767b\u5f55\u5931\u8d25";
         try {
             const json = JSON.parse(loginRes.body);
-            errorMsg = json.message || json.msg || "登录失败，请检查学号、密码和验证码";
+            errorMsg = json.message || json.msg || "\u767b\u5f55\u5931\u8d25\uff0c\u8bf7\u68c0\u67e5\u5b66\u53f7\u3001\u5bc6\u7801\u548c\u9a8c\u8bc1\u7801";
         } catch {
-            errorMsg = `登录失败: ${loginRes.body.slice(0, 200)}`;
+            errorMsg = `\u767b\u5f55\u5931\u8d25: ${loginRes.body.slice(0, 200)}`;
         }
         throw new Error(errorMsg);
     }
 
     const json = JSON.parse(loginRes.body);
     const ticket = json.ticket as string;
-    if (!ticket) throw new Error("登录成功但未获取到 ticket");
+    if (!ticket) throw new Error("\u767b\u5f55\u6210\u529f\u4f46\u672a\u83b7\u53d6\u5230 ticket");
 
-    // Follow redirects to establish academic session
     let currentPath = `/new/ssoLogin?ticket=${encodeURIComponent(ticket)}`;
-    let cookies = loginRes.cookies;
 
     console.log("[login] Following SSO redirects...");
     for (let i = 0; i < 5; i++) {
         console.log(`[login] Redirect ${i + 1}: ${ZHJW}${currentPath}`);
-        const res = await proxyFetch(`${ZHJW}${currentPath}`, cookies, {
+        const res = await proxyFetch(`${ZHJW}${currentPath}`, sessionId, {
             headers: { Accept: "text/html,*/*" },
         });
-        cookies = res.cookies;
 
         if (!res.location) { console.log("[login] No more redirects"); break; }
         const loc = res.location;
-        console.log(`[login] → Location: ${loc}`);
+        console.log(`[login] -> Location: ${loc}`);
         if (loc.startsWith("http")) {
             if (loc.includes("zhjw.smu.edu.cn")) {
                 currentPath = loc.replace("https://zhjw.smu.edu.cn", "");
@@ -360,117 +322,100 @@ export async function loginViaProxy(
         }
     }
 
-    if (cookies.length === 0) {
-        throw new Error("建立教务系统会话失败");
-    }
-
-    console.log("[login] Login complete, got", cookies.length, "cookies");
-    return cookies;
+    console.log("[login] Login complete via session", sessionId);
+    return sessionId;
 }
 
 // ─── Cookie Login (reuse browser session, no SSO) ─────────────
 
 export async function cookieLoginViaProxy(
     cookieText: string,
-): Promise<string[]> {
-    // Parse cookie string: "JSESSIONID=xxx" or "name=val; name2=val2" or bare value
-    let raw = cookieText.trim();
-    if (raw.toLowerCase().startsWith("cookie:")) raw = raw.slice(7).trim();
-    raw = raw.replace(/^;+|;+$/g, "").trim();
-
-    if (!raw) throw new Error("Cookie 为空");
-
-    // If no = sign, treat as bare JSESSIONID value
-    if (!raw.includes("=") && !raw.includes(";")) {
-        raw = `JSESSIONID=${raw}`;
+): Promise<string> {
+    const resp = await fetch("/api/tools/session/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cookiesText: cookieText }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.error) {
+        throw new Error(data.error?.message || data.error || "Cookie \u767b\u5f55\u5931\u8d25");
     }
 
-    const cookies = raw.split(";").map((p) => p.trim()).filter(Boolean).map((p) => p);
-
-    console.log("[cookie-login] Validating session with", cookies.length, "cookies");
-
-    // Verify session is valid by requesting welcome page
-    const res = await proxyFetch(`${ZHJW}${WELCOME_PATH}`, cookies, {
+    const sessionId = data.data.sessionId as string;
+    const res = await proxyFetch(`${ZHJW}${WELCOME_PATH}`, sessionId, {
         headers: { Accept: "text/html,*/*" },
     });
 
-    if (res.body.includes("统一认证登录") || res.body.includes("扫码登录")) {
-        throw new Error("Cookie 会话无效（已过期或未登录）。请在浏览器重新登录后复制最新 Cookie。");
+    if (res.body.includes("\u7edf\u4e00\u8ba4\u8bc1\u767b\u5f55") || res.body.includes("\u626b\u7801\u767b\u5f55")) {
+        throw new Error("Cookie \u4f1a\u8bdd\u65e0\u6548\uff08\u5df2\u8fc7\u671f\u6216\u672a\u767b\u5f55\uff09\u3002\u8bf7\u5728\u6d4f\u89c8\u5668\u91cd\u65b0\u767b\u5f55\u540e\u590d\u5236\u6700\u65b0 Cookie\u3002");
     }
 
-    console.log("[cookie-login] Session valid, got", res.cookies.length, "cookies");
-    return res.cookies;
+    console.log("[cookie-login] Session valid", sessionId);
+    return sessionId;
 }
 
 // ─── Course Categories ────────────────────────────────────────
 
 export async function getCategoriesViaProxy(
-    cookies: string[],
-): Promise<{ categories: CourseCategory[]; cookies: string[] }> {
-    // Go directly to enrollment root (skip welcome page to save ~300ms RTT)
-    const res = await proxyFetch(`${ZHJW}${XK_ROOT}`, cookies, {
+    sessionId: string,
+): Promise<{ categories: CourseCategory[] }> {
+    const res = await proxyFetch(`${ZHJW}${XK_ROOT}`, sessionId, {
         headers: { Accept: "text/html,*/*" },
     });
 
     const html = res.body;
 
-    if (html.includes("统一认证登录") || html.includes("扫码登录")) {
-        throw new Error("会话已过期，请重新登录");
+    if (html.includes("\u7edf\u4e00\u8ba4\u8bc1\u767b\u5f55") || html.includes("\u626b\u7801\u767b\u5f55")) {
+        throw new Error("\u4f1a\u8bdd\u5df2\u8fc7\u671f\uff0c\u8bf7\u91cd\u65b0\u767b\u5f55");
     }
 
     const categories: CourseCategory[] = [];
     const seen = new Set<string>();
     let match: RegExpExecArray | null;
 
-    // Pattern 1: data-href with xklx + lay-iframe
     const p1 = /data-href\s*=\s*["']([^"']*xklx[^"']*)["'][^>]*lay-iframe\s*=\s*["']([^"']*)["']/gi;
     while ((match = p1.exec(html)) !== null) {
         const cm = match[1].match(/xklx\/(\d+)/);
         if (cm && !seen.has(cm[1])) { seen.add(cm[1]); categories.push({ code: cm[1], title: match[2] }); }
     }
-    // Pattern 2: reversed order
     const p2 = /lay-iframe\s*=\s*["']([^"']*)["'][^>]*data-href\s*=\s*["']([^"']*xklx[^"']*)["']/gi;
     while ((match = p2.exec(html)) !== null) {
         const cm = match[2].match(/xklx\/(\d+)/);
         if (cm && !seen.has(cm[1])) { seen.add(cm[1]); categories.push({ code: cm[1], title: match[1] }); }
     }
-    // Pattern 3: href + text
     const p3 = /href\s*=\s*["']([^"']*xklx\/(\d+)[^"']*)["'][^>]*>([^<]+)</gi;
     while ((match = p3.exec(html)) !== null) {
         if (!seen.has(match[2])) { seen.add(match[2]); categories.push({ code: match[2], title: match[3].trim() }); }
     }
-    // Pattern 4: generic /xklx/digits
     const p4 = /['"]([^'"]*\/xklx\/(\d+)[^'"]*)['"]/gi;
     while ((match = p4.exec(html)) !== null) {
-        if (!seen.has(match[2])) { seen.add(match[2]); categories.push({ code: match[2], title: `类型${match[2]}` }); }
+        if (!seen.has(match[2])) { seen.add(match[2]); categories.push({ code: match[2], title: `\u7c7b\u578b${match[2]}` }); }
     }
-    // Pattern 5: xklxdm=digits
     const p5 = /xklxdm=(\d+)/gi;
     while ((match = p5.exec(html)) !== null) {
-        if (!seen.has(match[1])) { seen.add(match[1]); categories.push({ code: match[1], title: `类型${match[1]}` }); }
+        if (!seen.has(match[1])) { seen.add(match[1]); categories.push({ code: match[1], title: `\u7c7b\u578b${match[1]}` }); }
     }
 
     if (categories.length === 0) {
         const bodyText = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-        throw new Error(`未找到选课类型: ${bodyText.slice(0, 160)}`);
+        throw new Error(`\u672a\u627e\u5230\u9009\u8bfe\u7c7b\u578b: ${bodyText.slice(0, 160)}`);
     }
 
-    return { categories, cookies: res.cookies };
+    return { categories };
 }
 
 // ─── Course List ──────────────────────────────────────────────
 
 export async function getCoursesViaProxy(
-    cookies: string[],
+    sessionId: string,
     categoryCode: string,
-): Promise<{ courses: CourseItem[]; categoryUrl: string; cookies: string[] }> {
+): Promise<{ courses: CourseItem[]; categoryUrl: string }> {
     const categoryPath = `${XK_ROOT}xklx/${categoryCode}`;
     const courseListPath = `${categoryPath}/kxkc`;
 
     const allCourses: CourseItem[] = [];
     let page = 1;
     let total = Infinity;
-    let latestCookies = cookies;
 
     while (allCourses.length < total) {
         const body = new URLSearchParams({
@@ -478,15 +423,14 @@ export async function getCoursesViaProxy(
             rows: "50",
         });
 
-        const res = await proxyFetch(`${ZHJW}${courseListPath}`, latestCookies, {
+        const res = await proxyFetch(`${ZHJW}${courseListPath}`, sessionId, {
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
             body: body.toString(),
         });
-        latestCookies = res.cookies;
 
         if (!res.body.startsWith("{")) {
-            throw new Error(`课程列表返回异常: ${res.body.slice(0, 200)}`);
+            throw new Error(`\u8bfe\u7a0b\u5217\u8868\u8fd4\u56de\u5f02\u5e38: ${res.body.slice(0, 200)}`);
         }
 
         const json = JSON.parse(res.body);
@@ -512,13 +456,13 @@ export async function getCoursesViaProxy(
         page++;
     }
 
-    return { courses: allCourses, categoryUrl: categoryPath, cookies: latestCookies };
+    return { courses: allCourses, categoryUrl: categoryPath };
 }
 
 // ─── Submit One Course ────────────────────────────────────────
 
 async function orderCourseViaProxy(
-    cookies: string[],
+    sessionId: string,
     kcrwdm: string,
     kcmc: string,
     categoryPath: string,
@@ -527,25 +471,23 @@ async function orderCourseViaProxy(
     const addPath = `${categoryPath}/add`;
     const body = new URLSearchParams({ kcrwdm, kcmc, qz: "-1", xxyqdm: "", hlct: String(hlct) });
 
-    // Use selected proxy node for enrollment (IP protection)
     let res;
     if (activeProxyUrl) {
         try {
-            res = await enrollProxyFetch(`${ZHJW}${addPath}`, cookies, {
+            res = await enrollProxyFetch(`${ZHJW}${addPath}`, sessionId, {
                 method: "POST",
                 headers: { "Content-Type": "application/x-www-form-urlencoded" },
                 body: body.toString(),
             });
         } catch {
-            // Fallback to server-side proxy
-            res = await proxyFetch(`${ZHJW}${addPath}`, cookies, {
+            res = await proxyFetch(`${ZHJW}${addPath}`, sessionId, {
                 method: "POST",
                 headers: { "Content-Type": "application/x-www-form-urlencoded" },
                 body: body.toString(),
             });
         }
     } else {
-        res = await proxyFetch(`${ZHJW}${addPath}`, cookies, {
+        res = await proxyFetch(`${ZHJW}${addPath}`, sessionId, {
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
             body: body.toString(),
@@ -555,7 +497,7 @@ async function orderCourseViaProxy(
     try {
         return JSON.parse(res.body);
     } catch {
-        return { code: -1, message: `非JSON: ${res.body.slice(0, 100)}` };
+        return { code: -1, message: `\u975e JSON: ${res.body.slice(0, 100)}` };
     }
 }
 
@@ -565,7 +507,7 @@ export async function enrollJobViaProxy(
     preferences: (number | null)[],
     courses: CourseItem[],
     categoryPath: string,
-    cookies: string[],
+    sessionId: string,
     logger: LogCallback,
 ): Promise<EnrollResult> {
     const validOrders: number[] = [];
@@ -602,7 +544,7 @@ export async function enrollJobViaProxy(
         });
 
         try {
-            const result = await orderCourseViaProxy(cookies, course.kcrwdm, course.kcmc, categoryPath);
+            const result = await orderCourseViaProxy(sessionId, course.kcrwdm, course.kcmc, categoryPath);
             const msg = result.message || "";
             lastMessage = msg || JSON.stringify(result);
 
@@ -620,7 +562,7 @@ export async function enrollJobViaProxy(
             if (msg.includes("冲突")) {
                 logger({ type: "info", message: `检测到冲突提示，自动确认: ${msg}` });
                 try {
-                    const confirmResult = await orderCourseViaProxy(cookies, course.kcrwdm, course.kcmc, categoryPath, 1);
+                    const confirmResult = await orderCourseViaProxy(sessionId, course.kcrwdm, course.kcmc, categoryPath, 1);
                     const confirmMsg = confirmResult.message || "";
                     lastMessage = confirmMsg || JSON.stringify(confirmResult);
                     if (confirmResult.code === 0 || confirmMsg === "您已经选了该门课程") {
@@ -660,14 +602,14 @@ export async function enrollJobViaProxy(
 
 // ─── Time Calibration ─────────────────────────────────────────
 
-export async function calibrateTimeViaProxy(cookies: string[]): Promise<number> {
+export async function calibrateTimeViaProxy(sessionId: string): Promise<number> {
     let bestDiff = 0;
     let bestRtt = Infinity;
 
     for (let i = 0; i < 3; i++) {
         const before = Date.now();
         try {
-            const res = await proxyFetch(`${ZHJW}${WELCOME_PATH}`, cookies, {
+            const res = await proxyFetch(`${ZHJW}${WELCOME_PATH}`, sessionId, {
                 headers: { Accept: "text/html,*/*" },
             });
             const after = Date.now();

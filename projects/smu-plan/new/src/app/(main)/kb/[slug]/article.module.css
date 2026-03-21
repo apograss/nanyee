@@ -17,6 +17,39 @@
   min-width: 0;
 }
 
+.breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.breadcrumbLink {
+  color: var(--color-brand);
+  text-decoration: none;
+  font-weight: var(--font-semibold);
+}
+
+.breadcrumbLink:hover {
+  text-decoration: underline;
+}
+
+.breadcrumbSep {
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+.breadcrumbText {
+  color: var(--text-secondary);
+}
+
+.breadcrumbCurrent {
+  color: var(--text-primary);
+  font-weight: var(--font-semibold);
+}
+
 .sideRail {
   display: grid;
   gap: 16px;
@@ -126,7 +159,7 @@
   position: relative;
   overflow: visible;
   font-size: 18px;
-  line-height: 1.9;
+  line-height: 1.75;
   color: var(--text-primary);
 }
 

@@ -10,14 +10,15 @@
 
 .main {
   flex: 1;
-  padding: 22px 28px 64px;
+  padding: 18px 24px 56px;
   min-width: 0;
+  font-size: 0.9em;
 }
 
 .contentArea {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 280px;
-  gap: 24px;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 20px;
   align-items: start;
 }
 
@@ -30,13 +31,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 18px;
-  padding-bottom: 12px;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
   border-bottom: 1.5px solid var(--border-light);
 }
 
 .sortInfo {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
 }
 
@@ -55,8 +56,8 @@
 
 .insightCard {
   display: grid;
-  gap: 14px;
-  padding: 18px;
+  gap: 12px;
+  padding: 14px;
   border: var(--neo-border);
   border-radius: calc(var(--neo-radius) * 1.05);
   background: var(--bg-secondary);
@@ -64,7 +65,7 @@
 }
 
 .insightTitle {
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   font-weight: var(--font-bold);
 }
 
@@ -75,10 +76,10 @@
 
 .insightItem {
   display: grid;
-  grid-template-columns: 24px 28px minmax(0, 1fr) auto;
+  grid-template-columns: 20px 24px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
+  gap: 8px;
+  padding: 8px 10px;
   border-radius: var(--neo-radius);
   background: var(--bg-primary);
   color: var(--text-primary);
@@ -86,14 +87,14 @@
 }
 
 .insightIndex {
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   font-weight: var(--font-bold);
   color: var(--color-brand);
 }
 
 .contributorAvatar {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   display: inline-flex;
   align-items: center;
   justify-content: center;

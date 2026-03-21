@@ -107,7 +107,7 @@ export async function recordKeyUsage(params: {
  * Decrypt an AES-256-GCM encrypted key.
  * Format: iv:authTag:ciphertext (all hex)
  */
-function decryptKey(cipher: string): string {
+export function decryptKey(cipher: string): string {
   if (!KEY_ENCRYPTION_SECRET) {
     throw new Error(
       "KEY_ENCRYPTION_SECRET env var is required for key decryption",

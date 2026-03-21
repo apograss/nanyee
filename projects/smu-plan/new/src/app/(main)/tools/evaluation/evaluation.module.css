@@ -1,0 +1,435 @@
+/* ═══════════════════════════════════════════════════
+   Auto-Evaluation Page — Neo-Brutalism Styles
+   Reuses patterns from enroll.module.css
+   ═══════════════════════════════════════════════════ */
+
+/* ─── Page Layout ─────────────────────────────────── */
+
+.evalPage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-xl) var(--space-md);
+  min-height: calc(100vh - var(--header-height));
+}
+
+.container {
+  width: 100%;
+  max-width: 720px;
+}
+
+/* ─── Header ──────────────────────────────────────── */
+
+.header {
+  text-align: center;
+  margin-bottom: var(--space-lg);
+}
+
+.header h1 {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
+  margin-bottom: var(--space-xs);
+}
+
+.header p {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  text-decoration: none;
+  margin-bottom: var(--space-md);
+  transition: color var(--transition-fast);
+}
+
+.backLink:hover {
+  color: var(--color-brand);
+}
+
+/* ─── Card ────────────────────────────────────────── */
+
+.card {
+  background: var(--bg-secondary);
+  border: var(--neo-border);
+  border-radius: var(--neo-radius);
+  box-shadow: var(--neo-shadow);
+  padding: var(--space-lg);
+  margin-bottom: var(--space-md);
+}
+
+.card h2 {
+  font-size: var(--text-lg);
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
+  margin-bottom: var(--space-md);
+  padding-bottom: var(--space-sm);
+  border-bottom: 2px solid var(--border-light);
+}
+
+/* ─── Form ────────────────────────────────────────── */
+
+.formGroup {
+  margin-bottom: var(--space-md);
+}
+
+.formGroup label {
+  display: block;
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  color: var(--text-muted);
+  margin-bottom: var(--space-xs);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.formGroup input {
+  width: 100%;
+  padding: 0.7rem 0.9rem;
+  background: var(--bg-secondary);
+  border: 2px solid var(--border-light);
+  border-radius: var(--neo-radius);
+  color: var(--text-primary);
+  font-size: var(--text-base);
+  outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.formGroup input::placeholder {
+  color: var(--text-muted);
+}
+
+.formGroup input:focus {
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 3px rgba(232, 101, 43, 0.15);
+}
+
+/* ─── Buttons ─────────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: 0.8rem var(--space-md);
+  font-size: var(--text-base);
+  font-weight: var(--font-bold);
+  border: var(--neo-border);
+  border-radius: var(--neo-radius);
+  box-shadow: var(--neo-shadow);
+  cursor: pointer;
+  user-select: none;
+  transition:
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast),
+    background var(--transition-fast);
+}
+
+.btn:hover:not(:disabled) {
+  transform: translate(-1px, -1px);
+  box-shadow:
+    calc(var(--neo-shadow-offset) + 1px)
+    calc(var(--neo-shadow-offset) + 1px)
+    0 var(--border-color);
+}
+
+.btn:active:not(:disabled) {
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0 var(--border-color);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btnPrimary {
+  composes: btn;
+  background: var(--color-brand);
+  color: var(--text-inverse);
+}
+
+.btnPrimary:hover:not(:disabled) {
+  background: var(--color-brand-hover);
+}
+
+.btnSecondary {
+  composes: btn;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  margin-top: 0.5rem;
+}
+
+.btnSecondary:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.btnDanger {
+  composes: btn;
+  background: var(--color-error);
+  color: var(--text-inverse);
+  margin-top: 0.5rem;
+}
+
+.btnDanger:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+/* ─── Status Card ─────────────────────────────────── */
+
+.statusGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.statusItem {
+  padding: var(--space-md);
+  background: var(--bg-muted);
+  border-radius: var(--neo-radius);
+  text-align: center;
+}
+
+.statusValue {
+  font-size: var(--text-xl);
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
+  display: block;
+}
+
+.statusLabel {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: var(--space-xs);
+  display: block;
+}
+
+/* ─── Toggle ──────────────────────────────────────── */
+
+.toggleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md);
+  background: var(--bg-muted);
+  border-radius: var(--neo-radius);
+  margin-bottom: var(--space-md);
+}
+
+.toggleLabel {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--text-primary);
+}
+
+.toggleDesc {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.toggle {
+  position: relative;
+  width: 48px;
+  height: 26px;
+  flex-shrink: 0;
+}
+
+.toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggleTrack {
+  position: absolute;
+  inset: 0;
+  background: var(--border-light);
+  border-radius: 13px;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.toggleTrack::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  background: white;
+  border-radius: 50%;
+  transition: transform var(--transition-fast);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.toggle input:checked + .toggleTrack {
+  background: var(--color-brand);
+}
+
+.toggle input:checked + .toggleTrack::after {
+  transform: translateX(22px);
+}
+
+/* ─── Log Console ─────────────────────────────────── */
+
+.logConsole {
+  background: var(--bg-muted);
+  border: var(--neo-border);
+  border-radius: var(--neo-radius);
+  padding: var(--space-md);
+  max-height: 360px;
+  overflow-y: auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.7;
+  margin-bottom: var(--space-md);
+}
+
+.logConsole::-webkit-scrollbar {
+  width: 6px;
+}
+
+.logConsole::-webkit-scrollbar-thumb {
+  background: var(--border-light);
+  border-radius: 3px;
+}
+
+.logLine {
+  padding: 2px 0;
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+
+.logLine.info {
+  color: var(--color-info);
+}
+
+.logLine.warn {
+  color: var(--color-warning);
+}
+
+.logLine.error {
+  color: var(--color-error);
+}
+
+.logLine.success {
+  color: var(--color-success);
+  font-weight: var(--font-bold);
+}
+
+/* ─── Banners ─────────────────────────────────────── */
+
+.errorBanner {
+  padding: var(--space-md);
+  background: var(--color-error-light);
+  border: 2px solid var(--color-error);
+  border-radius: var(--neo-radius);
+  color: var(--color-error);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  margin-bottom: var(--space-md);
+}
+
+.successBanner {
+  padding: var(--space-md);
+  background: var(--color-success-light);
+  border: 2px solid var(--color-success);
+  border-radius: var(--neo-radius);
+  color: var(--color-success);
+  font-size: var(--text-sm);
+  font-weight: var(--font-bold);
+  margin-bottom: var(--space-md);
+}
+
+.infoBanner {
+  padding: var(--space-sm) var(--space-md);
+  background: rgba(100, 160, 255, 0.06);
+  border: 1px solid rgba(100, 160, 255, 0.15);
+  border-radius: var(--neo-radius);
+  font-size: var(--text-xs);
+  line-height: 1.7;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-md);
+}
+
+/* ─── Status Badge ────────────────────────────────── */
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  font-weight: var(--font-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.badgeSuccess {
+  composes: badge;
+  background: var(--color-success-light);
+  color: var(--color-success);
+}
+
+.badgeFailed {
+  composes: badge;
+  background: var(--color-error-light);
+  color: var(--color-error);
+}
+
+.badgeRunning {
+  composes: badge;
+  background: var(--color-brand-light);
+  color: var(--color-brand);
+}
+
+.badgeIdle {
+  composes: badge;
+  background: var(--bg-muted);
+  color: var(--text-muted);
+}
+
+/* ─── Spinner ─────────────────────────────────────── */
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border-light);
+  border-top-color: var(--color-brand);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  flex-shrink: 0;
+}
+
+/* ─── Responsive ──────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .evalPage {
+    padding: var(--space-md) var(--space-sm);
+  }
+
+  .card {
+    padding: var(--space-md);
+  }
+
+  .statusGrid {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-sm);
+  }
+}

@@ -20,6 +20,7 @@ const nextConfig: NextConfig = {
   images: {
     formats: ["image/avif", "image/webp"],
   },
+  serverExternalPackages: ["onnxruntime-node", "sharp"],
   experimental: {
     serverActions: {
       bodySizeLimit: "2mb",

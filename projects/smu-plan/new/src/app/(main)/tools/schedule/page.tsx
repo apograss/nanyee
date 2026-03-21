@@ -122,7 +122,8 @@ export default function SchedulePage() {
         setSessionId(data.sessionId);
         sid = data.sessionId;
         const ocrResult = await recognizeCaptcha(data.image);
-        if (ocrResult) { ocrText = ocrResult.text; setCaptcha(ocrText); }
+        if (ocrResult) ocrText = ocrResult.text;
+        if (ocrText) setCaptcha(ocrText);
       } catch {}
       setCaptchaLoading(false);
       if (!ocrText || !sid) { setAutoLoginStatus("验证码识别失败，重试..."); continue; }

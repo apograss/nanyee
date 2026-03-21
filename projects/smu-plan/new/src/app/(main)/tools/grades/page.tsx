@@ -187,10 +187,8 @@ export default function GradesPage() {
         setSessionId(data.sessionId);
         sid = data.sessionId;
         const ocrResult = await recognizeCaptcha(data.image);
-        if (ocrResult) {
-          ocrText = ocrResult.text;
-          setCaptcha(ocrText);
-        }
+        if (ocrResult) ocrText = ocrResult.text;
+        if (ocrText) setCaptcha(ocrText);
       } catch {
         /* ignore */
       }

@@ -28,6 +28,13 @@ const TOOLS = [
     href: "/tools/enroll",
     tag: "新",
   },
+  {
+    title: "自动评课",
+    desc: "自动完成教务系统课程评价，支持后台定时执行",
+    icon: "📝",
+    href: "/tools/evaluation",
+    tag: "新",
+  },
 ];
 
 const COMING_SOON = [

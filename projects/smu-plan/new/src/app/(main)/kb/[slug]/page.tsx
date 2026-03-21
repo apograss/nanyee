@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { presentPublicUser } from "@/lib/user-presenter";
 import { isInteractiveHtmlFormat, type ArticleFormat } from "@/lib/wiki/formats";
 import { renderArticleBody } from "@/lib/wiki/render";
+import { recordView } from "@/lib/wiki/view-count";
 
 import ArticleEditButton from "./ArticleEditButton";
 import styles from "./article.module.css";
@@ -37,9 +38,8 @@ export default async function ArticleDetailPage({ params }: Props) {
     notFound();
   }
 
-  prisma.article
-    .update({ where: { id: article.id }, data: { viewCount: { increment: 1 } } })
-    .catch(() => {});
+  // Batch view-count increments to reduce DB write pressure
+  recordView(article.id);
 
   let isLoggedIn = false;
   let isAdmin = false;
@@ -80,6 +80,24 @@ export default async function ArticleDetailPage({ params }: Props) {
     <div className={styles.page}>
       <article className={styles.shell}>
         <div className={styles.mainColumn}>
+          <nav className={styles.breadcrumb} aria-label="面包屑导航">
+            <a href="/kb" className={styles.breadcrumbLink}>知识库</a>
+            {article.categoryRef?.parent ? (
+              <>
+                <span className={styles.breadcrumbSep}>/</span>
+                <span className={styles.breadcrumbText}>{article.categoryRef.parent.name}</span>
+              </>
+            ) : null}
+            {article.categoryRef ? (
+              <>
+                <span className={styles.breadcrumbSep}>/</span>
+                <span className={styles.breadcrumbText}>{article.categoryRef.name}</span>
+              </>
+            ) : null}
+            <span className={styles.breadcrumbSep}>/</span>
+            <span className={styles.breadcrumbCurrent}>{article.title}</span>
+          </nav>
+
           <header className={styles.header}>
             <p className={styles.kicker}>知识库 Wiki</p>
             <h1 className={styles.title}>{article.title}</h1>

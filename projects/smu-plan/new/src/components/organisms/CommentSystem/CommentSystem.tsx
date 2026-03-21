@@ -89,11 +89,16 @@ export default function CommentSystem({
     }
   }, [activeParagraph]);
 
+  const injectedIconsRef = useRef<HTMLButtonElement[]>([]);
+
   useEffect(() => {
     const body = document.querySelector("[data-article-body]");
     if (!body) return;
     containerRef.current = body as HTMLDivElement;
 
+    // Clean up any previously injected icons (defensive against React strict mode double-invoke)
+    injectedIconsRef.current.forEach((node) => node.remove());
+    injectedIconsRef.current = [];
     body.querySelectorAll("[data-comment-icon]").forEach((node) => node.remove());
 
     const commentableBlocks = Array.from(body.querySelectorAll(PARAGRAPH_SELECTOR)).filter((node) => {
@@ -112,9 +117,10 @@ export default function CommentSystem({
       icon.setAttribute("data-comment-icon", "true");
       icon.className = styles.commentIcon;
       icon.setAttribute("aria-label", "添加段落评论");
+      icon.type = "button";
 
       const emoji = document.createElement("span");
-      emoji.textContent = "💬";
+      emoji.textContent = "\uD83D\uDCAC";
       emoji.setAttribute("aria-hidden", "true");
       icon.appendChild(emoji);
 
@@ -126,10 +132,12 @@ export default function CommentSystem({
       };
 
       block.appendChild(icon);
+      injectedIconsRef.current.push(icon);
     });
 
     return () => {
-      body.querySelectorAll("[data-comment-icon]").forEach((node) => node.remove());
+      injectedIconsRef.current.forEach((node) => node.remove());
+      injectedIconsRef.current = [];
     };
   }, []);
 

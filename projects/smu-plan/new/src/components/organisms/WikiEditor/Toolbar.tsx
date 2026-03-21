@@ -140,6 +140,13 @@ export default function Toolbar({ editor }: ToolbarProps) {
       />
 
       <div className={styles.toolGroup}>
+        {btn("↩", () => editor.chain().focus().undo().run(), false, "撤销")}
+        {btn("↪", () => editor.chain().focus().redo().run(), false, "重做")}
+      </div>
+
+      <div className={styles.toolDivider} />
+
+      <div className={styles.toolGroup}>
         {btn("H1", () => editor.chain().focus().toggleHeading({ level: 1 }).run(), editor.isActive("heading", { level: 1 }))}
         {btn("H2", () => editor.chain().focus().toggleHeading({ level: 2 }).run(), editor.isActive("heading", { level: 2 }))}
         {btn("H3", () => editor.chain().focus().toggleHeading({ level: 3 }).run(), editor.isActive("heading", { level: 3 }))}

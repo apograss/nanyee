@@ -35,6 +35,16 @@ export function getSession(id: string): string[] | null {
     return s.cookies;
 }
 
+export function replaceSession(id: string, cookies: string[]): void {
+    const existing = store.get(id);
+    if (!existing) return;
+    store.set(id, { cookies, createdAt: Date.now() });
+}
+
+export function createImportedSession(cookies: string[]): string {
+    return createSession(cookies);
+}
+
 export function deleteSession(id: string): void {
     store.delete(id);
 }

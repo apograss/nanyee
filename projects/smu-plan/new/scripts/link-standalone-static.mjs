@@ -2,10 +2,14 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 const rootDir = process.cwd();
-const standaloneNextDir = path.join(rootDir, ".next", "standalone", ".next");
+const standaloneDir = path.join(rootDir, ".next", "standalone");
+const standaloneNextDir = path.join(standaloneDir, ".next");
 const staticDir = path.join(rootDir, ".next", "static");
 const standaloneStaticDir = path.join(standaloneNextDir, "static");
 const symlinkTarget = "../../static";
+
+const publicDir = path.join(rootDir, "public");
+const standalonePublicDir = path.join(standaloneDir, "public");
 
 async function pathExists(targetPath) {
   try {
@@ -35,7 +39,29 @@ async function ensureStandaloneStatic() {
   console.log("[link-standalone-static] copied .next/static into standalone bundle");
 }
 
-ensureStandaloneStatic().catch((error) => {
+async function ensureStandalonePublic() {
+  if (!(await pathExists(publicDir)) || !(await pathExists(standaloneDir))) {
+    return;
+  }
+
+  await fs.rm(standalonePublicDir, { recursive: true, force: true });
+
+  try {
+    await fs.symlink("../../public", standalonePublicDir, "junction");
+    console.log("[link-standalone-static] linked public/ into standalone bundle");
+    return;
+  } catch (error) {
+    console.warn("[link-standalone-static] public symlink failed, falling back to copy:", error);
+  }
+
+  await fs.cp(publicDir, standalonePublicDir, { recursive: true });
+  console.log("[link-standalone-static] copied public/ into standalone bundle");
+}
+
+Promise.all([
+  ensureStandaloneStatic(),
+  ensureStandalonePublic(),
+]).catch((error) => {
   console.error("[link-standalone-static] failed:", error);
   process.exitCode = 1;
 });

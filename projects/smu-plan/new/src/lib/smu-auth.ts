@@ -47,6 +47,7 @@ function mergeCookies(existing: string[], incoming: string[]): string[] {
 export interface CaptchaResult {
     imageBase64: string; // data:image/jpeg;base64,...
     cookies: string[];   // UIS session cookies to carry forward
+    imageBuffer: Buffer; // raw image bytes for server-side OCR
 }
 
 export async function fetchCaptcha(): Promise<CaptchaResult> {
@@ -63,7 +64,7 @@ export async function fetchCaptcha(): Promise<CaptchaResult> {
     const buffer = Buffer.from(await res.arrayBuffer());
     const imageBase64 = `data:image/jpeg;base64,${buffer.toString("base64")}`;
 
-    return { imageBase64, cookies };
+    return { imageBase64, cookies, imageBuffer: buffer };
 }
 
 // ─── Step 2: Login → Ticket ───────────────────────────────────────

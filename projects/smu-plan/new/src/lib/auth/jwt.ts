@@ -11,11 +11,16 @@ function requireEnv(name: string): string {
   return value;
 }
 
-const ACCESS_SECRET = new TextEncoder().encode(requireEnv("JWT_ACCESS_SECRET"));
-const REFRESH_SECRET = new TextEncoder().encode(requireEnv("JWT_REFRESH_SECRET"));
-
 const ACCESS_TTL = "15m";
 const REFRESH_TTL = "30d";
+
+function getAccessSecret() {
+  return new TextEncoder().encode(requireEnv("JWT_ACCESS_SECRET"));
+}
+
+function getRefreshSecret() {
+  return new TextEncoder().encode(requireEnv("JWT_REFRESH_SECRET"));
+}
 
 export interface AccessTokenPayload extends JWTPayload {
   sub: string; // userId
@@ -41,7 +46,7 @@ export async function signAccessToken(payload: {
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(ACCESS_TTL)
-    .sign(ACCESS_SECRET);
+    .sign(getAccessSecret());
 }
 
 export async function signRefreshToken(payload: {
@@ -55,14 +60,14 @@ export async function signRefreshToken(payload: {
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(REFRESH_TTL)
-    .sign(REFRESH_SECRET);
+    .sign(getRefreshSecret());
 }
 
 export async function verifyAccessToken(
   token: string
 ): Promise<AccessTokenPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, ACCESS_SECRET);
+    const { payload } = await jwtVerify(token, getAccessSecret());
     return payload as AccessTokenPayload;
   } catch {
     return null;
@@ -73,7 +78,7 @@ export async function verifyRefreshToken(
   token: string
 ): Promise<RefreshTokenPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, REFRESH_SECRET);
+    const { payload } = await jwtVerify(token, getRefreshSecret());
     return payload as RefreshTokenPayload;
   } catch {
     return null;
