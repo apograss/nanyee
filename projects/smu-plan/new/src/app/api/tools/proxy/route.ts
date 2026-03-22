@@ -4,10 +4,6 @@ import { requireUser, handleAuthError } from "@/lib/auth/guard";
 import { getSession, replaceSession } from "@/lib/session-store";
 
 const ALLOWED_HOSTS = ["uis.smu.edu.cn", "zhjw.smu.edu.cn"];
-const ALLOWED_PROXY_BASES = [
-  "http://119.29.161.78:8080",
-  "http://104.248.158.12:8080",
-];
 
 function cookieString(cookies: string[]): string {
   return cookies.map((c) => c.split(";")[0]).join("; ");
@@ -74,58 +70,6 @@ async function fetchDirect(
   };
 }
 
-async function fetchViaExternalProxy(
-  proxyBaseUrl: string,
-  targetUrl: URL,
-  method: string,
-  headers: Record<string, string>,
-  body: string | undefined,
-  cookies: string[],
-) {
-  if (!ALLOWED_PROXY_BASES.includes(proxyBaseUrl)) {
-    throw new Error(`Proxy base not allowed: ${proxyBaseUrl}`);
-  }
-
-  let proxyPath = "";
-  if (targetUrl.host === "zhjw.smu.edu.cn") {
-    proxyPath = `/zhjw${targetUrl.pathname}${targetUrl.search}`;
-  } else if (targetUrl.host === "uis.smu.edu.cn") {
-    proxyPath = `/uis${targetUrl.pathname}${targetUrl.search}`;
-  } else {
-    throw new Error(`Host not allowed: ${targetUrl.host}`);
-  }
-
-  const proxyUrl = `${proxyBaseUrl}${proxyPath}`;
-  const res = await fetch(proxyUrl, {
-    method,
-    headers: {
-      "X-Cookie": cookieString(cookies),
-      ...headers,
-    },
-    body: method !== "GET" && method !== "HEAD" ? body : undefined,
-    redirect: "manual",
-  });
-
-  const resBody = await res.text();
-  let setCookies: string[] = [];
-  const xSetCookie = res.headers.get("X-Set-Cookie");
-  if (xSetCookie) {
-    try {
-      setCookies = JSON.parse(xSetCookie);
-    } catch {
-      setCookies = [];
-    }
-  }
-
-  return {
-    status: res.status,
-    body: resBody,
-    cookies: setCookies,
-    location: res.headers.get("X-Location") || undefined,
-    dateHeader: res.headers.get("date") || undefined,
-  };
-}
-
 /**
  * POST /api/tools/proxy
  *
@@ -135,8 +79,7 @@ async function fetchViaExternalProxy(
  *   method?: string,
  *   headers?: Record<string, string>,
  *   body?: string,
- *   sessionId?: string,
- *   proxyBaseUrl?: string
+ *   sessionId?: string
  * }
  */
 export async function POST(request: NextRequest) {
@@ -150,14 +93,12 @@ export async function POST(request: NextRequest) {
       headers = {},
       body,
       sessionId,
-      proxyBaseUrl,
     } = req as {
       url: string;
       method?: string;
       headers?: Record<string, string>;
       body?: string;
       sessionId?: string;
-      proxyBaseUrl?: string;
     };
 
     if (!url) {
@@ -184,9 +125,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = proxyBaseUrl
-      ? await fetchViaExternalProxy(proxyBaseUrl, targetUrl, method, headers, body, currentCookies)
-      : await fetchDirect(targetUrl, method, headers, body, currentCookies);
+    const result = await fetchDirect(targetUrl, method, headers, body, currentCookies);
 
     replaceSession(sessionId, mergeCookies(currentCookies, result.cookies));
 

@@ -20,8 +20,7 @@ export interface ProxyNode {
 }
 
 export const PROXY_NODES: ProxyNode[] = [
-    { id: "tencent", label: "节点 A（国内）", url: "http://119.29.161.78:8080", region: "腾讯云" },
-    { id: "do", label: "节点 B（海外）", url: "http://104.248.158.12:8080", region: "DigitalOcean" },
+    { id: "safe", label: "安全代理", url: "internal", region: "主站" },
 ];
 
 let activeProxyUrl: string = PROXY_NODES[0].url;
@@ -100,7 +99,6 @@ async function proxyFetch(
     url: string,
     sessionId: string,
     options: RequestInit = {},
-    proxyBaseUrl?: string,
 ): Promise<{ status: number; body: string; location?: string; dateHeader?: string }> {
     const method = (options.method as string) || "GET";
     const headers = (options.headers as Record<string, string>) || {};
@@ -111,7 +109,7 @@ async function proxyFetch(
     const res = await fetch("/api/tools/proxy", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, method, headers, body, sessionId, proxyBaseUrl }),
+        body: JSON.stringify({ url, method, headers, body, sessionId }),
     });
 
     const data = await res.json();
@@ -138,8 +136,7 @@ async function enrollProxyFetch(
     sessionId: string,
     options: RequestInit = {},
 ): Promise<{ status: number; body: string; location?: string }> {
-    if (!activeProxyUrl) throw new Error("\u672a\u9009\u62e9\u4ee3\u7406\u8282\u70b9");
-    return proxyFetch(targetUrl, sessionId, options, activeProxyUrl);
+    return proxyFetch(targetUrl, sessionId, options);
 }
 
 // ─── Login ────────────────────────────────────────────────────

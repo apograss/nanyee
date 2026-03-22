@@ -13,10 +13,13 @@ function readProjectFile(...segments: string[]) {
 test("captcha api no longer leaks raw upstream cookies and enroll flow uses session ids", () => {
   const captchaRoute = readProjectFile("src", "app", "api", "tools", "captcha", "route.ts");
   const enrollClient = readProjectFile("src", "lib", "enroll-client.ts");
+  const proxyRoute = readProjectFile("src", "app", "api", "tools", "proxy", "route.ts");
 
   assert.doesNotMatch(captchaRoute, /rawCookies/);
   assert.match(enrollClient, /sessionId/);
   assert.doesNotMatch(enrollClient, /rawCookies/);
+  assert.doesNotMatch(enrollClient, /119\.29\.161\.78|104\.248\.158\.12/);
+  assert.doesNotMatch(proxyRoute, /ALLOWED_PROXY_BASES|fetchViaExternalProxy|X-Cookie/);
 });
 
 test("evaluation engine checks save responses before claiming success", () => {
