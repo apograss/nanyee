@@ -14,8 +14,8 @@ import {
   type ParsedGrokAccount,
 } from "./monitor-core";
 
-type Provider = "chatgpt" | "grok";
-type ServiceName = "cpa" | "new_api" | "grok2api";
+type Provider = "qwen" | "longcat";
+type ServiceName = "cpa" | "new_api";
 
 interface ServiceHealthRecordInput {
   provider: Provider;
@@ -77,14 +77,14 @@ export async function collectAiMonitoring(now = new Date()): Promise<CollectAiMo
     })),
   });
 
-  const [chatgptAccounts, grokAccounts] = await Promise.all([
-    collectChatgptAccountStates(config, now, serviceHealth),
-    collectGrokAccountStates(config, now, serviceHealth),
+  const [qwenAccounts, longcatAccounts] = await Promise.all([
+    collectQwenAccountStates(config, now),
+    collectLongcatAccountStates(now),
   ]);
-  const allAccounts = [...chatgptAccounts, ...grokAccounts];
+  const allAccounts = [...qwenAccounts, ...longcatAccounts];
 
-  await syncAccountStates("chatgpt", chatgptAccounts);
-  await syncAccountStates("grok", grokAccounts);
+  await syncAccountStates("qwen", qwenAccounts);
+  await syncAccountStates("longcat", longcatAccounts);
 
   const providerSnapshots = await buildProviderSnapshots(now, allAccounts);
   await prisma.aiProviderSnapshot.createMany({
@@ -118,22 +118,18 @@ export async function collectAiMonitoring(now = new Date()): Promise<CollectAiMo
 async function collectServiceHealth(config: ReturnType<typeof getCheckConfig>): Promise<ServiceHealthRecordInput[]> {
   return Promise.all([
     checkService({
-      provider: "chatgpt",
+      provider: "qwen",
       service: "cpa",
       url: config.cpaApiKey ? `${config.cpaBaseUrl}/v1/models` : config.cpaBaseUrl,
       headers: config.cpaApiKey ? { Authorization: `Bearer ${config.cpaApiKey}` } : undefined,
+      requiredText: "qwen",
     }),
     checkService({
-      provider: "chatgpt",
+      provider: "longcat",
       service: "new_api",
       url: config.newApiApiKey ? `${config.newApiBaseUrl}/v1/models` : config.newApiBaseUrl,
       headers: config.newApiApiKey ? { Authorization: `Bearer ${config.newApiApiKey}` } : undefined,
-    }),
-    checkService({
-      provider: "grok",
-      service: "grok2api",
-      url: config.grokBaseUrl,
-      headers: config.grokApiKey ? { Authorization: `Bearer ${config.grokApiKey}` } : undefined,
+      requiredText: "longcat",
     }),
   ]);
 }
@@ -143,6 +139,7 @@ async function checkService(options: {
   service: ServiceName;
   url: string;
   headers?: Record<string, string>;
+  requiredText?: string;
 }): Promise<ServiceHealthRecordInput> {
   const startedAt = Date.now();
 
@@ -155,7 +152,7 @@ async function checkService(options: {
     const latencyMs = Date.now() - startedAt;
     const body = await safeReadText(response);
 
-    if (response.ok) {
+    if (response.ok && (!options.requiredText || body.toLowerCase().includes(options.requiredText.toLowerCase()))) {
       return {
         provider: options.provider,
         service: options.service,
@@ -169,10 +166,14 @@ async function checkService(options: {
     return {
       provider: options.provider,
       service: options.service,
-      status: response.status < 500 ? "degraded" : "unhealthy",
+      status: "degraded",
       latencyMs,
       version: extractVersion(body),
-      lastError: truncate(`HTTP ${response.status}: ${body || response.statusText}`),
+      lastError: truncate(
+        response.ok
+          ? `${options.service} did not expose ${options.requiredText ?? "expected"} models`
+          : `HTTP ${response.status}: ${body || response.statusText}`,
+      ),
     };
   } catch (error) {
     return {
@@ -186,12 +187,11 @@ async function checkService(options: {
   }
 }
 
-async function collectChatgptAccountStates(
+async function collectQwenAccountStates(
   config: ReturnType<typeof getCheckConfig>,
   now: Date,
-  _serviceHealth: ServiceHealthRecordInput[]
 ): Promise<AccountStateInput[]> {
-  const files = await listFiles(config.chatgptAuthDir, (name) => name.startsWith("token_oai") && name.endsWith(".json"));
+  const files = await listFiles(config.chatgptAuthDir, (name) => name.startsWith("qwen-") && name.endsWith(".json"));
 
   const accounts: AccountStateInput[] = [];
   for (const filePath of files) {
@@ -224,8 +224,8 @@ async function collectChatgptAccountStates(
 
       const email = json.email || path.basename(filePath);
       accounts.push({
-        provider: "chatgpt",
-        accountKey: stableAccountKey("chatgpt", email),
+        provider: "qwen",
+        accountKey: stableAccountKey("qwen", email),
         displayLabel: email.includes("@") ? maskEmail(email) : path.basename(filePath),
         status,
         lastUsedAt: lastRefreshAt,
@@ -245,8 +245,8 @@ async function collectChatgptAccountStates(
     } catch (error) {
       const label = path.basename(filePath);
       accounts.push({
-        provider: "chatgpt",
-        accountKey: stableAccountKey("chatgpt", label),
+        provider: "qwen",
+        accountKey: stableAccountKey("qwen", label),
         displayLabel: label,
         status: "invalid",
         lastUsedAt: null,
@@ -263,81 +263,81 @@ async function collectChatgptAccountStates(
   return accounts;
 }
 
-async function collectGrokAccountStates(
-  config: ReturnType<typeof getCheckConfig>,
+async function collectLongcatAccountStates(
   now: Date,
-  _serviceHealth: ServiceHealthRecordInput[]
 ): Promise<AccountStateInput[]> {
-  const tokenStates = await collectGrokTokenStates(config, now);
-  if (tokenStates.length > 0) {
-    return tokenStates;
-  }
+  const keys = await prisma.providerKey.findMany({
+    where: { provider: "longcat" },
+    include: {
+      usages: {
+        where: { createdAt: { gte: subtractMs(now, DAY_MS) } },
+        orderBy: { createdAt: "desc" },
+        select: { createdAt: true, success: true },
+      },
+      healthChecks: {
+        orderBy: { checkedAt: "desc" },
+        take: 1,
+        select: { status: true, error: true, checkedAt: true },
+      },
+    },
+  });
 
-  const files = await listFiles(
-    config.grokResultDir,
-    (name) => name.startsWith("grok") && name.endsWith(".txt")
-  );
+  return keys.map((key) => {
+    const latestHealth = key.healthChecks[0] ?? null;
+    const latestSuccessAt = key.usages.find((usage) => usage.success)?.createdAt ?? null;
+    const lastObservedAt = latestHealth?.checkedAt ?? key.lastCheckAt ?? key.updatedAt;
+    const requestCount24h = key.usages.length;
+    const successCount24h = key.usages.filter((usage) => usage.success).length;
 
-  const accounts: AccountStateInput[] = [];
-  for (const filePath of files) {
-    const stat = await fs.stat(filePath);
-    const raw = await fs.readFile(filePath, "utf8");
-    const parsed = parseGrokAccounts(raw);
-
-    for (const account of parsed) {
-      accounts.push({
-        provider: "grok",
-        accountKey: account.accountKey,
-        displayLabel: account.displayLabelMasked,
-        status: "unknown",
-        lastUsedAt: stat.mtime,
-        lastSuccessAt: null,
-        lastObservedAt: stat.mtime,
-        lastError: null,
-        requestCount24h: 0,
-        successRate24h: 0,
-        metadataJson: JSON.stringify(buildGrokMetadata(account, filePath, stat.mtime)),
-      });
+    let status: AccountStatus;
+    if (key.status === "disabled") {
+      status = "invalid";
+    } else if (latestHealth?.status === "rate_limited") {
+      status = "rate_limited";
+    } else if (latestHealth?.status === "fail" && (key.lastError || latestHealth.error)) {
+      status = classifyAccountStatus(
+        {
+          lastSuccessAt: latestSuccessAt,
+          lastObservedAt,
+          lastError: key.lastError || latestHealth.error || null,
+          requestCount24h,
+          successCount24h,
+        },
+        now,
+      );
+    } else {
+      status = classifyAccountStatus(
+        {
+          lastSuccessAt: latestSuccessAt,
+          lastObservedAt,
+          lastError: key.lastError,
+          requestCount24h,
+          successCount24h,
+        },
+        now,
+      );
     }
-  }
 
-  return dedupeAccountStates(accounts);
-}
-
-async function collectGrokTokenStates(
-  config: ReturnType<typeof getCheckConfig>,
-  now: Date
-): Promise<AccountStateInput[]> {
-  try {
-    const payload = await readGrokTokenPayload(config);
-    if (!payload) return [];
-
-    const parsed = parseGrokTokenStates(payload.raw);
-
-    return parsed.map((item) => ({
-      provider: "grok",
-      accountKey: item.accountKey,
-      displayLabel: item.displayLabelMasked,
-      status: item.status,
-      lastUsedAt: item.lastUsedAt,
-      lastSuccessAt: item.status === "healthy" ? item.lastSyncAt ?? item.lastUsedAt ?? now : null,
-      lastObservedAt: item.lastObservedAt ?? now,
-      lastError: resolveGrokTokenError(item),
-      requestCount24h: 0,
-      successRate24h: item.status === "healthy" ? 100 : 0,
+    return {
+      provider: "longcat" as const,
+      accountKey: stableAccountKey("longcat", key.id),
+      displayLabel: key.keyPrefix,
+      status,
+      lastUsedAt: key.usages[0]?.createdAt ?? null,
+      lastSuccessAt: latestSuccessAt,
+      lastObservedAt,
+      lastError: key.lastError || latestHealth?.error || null,
+      requestCount24h,
+      successRate24h: requestCount24h ? Math.round((successCount24h / requestCount24h) * 100) : 0,
       metadataJson: JSON.stringify({
-        source: payload.source,
-        quota: item.quota,
-        rawStatus: item.rawStatus,
-        lastFailReason: item.lastFailReason,
-        useCount: item.useCount,
-        lastSyncAt: item.lastSyncAt?.toISOString() ?? null,
-        observedAt: (item.lastObservedAt ?? now).toISOString(),
+        source: "provider-key",
+        keyPrefix: key.keyPrefix,
+        keyStatus: key.status,
+        lastCheckAt: key.lastCheckAt?.toISOString() ?? null,
+        latestHealthStatus: latestHealth?.status ?? null,
       }),
-    }));
-  } catch {
-    return [];
-  }
+    };
+  });
 }
 
 async function readGrokTokenPayload(
@@ -416,31 +416,54 @@ async function buildProviderSnapshots(
   now: Date,
   accounts: AccountStateInput[]
 ): Promise<ProviderSnapshotInput[]> {
-  const chatgptHealthRates = await getProviderHealthRates("chatgpt", now);
-  const grokHealthRates = await getProviderHealthRates("grok", now);
+  const [qwenHealthRates, longcatHealthRates, qwenUsage, longcatUsage] = await Promise.all([
+    getProviderHealthRates("qwen", now),
+    getProviderHealthRates("longcat", now),
+    getProviderUsageSummary("qwen", now),
+    getProviderUsageSummary("longcat", now),
+  ]);
 
   return [
     buildProviderSnapshot(
-      "chatgpt",
-      accounts.filter((account) => account.provider === "chatgpt"),
+      "qwen",
+      accounts.filter((account) => account.provider === "qwen"),
       {
-        requests1h: await prisma.searchLog.count({ where: { createdAt: { gte: subtractMs(now, HOUR_MS) } } }),
-        requests24h: await prisma.searchLog.count({ where: { createdAt: { gte: subtractMs(now, DAY_MS) } } }),
-        successRate1h: chatgptHealthRates.successRate1h,
-        successRate24h: chatgptHealthRates.successRate24h,
+        requests1h: qwenUsage.requests1h,
+        requests24h: qwenUsage.requests24h,
+        successRate1h: qwenHealthRates.successRate1h,
+        successRate24h: qwenHealthRates.successRate24h,
       }
     ),
     buildProviderSnapshot(
-      "grok",
-      accounts.filter((account) => account.provider === "grok"),
+      "longcat",
+      accounts.filter((account) => account.provider === "longcat"),
       {
-        requests1h: 0,
-        requests24h: 0,
-        successRate1h: grokHealthRates.successRate1h,
-        successRate24h: grokHealthRates.successRate24h,
+        requests1h: longcatUsage.requests1h,
+        requests24h: longcatUsage.requests24h,
+        successRate1h: longcatHealthRates.successRate1h,
+        successRate24h: longcatHealthRates.successRate24h,
       }
     ),
   ];
+}
+
+async function getProviderUsageSummary(provider: Provider, now: Date) {
+  const [requests1h, requests24h] = await Promise.all([
+    prisma.keyUsage.count({
+      where: {
+        createdAt: { gte: subtractMs(now, HOUR_MS) },
+        providerKey: { provider },
+      },
+    }),
+    prisma.keyUsage.count({
+      where: {
+        createdAt: { gte: subtractMs(now, DAY_MS) },
+        providerKey: { provider },
+      },
+    }),
+  ]);
+
+  return { requests1h, requests24h };
 }
 
 function buildProviderSnapshot(

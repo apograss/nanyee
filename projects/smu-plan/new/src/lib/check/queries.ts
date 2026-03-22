@@ -3,13 +3,14 @@ import { prisma } from "@/lib/prisma";
 import { getCheckConfig } from "./config";
 import { resolveLatestCheckAt } from "./view-models";
 
-const PROVIDERS = ["chatgpt", "grok"] as const;
+const PROVIDERS = ["qwen", "longcat"] as const;
 
 export async function getPublicCheckSummary() {
   const [services, snapshots, incidents] = await Promise.all([
     getLatestServiceStatuses(),
     getLatestProviderSnapshots(),
     prisma.aiIncident.findMany({
+      where: { provider: { in: [...PROVIDERS] } },
       orderBy: { occurredAt: "desc" },
       take: 12,
       select: {
@@ -81,6 +82,7 @@ export async function getAdminAiMonitorOverview() {
   const [summary, latestAccounts, links] = await Promise.all([
     getPublicCheckSummary(),
     prisma.aiAccountState.findMany({
+      where: { provider: { in: [...PROVIDERS] } },
       orderBy: [{ updatedAt: "desc" }],
       take: 8,
       select: {
@@ -163,6 +165,7 @@ export async function getAdminAiAccounts(params: {
 
 export async function getAdminAiIncidents() {
   const incidents = await prisma.aiIncident.findMany({
+    where: { provider: { in: [...PROVIDERS] } },
     orderBy: { occurredAt: "desc" },
     take: 100,
     select: {
@@ -183,6 +186,7 @@ export async function getAdminAiIncidents() {
 
 async function getLatestServiceStatuses() {
   const rows = await prisma.aiServiceHealth.findMany({
+    where: { provider: { in: [...PROVIDERS] } },
     orderBy: { checkedAt: "desc" },
     select: {
       provider: true,
@@ -204,6 +208,7 @@ async function getLatestServiceStatuses() {
 
 async function getLatestProviderSnapshots() {
   const rows = await prisma.aiProviderSnapshot.findMany({
+    where: { provider: { in: [...PROVIDERS] } },
     orderBy: { capturedAt: "desc" },
     select: {
       provider: true,

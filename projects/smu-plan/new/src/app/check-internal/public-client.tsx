@@ -90,10 +90,10 @@ export default function PublicCheckClient({
       string,
       {
         date: string;
-        chatgptRequests24h: number;
-        grokRequests24h: number;
-        chatgptHealthyAccounts: number;
-        grokHealthyAccounts: number;
+        qwenRequests24h: number;
+        longcatRequests24h: number;
+        qwenHealthyAccounts: number;
+        longcatHealthyAccounts: number;
       }
     >();
 
@@ -101,18 +101,18 @@ export default function PublicCheckClient({
       const entry =
         grouped.get(item.date) || {
           date: item.date,
-          chatgptRequests24h: 0,
-          grokRequests24h: 0,
-          chatgptHealthyAccounts: 0,
-          grokHealthyAccounts: 0,
+          qwenRequests24h: 0,
+          longcatRequests24h: 0,
+          qwenHealthyAccounts: 0,
+          longcatHealthyAccounts: 0,
         };
 
-      if (item.provider === "chatgpt") {
-        entry.chatgptRequests24h = item.requests24h;
-        entry.chatgptHealthyAccounts = item.healthyAccounts;
+      if (item.provider === "qwen") {
+        entry.qwenRequests24h = item.requests24h;
+        entry.qwenHealthyAccounts = item.healthyAccounts;
       } else {
-        entry.grokRequests24h = item.requests24h;
-        entry.grokHealthyAccounts = item.healthyAccounts;
+        entry.longcatRequests24h = item.requests24h;
+        entry.longcatHealthyAccounts = item.healthyAccounts;
       }
 
       grouped.set(item.date, entry);
@@ -129,7 +129,7 @@ export default function PublicCheckClient({
           <p className={styles.eyebrow}>Public Status</p>
           <h2 className={styles.heroTitle}>综合概览</h2>
           <p className={styles.heroText}>
-            展示 ChatGPT 与 Grok 最近一次定时采集结果。页面优先秒开，后台再按节奏刷新账号池状态。
+            展示 Qwen 与 LongCat 最近一次定时采集结果。页面优先秒开，后台再按节奏刷新账号池状态。
           </p>
           <div className={styles.heroMetaRow}>
             <span className={styles.heroPill}>上次刷新：{formatTimestamp(initialSummary.checkedAt)}</span>
@@ -139,7 +139,7 @@ export default function PublicCheckClient({
 
         <div className={styles.heroStats}>
           <MetricCard label="健康覆盖率" value={`${overview.healthPercent}%`} note={`${overview.healthyAccounts}/${overview.totalAccounts} 账号可用`} />
-          <MetricCard label="24 小时请求" value={formatNumber(overview.totalRequests24h)} note="合并 ChatGPT 与 Grok 请求量" />
+          <MetricCard label="24 小时请求" value={formatNumber(overview.totalRequests24h)} note="合并 Qwen 与 LongCat 请求量" />
           <MetricCard label="平均成功率" value={`${overview.averageSuccessRate24h}%`} note="按服务商快照平均计算" />
           <MetricCard label="待处理告警" value={formatNumber(overview.attentionAccounts)} note={`${overview.invalidAccounts} 失效 / ${overview.rateLimitedAccounts} 限流`} tone="warning" />
         </div>
@@ -173,7 +173,7 @@ export default function PublicCheckClient({
               <article
                 key={provider.provider}
                 className={`${styles.providerCard} ${
-                  provider.provider === "chatgpt" ? styles.providerCardChatgpt : styles.providerCardGrok
+                  provider.provider === "qwen" ? styles.providerCardChatgpt : styles.providerCardGrok
                 }`}
               >
                 <div className={styles.providerHeader}>
@@ -293,8 +293,8 @@ export default function PublicCheckClient({
                   <XAxis dataKey="date" tickLine={false} axisLine={false} fontSize={12} />
                   <YAxis tickLine={false} axisLine={false} fontSize={12} />
                   <Tooltip />
-                  <Area type="monotone" dataKey="chatgptRequests24h" stroke="#e8652b" fill="url(#chatgptArea)" name="ChatGPT 请求量" />
-                  <Area type="monotone" dataKey="grokRequests24h" stroke="#1d3557" fill="url(#grokArea)" name="Grok 请求量" />
+                  <Area type="monotone" dataKey="qwenRequests24h" stroke="#e8652b" fill="url(#chatgptArea)" name="Qwen 请求量" />
+                  <Area type="monotone" dataKey="longcatRequests24h" stroke="#1d3557" fill="url(#grokArea)" name="LongCat 请求量" />
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
@@ -324,8 +324,8 @@ export default function PublicCheckClient({
                   <XAxis dataKey="date" tickLine={false} axisLine={false} fontSize={12} />
                   <YAxis tickLine={false} axisLine={false} fontSize={12} />
                   <Tooltip />
-                  <Area type="monotone" dataKey="chatgptHealthyAccounts" stroke="#2a9d8f" fill="url(#chatgptHealthyArea)" name="ChatGPT 健康账号" />
-                  <Area type="monotone" dataKey="grokHealthyAccounts" stroke="#457b9d" fill="url(#grokHealthyArea)" name="Grok 健康账号" />
+                  <Area type="monotone" dataKey="qwenHealthyAccounts" stroke="#2a9d8f" fill="url(#chatgptHealthyArea)" name="Qwen 健康账号" />
+                  <Area type="monotone" dataKey="longcatHealthyAccounts" stroke="#457b9d" fill="url(#grokHealthyArea)" name="LongCat 健康账号" />
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
@@ -420,13 +420,11 @@ function normalizeStatus(status: string) {
 }
 
 function getProviderLabel(provider: string) {
-  return provider === "chatgpt" ? "ChatGPT" : provider === "grok" ? "Grok" : provider;
+  return provider === "qwen" ? "Qwen" : provider === "longcat" ? "LongCat" : provider;
 }
-
 function getServiceLabel(service: string) {
-  if (service === "cpa") return "CPA 代理池";
-  if (service === "new_api") return "New API";
-  if (service === "grok2api") return "Grok 浏览器服务";
+  if (service === "cpa") return "CPA Qwen 池";
+  if (service === "new_api") return "LongCat / New API";
   return service;
 }
 

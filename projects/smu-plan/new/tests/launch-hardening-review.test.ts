@@ -60,3 +60,17 @@ test("jwt secrets are loaded lazily so imports do not require env upfront", () =
   assert.doesNotMatch(jwt, /const ACCESS_SECRET =/);
   assert.doesNotMatch(jwt, /const REFRESH_SECRET =/);
 });
+
+test("auth me route returns a quiet anonymous payload instead of a 401 for public bootstraps", () => {
+  const route = readProjectFile("src", "app", "api", "auth", "me", "route.ts");
+
+  assert.match(route, /data:\s*\{\s*user:\s*null\s*\}/);
+  assert.doesNotMatch(route, /code:\s*401/);
+});
+
+test("evaluation page gates setup UI behind login instead of rendering a broken guest form", () => {
+  const page = readProjectFile("src", "app", "(main)", "tools", "evaluation", "page.tsx");
+
+  assert.match(page, /useAuth/);
+  assert.match(page, /需要登录|前往登录|登录后/);
+});

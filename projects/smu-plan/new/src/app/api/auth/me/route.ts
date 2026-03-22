@@ -5,10 +5,7 @@ import { prisma } from "@/lib/prisma";
 export async function GET(req: NextRequest) {
   const ctx = await getAuthContext(req);
   if (!ctx) {
-    return Response.json(
-      { ok: false, error: { code: 401, message: "Unauthorized" } },
-      { status: 401 }
-    );
+    return Response.json({ ok: true, data: { user: null } });
   }
 
   const user = await prisma.user.findUnique({

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useAuth } from "@/hooks/useAuth";
 import s from "./evaluation.module.css";
 
 /* ── Types ───────────────────────────────── */
@@ -26,6 +27,7 @@ interface LogEntry {
 /* ── Component ───────────────────────────── */
 
 export default function EvaluationPage() {
+  const { user, loading: authLoading } = useAuth();
   const [task, setTask] = useState<EvalTask | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -44,8 +46,9 @@ export default function EvaluationPage() {
 
   /* ── Load task on mount ── */
   useEffect(() => {
+    if (!user) return;
     loadTask();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (logRef.current) {
@@ -184,12 +187,42 @@ export default function EvaluationPage() {
   }
 
   /* ── Render ── */
-  if (loading) {
+  if (authLoading || (user && loading)) {
     return (
       <div className={s.evalPage}>
         <div className={s.container}>
           <div style={{ textAlign: "center", padding: "4rem 0" }}>
             <span className={s.spinner} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className={s.evalPage}>
+        <div className={s.container}>
+          <Link href="/tools" className={s.backLink}>
+            &larr; 返回工具列表
+          </Link>
+
+          <div className={s.header}>
+            <h1>📝 自动评课</h1>
+            <p>自动完成教务系统课程评价，支持后台定时执行</p>
+          </div>
+
+          <div className={s.card}>
+            <h2>需要登录</h2>
+            <p className={s.toggleDesc}>登录后才能保存教务账号、执行评课或查看历史日志。</p>
+            <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", marginTop: "1rem" }}>
+              <Link href="/login?redirect=%2Ftools%2Fevaluation">
+                <button className={s.btnPrimary}>前往登录</button>
+              </Link>
+              <Link href="/register">
+                <button className={s.btnSecondary}>注册账号</button>
+              </Link>
+            </div>
           </div>
         </div>
       </div>

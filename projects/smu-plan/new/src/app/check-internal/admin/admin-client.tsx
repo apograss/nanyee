@@ -83,7 +83,7 @@ export default function CheckAdminClient({
   const [overview, setOverview] = useState<AdminOverviewPayload>(initialOverview);
   const [accounts, setAccounts] = useState<AdminAccountItem[]>(initialAccounts);
   const [incidents, setIncidents] = useState(initialOverview.incidents);
-  const [provider, setProvider] = useState("chatgpt");
+  const [provider, setProvider] = useState("qwen");
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
   const [accountsLoading, setAccountsLoading] = useState(false);
@@ -163,36 +163,17 @@ export default function CheckAdminClient({
       processed: 0,
       ok: 0,
       fail: 0,
-      message: "正在启动 Grok 状态刷新…",
+      message: "正在刷新检测快照…",
     });
-
-    const response = await fetch("/api/admin/ai-monitor/grok-refresh", {
-      method: "POST",
-      cache: "no-store",
-    });
-    const json = await response.json();
-
-    if (!response.ok || !json.ok) {
-      setRefreshTaskId(null);
-      setRefreshStatus({
-        status: "error",
-        total: 0,
-        processed: 0,
-        ok: 0,
-        fail: 0,
-        message: json?.error?.message || "启动 Grok 状态刷新失败",
-      });
-      return;
-    }
-
-    setRefreshTaskId(json.data.taskId);
+    setRefreshTaskId(null);
+    await Promise.all([loadOverview(), loadAccounts(provider, status)]);
     setRefreshStatus({
-      status: "running",
-      total: json.data.total ?? 0,
+      status: "done",
+      total: 0,
       processed: 0,
       ok: 0,
       fail: 0,
-      message: `已启动 Grok 状态刷新，共 ${json.data.total ?? 0} 个 token。`,
+      message: "检测快照已刷新。",
     });
   }
 
@@ -269,7 +250,7 @@ export default function CheckAdminClient({
       <div className={styles.header}>
         <div>
           <h2 className={styles.title}>统一 AI 监控</h2>
-          <p className={styles.subtitle}>只读监控台，用于查看 ChatGPT 和 Grok 的服务、账号与异常。</p>
+          <p className={styles.subtitle}>只读监控台，用于查看 Qwen 和 LongCat 的服务、账号与异常。</p>
           <p className={styles.refreshMeta}>上次刷新：{formatTimestamp(overview.checkedAt)}</p>
         </div>
         <div className={styles.linkRow}>
@@ -280,17 +261,12 @@ export default function CheckAdminClient({
             disabled={refreshStatus.status === "running"}
           >
             {refreshStatus.status === "running"
-              ? `刷新 Grok 状态 ${refreshStatus.processed}/${refreshStatus.total || "-"}`
-              : "刷新 Grok 状态"}
+              ? `刷新检测快照 ${refreshStatus.processed}/${refreshStatus.total || "-"}`
+              : "刷新检测快照"}
           </button>
           {overview.links.newApiAdminUrl ? (
             <a href={overview.links.newApiAdminUrl} className={styles.linkButton} target="_blank" rel="noreferrer">
               打开 New API
-            </a>
-          ) : null}
-          {overview.links.grokAdminUrl ? (
-            <a href={overview.links.grokAdminUrl} className={styles.linkButton} target="_blank" rel="noreferrer">
-              打开 Grok 后台
             </a>
           ) : null}
           {overview.links.mainAdminUrl ? (
@@ -309,7 +285,7 @@ export default function CheckAdminClient({
 
       {loading || accountsLoading ? (
         <div className={styles.empty}>
-          {progressVariant === "refresh" ? "正在刷新 Grok 状态…" : "正在加载上一次快照…"}
+          {progressVariant === "refresh" ? "正在刷新检测快照…" : "正在加载上一次快照…"}
         </div>
       ) : null}
 
@@ -366,8 +342,8 @@ export default function CheckAdminClient({
           <h3 className={styles.sectionTitle}>账号状态</h3>
           <div className={styles.filters}>
             <select value={provider} onChange={(event) => setProvider(event.target.value)} className={styles.select}>
-              <option value="chatgpt">ChatGPT</option>
-              <option value="grok">Grok</option>
+              <option value="qwen">Qwen</option>
+              <option value="longcat">LongCat</option>
             </select>
             <select value={status} onChange={(event) => setStatus(event.target.value)} className={styles.select}>
               <option value="">全部状态</option>
@@ -443,13 +419,12 @@ function normalizeStatus(status: string) {
 }
 
 function getProviderLabel(provider: string) {
-  return provider === "chatgpt" ? "ChatGPT" : provider === "grok" ? "Grok" : provider;
+  return provider === "qwen" ? "Qwen" : provider === "longcat" ? "LongCat" : provider;
 }
 
 function getServiceLabel(service: string) {
   if (service === "cpa") return "CPA 代理池";
   if (service === "new_api") return "New API";
-  if (service === "grok2api") return "Grok 浏览器服务";
   return service;
 }
 

@@ -209,7 +209,7 @@ export function classifyAccountStatus(signal: ObservedAccountSignal, now = new D
   return "unknown";
 }
 
-export function stableAccountKey(provider: "chatgpt" | "grok", rawIdentifier: string): string {
+export function stableAccountKey(provider: "chatgpt" | "grok" | "qwen" | "longcat", rawIdentifier: string): string {
   return createHash("sha256").update(`${provider}:${rawIdentifier.trim().toLowerCase()}`).digest("hex");
 }
 
