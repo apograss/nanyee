@@ -363,5 +363,24 @@
 
   .mobileToggle {
     display: inline-flex;
+    position: sticky;
+    top: calc(var(--header-height) + 10px);
+    z-index: calc(var(--z-sticky) - 1);
+    margin: 12px 14px 8px;
+    min-height: 42px;
+    background: color-mix(in srgb, var(--bg-secondary) 90%, var(--bg-primary) 10%);
+    box-shadow: var(--neo-shadow-sm);
+  }
+
+  .overlay {
+    backdrop-filter: blur(3px);
+  }
+
+  .drawer {
+    top: calc(var(--header-height) + 8px);
+    bottom: 12px;
+    left: 12px;
+    width: min(320px, calc(100vw - 24px));
+    border-radius: calc(var(--neo-radius) * 1.15);
   }
 }

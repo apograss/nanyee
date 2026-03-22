@@ -72,6 +72,10 @@
 }
 
 @media (max-width: 640px) {
+  .footer {
+    padding: 20px 14px;
+  }
+
   .inner {
     flex-direction: column;
     text-align: center;
@@ -79,5 +83,16 @@
 
   .linksRow {
     justify-content: center;
+  }
+
+  .secondaryLink {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    padding: 0 14px;
+    border-radius: 999px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-light);
   }
 }

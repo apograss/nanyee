@@ -318,12 +318,24 @@
 
 @media (max-width: 900px) {
   .page {
-    padding-inline: 16px;
+    padding: 18px 14px 52px;
   }
 
   .bodyCard,
   .header {
     padding: 20px;
+  }
+
+  .breadcrumb {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    white-space: nowrap;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+
+  .breadcrumb::-webkit-scrollbar {
+    display: none;
   }
 
   .markdown {
@@ -332,5 +344,34 @@
 
   .interactiveFrame {
     min-height: 480px;
+  }
+
+  .actions {
+    display: grid;
+    width: 100%;
+  }
+
+  .actions > * {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .sideRail {
+    gap: 14px;
+  }
+}
+
+@media (max-width: 560px) {
+  .title {
+    font-size: clamp(1.8rem, 10vw, 2.5rem);
+  }
+
+  .bodyCard,
+  .header {
+    padding: 18px;
+  }
+
+  .categoryBar {
+    gap: 6px;
   }
 }

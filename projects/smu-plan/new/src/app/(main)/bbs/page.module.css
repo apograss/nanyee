@@ -225,7 +225,7 @@
 
 @media (max-width: 900px) {
   .page {
-    padding-inline: 16px;
+    padding: 20px 14px 56px;
   }
 
   .hero,
@@ -239,5 +239,33 @@
 
   .subtitle {
     font-size: 16px;
+  }
+
+  .metaList {
+    gap: 8px;
+  }
+
+  .actions {
+    display: grid;
+    width: 100%;
+  }
+
+  .actions > a,
+  .actions > button {
+    width: 100%;
+  }
+
+  .secondaryLink {
+    display: inline-flex;
+    justify-content: center;
+    min-height: 44px;
+    align-items: center;
+    border: var(--neo-border);
+    border-radius: var(--neo-radius);
+    background: var(--bg-primary);
+  }
+
+  .topicMeta {
+    gap: 8px 10px;
   }
 }

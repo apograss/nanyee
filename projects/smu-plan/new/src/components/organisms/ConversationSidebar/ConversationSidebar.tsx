@@ -17,12 +17,14 @@ interface ConversationSidebarProps {
   activeConversationId: string | null;
   onSelectConversation: (id: string, messages: ChatMessage[]) => void;
   onCreateConversation: () => void;
+  className?: string;
 }
 
 export default function ConversationSidebar({
   activeConversationId,
   onSelectConversation,
   onCreateConversation,
+  className,
 }: ConversationSidebarProps) {
   const [conversations, setConversations] = useState<ConversationListItem[]>([]);
 
@@ -70,7 +72,7 @@ export default function ConversationSidebar({
   };
 
   return (
-    <aside className={styles.sidebar}>
+    <aside className={[styles.sidebar, className].filter(Boolean).join(" ")}>
       <div className={styles.header}>
         <div className={styles.title}>对话历史</div>
         <div className={styles.hint}>登录后自动同步最近 20 条对话</div>

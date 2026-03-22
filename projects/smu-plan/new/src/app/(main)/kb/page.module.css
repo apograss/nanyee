@@ -128,15 +128,54 @@
   }
 
   .main {
-    padding: 18px 18px 52px;
+    padding: 16px 14px 48px;
   }
 
   .contentArea {
     grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .sortRow {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .sortInfo {
+    font-size: 15px;
+  }
+
+  .sortInfoCount {
+    display: inline-block;
+    margin-left: 6px;
   }
 
   .insights {
     position: static;
     grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .insightCard {
+    padding: 16px;
+  }
+
+  .insightItem {
+    grid-template-columns: 18px 26px minmax(0, 1fr) auto;
+    padding: 10px 12px;
+  }
+
+  .insightText {
+    font-size: var(--text-xs);
+    line-height: 1.5;
+  }
+}
+
+@media (max-width: 560px) {
+  .sortInfoCount {
+    display: block;
+    margin-left: 0;
+    margin-top: 4px;
   }
 }

@@ -675,6 +675,10 @@
   border-right: 1px solid var(--border-light);
 }
 
+.desktopConversationSidebar {
+  display: block;
+}
+
 .chatMain {
   min-width: 0;
   flex: 1;
@@ -695,6 +699,25 @@
   border-top: 1px solid var(--border-light);
   background: var(--bg-secondary);
   width: 100%;
+}
+
+.chatBarTools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.historyToggle {
+  display: none;
+  min-height: 40px;
+  padding: 0 14px;
+  border: var(--neo-border);
+  border-radius: var(--neo-radius);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  box-shadow: var(--neo-shadow-sm);
 }
 
 .newChatBtn {
@@ -838,6 +861,68 @@
   cursor: pointer;
 }
 
+.mobileConversationOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: none;
+  background: rgba(17, 24, 39, 0.42);
+  backdrop-filter: blur(3px);
+}
+
+.mobileConversationPanel {
+  display: grid;
+  gap: 12px;
+  width: min(100%, 360px);
+  max-height: min(78vh, 680px);
+  margin: auto 12px 12px;
+  padding: 14px;
+  border: var(--neo-border);
+  border-radius: calc(var(--neo-radius) * 1.2);
+  background: var(--bg-secondary);
+  box-shadow: var(--neo-shadow);
+}
+
+.mobileConversationHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mobileConversationTitle {
+  display: block;
+  font-size: var(--text-base);
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
+}
+
+.mobileConversationHint {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.mobileConversationClose {
+  width: 36px;
+  height: 36px;
+  border: var(--neo-border);
+  border-radius: var(--neo-radius);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.mobileConversationSidebar {
+  width: 100%;
+  border-right: none;
+  border: 1px solid var(--border-light);
+  border-radius: calc(var(--neo-radius) * 1.05);
+  overflow: hidden;
+}
+
 /* ═══ RESPONSIVE ═══ */
 @media (max-width: 900px) {
   .hero {
@@ -873,6 +958,10 @@
 }
 
 @media (max-width: 768px) {
+  .idle {
+    padding: 0 14px;
+  }
+
   .pillars {
     grid-template-columns: 1fr;
   }
@@ -881,16 +970,114 @@
     grid-template-columns: 1fr;
   }
 
+  .hero {
+    padding-top: 24px;
+    gap: 24px;
+    text-align: left;
+  }
+
+  .heroBadge {
+    margin-bottom: 12px;
+  }
+
   .heroRight {
     display: none;
   }
 
   .greeting {
     font-size: 30px;
+    letter-spacing: -0.04em;
+    margin-bottom: 12px;
+  }
+
+  .subtitle {
+    max-width: none;
+    margin-bottom: 20px;
+    font-size: 15px;
+    line-height: 1.65;
+  }
+
+  .searchWrap {
+    max-width: none;
+  }
+
+  .searchBox {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .searchInput {
+    flex: 1 1 180px;
+    min-height: 40px;
+  }
+
+  .searchModes {
+    order: 3;
+    width: 100%;
+    overflow-x: auto;
+    padding: 4px;
+    scrollbar-width: none;
+  }
+
+  .searchModes::-webkit-scrollbar {
+    display: none;
+  }
+
+  .searchMode {
+    flex: 0 0 auto;
+    min-width: 72px;
+    padding: 8px 12px;
+  }
+
+  .attachBtn,
+  .searchGo {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    margin-right: -4px;
+    scrollbar-width: none;
+  }
+
+  .chips::-webkit-scrollbar {
+    display: none;
+  }
+
+  .chip {
+    flex: 0 0 auto;
+  }
+
+  .pillarsSection {
+    padding: 32px 0 28px;
+  }
+
+  .sectionLabel {
+    margin-bottom: 12px;
+  }
+
+  .pillar {
+    padding: 18px;
+  }
+
+  .pillarHead {
+    align-items: flex-start;
+  }
+
+  .toolCard {
+    padding: 14px 16px;
+    gap: 12px;
   }
 
   .chatBar {
-    padding: var(--space-sm);
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 12px 14px;
   }
 
   .modelSwitchSmall {
@@ -907,8 +1094,46 @@
     width: 100%;
   }
 
-  .chatLayout > aside {
+  .desktopConversationSidebar {
     display: none;
+  }
+
+  .historyToggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .chatBarTools {
+    width: 100%;
+  }
+
+  .newChatBtn,
+  .historyToggle {
+    flex: 1;
+    min-height: 44px;
+  }
+
+  .chatForm {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .chatInput {
+    flex-basis: 100%;
+    min-height: 46px;
+  }
+
+  .attachBtn {
+    order: 2;
+  }
+
+  .sendBtn {
+    margin-left: auto;
+  }
+
+  .mobileConversationOverlay {
+    display: flex;
   }
 }
 

@@ -72,6 +72,7 @@ export default function HomePage() {
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [preview, setPreview] = useState<HomePreview | null>(null);
   const [visionEnabled, setVisionEnabled] = useState(false);
+  const [mobileHistoryOpen, setMobileHistoryOpen] = useState(false);
   const [imageAttachment, setImageAttachment] = useState<{
     name: string;
     dataUrl: string;
@@ -245,8 +246,14 @@ export default function HomePage() {
 
   const handleNewChat = () => {
     reset();
+    setMobileHistoryOpen(false);
     setInput("");
     setTimeout(() => inputRef.current?.focus(), 100);
+  };
+
+  const handleSelectConversation = (id: string, nextMessages: typeof messages) => {
+    hydrateConversation(id, nextMessages);
+    setMobileHistoryOpen(false);
   };
 
   const currentPlaceholder = SEARCH_MODES.find((m) => m.id === searchMode)?.placeholder ?? "";
@@ -597,11 +604,46 @@ export default function HomePage() {
   return (
     <div className={styles.chatLayout}>
       {user ? (
-        <ConversationSidebar
-          activeConversationId={conversationId}
-          onSelectConversation={hydrateConversation}
-          onCreateConversation={handleNewChat}
-        />
+        <>
+          <ConversationSidebar
+            className={styles.desktopConversationSidebar}
+            activeConversationId={conversationId}
+            onSelectConversation={handleSelectConversation}
+            onCreateConversation={handleNewChat}
+          />
+          {mobileHistoryOpen ? (
+            <div
+              className={styles.mobileConversationOverlay}
+              onClick={() => setMobileHistoryOpen(false)}
+            >
+              <div
+                className={styles.mobileConversationPanel}
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className={styles.mobileConversationHeader}>
+                  <div>
+                    <strong className={styles.mobileConversationTitle}>对话历史</strong>
+                    <p className={styles.mobileConversationHint}>从手机上也能快速切换旧对话。</p>
+                  </div>
+                  <button
+                    type="button"
+                    className={styles.mobileConversationClose}
+                    onClick={() => setMobileHistoryOpen(false)}
+                    aria-label="关闭对话历史"
+                  >
+                    ×
+                  </button>
+                </div>
+                <ConversationSidebar
+                  className={styles.mobileConversationSidebar}
+                  activeConversationId={conversationId}
+                  onSelectConversation={handleSelectConversation}
+                  onCreateConversation={handleNewChat}
+                />
+              </div>
+            </div>
+          ) : null}
+        </>
       ) : null}
 
       <div className={styles.chatMain}>
@@ -614,6 +656,16 @@ export default function HomePage() {
         </div>
 
         <div className={styles.chatBar}>
+          <div className={styles.chatBarTools}>
+            {user ? (
+              <button
+                type="button"
+                className={styles.historyToggle}
+                onClick={() => setMobileHistoryOpen(true)}
+              >
+                历史
+              </button>
+            ) : null}
           <button
             className={styles.newChatBtn}
             onClick={handleNewChat}
@@ -622,6 +674,7 @@ export default function HomePage() {
           >
             +
           </button>
+          </div>
           <form
             className={styles.chatForm}
             onSubmit={handleSubmit}

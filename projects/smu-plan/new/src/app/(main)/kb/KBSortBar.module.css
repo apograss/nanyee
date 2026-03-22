@@ -3,6 +3,8 @@
 .tabs {
   display: flex;
   gap: 3px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .tab {
@@ -27,4 +29,17 @@
   background: var(--color-dark);
   color: var(--text-inverse);
   border-color: var(--color-dark);
+}
+
+@media (max-width: 900px) {
+  .tabs {
+    justify-content: stretch;
+  }
+
+  .tab {
+    flex: 1 1 0;
+    min-height: 40px;
+    padding: 8px 10px;
+    font-size: 12px;
+  }
 }

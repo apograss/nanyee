@@ -99,6 +99,10 @@ export default function Header() {
       ? pathname === "/"
       : pathname === href || pathname.startsWith(`${href}/`);
 
+  const mobileToolsLinkClasses = `${styles.mobileLink} ${
+    isActiveLink("/tools") ? styles.active : ""
+  }`;
+
   return (
     <header className={styles.header}>
       <div className={styles.inner}>
@@ -225,63 +229,131 @@ export default function Header() {
 
       {navOpen ? (
         <div className={styles.mobileNav} id="mobile-nav" ref={mobileNavRef}>
-          {navLinks.map((link) =>
-            !link.external && link.href === "/tools" ? (
-              <div key={link.href} className={styles.mobileTools}>
-                <button
-                  type="button"
-                  className={`${styles.mobileLink} ${
-                    isActiveLink(link.href) ? styles.active : ""
-                  }`}
-                  onClick={() => setToolsMenuOpen((open) => !open)}
-                  aria-expanded={toolsMenuOpen}
-                >
-                  {link.label}
-                </button>
-                {toolsMenuOpen ? (
-                  <div className={styles.mobileSubnav}>
-                    {TOOL_MENU_ITEMS.map((item) => (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className={`${styles.mobileSubLink} ${
-                          isActiveLink(item.href) ? styles.active : ""
-                        }`}
-                        onClick={() => {
-                          setToolsMenuOpen(false);
-                          setNavOpen(false);
-                        }}
-                      >
-                        {item.label}
-                      </Link>
-                    ))}
+          <div className={styles.mobileNavInner}>
+            <div className={styles.mobileNavLinks}>
+              {navLinks.map((link) =>
+                !link.external && link.href === "/tools" ? (
+                  <div key={link.href} className={styles.mobileTools}>
+                    <button
+                      type="button"
+                      className={mobileToolsLinkClasses}
+                      onClick={() => setToolsMenuOpen((open) => !open)}
+                      aria-expanded={toolsMenuOpen}
+                    >
+                      <span>{link.label}</span>
+                      <span className={styles.mobileToolsArrow}>{toolsMenuOpen ? "−" : "+"}</span>
+                    </button>
+                    {toolsMenuOpen ? (
+                      <div className={styles.mobileSubnav}>
+                        {TOOL_MENU_ITEMS.map((item) => (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            className={`${styles.mobileSubLink} ${
+                              isActiveLink(item.href) ? styles.active : ""
+                            }`}
+                            onClick={() => {
+                              setToolsMenuOpen(false);
+                              setNavOpen(false);
+                            }}
+                          >
+                            {item.label}
+                          </Link>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
-                ) : null}
-              </div>
-            ) :
-            link.external ? (
-              <a
-                key={link.href}
-                href={link.href}
-                className={styles.mobileLink}
-                rel="noopener noreferrer"
-                onClick={() => setNavOpen(false)}
-              >
-                {link.label}
-              </a>
-            ) : (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`${styles.mobileLink} ${
-                  isActiveLink(link.href) ? styles.active : ""
-                }`}
-                onClick={() => setNavOpen(false)}
-              >
-                {link.label}
-              </Link>
-            )
-          )}
+                ) : link.external ? (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    className={styles.mobileLink}
+                    rel="noopener noreferrer"
+                    onClick={() => setNavOpen(false)}
+                  >
+                    {link.label}
+                  </a>
+                ) : (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={`${styles.mobileLink} ${
+                      isActiveLink(link.href) ? styles.active : ""
+                    }`}
+                    onClick={() => setNavOpen(false)}
+                  >
+                    {link.label}
+                  </Link>
+                ),
+              )}
+            </div>
+
+            <div className={styles.mobileAuth}>
+              {user ? (
+                <>
+                  <div className={styles.mobileUserMeta}>
+                    <strong className={styles.mobileUserName}>
+                      {user.nickname || user.username}
+                    </strong>
+                    <span className={styles.mobileUserRole}>
+                      {user.role === "admin" ? "管理员账户" : "已登录用户"}
+                    </span>
+                  </div>
+                  <div className={styles.mobileAuthActions}>
+                    {user.role === "admin" ? (
+                      <Link
+                        href="/admin"
+                        className={styles.mobileSecondaryAction}
+                        onClick={() => setNavOpen(false)}
+                      >
+                        管理后台
+                      </Link>
+                    ) : null}
+                    <Link
+                      href="/settings"
+                      className={styles.mobileSecondaryAction}
+                      onClick={() => setNavOpen(false)}
+                    >
+                      账号设置
+                    </Link>
+                    <Link
+                      href="/editor"
+                      className={styles.mobilePrimaryAction}
+                      onClick={() => setNavOpen(false)}
+                    >
+                      发起共建
+                    </Link>
+                    <button type="button" onClick={handleLogout} className={styles.mobileGhostAction}>
+                      退出登录
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className={styles.mobileUserMeta}>
+                    <strong className={styles.mobileUserName}>登录后继续</strong>
+                    <span className={styles.mobileUserRole}>收藏工具、参与共建和继续对话都会更顺手。</span>
+                  </div>
+                  <div className={styles.mobileAuthActions}>
+                    <Link
+                      href="/login"
+                      className={styles.mobilePrimaryAction}
+                      onClick={() => setNavOpen(false)}
+                    >
+                      登录
+                    </Link>
+                    <Link
+                      href="/register"
+                      className={styles.mobileSecondaryAction}
+                      onClick={() => setNavOpen(false)}
+                    >
+                      注册
+                    </Link>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       ) : null}
     </header>
