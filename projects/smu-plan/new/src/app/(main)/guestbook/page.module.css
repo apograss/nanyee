@@ -131,3 +131,28 @@
   border-color: var(--color-brand);
   background: var(--color-brand-light);
 }
+
+@media (max-width: 640px) {
+  .page {
+    padding: 20px 14px 40px;
+  }
+
+  .headerRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .toggle {
+    justify-content: center;
+    min-height: 40px;
+  }
+
+  .danmakuArea {
+    height: 180px;
+    margin-bottom: 12px;
+  }
+
+  .empty {
+    padding: 32px 18px;
+  }
+}

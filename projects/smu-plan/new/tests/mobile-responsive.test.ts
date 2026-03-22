@@ -29,3 +29,21 @@ test("kb list mobile styles stack sort controls vertically", () => {
   const css = read("src/app/(main)/kb/page.module.css");
   assert.match(css, /@media \(max-width: 900px\)[\s\S]*?\.sortRow\s*\{[\s\S]*?flex-direction:\s*column;/);
 });
+
+test("editor mobile styles let mode controls wrap and reduce source editor height", () => {
+  const css = read("src/app/(main)/editor/page.module.css");
+  assert.match(css, /@media \(max-width: 900px\)[\s\S]*?\.modeSwitch,[\s\S]*?\.formatSwitch\s*\{[\s\S]*?flex-wrap:\s*wrap;/);
+  assert.match(css, /@media \(max-width: 900px\)[\s\S]*?\.sourceEditor\s*\{[\s\S]*?min-height:\s*360px;/);
+});
+
+test("guestbook mobile styles stack the header and tighten the danmaku area", () => {
+  const css = read("src/app/(main)/guestbook/page.module.css");
+  assert.match(css, /@media \(max-width: 640px\)[\s\S]*?\.headerRow\s*\{[\s\S]*?flex-direction:\s*column;/);
+  assert.match(css, /@media \(max-width: 640px\)[\s\S]*?\.danmakuArea\s*\{[\s\S]*?height:\s*180px;/);
+});
+
+test("tool cards gain a compact mobile layout instead of only shrinking text", () => {
+  const css = read("src/components/molecules/ToolCard.module.css");
+  assert.match(css, /@media \(max-width: 640px\)[\s\S]*?\.card\s*\{[\s\S]*?padding:/);
+  assert.match(css, /@media \(max-width: 640px\)[\s\S]*?\.icon\s*\{[\s\S]*?font-size:/);
+});

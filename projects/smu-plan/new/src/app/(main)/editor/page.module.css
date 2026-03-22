@@ -437,6 +437,21 @@
 }
 
 @media (max-width: 900px) {
+  .page {
+    padding: 18px 14px 48px;
+  }
+
+  .hero,
+  .warningBanner,
+  .noticeCard,
+  .loadingCard {
+    padding: 22px 18px;
+  }
+
+  .title {
+    font-size: clamp(1.8rem, 10vw, 2.6rem);
+  }
+
   .metaGrid {
     grid-template-columns: 1fr;
   }
@@ -458,6 +473,33 @@
   .editorTools {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .modeSwitch,
+  .formatSwitch {
+    width: 100%;
+    flex-wrap: wrap;
+    border-radius: 18px;
+  }
+
+  .modeButton,
+  .formatButton {
+    flex: 1 1 calc(50% - 6px);
+    min-width: 0;
+  }
+
+  .sourceWrap,
+  .previewShell {
+    padding: 0 16px 18px;
+  }
+
+  .sourceEditor {
+    min-height: 360px;
+    padding: 16px;
+  }
+
+  .formActions > * {
+    width: 100%;
   }
 
   .interactivePreviewFrame {

@@ -90,3 +90,25 @@
   transform: translateX(4px);
   color: var(--color-brand);
 }
+
+@media (max-width: 640px) {
+  .card {
+    gap: 12px;
+    padding: 14px 15px;
+  }
+
+  .icon {
+    font-size: 1.65rem;
+  }
+
+  .titleRow {
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .arrow {
+    font-size: 1rem;
+    align-self: flex-start;
+    margin-top: 2px;
+  }
+}
