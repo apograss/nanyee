@@ -11,9 +11,11 @@ function readProjectFile(...segments: string[]) {
 
 test("build script ensures standalone static assets are linked after next build", () => {
   const packageJson = readProjectFile("package.json");
+  const prepareBuildScript = readProjectFile("scripts", "prepare-build.mjs");
   const helperScript = readProjectFile("scripts", "link-standalone-static.mjs");
 
-  assert.match(packageJson, /next build && node scripts\/link-standalone-static\.mjs/);
+  assert.match(packageJson, /node scripts\/prepare-build\.mjs && next build && node scripts\/link-standalone-static\.mjs/);
+  assert.match(prepareBuildScript, /removed stale \.next artifacts/);
   assert.match(helperScript, /standaloneStaticDir/);
   assert.match(helperScript, /symlinkTarget/);
 });
