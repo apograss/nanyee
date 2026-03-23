@@ -3,7 +3,11 @@ import { prisma } from "@/lib/prisma";
 import { compare, hash } from "bcryptjs";
 import { z } from "zod";
 import { requireUser, handleAuthError } from "@/lib/auth/guard";
-import { isVerificationMailConfigured, sendVerificationEmail } from "@/lib/mail/resend";
+import {
+  allowVerificationMailDevFallback,
+  isVerificationMailConfigured,
+  sendVerificationEmail,
+} from "@/lib/mail/resend";
 import { buildVerificationRecordInput } from "@/lib/auth/verification-records";
 
 const schema = z.object({
@@ -102,13 +106,26 @@ export async function POST(req: NextRequest) {
 
     // Send both emails
     if (isVerificationMailConfigured()) {
-      await Promise.all([
-        sendVerificationEmail({ to: user.email, code: oldCode, purpose: "change_old" }),
-        sendVerificationEmail({ to: data.newEmail, code: newCode, purpose: "change_new" }),
-      ]);
-    } else {
+      try {
+        await Promise.all([
+          sendVerificationEmail({ to: user.email, code: oldCode, purpose: "change_old" }),
+          sendVerificationEmail({ to: data.newEmail, code: newCode, purpose: "change_new" }),
+        ]);
+      } catch (err) {
+        console.error("Failed to send change verification emails:", err);
+        return Response.json(
+          { ok: false, error: { code: 500, message: "邮箱验证码发送失败，请稍后再试" } },
+          { status: 500 },
+        );
+      }
+    } else if (allowVerificationMailDevFallback()) {
       console.log(`[DEV] Email change old code for ${user.email}: ${oldCode}`);
       console.log(`[DEV] Email change new code for ${data.newEmail}: ${newCode}`);
+    } else {
+      return Response.json(
+        { ok: false, error: { code: 500, message: "邮箱验证码服务未配置，请联系管理员" } },
+        { status: 500 },
+      );
     }
 
     const maskEmail = (e: string) =>

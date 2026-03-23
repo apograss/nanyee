@@ -42,6 +42,7 @@ model User {
   bbsTopics    BbsTopic[]  @relation("BbsTopicAuthor")
   bbsReplies   BbsReply[]  @relation("BbsReplyAuthor")
   evalTask     EvalTask?
+  twoFactor    UserTwoFactor?
 }
 
 model EvalTask {
@@ -277,6 +278,18 @@ model Conversation {
   updatedAt   DateTime @updatedAt
 
   @@index([userId, updatedAt])
+}
+
+model UserTwoFactor {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  secretCipher          String
+  enabledAt             DateTime?
+  recoveryCodesHashJson String?
+  lastUsedAt            DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 }
 
 // ═══════════════════════════════════════

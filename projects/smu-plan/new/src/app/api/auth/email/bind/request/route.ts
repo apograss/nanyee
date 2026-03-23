@@ -3,7 +3,11 @@ import { prisma } from "@/lib/prisma";
 import { compare, hash } from "bcryptjs";
 import { z } from "zod";
 import { requireUser, handleAuthError } from "@/lib/auth/guard";
-import { isVerificationMailConfigured, sendVerificationEmail } from "@/lib/mail/resend";
+import {
+  allowVerificationMailDevFallback,
+  isVerificationMailConfigured,
+  sendVerificationEmail,
+} from "@/lib/mail/resend";
 import { buildVerificationRecordInput } from "@/lib/auth/verification-records";
 
 const schema = z.object({
@@ -91,9 +95,22 @@ export async function POST(req: NextRequest) {
 
     // Send verification email
     if (isVerificationMailConfigured()) {
-      await sendVerificationEmail({ to: data.email, code, purpose: "bind" });
-    } else {
+      try {
+        await sendVerificationEmail({ to: data.email, code, purpose: "bind" });
+      } catch (err) {
+        console.error("Failed to send bind verification email:", err);
+        return Response.json(
+          { ok: false, error: { code: 500, message: "邮箱验证码发送失败，请稍后再试" } },
+          { status: 500 },
+        );
+      }
+    } else if (allowVerificationMailDevFallback()) {
       console.log(`[DEV] Email bind code for ${data.email}: ${code}`);
+    } else {
+      return Response.json(
+        { ok: false, error: { code: 500, message: "邮箱验证码服务未配置，请联系管理员" } },
+        { status: 500 },
+      );
     }
 
     const masked = data.email.replace(/^(.{1,2})(.*)(@.*)$/, (_, a, b, c) =>

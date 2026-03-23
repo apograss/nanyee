@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { hash } from "bcryptjs";
 import { z } from "zod";
 import {
+  allowVerificationMailDevFallback,
   isVerificationMailConfigured,
   sendVerificationEmail,
 } from "@/lib/mail/resend";
@@ -97,8 +98,13 @@ export async function POST(req: NextRequest) {
             { status: 500 }
           );
         }
-      } else {
+      } else if (allowVerificationMailDevFallback()) {
         console.log(`[DEV] Registration verification code for ${data.email}: ${code}`);
+      } else {
+        return Response.json(
+          { ok: false, error: { code: 500, message: "注册邮件服务未配置，请联系管理员" } },
+          { status: 500 },
+        );
       }
 
       const masked = data.email.replace(/^(.{1,2})(.*)(@.*)$/, (_, a, b, c) =>

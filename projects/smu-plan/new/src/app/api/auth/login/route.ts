@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { compare } from "bcryptjs";
 import { z } from "zod";
 import { issueUserSession } from "@/lib/auth/session";
+import { signTwoFactorChallenge } from "@/lib/auth/two-factor";
 import { checkAuthRateLimit } from "@/lib/rate-limiter";
 
 const loginSchema = z.object({
@@ -32,6 +33,13 @@ export async function POST(req: NextRequest) {
           { email: data.username },
         ],
       },
+      include: {
+        twoFactor: {
+          select: {
+            enabledAt: true,
+          },
+        },
+      },
     });
 
     if (!user) {
@@ -47,6 +55,28 @@ export async function POST(req: NextRequest) {
         { ok: false, error: { code: 401, message: "Invalid credentials" } },
         { status: 401 }
       );
+    }
+
+    if (user.twoFactor?.enabledAt) {
+      const challengeId = await signTwoFactorChallenge({
+        userId: user.id,
+        username: user.username,
+        role: user.role,
+      });
+
+      return Response.json({
+        ok: true,
+        data: {
+          requiresTwoFactor: true,
+          challengeId,
+          user: {
+            id: user.id,
+            username: user.username,
+            nickname: user.nickname,
+            role: user.role,
+          },
+        },
+      });
     }
 
     return issueUserSession(req, user, {

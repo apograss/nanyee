@@ -55,3 +55,74 @@
   padding: 0;
   text-decoration: underline;
 }
+
+.twoFactorHeader,
+.twoFactorSetup,
+.twoFactorManage,
+.recoveryCard {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.twoFactorHeader {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.twoFactorTitle,
+.recoveryTitle {
+  font-size: var(--text-sm);
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
+}
+
+.qrCard {
+  display: grid;
+  gap: 12px;
+  padding: var(--space-md);
+  border: var(--neo-border);
+  border-radius: var(--neo-radius);
+  background: var(--bg-primary);
+}
+
+.qrImage {
+  width: min(220px, 100%);
+  border-radius: var(--neo-radius);
+  border: 1px solid var(--border-light);
+}
+
+.manualKey {
+  display: grid;
+  gap: 6px;
+}
+
+.manualKey code,
+.recoveryCode {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: var(--neo-radius);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  font-family: var(--font-mono);
+}
+
+.recoveryList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 768px) {
+  .actionRow {
+    flex-wrap: wrap;
+  }
+
+  .actionRow > * {
+    width: 100%;
+  }
+
+  .twoFactorHeader {
+    grid-template-columns: 1fr;
+  }
+}

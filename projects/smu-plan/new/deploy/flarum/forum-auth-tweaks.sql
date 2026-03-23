@@ -12,35 +12,62 @@ REPLACE INTO flarum_settings (`key`, `value`) VALUES
 .item-signUp { display: none !important; }
 
 body,
-.App {
+.App,
+.App-content,
+.App-body,
+.IndexPage,
+.DiscussionPage {
   background: #f7f2e8;
   color: #16345c;
 }
 
-.Header-secondary {
-  gap: 12px;
+.Header {
+  background: rgba(255, 250, 237, 0.96);
+  border-bottom: 2px solid #16345c;
+  box-shadow: none;
+}
+
+.Header-title a,
+.Header-title a:hover,
+.DiscussionListItem-title,
+.DiscussionListItem-title:hover,
+.TagLinkButton,
+.TagLinkButton:hover,
+.Post-body a,
+.Post-body a:hover {
+  color: #16345c;
+}
+
+.Header-primary .Button,
+.Header-secondary .Button,
+.Button,
+.Button:hover,
+.Button:focus {
+  border-radius: 14px;
 }
 
 .Button {
-  border-radius: 14px;
+  border: 2px solid #16345c;
+  box-shadow: 3px 3px 0 rgba(22, 52, 92, 0.14);
 }
 
 .Button--primary,
 .Button--primary:hover,
 .Button--primary:focus {
   background: #e8652b;
-  border: 2px solid #16345c;
+  border-color: #16345c;
   color: #fff8f0;
-  box-shadow: 4px 4px 0 #16345c;
 }
 
-.Button--link,
-.Button--link:hover,
-.Header-title a,
-.Header-title a:hover,
-.DiscussionListItem-title,
-.DiscussionListItem-title:hover {
+.Button--secondary,
+.Button--secondary:hover,
+.Button--secondary:focus,
+.Button--flat,
+.Button--flat:hover,
+.Button--flat:focus {
+  background: #fffaf0;
   color: #16345c;
+  border-color: #16345c;
 }
 
 .Hero,
@@ -51,7 +78,10 @@ body,
 .PostStream-item,
 .DiscussionHero,
 .IndexPage .sideNav,
-.Composer-content {
+.Composer-content,
+.App-nav .sideNav,
+.NotificationList,
+.UserCard {
   border-radius: 18px;
 }
 
@@ -60,17 +90,59 @@ body,
 .Modal-content,
 .Composer-content,
 .Post-body,
-.DiscussionHero {
+.DiscussionHero,
+.App-nav .sideNav,
+.NotificationList,
+.UserCard {
   border: 2px solid #16345c;
   box-shadow: 4px 4px 0 rgba(22, 52, 92, 0.12);
+  background: rgba(255, 250, 240, 0.92);
 }
 
-.Hero {
-  background: linear-gradient(135deg, rgba(232, 101, 43, 0.14), rgba(255, 255, 255, 0.45));
+.DiscussionListItem {
+  background: #fffaf0;
+}
+
+.Hero,
+.DiscussionHero {
+  background: linear-gradient(135deg, rgba(232, 101, 43, 0.16), rgba(255, 255, 255, 0.55));
+}
+
+.TagLabel,
+.Badge,
+.Notification-unread,
+.Composer-title,
+.App-titleControl .Button,
+.IndexPage-results .Button {
+  border-radius: 999px;
 }
 
 .TagLabel,
 .Badge {
-  border-radius: 999px;
+  background: rgba(232, 101, 43, 0.12);
+  color: #16345c;
+  border: 1px solid rgba(22, 52, 92, 0.16);
+}
+
+.Composer-content,
+.TextEditor-editor,
+.Post-body,
+.Dropdown-menu,
+.NotificationList {
+  color: #16345c;
+}
+
+.Search-input,
+.FormControl,
+textarea,
+input {
+  background: #fffaf0;
+  border-radius: 14px;
+  border: 2px solid rgba(22, 52, 92, 0.18);
+}
+
+.Hero,
+.Composer:not(.minimized) {
+  border: 2px solid #16345c;
 }
 ');

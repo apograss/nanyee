@@ -70,11 +70,12 @@ test("links page uses timeout-safe loading and wave one pages consume skeleton b
   assert.match(homePage, /SkeletonBlock/);
 });
 
-test("footer exposes a guestbook entry and tools page renders coming-soon cards", () => {
+test("footer exposes a guestbook entry and tools page only shows open tools", () => {
   const footer = readProjectFile("src", "components", "organisms", "Footer.tsx");
   const toolsPage = readProjectFile("src", "app", "(main)", "tools", "page.tsx");
 
   assert.match(footer, /href="\/guestbook"/);
-  assert.match(toolsPage, /COMING_SOON/);
-  assert.match(toolsPage, /即将推出/);
+  assert.doesNotMatch(toolsPage, /COMING_SOON/);
+  assert.doesNotMatch(toolsPage, /即将推出/);
+  assert.match(toolsPage, /\/tools\/evaluation/);
 });

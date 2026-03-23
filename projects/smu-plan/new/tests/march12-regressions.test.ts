@@ -49,10 +49,12 @@ test("knowledge base leaderboard only renders on the root all-articles view", ()
   assert.match(kbPage, /showLeaderboard \? \(/);
 });
 
-test("login page safely handles non-json server errors", () => {
+test("login page safely handles non-json server errors and 2fa follow-up", () => {
   const loginPage = readProjectFile("src", "app", "(auth)", "login", "LoginPageClient.tsx");
 
-  assert.match(loginPage, /const text = await res\.text\(\)/);
-  assert.match(loginPage, /JSON\.parse\(text\)/);
+  assert.match(loginPage, /async function readJsonResponse/);
+  assert.match(loginPage, /const text = await response\.text\(\)/);
+  assert.match(loginPage, /requiresTwoFactor/);
+  assert.match(loginPage, /\/api\/auth\/login\/2fa/);
   assert.match(loginPage, /登录服务暂时不可用/);
 });

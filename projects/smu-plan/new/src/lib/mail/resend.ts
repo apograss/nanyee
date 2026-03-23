@@ -57,6 +57,12 @@ export function isVerificationMailConfigured(
   return getVerificationDeliveryMode(env) !== "disabled";
 }
 
+export function allowVerificationMailDevFallback(
+  env: Partial<Record<string, string | undefined>> = process.env,
+): boolean {
+  return (env.NODE_ENV || "development") !== "production";
+}
+
 export function getVerificationEmailSubject(
   purpose: VerificationPurpose,
   code: string,

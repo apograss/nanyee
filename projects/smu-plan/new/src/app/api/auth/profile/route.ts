@@ -18,6 +18,11 @@ export async function GET(req: NextRequest) {
         role: true,
         emailVerifiedAt: true,
         createdAt: true,
+        twoFactor: {
+          select: {
+            enabledAt: true,
+          },
+        },
       },
     });
 
@@ -27,10 +32,13 @@ export async function GET(req: NextRequest) {
       prisma.bbsTopic.count({ where: { authorId: ctx.userId } }),
     ]);
 
+    const { twoFactor, ...profile } = user;
+
     return Response.json({
       ok: true,
       data: {
-        ...user,
+        ...profile,
+        twoFactorEnabled: Boolean(twoFactor?.enabledAt),
         stats: { articles: articleCount, messages: messageCount, topics: topicCount },
       },
     });

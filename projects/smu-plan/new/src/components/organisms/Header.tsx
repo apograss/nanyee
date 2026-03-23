@@ -19,8 +19,7 @@ const TOOL_MENU_ITEMS = [
   { href: "/tools/schedule", label: "课表导出" },
   { href: "/tools/grades", label: "成绩查询" },
   { href: "/tools/enroll", label: "自动选课" },
-  { href: "/links", label: "校园导航" },
-  { href: "/tools/countdown", label: "考试倒计时" },
+  { href: "/tools/evaluation", label: "自动评课" },
 ];
 
 export default function Header() {
@@ -52,16 +51,9 @@ export default function Header() {
         }
       })
       .catch(() => {
-        // Keep the default nav when settings cannot be loaded.
+        // Keep default nav when settings cannot be loaded.
       });
   }, []);
-
-  const handleLogout = async () => {
-    await logout();
-    setUserMenuOpen(false);
-    setNavOpen(false);
-    setToolsMenuOpen(false);
-  };
 
   useEffect(() => {
     function handleDocumentClick(event: MouseEvent) {
@@ -75,6 +67,7 @@ export default function Header() {
         !navToggleRef.current.contains(target)
       ) {
         setNavOpen(false);
+        setToolsMenuOpen(false);
       }
 
       if (
@@ -83,10 +76,6 @@ export default function Header() {
         !userMenuRef.current.contains(target)
       ) {
         setUserMenuOpen(false);
-      }
-
-      if (navOpen && !mobileNavRef.current?.contains(target)) {
-        setToolsMenuOpen(false);
       }
     }
 
@@ -103,6 +92,13 @@ export default function Header() {
     isActiveLink("/tools") ? styles.active : ""
   }`;
 
+  const handleLogout = async () => {
+    await logout();
+    setNavOpen(false);
+    setUserMenuOpen(false);
+    setToolsMenuOpen(false);
+  };
+
   return (
     <header className={styles.header}>
       <div className={styles.inner}>
@@ -116,9 +112,7 @@ export default function Header() {
               <div key={link.href} className={styles.navDropdown}>
                 <Link
                   href={link.href}
-                  className={`${styles.navLink} ${
-                    isActiveLink(link.href) ? styles.active : ""
-                  }`}
+                  className={`${styles.navLink} ${isActiveLink(link.href) ? styles.active : ""}`}
                 >
                   {link.label}
                 </Link>
@@ -130,8 +124,7 @@ export default function Header() {
                   ))}
                 </div>
               </div>
-            ) :
-            link.external ? (
+            ) : link.external ? (
               <a
                 key={link.href}
                 href={link.href}
@@ -144,13 +137,11 @@ export default function Header() {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`${styles.navLink} ${
-                  isActiveLink(link.href) ? styles.active : ""
-                }`}
+                className={`${styles.navLink} ${isActiveLink(link.href) ? styles.active : ""}`}
               >
                 {link.label}
               </Link>
-            )
+            ),
           )}
         </nav>
 
@@ -161,6 +152,7 @@ export default function Header() {
           {user ? (
             <div className={styles.userMenu} ref={userMenuRef}>
               <button
+                type="button"
                 className={styles.userBtn}
                 aria-expanded={userMenuOpen}
                 onClick={() => {
@@ -196,20 +188,26 @@ export default function Header() {
                   >
                     发起共建
                   </Link>
-                  <button onClick={handleLogout} className={styles.dropItem}>
+                  <button type="button" onClick={handleLogout} className={styles.dropItem}>
                     退出登录
                   </button>
                 </div>
               ) : null}
             </div>
           ) : (
-            <Link href="/login" className={styles.loginBtn}>
-              登录
-            </Link>
+            <div className={styles.authActions}>
+              <Link href="/register" className={styles.registerBtn}>
+                注册
+              </Link>
+              <Link href="/login" className={styles.loginBtn}>
+                登录
+              </Link>
+            </div>
           )}
 
           <button
             ref={navToggleRef}
+            type="button"
             className={styles.hamburger}
             onClick={() => {
               setNavOpen((open) => !open);
@@ -277,9 +275,7 @@ export default function Header() {
                   <Link
                     key={link.href}
                     href={link.href}
-                    className={`${styles.mobileLink} ${
-                      isActiveLink(link.href) ? styles.active : ""
-                    }`}
+                    className={`${styles.mobileLink} ${isActiveLink(link.href) ? styles.active : ""}`}
                     onClick={() => setNavOpen(false)}
                   >
                     {link.label}
@@ -332,7 +328,9 @@ export default function Header() {
                 <>
                   <div className={styles.mobileUserMeta}>
                     <strong className={styles.mobileUserName}>登录后继续</strong>
-                    <span className={styles.mobileUserRole}>收藏工具、参与共建和继续对话都会更顺手。</span>
+                    <span className={styles.mobileUserRole}>
+                      收藏工具、参与共建和继续对话都会更顺手。
+                    </span>
                   </div>
                   <div className={styles.mobileAuthActions}>
                     <Link
