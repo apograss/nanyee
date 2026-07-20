@@ -11,6 +11,20 @@ permissions:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: nanyee_ci
+          POSTGRES_USER: nanyee_ci
+          POSTGRES_PASSWORD: nanyee_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nanyee_ci -d nanyee_ci"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -26,5 +40,9 @@ jobs:
       - run: uv run mypy
       - run: uv run pytest --cov --cov-report=xml
       - run: uv run python scripts/export_openapi.py --check
+      - run: uv run alembic -c services/platform/alembic.ini upgrade head
+        env:
+          NANYEE_DATABASE_URL: postgresql+asyncpg://nanyee_ci:nanyee_ci@127.0.0.1:5432/nanyee_ci
       - run: uv run alembic -c services/platform/alembic.ini check
-
+        env:
+          NANYEE_DATABASE_URL: postgresql+asyncpg://nanyee_ci:nanyee_ci@127.0.0.1:5432/nanyee_ci
