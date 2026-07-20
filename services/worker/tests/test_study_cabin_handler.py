@@ -9,6 +9,7 @@ import pytest
 from nanyee.config import Settings
 from nanyee.credentials.service import CredentialVaultService
 from nanyee.integrations.infospace.client import BusinessError, UserInfo
+from nanyee.integrations.infospace.sso import AuthenticationRejected
 from nanyee.jobs.models import Job
 from nanyee.tools.study_cabin import RoomAvailability
 from nanyee_worker.runtime import ExecutionFailure
@@ -121,3 +122,35 @@ async def test_handler_stops_after_attempt_deadline() -> None:
         await handler.execute(cast(Any, object()), job)
     assert raised.value.error_code == "NO_AVAILABILITY"
     assert raised.value.retryable is False
+
+
+@pytest.mark.asyncio
+async def test_study_cabin_login_retries_ocr_rejections_with_backoff(monkeypatch: Any) -> None:
+    import nanyee_worker.study_cabin as module
+
+    class FlakyAuthenticator:
+        calls = 0
+
+        async def login(self, _account: str, _password: str) -> dict[str, str]:
+            self.calls += 1
+            if self.calls < 3:
+                raise AuthenticationRejected("captcha rejected")
+            return {"ic-cookie": "session"}
+
+    delays: list[float] = []
+
+    async def no_wait(delay: float) -> None:
+        delays.append(delay)
+
+    monkeypatch.setattr(module.asyncio, "sleep", no_wait)
+    handler = StudyCabinHandler(
+        Settings(app_env="test"),
+        cast(CredentialVaultService, FakeVault()),
+        DdddOcrSolver(),
+    )
+    handler._authenticator = cast(Any, FlakyAuthenticator())
+
+    cookies = await handler._login_with_backoff("student", "password")
+
+    assert cookies == {"ic-cookie": "session"}
+    assert delays == [1, 2]

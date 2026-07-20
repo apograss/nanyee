@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from datetime import datetime
+from enum import StrEnum
+
 from pydantic import BaseModel, Field
 
 
@@ -25,3 +28,37 @@ class EnrollmentResult(BaseModel):
     success: bool
     course_name: str
     outcome: str
+    message: str = ""
+
+
+class EnrollmentRunState(StrEnum):
+    CALIBRATING = "calibrating"
+    WAITING = "waiting"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class EnrollmentRunEvent(BaseModel):
+    sequence: int
+    created_at: datetime
+    type: str
+    message: str
+    attempt: int | None = None
+    course_name: str | None = None
+
+
+class EnrollmentRun(BaseModel):
+    id: str
+    state: EnrollmentRunState
+    category_code: str
+    preferences: list[CourseItem]
+    scheduled_time: str | None
+    run_at: datetime | None
+    attempt_count: int
+    max_attempts: int
+    result: EnrollmentResult | None
+    events: list[EnrollmentRunEvent]
+    created_at: datetime
+    finished_at: datetime | None

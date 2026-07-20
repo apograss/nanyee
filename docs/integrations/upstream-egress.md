@@ -1,6 +1,6 @@
 # 上游出口与后续 Cloudflare 代理池
 
-当前版本由 API/Worker 直接访问 UIS、教务、Infospace 和 Qun100。业务代码只依赖各集成客户端，未把本机 IP、代理 URL 或 Cloudflare Worker 地址写入任务载荷，因此以后可以在 HTTP 传输层增加出口池，不需要修改前端契约、数据库任务或凭据格式。
+当前版本由 API/Worker 直接访问 UIS、教务、Infospace、Qun100 和用户明确确认后的 WakeUp 分享接口。业务代码只依赖各集成客户端，未把本机 IP、代理 URL 或 Cloudflare Worker 地址写入任务载荷，因此以后可以在 HTTP 传输层增加出口池，不需要修改前端契约、数据库任务或凭据格式。
 
 接入代理池前必须满足以下边界：
 

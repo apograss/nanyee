@@ -1,4 +1,6 @@
 from nanyee.tools.evaluation.models import (
+    EvaluationAutoAnswer,
+    EvaluationAutomationRequest,
     EvaluationDraft,
     EvaluationOption,
     EvaluationQuestion,
@@ -8,6 +10,8 @@ from nanyee.tools.evaluation.models import (
 )
 
 __all__ = [
+    "EvaluationAutoAnswer",
+    "EvaluationAutomationRequest",
     "EvaluationDraft",
     "EvaluationOption",
     "EvaluationQuestion",

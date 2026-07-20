@@ -98,27 +98,42 @@ Turnstile Secret 永远不进入前端配置。所需脚本与 CSP 域名以 Clo
 
 1. `GET /smu/captcha`，得到 `flow_id`、`content_type` 和不带 Data URL 前缀的 `image_base64`。
 2. 图片源可由 `data:${content_type};base64,${image_base64}` 构造。
-3. `POST /smu/session` 提交 `flow_id`、学号、学校密码和验证码。
-4. 成功后只得到 `academic_session_id` 和过期时间；服务器不会返回 UIS/教务 Cookie。
-5. 在 5 分钟内调用：
+3. 在浏览器中识别验证码；可直接复用 `legacy/smu-tools/public/captcha_model.onnx` 和 `legacy/smu-tools/src/lib/captcha-ocr.ts`。普通在线工具不得调用 VPS OCR。
+4. `POST /smu/session` 提交 `flow_id`、学号、学校密码和识别结果。验证码错误时重新获取验证码并在浏览器中重试，建议最多自动重试 3 次后让用户手工输入。
+5. 成功后只得到 `academic_session_id` 和过期时间；服务器不会返回 UIS/教务 Cookie。
+6. 在 5 分钟内调用：
    - `POST /smu/timetable`；
    - `POST /smu/timetable.ics`；
    - `POST /smu/timetable.wakeup`；
    - `POST /smu/grades`。
 
-学校密码只用于第 3 步，不保存、不复用、不进入前端日志。`flow_id` 为一次性；登录失败后重新取验证码。`academic_session_id` 只放内存，页面刷新后允许用户重新登录学校系统。
+学校密码只用于第 4 步，不保存、不复用、不进入前端日志。`flow_id` 为一次性；登录失败后重新取验证码。`academic_session_id` 只放内存，页面刷新后允许用户重新登录学校系统。
 
-`/smu/timetable.ics` 返回 `text/calendar` 文件。`/smu/timetable.wakeup` 还需提交 `semester_monday` 和 `campus: "main" | "shunde"`，返回 `.wakeup_schedule` 文件；两者都按普通 Blob 下载处理。WakeUp 文件不会由后端上传给第三方。成绩结果默认不在服务器保存。
+`/smu/timetable.ics` 返回 `text/calendar` 文件。`/smu/timetable.wakeup` 还需提交 `semester_monday` 和 `campus: "main" | "shunde"`，返回 `.wakeup_schedule` 文件；两者都按普通 Blob 下载处理。
+
+如果用户明确选择“导入 WakeUp”，可在登录平台并确认第三方上传后调用 `POST /smu/timetable.wakeup.share`，额外提交 `confirmation_version: "timetable:wakeup_share:v1"`，后端返回 `share_code`。该路径会把生成的课表上传到 WakeUp；拒绝上传时仍可下载本地文件。成绩结果默认不在服务器保存，返回的 `ranking` 包含课程和教学班范围的排名与分布。
 
 ## 5. 托管凭据
 
-托管凭据用于浏览器关闭后仍需执行的预约任务。拒绝托管不影响瞬时在线工具。
+托管凭据只用于浏览器关闭后仍需继续执行的评课、学习舱和群报数任务。拒绝托管不影响课表、成绩和在线选课。
 
 - 创建：`POST /credentials`，必须登录、带 CSRF，并提交 `consent_version: "credential-hosting-v1"`。
 - 列表：`GET /credentials`，只返回用途、上游、状态、期限和允许公开的提示字段。
 - 撤销：`DELETE /credentials/{id}`，必须带 CSRF。
 
 创建响应和列表永远不会返回明文、密文、nonce、包裹密钥或 Azure Key ID。前端提交成功后立即清空密码/Token 输入值及其组件状态。
+
+自动评课凭据的创建参数固定为：
+
+```json
+{
+  "upstream": "academic",
+  "purpose": "evaluation",
+  "secret": "{\"account\":\"学号\",\"password\":\"学校密码\"}",
+  "consent_version": "credential-hosting-v1",
+  "metadata": {"account_hint": "仅显示给用户的脱敏提示"}
+}
+```
 
 学习舱凭据的创建参数固定为：
 
@@ -148,7 +163,7 @@ Turnstile Secret 永远不进入前端配置。所需脚本与 CSP 域名以 Clo
 
 - `queued`：等待计划时间；
 - `running`：Worker 已领取；
-- `retry_wait`：有限重试等待中；
+- `retry_wait`：等待下一次持久重试；
 - `succeeded`：已完成并有脱敏收据；
 - `failed`：确定失败；
 - `cancelled`：已取消；
@@ -166,7 +181,27 @@ Turnstile Secret 永远不进入前端配置。所需脚本与 CSP 域名以 Clo
 - `attempt_until`：带时区的停止尝试时间，不能晚于预约开始；
 - `title`：1–30 字符。
 
-`scheduled_for` 决定 Worker 首次尝试时间。无可用舱位会在截止前有限重试；上游提交超时会直接进入 `verification_required`。成功收据只含舱位、日期和时间，不含学校账号或凭据。
+`GET /study-cabin/cabins` 返回可选舱位，不要在前端另写一份 ID。`scheduled_for` 决定 Worker 首次尝试时间。验证码识别失败会退避并重新排队，不会立即废弃凭据；无可用舱位会在 `attempt_until` 前重试。上游提交超时会直接进入 `verification_required`。成功收据只含舱位、日期和时间，不含学校账号或凭据。
+
+### 自动评课
+
+自动评课必须使用 `purpose: "evaluation"` 的托管学校凭据创建持久任务：
+
+```json
+{
+  "tool_id": "evaluation",
+  "operation": "submit",
+  "credential_id": "评课凭据 ID",
+  "confirmation_version": "evaluation:submit:v1",
+  "payload": {
+    "strategy": "legacy_positive_random",
+    "max_courses": 60,
+    "retry_until": "2026-09-30T23:59:00+08:00"
+  }
+}
+```
+
+`retry_until` 可省略；填写时表示用户主动设置的停止时间。Worker 会查找全部待评课程，按旧工具的偏高随机档位生成合法答案并依次提交。服务端验证码仅用于这个无人值守任务：单次登录按 1、2、4、8 秒退避识别，仍未成功时任务重新进入 `retry_wait`，浏览器关闭不影响后续执行。只有用户取消、凭据撤销或过期、用户设置的截止时间到达等确定条件才终止。
 
 ### 群报数
 
@@ -174,31 +209,43 @@ Turnstile Secret 永远不进入前端配置。所需脚本与 CSP 域名以 Clo
 
 - `POST /qun/token/verify`；
 - `POST /qun/forms`；
-- `POST /qun/forms/{form_id}/preview`。
+- `POST /qun/forms/resolve`，可提交表单 ID 或群报数链接；
+- `POST /qun/forms/{form_id}/preview`；
+- `POST /qun/forms/{form_id}/submit`，使用本次 Token 立即提交；
 - `POST /qun/images`，使用 `multipart/form-data`，字段为 `auth_token` 与 `file`。
 
-图片仅接受内容与声明 MIME 一致的 JPEG、PNG、GIF 或 WebP，单张最多 5 MiB。响应 URL 已经过后端上传目标和 CDN 域名校验；前端把它填入对应图片字段。预览请求携带 `auth_token`、`defaults` 和按 `cid` 索引的 `custom_fields`，返回规范化 `catalogs`。前端让用户核对后，可用返回的 `form_id`、`version`、`title`、`catalogs` 构造 `qun_checkin:submit:v1` 任务；任务只引用已托管的 Token 凭据。预约提交结果未知时禁止前端自动创建新任务，应引导用户先到群报数核验。
+图片仅接受内容与声明 MIME 一致的 JPEG、PNG、GIF 或 WebP，单张最多 5 MiB。响应 URL 已经过后端上传目标和 CDN 域名校验；前端把它填入对应图片字段。预览请求携带 `auth_token`、`defaults` 和按 `cid` 索引的 `custom_fields`，返回规范化 `catalogs`。用户核对后可以把相同 Token、`form_version`、`title`、`catalogs` 发送到即时提交接口；需要定时执行时才创建托管 Token 凭据和 `qun_checkin:submit:v1` 任务。提交结果未知时禁止前端自动重放，应引导用户先到群报数核验。
 
-## 7. 在线确认型选课与评课
+## 7. 自动选课与兼容接口
 
-这两类接口都要求平台登录、CSRF 和仍有效的 `academic_session_id`，但不允许创建托管学校凭据。学校会话失效后从验证码流程重新登录。
+自动选课要求平台登录、CSRF 和仍有效的 `academic_session_id`。它使用当前 API 进程内的学校会话，不保存学校密码；浏览器关闭不会主动取消，但 API 重启后无法恢复本次运行。
 
 ### 选课
 
 1. `POST /smu/enrollment/categories` 获取当前选课类型。
 2. `POST /smu/enrollment/courses` 提交 `category_code` 获取实时可选列表。
-3. 用户选择一门课程并确认摘要后，`POST /smu/enrollment/submit` 提交 `category_code`、列表中的 `task_code` 和 `confirmation_version: "course_selection:enroll:v1"`。
+3. 用户按优先级选择 1–4 门课程并确认后，调用 `POST /smu/enrollment/runs`：
 
-提交前后端会再次读取当前课程列表；目标已消失时返回 `404 NOT_FOUND`。接口每次只提交一门课，不提供循环抢课、后台托管或批量账号。收到 `RESULT_UNKNOWN` 后不得自动重试，必须先去教务系统核验。
+```json
+{
+  "academic_session_id": "temporary-session-id",
+  "category_code": "12",
+  "preference_task_codes": ["第一志愿 task_code", "第二志愿 task_code"],
+  "scheduled_time": "09:00:00",
+  "max_attempts": 15,
+  "primary_burst_attempts": 5,
+  "confirm_conflicts": true,
+  "confirmation_version": "course_selection:auto_enroll:v1"
+}
+```
 
-### 评课
+4. 轮询 `GET /smu/enrollment/runs/{run_id}` 展示当前状态、尝试次数、命中课程和事件；用户停止时调用 `POST /smu/enrollment/runs/{run_id}/cancel`。
 
-1. `POST /smu/evaluations/pending` 获取待评课程，保存所选课程的三个 reference 字段。
-2. `POST /smu/evaluations/drafts` 提交该 `reference`，获得 `draft_id`、到期时间、题目和后端解析出的合法选项。
-3. 前端必须让学生逐题选择，以 `indicator_code -> option.code` 构造 `selections`。
-4. `POST /smu/evaluations/submit` 提交 `draft_id`、`selections` 和 `confirmation_version: "evaluation:submit:v1"`。
+后端会先校准教务服务器时间；到达计划时间后先连续尝试第一志愿，再按志愿顺序轮询，尝试间隔随机为 500–1000 毫秒，默认 15 次、最多 120 次。冲突课程可按用户确认自动执行二次确认。前端只使用接口返回的真实类型、课程和事件，不得生成示例课程或硬编码 `category_code`。
 
-草稿最长有效 5 分钟、绑定当前平台用户与学校会话，并在第一次提交尝试时消费。后端不会随机生成分数，也不接受缺题、未知选项或篡改的隐藏参数。网络中断或响应无法确认时返回 `RESULT_UNKNOWN`，前端不得重新生成草稿继续提交，应先去教务系统核验。
+### 兼容接口
+
+`POST /smu/enrollment/submit` 以及 `/smu/evaluations/pending`、`/drafts`、`/submit` 保留给兼容和人工排错，不作为新前端的主流程。新前端的选课主入口使用自动运行接口；评课主入口创建托管凭据和持久任务，不再要求用户逐题填写。
 
 ## 8. 错误处理速查
 

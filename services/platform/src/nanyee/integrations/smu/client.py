@@ -4,8 +4,10 @@ import asyncio
 import hashlib
 import json
 import re
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from email.utils import parsedate_to_datetime
 from typing import Any
 from urllib.parse import urljoin, urlparse
 from zoneinfo import ZoneInfo
@@ -24,7 +26,7 @@ from nanyee.tools.evaluation import (
     EvaluationResult,
     PendingEvaluation,
 )
-from nanyee.tools.grades import GradeRecord, parse_grades
+from nanyee.tools.grades import GradeDistribution, GradeRecord, RankingInfo, parse_grades
 from nanyee.tools.timetable import CourseEvent
 
 COMMON_HEADERS = {
@@ -146,11 +148,70 @@ class SmuAcademicClient:
                 )
             except httpx.HTTPError as exc:
                 raise self._unavailable() from exc
-        self._ensure_success(response)
+            self._ensure_success(response)
+            try:
+                grades = parse_grades(response.json())
+            except (ValueError, TypeError) as exc:
+                raise self._unavailable() from exc
+            enriched: list[GradeRecord] = []
+            for grade in grades:
+                ranking = (
+                    await self._fetch_grade_ranking(client, grade.grade_id)
+                    if grade.grade_id
+                    else None
+                )
+                enriched.append(grade.model_copy(update={"ranking": ranking}))
+            return enriched
+
+    async def _fetch_grade_ranking(
+        self, client: httpx.AsyncClient, grade_id: str
+    ) -> RankingInfo | None:
         try:
-            return parse_grades(response.json())
-        except (ValueError, TypeError) as exc:
-            raise self._unavailable() from exc
+            response = await client.get(
+                f"{self._settings.smu_academic_base_url}/new/student/xskccj/kccjfxd.page",
+                params={"cjdm": grade_id},
+                headers={**COMMON_HEADERS, "Accept": "text/html,*/*"},
+            )
+        except httpx.HTTPError:
+            return None
+        if response.status_code != 200 or self._response_size_invalid(response):
+            return None
+        return _parse_grade_ranking(response.text)
+
+    async def calibrate_server_time(
+        self, *, academic_cookies: dict[str, str], samples: int = 3
+    ) -> int:
+        """Return upstream wall-clock minus local wall-clock in milliseconds."""
+        best_rtt = float("inf")
+        best_offset = 0.0
+        base = self._settings.smu_academic_base_url
+        sample_count = max(1, min(samples, 5))
+        async with self._client(cookies=academic_cookies) as client:
+            for index in range(sample_count):
+                wall_before = time.time() * 1000
+                monotonic_before = time.monotonic() * 1000
+                try:
+                    response = await client.get(
+                        f"{base}/new/welcome.page?ui=new",
+                        headers={**COMMON_HEADERS, "Accept": "text/html,*/*"},
+                    )
+                except httpx.HTTPError:
+                    continue
+                monotonic_after = time.monotonic() * 1000
+                date_header = response.headers.get("date")
+                if response.status_code != 200 or not date_header:
+                    continue
+                try:
+                    server_ms = parsedate_to_datetime(date_header).timestamp() * 1000
+                except (TypeError, ValueError, OverflowError):
+                    continue
+                rtt = monotonic_after - monotonic_before
+                if rtt < best_rtt:
+                    best_rtt = rtt
+                    best_offset = server_ms - (wall_before + rtt / 2)
+                if index + 1 < sample_count:
+                    await asyncio.sleep(0.03)
+        return round(best_offset)
 
     async def fetch_enrollment_categories(
         self, *, academic_cookies: dict[str, str]
@@ -218,6 +279,7 @@ class SmuAcademicClient:
         academic_cookies: dict[str, str],
         category_code: str,
         course: CourseItem,
+        confirm_conflict: bool = False,
     ) -> EnrollmentResult:
         if not re.fullmatch(r"\d{1,8}", category_code):
             raise ValueError("invalid enrollment category code")
@@ -231,7 +293,7 @@ class SmuAcademicClient:
                         "kcmc": course.name,
                         "qz": "-1",
                         "xxyqdm": "",
-                        "hlct": "0",
+                        "hlct": "1" if confirm_conflict else "0",
                     },
                     headers={
                         **COMMON_HEADERS,
@@ -277,10 +339,18 @@ class SmuAcademicClient:
         elif message.startswith("超出选课要求门数"):
             outcome = "limit_reached"
             success = True
+        elif "冲突" in message:
+            outcome = "conflict"
+            success = False
         else:
             outcome = "rejected"
             success = False
-        return EnrollmentResult(success=success, course_name=course.name, outcome=outcome)
+        return EnrollmentResult(
+            success=success,
+            course_name=course.name,
+            outcome=outcome,
+            message=message,
+        )
 
     async def fetch_pending_evaluations(
         self, *, academic_cookies: dict[str, str]
@@ -805,4 +875,36 @@ def _course_item(row: dict[str, Any]) -> CourseItem:
         schedule=str(row.get("sksj") or "")[:500],
         location=str(row.get("skdd") or "")[:300],
         department=str(row.get("kkbmmc") or "")[:200],
+    )
+
+
+def _parse_grade_ranking(html: str) -> RankingInfo | None:
+    soup = BeautifulSoup(html, "html.parser")
+    parsed: dict[str, list[int]] = {}
+    for row in soup.select("tr"):
+        cells = [cell.get_text(" ", strip=True) for cell in row.select("th,td")]
+        if not cells:
+            continue
+        kind = next((name for name in ("课程", "教学班") if name in cells[0]), None)
+        if kind is None:
+            continue
+        values = [_safe_int(value) for value in cells[2:9]]
+        if len(values) == 7:
+            parsed[kind] = values
+    course = parsed.get("课程")
+    class_group = parsed.get("教学班")
+    if course is None or class_group is None:
+        return None
+    return RankingInfo(
+        course_rank=course[6],
+        course_total=course[5],
+        class_rank=class_group[6],
+        class_total=class_group[5],
+        distribution=GradeDistribution(
+            lt60=course[0],
+            s60to70=course[1],
+            s70to80=course[2],
+            s80to90=course[3],
+            gte90=course[4],
+        ),
     )

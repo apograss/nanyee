@@ -132,6 +132,31 @@ async def test_quiz_registration_session_and_csrf_logout(
     assert listed.status_code == 200
     assert listed.json()[0]["id"] == stored.json()["id"]
 
+    evaluation_credential = await api_client.post(
+        "/api/v1/credentials",
+        headers={"X-CSRF-Token": csrf},
+        json={
+            "upstream": "academic",
+            "purpose": "evaluation",
+            "secret": '{"account":"20260001","password":"school-password"}',
+            "consent_version": "credential-hosting-v1",
+            "metadata": {"account_hint": "尾号 0001"},
+        },
+    )
+    assert evaluation_credential.status_code == 201, evaluation_credential.text
+    evaluation_job = await api_client.post(
+        "/api/v1/jobs",
+        headers={"X-CSRF-Token": csrf, "Idempotency-Key": "evaluation-job-test-0001"},
+        json={
+            "tool_id": "evaluation",
+            "operation": "submit",
+            "payload": {"strategy": "legacy_positive_random", "max_courses": 60},
+            "credential_id": evaluation_credential.json()["id"],
+            "confirmation_version": "evaluation:submit:v1",
+        },
+    )
+    assert evaluation_job.status_code == 201, evaluation_job.text
+
     job_payload = {
         "tool_id": "qun_checkin",
         "operation": "submit",
@@ -165,12 +190,25 @@ async def test_quiz_registration_session_and_csrf_logout(
     assert cancelled.status_code == 200
     assert cancelled.json()["state"] == "cancelled"
 
+    cancelled_evaluation = await api_client.post(
+        f"/api/v1/jobs/{evaluation_job.json()['id']}/cancel",
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert cancelled_evaluation.status_code == 200
+    assert cancelled_evaluation.json()["state"] == "cancelled"
+
     revoked = await api_client.delete(
         f"/api/v1/credentials/{stored.json()['id']}",
         headers={"X-CSRF-Token": csrf},
     )
     assert revoked.status_code == 200
     assert revoked.json()["status"] == "revoked"
+    revoked_evaluation = await api_client.delete(
+        f"/api/v1/credentials/{evaluation_credential.json()['id']}",
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert revoked_evaluation.status_code == 200
+    assert revoked_evaluation.json()["status"] == "revoked"
 
     rejected_logout = await api_client.post("/api/v1/auth/logout")
     assert rejected_logout.status_code == 403

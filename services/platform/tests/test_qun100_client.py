@@ -72,3 +72,18 @@ async def test_qun100_success_without_data_is_still_confirmed() -> None:
     )
 
     assert result == {}
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_qun100_resolves_direct_and_shared_form_links() -> None:
+    client = Qun100Client(Settings(app_env="test"))
+    assert await client.resolve_form_id("123456789012345") == "123456789012345"
+
+    respx.get("https://qun100.com/share/abc").mock(
+        return_value=httpx.Response(
+            302,
+            headers={"location": "https://form.qun100.com/open?formId%3D123456789012345"},
+        )
+    )
+    assert await client.resolve_form_id("https://qun100.com/share/abc") == "123456789012345"

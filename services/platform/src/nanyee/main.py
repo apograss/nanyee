@@ -19,8 +19,10 @@ from nanyee.db import close_database
 from nanyee.errors import AppError, ErrorBody, ErrorCode, ErrorResponse, app_error_handler
 from nanyee.health import router as health_router
 from nanyee.identity.router import router as identity_router
+from nanyee.integrations.infospace.router import router as infospace_router
 from nanyee.integrations.qun100.router import router as qun100_router
 from nanyee.integrations.smu.client import SmuAcademicClient
+from nanyee.integrations.smu.enrollment_runs import EnrollmentRunManager
 from nanyee.integrations.smu.router import router as smu_router
 from nanyee.jobs.router import router as jobs_router
 from nanyee.logging import configure_logging
@@ -39,11 +41,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ttl_seconds=settings.transient_secret_ttl_seconds,
         max_entries=settings.transient_secret_max_entries,
     )
+    smu_client = SmuAcademicClient(settings)
+    enrollment_runs = EnrollmentRunManager(smu_client)
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         logger.info("api_started", extra={"event": "api_started"})
         yield
+        await enrollment_runs.close()
         await transient_store.close()
         await close_database()
         logger.info("api_stopped", extra={"event": "api_stopped"})
@@ -61,7 +66,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.credential_cipher = build_envelope_cipher(settings)
     app.state.transient_store = transient_store
-    app.state.smu_client = SmuAcademicClient(settings)
+    app.state.smu_client = smu_client
+    app.state.enrollment_runs = enrollment_runs
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
@@ -96,6 +102,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(jobs_router, prefix="/api/v1")
     app.include_router(smu_router, prefix="/api/v1")
     app.include_router(qun100_router, prefix="/api/v1")
+    app.include_router(infospace_router, prefix="/api/v1")
     return app
 
 

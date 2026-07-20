@@ -92,6 +92,7 @@ class Settings(BaseSettings):
     smu_academic_base_url: str = "https://zhjw.smu.edu.cn"
     smu_infospace_base_url: str = "https://infospace.smu.edu.cn/ic-web"
     qun100_base_url: str = "https://form.qun100.com"
+    wakeup_share_url: str = "https://i.wakeup.fun/share_schedule"
 
     worker_id: str = Field(default="nanyee-worker-1", min_length=1, max_length=128)
     worker_poll_interval_seconds: float = Field(default=2.0, ge=0.2, le=30)
@@ -127,6 +128,9 @@ class Settings(BaseSettings):
         qun100 = urlparse(self.qun100_base_url)
         if not _is_exact_https_origin(qun100, hostname="form.qun100.com", path=""):
             raise ValueError("Qun100 upstream must be https://form.qun100.com")
+        wakeup = urlparse(self.wakeup_share_url)
+        if not _is_exact_https_origin(wakeup, hostname="i.wakeup.fun", path="/share_schedule"):
+            raise ValueError("WakeUp upstream must be https://i.wakeup.fun/share_schedule")
 
     def _validate_credential_provider(self) -> None:
         if self.credential_key_provider == "azure":

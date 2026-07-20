@@ -6,7 +6,7 @@ from datetime import date, datetime
 from typing import Annotated, Literal, cast
 
 from fastapi import APIRouter, Depends, Header, Query, Request, Response
-from pydantic import BaseModel, Field, SecretStr, ValidationError
+from pydantic import BaseModel, Field, SecretStr, ValidationError, model_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nanyee.anti_abuse.gate import AntiAbuseGate
@@ -17,7 +17,14 @@ from nanyee.errors import AppError, ErrorCode
 from nanyee.identity.router import current_auth
 from nanyee.identity.sessions import AuthContext, settings_from_request
 from nanyee.integrations.smu.client import SmuAcademicClient
-from nanyee.tools.course_selection import CourseCategory, CourseItem, EnrollmentResult
+from nanyee.integrations.smu.enrollment_runs import EnrollmentRunManager
+from nanyee.integrations.wakeup import WakeUpClient, WakeUpShareError
+from nanyee.tools.course_selection import (
+    CourseCategory,
+    CourseItem,
+    EnrollmentResult,
+    EnrollmentRun,
+)
 from nanyee.tools.evaluation import (
     EvaluationDraft,
     EvaluationQuestion,
@@ -40,6 +47,7 @@ CAPTCHA_POLICY = RateLimitPolicy(window_seconds=10 * 60, soft_limit=5, hard_limi
 LOGIN_POLICY = RateLimitPolicy(window_seconds=10 * 60, soft_limit=3, hard_limit=10)
 READ_POLICY = RateLimitPolicy(window_seconds=10 * 60, soft_limit=20, hard_limit=60)
 ENROLL_POLICY = RateLimitPolicy(window_seconds=60, soft_limit=3, hard_limit=6)
+ENROLL_RUN_POLICY = RateLimitPolicy(window_seconds=10 * 60, soft_limit=3, hard_limit=10)
 EVALUATION_SUBMIT_POLICY = RateLimitPolicy(window_seconds=10 * 60, soft_limit=5, hard_limit=15)
 
 
@@ -89,6 +97,14 @@ class WakeUpRequest(TimetableRequest):
     campus: Literal["main", "shunde"]
 
 
+class WakeUpShareRequest(WakeUpRequest):
+    confirmation_version: str
+
+
+class WakeUpShareResponse(BaseModel):
+    share_code: str
+
+
 class GradesResponse(BaseModel):
     grades: list[GradeRecord]
     summary: GradeSummary
@@ -105,6 +121,25 @@ class EnrollmentCourseRequest(AcademicSessionRequest):
 class EnrollmentSubmitRequest(EnrollmentCourseRequest):
     task_code: str = Field(min_length=1, max_length=128)
     confirmation_version: str
+
+
+class EnrollmentRunRequest(EnrollmentCourseRequest):
+    preference_task_codes: list[str] = Field(min_length=1, max_length=4)
+    scheduled_time: str | None = Field(default=None, pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d$")
+    max_attempts: int = Field(default=15, ge=1, le=120)
+    primary_burst_attempts: int = Field(default=5, ge=0, le=120)
+    confirm_conflicts: bool = True
+    confirmation_version: str
+
+    @model_validator(mode="after")
+    def validate_preferences(self) -> EnrollmentRunRequest:
+        if len(self.preference_task_codes) != len(set(self.preference_task_codes)):
+            raise ValueError("preference_task_codes must not contain duplicates")
+        if any(not value or len(value) > 128 for value in self.preference_task_codes):
+            raise ValueError("preference task code is invalid")
+        if self.primary_burst_attempts > self.max_attempts:
+            raise ValueError("primary_burst_attempts cannot exceed max_attempts")
+        return self
 
 
 class EvaluationDraftRequest(AcademicSessionRequest):
@@ -137,6 +172,10 @@ def get_transient_store(request: Request) -> TransientSecretStore:
 
 def get_smu_client(request: Request) -> SmuAcademicClient:
     return cast(SmuAcademicClient, request.app.state.smu_client)
+
+
+def get_enrollment_runs(request: Request) -> EnrollmentRunManager:
+    return cast(EnrollmentRunManager, request.app.state.enrollment_runs)
 
 
 async def load_academic_cookies(
@@ -338,6 +377,51 @@ async def timetable_wakeup(
     )
 
 
+@router.post(
+    "/timetable.wakeup.share",
+    response_model=WakeUpShareResponse,
+    operation_id="smu_timetable_wakeup_share",
+)
+async def timetable_wakeup_share(
+    payload: WakeUpShareRequest,
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    store: Annotated[TransientSecretStore, Depends(get_transient_store)],
+    client: Annotated[SmuAcademicClient, Depends(get_smu_client)],
+    auth: Annotated[AuthContext, Depends(current_auth)],
+    csrf_header: Annotated[str | None, Header(alias="X-CSRF-Token")] = None,
+) -> WakeUpShareResponse:
+    require_csrf(request, auth, csrf_header)
+    if payload.confirmation_version != "timetable:wakeup_share:v1":
+        raise AppError(
+            ErrorCode.INVALID_REQUEST,
+            "请确认将课表临时上传到 WakeUp。",
+            status_code=422,
+            details={"required_confirmation_version": "timetable:wakeup_share:v1"},
+        )
+    await check_read_gate(db, request, payload, action="smu_timetable")
+    cookies = await load_academic_cookies(store, payload.academic_session_id)
+    _, events = await client.fetch_timetable(
+        academic_cookies=cookies, total_weeks=payload.total_weeks
+    )
+    schedule = export_wakeup_schedule(
+        aggregate_events(events),
+        semester_monday=payload.semester_monday,
+        total_weeks=payload.total_weeks,
+        campus=payload.campus,
+    )
+    try:
+        share_code = await WakeUpClient(settings_from_request(request)).share(schedule)
+    except WakeUpShareError as exc:
+        raise AppError(
+            ErrorCode.UPSTREAM_UNAVAILABLE,
+            "WakeUp 分享服务暂时不可用，请下载文件后手动导入。",
+            status_code=503,
+            retryable=True,
+        ) from exc
+    return WakeUpShareResponse(share_code=share_code)
+
+
 @router.post("/grades", response_model=GradesResponse, operation_id="smu_grades")
 async def grades(
     payload: AcademicSessionRequest,
@@ -443,6 +527,108 @@ async def enrollment_submit(
         category_code=payload.category_code,
         course=course,
     )
+
+
+@router.post(
+    "/enrollment/runs",
+    response_model=EnrollmentRun,
+    status_code=201,
+    operation_id="start_smu_enrollment_run",
+)
+async def start_enrollment_run(
+    payload: EnrollmentRunRequest,
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    store: Annotated[TransientSecretStore, Depends(get_transient_store)],
+    client: Annotated[SmuAcademicClient, Depends(get_smu_client)],
+    runs: Annotated[EnrollmentRunManager, Depends(get_enrollment_runs)],
+    auth: Annotated[AuthContext, Depends(current_auth)],
+    csrf_header: Annotated[str | None, Header(alias="X-CSRF-Token")] = None,
+) -> EnrollmentRun:
+    require_csrf(request, auth, csrf_header)
+    if payload.confirmation_version != "course_selection:auto_enroll:v1":
+        raise AppError(
+            ErrorCode.INVALID_REQUEST,
+            "请确认自动选课的志愿、时间和重试次数。",
+            status_code=422,
+            details={"required_confirmation_version": "course_selection:auto_enroll:v1"},
+        )
+    await AntiAbuseGate(settings_from_request(request)).check(
+        db,
+        request,
+        action="smu_enrollment_run",
+        identity=f"{auth.user.id}:{payload.academic_session_id}",
+        policy=ENROLL_RUN_POLICY,
+        turnstile_token=payload.turnstile_token,
+        anti_abuse_pass=payload.anti_abuse_pass,
+    )
+    cookies = await load_academic_cookies(store, payload.academic_session_id)
+    courses = await client.fetch_enrollment_courses(
+        academic_cookies=cookies,
+        category_code=payload.category_code,
+    )
+    by_task_code = {course.task_code: course for course in courses}
+    try:
+        preferences = [by_task_code[code] for code in payload.preference_task_codes]
+    except KeyError as exc:
+        raise AppError(
+            ErrorCode.NOT_FOUND,
+            "志愿课程不在当前可选列表中，请刷新后重试。",
+            status_code=404,
+        ) from exc
+    try:
+        return await runs.create(
+            user_id=auth.user.id,
+            category_code=payload.category_code,
+            preferences=preferences,
+            cookies=cookies,
+            scheduled_time=payload.scheduled_time,
+            max_attempts=payload.max_attempts,
+            primary_burst_attempts=payload.primary_burst_attempts,
+            confirm_conflicts=payload.confirm_conflicts,
+        )
+    except RuntimeError as exc:
+        raise AppError(
+            ErrorCode.UPSTREAM_UNAVAILABLE,
+            "自动选课运行队列已满，请稍后重试。",
+            status_code=503,
+            retryable=True,
+        ) from exc
+
+
+@router.get(
+    "/enrollment/runs/{run_id}",
+    response_model=EnrollmentRun,
+    operation_id="get_smu_enrollment_run",
+)
+async def get_enrollment_run(
+    run_id: str,
+    runs: Annotated[EnrollmentRunManager, Depends(get_enrollment_runs)],
+    auth: Annotated[AuthContext, Depends(current_auth)],
+) -> EnrollmentRun:
+    record = await runs.get(run_id, user_id=auth.user.id)
+    if record is None:
+        raise AppError(ErrorCode.NOT_FOUND, "自动选课运行不存在。", status_code=404)
+    return record
+
+
+@router.post(
+    "/enrollment/runs/{run_id}/cancel",
+    response_model=EnrollmentRun,
+    operation_id="cancel_smu_enrollment_run",
+)
+async def cancel_enrollment_run(
+    run_id: str,
+    request: Request,
+    runs: Annotated[EnrollmentRunManager, Depends(get_enrollment_runs)],
+    auth: Annotated[AuthContext, Depends(current_auth)],
+    csrf_header: Annotated[str | None, Header(alias="X-CSRF-Token")] = None,
+) -> EnrollmentRun:
+    require_csrf(request, auth, csrf_header)
+    record = await runs.cancel(run_id, user_id=auth.user.id)
+    if record is None:
+        raise AppError(ErrorCode.NOT_FOUND, "自动选课运行不存在。", status_code=404)
+    return record
 
 
 @router.post(

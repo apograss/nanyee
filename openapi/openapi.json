@@ -596,6 +596,7 @@
           },
           "purpose": {
             "enum": [
+              "evaluation",
               "study_cabin",
               "qun_checkin"
             ],
@@ -635,6 +636,7 @@
           },
           "upstream": {
             "enum": [
+              "academic",
               "infospace",
               "qun100"
             ],
@@ -839,6 +841,11 @@
             "title": "Course Name",
             "type": "string"
           },
+          "message": {
+            "default": "",
+            "title": "Message",
+            "type": "string"
+          },
           "outcome": {
             "title": "Outcome",
             "type": "string"
@@ -855,6 +862,263 @@
         ],
         "title": "EnrollmentResult",
         "type": "object"
+      },
+      "EnrollmentRun": {
+        "properties": {
+          "attempt_count": {
+            "title": "Attempt Count",
+            "type": "integer"
+          },
+          "category_code": {
+            "title": "Category Code",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/EnrollmentRunEvent"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "max_attempts": {
+            "title": "Max Attempts",
+            "type": "integer"
+          },
+          "preferences": {
+            "items": {
+              "$ref": "#/components/schemas/CourseItem"
+            },
+            "title": "Preferences",
+            "type": "array"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EnrollmentResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "run_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run At"
+          },
+          "scheduled_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scheduled Time"
+          },
+          "state": {
+            "$ref": "#/components/schemas/EnrollmentRunState"
+          }
+        },
+        "required": [
+          "id",
+          "state",
+          "category_code",
+          "preferences",
+          "scheduled_time",
+          "run_at",
+          "attempt_count",
+          "max_attempts",
+          "result",
+          "events",
+          "created_at",
+          "finished_at"
+        ],
+        "title": "EnrollmentRun",
+        "type": "object"
+      },
+      "EnrollmentRunEvent": {
+        "properties": {
+          "attempt": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt"
+          },
+          "course_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Course Name"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "sequence": {
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sequence",
+          "created_at",
+          "type",
+          "message"
+        ],
+        "title": "EnrollmentRunEvent",
+        "type": "object"
+      },
+      "EnrollmentRunRequest": {
+        "properties": {
+          "academic_session_id": {
+            "maxLength": 128,
+            "minLength": 20,
+            "title": "Academic Session Id",
+            "type": "string"
+          },
+          "anti_abuse_pass": {
+            "anyOf": [
+              {
+                "maxLength": 4096,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anti Abuse Pass"
+          },
+          "category_code": {
+            "pattern": "^\\d{1,8}$",
+            "title": "Category Code",
+            "type": "string"
+          },
+          "confirm_conflicts": {
+            "default": true,
+            "title": "Confirm Conflicts",
+            "type": "boolean"
+          },
+          "confirmation_version": {
+            "title": "Confirmation Version",
+            "type": "string"
+          },
+          "max_attempts": {
+            "default": 15,
+            "maximum": 120.0,
+            "minimum": 1.0,
+            "title": "Max Attempts",
+            "type": "integer"
+          },
+          "preference_task_codes": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 4,
+            "minItems": 1,
+            "title": "Preference Task Codes",
+            "type": "array"
+          },
+          "primary_burst_attempts": {
+            "default": 5,
+            "maximum": 120.0,
+            "minimum": 0.0,
+            "title": "Primary Burst Attempts",
+            "type": "integer"
+          },
+          "scheduled_time": {
+            "anyOf": [
+              {
+                "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scheduled Time"
+          },
+          "turnstile_token": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turnstile Token"
+          }
+        },
+        "required": [
+          "academic_session_id",
+          "category_code",
+          "preference_task_codes",
+          "confirmation_version"
+        ],
+        "title": "EnrollmentRunRequest",
+        "type": "object"
+      },
+      "EnrollmentRunState": {
+        "enum": [
+          "calibrating",
+          "waiting",
+          "running",
+          "succeeded",
+          "failed",
+          "cancelled"
+        ],
+        "title": "EnrollmentRunState",
+        "type": "string"
       },
       "EnrollmentSubmitRequest": {
         "properties": {
@@ -1179,6 +1443,37 @@
         "title": "EvaluationSubmitRequest",
         "type": "object"
       },
+      "GradeDistribution": {
+        "properties": {
+          "gte90": {
+            "default": 0,
+            "title": "Gte90",
+            "type": "integer"
+          },
+          "lt60": {
+            "default": 0,
+            "title": "Lt60",
+            "type": "integer"
+          },
+          "s60to70": {
+            "default": 0,
+            "title": "S60To70",
+            "type": "integer"
+          },
+          "s70to80": {
+            "default": 0,
+            "title": "S70To80",
+            "type": "integer"
+          },
+          "s80to90": {
+            "default": 0,
+            "title": "S80To90",
+            "type": "integer"
+          }
+        },
+        "title": "GradeDistribution",
+        "type": "object"
+      },
       "GradeRecord": {
         "properties": {
           "course_category": {
@@ -1225,6 +1520,16 @@
             "default": 0,
             "title": "Numeric Score",
             "type": "number"
+          },
+          "ranking": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RankingInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "raw_score": {
             "title": "Raw Score",
@@ -1850,6 +2155,78 @@
         "title": "QunImageResponse",
         "type": "object"
       },
+      "QunImmediateSubmitRequest": {
+        "properties": {
+          "anti_abuse_pass": {
+            "anyOf": [
+              {
+                "maxLength": 4096,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anti Abuse Pass"
+          },
+          "auth_token": {
+            "format": "password",
+            "title": "Auth Token",
+            "type": "string",
+            "writeOnly": true
+          },
+          "catalogs": {
+            "items": {
+              "$ref": "#/components/schemas/QunCatalogItem"
+            },
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Catalogs",
+            "type": "array"
+          },
+          "confirmation_version": {
+            "title": "Confirmation Version",
+            "type": "string"
+          },
+          "form_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Form Version"
+          },
+          "title": {
+            "default": "",
+            "maxLength": 200,
+            "title": "Title",
+            "type": "string"
+          },
+          "turnstile_token": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turnstile Token"
+          }
+        },
+        "required": [
+          "auth_token",
+          "form_version",
+          "catalogs",
+          "confirmation_version"
+        ],
+        "title": "QunImmediateSubmitRequest",
+        "type": "object"
+      },
       "QunPreviewRequest": {
         "properties": {
           "anti_abuse_pass": {
@@ -1935,6 +2312,75 @@
         "title": "QunPreviewResponse",
         "type": "object"
       },
+      "QunResolveRequest": {
+        "properties": {
+          "anti_abuse_pass": {
+            "anyOf": [
+              {
+                "maxLength": 4096,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anti Abuse Pass"
+          },
+          "auth_token": {
+            "format": "password",
+            "title": "Auth Token",
+            "type": "string",
+            "writeOnly": true
+          },
+          "input": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Input",
+            "type": "string"
+          },
+          "turnstile_token": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turnstile Token"
+          }
+        },
+        "required": [
+          "auth_token",
+          "input"
+        ],
+        "title": "QunResolveRequest",
+        "type": "object"
+      },
+      "QunSubmitResponse": {
+        "properties": {
+          "form_id": {
+            "title": "Form Id",
+            "type": "string"
+          },
+          "submitted": {
+            "title": "Submitted",
+            "type": "boolean"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "form_id",
+          "title",
+          "submitted"
+        ],
+        "title": "QunSubmitResponse",
+        "type": "object"
+      },
       "QunUserDefaults": {
         "properties": {
           "default_address": {
@@ -1977,6 +2423,35 @@
           }
         },
         "title": "QunUserDefaults",
+        "type": "object"
+      },
+      "RankingInfo": {
+        "properties": {
+          "class_rank": {
+            "default": 0,
+            "title": "Class Rank",
+            "type": "integer"
+          },
+          "class_total": {
+            "default": 0,
+            "title": "Class Total",
+            "type": "integer"
+          },
+          "course_rank": {
+            "default": 0,
+            "title": "Course Rank",
+            "type": "integer"
+          },
+          "course_total": {
+            "default": 0,
+            "title": "Course Total",
+            "type": "integer"
+          },
+          "distribution": {
+            "$ref": "#/components/schemas/GradeDistribution"
+          }
+        },
+        "title": "RankingInfo",
         "type": "object"
       },
       "RegisterRequest": {
@@ -2147,6 +2622,24 @@
           "expires_at"
         ],
         "title": "SmuSessionResponse",
+        "type": "object"
+      },
+      "StudyCabinResponse": {
+        "properties": {
+          "dev_id": {
+            "title": "Dev Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "dev_id",
+          "name"
+        ],
+        "title": "StudyCabinResponse",
         "type": "object"
       },
       "ThirdPartyFlow": {
@@ -2516,6 +3009,85 @@
           "campus"
         ],
         "title": "WakeUpRequest",
+        "type": "object"
+      },
+      "WakeUpShareRequest": {
+        "properties": {
+          "academic_session_id": {
+            "maxLength": 128,
+            "minLength": 20,
+            "title": "Academic Session Id",
+            "type": "string"
+          },
+          "anti_abuse_pass": {
+            "anyOf": [
+              {
+                "maxLength": 4096,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anti Abuse Pass"
+          },
+          "campus": {
+            "enum": [
+              "main",
+              "shunde"
+            ],
+            "title": "Campus",
+            "type": "string"
+          },
+          "confirmation_version": {
+            "title": "Confirmation Version",
+            "type": "string"
+          },
+          "semester_monday": {
+            "format": "date",
+            "title": "Semester Monday",
+            "type": "string"
+          },
+          "total_weeks": {
+            "default": 20,
+            "maximum": 30.0,
+            "minimum": 1.0,
+            "title": "Total Weeks",
+            "type": "integer"
+          },
+          "turnstile_token": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turnstile Token"
+          }
+        },
+        "required": [
+          "academic_session_id",
+          "semester_monday",
+          "campus",
+          "confirmation_version"
+        ],
+        "title": "WakeUpShareRequest",
+        "type": "object"
+      },
+      "WakeUpShareResponse": {
+        "properties": {
+          "share_code": {
+            "title": "Share Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "share_code"
+        ],
+        "title": "WakeUpShareResponse",
         "type": "object"
       }
     }
@@ -3034,6 +3606,65 @@
         ]
       }
     },
+    "/api/v1/qun/forms/resolve": {
+      "post": {
+        "operationId": "resolve_qun100_form",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QunResolveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QunFormSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resolve Form",
+        "tags": [
+          "qun100"
+        ]
+      }
+    },
     "/api/v1/qun/forms/{form_id}/preview": {
       "post": {
         "operationId": "preview_qun100_form",
@@ -3097,6 +3728,74 @@
           }
         },
         "summary": "Preview Form",
+        "tags": [
+          "qun100"
+        ]
+      }
+    },
+    "/api/v1/qun/forms/{form_id}/submit": {
+      "post": {
+        "operationId": "submit_qun100_form_immediately",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "form_id",
+            "required": true,
+            "schema": {
+              "title": "Form Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QunImmediateSubmitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QunSubmitResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Submit Form Immediately",
         "tags": [
           "qun100"
         ]
@@ -3552,6 +4251,165 @@
         ]
       }
     },
+    "/api/v1/smu/enrollment/runs": {
+      "post": {
+        "operationId": "start_smu_enrollment_run",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnrollmentRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentRun"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Enrollment Run",
+        "tags": [
+          "smu"
+        ]
+      }
+    },
+    "/api/v1/smu/enrollment/runs/{run_id}": {
+      "get": {
+        "operationId": "get_smu_enrollment_run",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentRun"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Enrollment Run",
+        "tags": [
+          "smu"
+        ]
+      }
+    },
+    "/api/v1/smu/enrollment/runs/{run_id}/cancel": {
+      "post": {
+        "operationId": "cancel_smu_enrollment_run",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentRun"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Enrollment Run",
+        "tags": [
+          "smu"
+        ]
+      }
+    },
     "/api/v1/smu/enrollment/submit": {
       "post": {
         "operationId": "smu_enrollment_submit",
@@ -3980,6 +4838,90 @@
         "summary": "Timetable Wakeup",
         "tags": [
           "smu"
+        ]
+      }
+    },
+    "/api/v1/smu/timetable.wakeup.share": {
+      "post": {
+        "operationId": "smu_timetable_wakeup_share",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WakeUpShareRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WakeUpShareResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Timetable Wakeup Share",
+        "tags": [
+          "smu"
+        ]
+      }
+    },
+    "/api/v1/study-cabin/cabins": {
+      "get": {
+        "operationId": "list_study_cabins",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StudyCabinResponse"
+                  },
+                  "title": "Response List Study Cabins",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Study Cabins",
+        "tags": [
+          "study-cabin"
         ]
       }
     },

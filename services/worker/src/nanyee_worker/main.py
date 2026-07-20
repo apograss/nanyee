@@ -13,6 +13,7 @@ from nanyee.db import close_database
 from nanyee.db.session import get_session_factory
 from nanyee.logging import configure_logging
 
+from nanyee_worker.evaluation import EvaluationHandler
 from nanyee_worker.qun_checkin import QunCheckinHandler
 from nanyee_worker.runtime import WorkerRuntime
 from nanyee_worker.study_cabin import DdddOcrSolver, StudyCabinHandler
@@ -35,13 +36,15 @@ async def serve() -> None:
     if cipher is None:
         raise RuntimeError("worker requires a configured credential key provider")
     vault = CredentialVaultService(cipher, settings)
-    handler = StudyCabinHandler(settings, vault, DdddOcrSolver())
+    solver = DdddOcrSolver()
+    handler = StudyCabinHandler(settings, vault, solver)
     runtime = WorkerRuntime(
         get_session_factory(),
         worker_id=worker_id,
         lease_seconds=settings.worker_lease_seconds,
         retry_interval_seconds=settings.worker_retry_interval_seconds,
         handlers={
+            "evaluation": EvaluationHandler(settings, vault, solver),
             "study_cabin": handler,
             "qun_checkin": QunCheckinHandler(settings, vault),
         },

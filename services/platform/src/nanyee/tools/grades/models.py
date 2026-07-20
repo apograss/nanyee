@@ -3,6 +3,22 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class GradeDistribution(BaseModel):
+    lt60: int = 0
+    s60to70: int = 0
+    s70to80: int = 0
+    s80to90: int = 0
+    gte90: int = 0
+
+
+class RankingInfo(BaseModel):
+    course_rank: int = 0
+    course_total: int = 0
+    class_rank: int = 0
+    class_total: int = 0
+    distribution: GradeDistribution = Field(default_factory=GradeDistribution)
+
+
 class GradeRecord(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -19,6 +35,7 @@ class GradeRecord(BaseModel):
     exam_type: str = ""
     grade_id: str = ""
     total_hours: float = 0
+    ranking: RankingInfo | None = None
 
     @classmethod
     def from_upstream(cls, row: dict[str, object]) -> GradeRecord:

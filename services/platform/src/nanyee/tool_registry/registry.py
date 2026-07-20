@@ -34,10 +34,13 @@ _TOOLS = (
     ToolDefinition(
         id="evaluation",
         name="评课助手",
-        description="读取待评课程、生成草稿并在确认后逐项提交。",
+        description="由 VPS 自动读取全部待评课程、生成旧版高分组合并批量提交。",
         operations=("prepare", "submit"),
-        credential_modes=(CredentialMode.TRANSIENT_SERVER,),
-        risk_level=RiskLevel.USER_CONFIRMED_WRITE,
+        credential_modes=(
+            CredentialMode.TRANSIENT_SERVER,
+            CredentialMode.HOSTED_AUTOMATION,
+        ),
+        risk_level=RiskLevel.SCHEDULED_WRITE,
         account_required=True,
         student_identity_required=True,
     ),
@@ -60,7 +63,7 @@ _TOOLS = (
     ToolDefinition(
         id="course_selection",
         name="选课助手",
-        description="在用户在线确认后按公平配额尝试选课。",
+        description="按多级志愿校时等待，并自动重试选课与确认课程冲突。",
         operations=("preview", "enroll"),
         credential_modes=(CredentialMode.TRANSIENT_SERVER,),
         risk_level=RiskLevel.USER_CONFIRMED_WRITE,

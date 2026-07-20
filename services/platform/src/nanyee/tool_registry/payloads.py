@@ -6,6 +6,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from nanyee.errors import AppError, ErrorCode
+from nanyee.tools.evaluation import EvaluationAutomationRequest
 from nanyee.tools.qun_checkin import QunSubmitRequest
 from nanyee.tools.study_cabin import StudyCabinReservationRequest
 
@@ -28,6 +29,16 @@ def validate_job_payload(
         return ValidatedJobPayload(
             payload=qun_request.model_dump(mode="json"),
             max_attempts=3,
+            credential_required=True,
+        )
+    if (tool_id, operation) == ("evaluation", "submit"):
+        try:
+            evaluation_request = EvaluationAutomationRequest.model_validate(payload)
+        except ValidationError as exc:
+            raise _payload_error("自动评课参数无效。", exc) from exc
+        return ValidatedJobPayload(
+            payload=evaluation_request.model_dump(mode="json"),
+            max_attempts=86_400,
             credential_required=True,
         )
     if (tool_id, operation) != ("study_cabin", "reserve"):

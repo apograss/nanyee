@@ -87,9 +87,23 @@ async def test_smu_login_keeps_cookies_server_side_and_restricts_redirects() -> 
                             "cjjd": 4,
                             "xf": 2,
                             "xdfsmc": "必修",
+                            "cjdm": "grade-1",
                         }
                     ]
                 },
+            )
+        if request.url.path == "/new/student/xskccj/kccjfxd.page":
+            assert request.url.params["cjdm"] == "grade-1"
+            return httpx.Response(
+                200,
+                text="""
+                <table>
+                  <tr><td>课程</td><td>课程甲</td><td>1</td><td>2</td><td>3</td>
+                    <td>4</td><td>5</td><td>15</td><td>2</td></tr>
+                  <tr><td>教学班</td><td>一班</td><td>0</td><td>1</td><td>2</td>
+                    <td>3</td><td>4</td><td>10</td><td>1</td></tr>
+                </table>
+                """,
             )
         raise AssertionError(f"unexpected request: {request.url}")
 
@@ -111,6 +125,9 @@ async def test_smu_login_keeps_cookies_server_side_and_restricts_redirects() -> 
     grades = await client.fetch_grades(academic_cookies=cookies)
     assert grades[0].name == "课程甲"
     assert grades[0].grade_point == 4
+    assert grades[0].ranking is not None
+    assert grades[0].ranking.course_rank == 2
+    assert grades[0].ranking.class_rank == 1
 
 
 @pytest.mark.asyncio

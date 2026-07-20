@@ -21,7 +21,8 @@ docker compose --env-file .env.production -f infra/compose/compose.prod.yaml up 
 - `GET /health/live` 与 `/health/ready` 返回 200。
 - 生产环境无 `/docs` 和 `/openapi.json`。
 - API/Worker 使用同一数据库与凭据主密钥，数据库和 API 端口没有直接暴露公网。
-- 完成注册、平台登录、瞬时学校登录、只读查询、选课/评课确认、群报数预览、测试任务取消与凭据撤销的人工烟雾测试。
+- 完成注册、平台登录、浏览器 OCR 学校登录、成绩排名、课表导出、自动选课运行与取消、自动评课测试任务、群报数即时提交、学习舱舱位读取、任务取消与凭据撤销的人工烟雾测试。
+- 人为让评课和学习舱验证码识别失败，确认任务退避后进入 `retry_wait`，凭据没有被误判为永久无效；恢复 OCR 后可继续执行。
 - 模拟上游超时，确认写请求进入 `RESULT_UNKNOWN`/`verification_required`，不会自动重放。
 
 ## 回滚边界

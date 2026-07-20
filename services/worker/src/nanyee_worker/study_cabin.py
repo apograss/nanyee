@@ -116,13 +116,9 @@ class StudyCabinHandler:
         if session is None:
             account, password = await self._load_login(db, job)
             try:
-                cookies = await self._authenticator.login(account, password)
+                cookies = await self._login_with_backoff(account, password)
                 client = InfospaceClient(self._settings, cookies=cookies)
                 user = await client.get_user_info()
-            except AuthenticationRejected as exc:
-                raise ExecutionFailure(
-                    "CREDENTIAL_REJECTED", retryable=False, next_action="replace_credential"
-                ) from exc
             except UpstreamUnavailable as exc:
                 raise ExecutionFailure("UPSTREAM_UNAVAILABLE", retryable=True) from exc
             finally:
@@ -238,6 +234,21 @@ class StudyCabinHandler:
                 "CREDENTIAL_INVALID", retryable=False, next_action="replace_credential"
             )
         return account, password
+
+    async def _login_with_backoff(self, account: str, password: str) -> dict[str, str]:
+        last_error: Exception | None = None
+        for attempt in range(5):
+            try:
+                return await self._authenticator.login(account, password)
+            except (AuthenticationRejected, UpstreamUnavailable) as exc:
+                last_error = exc
+            if attempt < 4:
+                await asyncio.sleep(2**attempt)
+        raise ExecutionFailure(
+            "INFOSPACE_LOGIN_RETRY",
+            retryable=True,
+            next_action="automatic_retry",
+        ) from last_error
 
 
 def _format_datetime(target_date: date, target_time: time) -> str:

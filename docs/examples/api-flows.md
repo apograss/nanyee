@@ -57,7 +57,7 @@ Content-Type: application/json
 }
 ```
 
-## 在线确认型写操作
+## 自动选课
 
 ### 选课
 
@@ -70,49 +70,65 @@ X-CSRF-Token: value-from-csrf-cookie
 ```
 
 ```http
-POST /api/v1/smu/enrollment/submit
+POST /api/v1/smu/enrollment/runs
 Content-Type: application/json
 X-CSRF-Token: value-from-csrf-cookie
 
 {
   "academic_session_id":"temporary-session-id",
   "category_code":"12",
-  "task_code":"course-task-from-current-list",
-  "confirmation_version":"course_selection:enroll:v1"
+  "preference_task_codes":["first-task-from-current-list","second-task-from-current-list"],
+  "scheduled_time":"09:00:00",
+  "max_attempts":15,
+  "primary_burst_attempts":5,
+  "confirm_conflicts":true,
+  "confirmation_version":"course_selection:auto_enroll:v1"
 }
 ```
 
-### 评课
+轮询 `GET /api/v1/smu/enrollment/runs/{run_id}`；取消时调用：
 
 ```http
-POST /api/v1/smu/evaluations/drafts
-Content-Type: application/json
+POST /api/v1/smu/enrollment/runs/run-id-from-server/cancel
 X-CSRF-Token: value-from-csrf-cookie
-
-{
-  "academic_session_id":"temporary-session-id",
-  "reference":{
-    "teacher_code":"teacher-1",
-    "class_hour_code":"hour-1",
-    "questionnaire_code":"questionnaire-1"
-  }
-}
-```
-
-```http
-POST /api/v1/smu/evaluations/submit
-Content-Type: application/json
-X-CSRF-Token: value-from-csrf-cookie
-
-{
-  "academic_session_id":"temporary-session-id",
-  "draft_id":"one-time-draft-id-from-server",
-  "selections":{"quality":"excellent","attendance":"yes"},
-  "confirmation_version":"evaluation:submit:v1"
-}
 ```
 
 ## 托管凭据与任务
+
+### 自动评课
+
+```http
+POST /api/v1/credentials
+Content-Type: application/json
+X-CSRF-Token: value-from-csrf-cookie
+
+{
+  "upstream":"academic",
+  "purpose":"evaluation",
+  "secret":"{\"account\":\"20260001\",\"password\":\"仅在此请求发送\"}",
+  "ttl_seconds":2592000,
+  "consent_version":"credential-hosting-v1",
+  "metadata":{"account_hint":"尾号 0001"}
+}
+```
+
+```http
+POST /api/v1/jobs
+Content-Type: application/json
+X-CSRF-Token: value-from-csrf-cookie
+Idempotency-Key: evaluation-20260720-0001
+
+{
+  "tool_id":"evaluation",
+  "operation":"submit",
+  "credential_id":"00000000-0000-4000-8000-000000000002",
+  "confirmation_version":"evaluation:submit:v1",
+  "payload":{
+    "strategy":"legacy_positive_random",
+    "max_courses":60
+  }
+}
+```
 
 ### 学习舱
 
@@ -156,18 +172,20 @@ Idempotency-Key: cabin-20260722-0001
 
 ### 群报数
 
-先用单次 Token 请求生成预览；不要在浏览器持久保存 Token：
-
-图片字段需要上传时使用 multipart，请求成功后只把返回的 URL 放进预览自定义字段：
+先解析表单 ID 或分享链接，再用单次 Token 生成预览；不要在浏览器持久保存 Token：
 
 ```http
-POST /api/v1/qun/images
-Content-Type: multipart/form-data; boundary=...
+POST /api/v1/qun/forms/resolve
+Content-Type: application/json
 X-CSRF-Token: value-from-csrf-cookie
 
-auth_token=完整Token
-file=@photo.png
+{
+  "auth_token":"完整且不少于六十字符的脱敏示例Token值aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "input":"https://form.qun100.com/s/123456789012345"
+}
 ```
+
+生成预览：
 
 ```http
 POST /api/v1/qun/forms/123456789012345/preview
@@ -185,6 +203,35 @@ X-CSRF-Token: value-from-csrf-cookie
   "custom_fields":{"temperature":"36.5"}
 }
 ```
+
+图片字段需要上传时使用 multipart，请求成功后只把返回的 URL 放进预览自定义字段：
+
+```http
+POST /api/v1/qun/images
+Content-Type: multipart/form-data; boundary=...
+X-CSRF-Token: value-from-csrf-cookie
+
+auth_token=完整Token
+file=@photo.png
+```
+
+立即提交可直接继续使用内存中的 Token，无需托管：
+
+```http
+POST /api/v1/qun/forms/123456789012345/submit
+Content-Type: application/json
+X-CSRF-Token: value-from-csrf-cookie
+
+{
+  "auth_token":"完整且不少于六十字符的脱敏示例Token值aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "form_version":1,
+  "title":"每日打卡",
+  "catalogs":[{"cid":"temperature","type":"NUMBER_FLOAT","value":"36.5"}],
+  "confirmation_version":"qun_checkin:submit:v1"
+}
+```
+
+只有定时提交才创建托管 Token 和任务：
 
 ```http
 POST /api/v1/credentials

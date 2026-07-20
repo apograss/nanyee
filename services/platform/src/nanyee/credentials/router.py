@@ -27,8 +27,8 @@ CREDENTIAL_CREATE_POLICY = RateLimitPolicy(window_seconds=10 * 60, soft_limit=5,
 
 
 class CredentialCreateRequest(BaseModel):
-    upstream: Literal["infospace", "qun100"]
-    purpose: Literal["study_cabin", "qun_checkin"]
+    upstream: Literal["academic", "infospace", "qun100"]
+    purpose: Literal["evaluation", "study_cabin", "qun_checkin"]
     secret: SecretStr
     ttl_seconds: int | None = Field(default=None, ge=300, le=30 * 24 * 60 * 60)
     consent_version: str
@@ -39,6 +39,7 @@ class CredentialCreateRequest(BaseModel):
     @model_validator(mode="after")
     def validate_upstream_for_purpose(self) -> CredentialCreateRequest:
         expected = {
+            "evaluation": "academic",
             "study_cabin": "infospace",
             "qun_checkin": "qun100",
         }
@@ -110,21 +111,21 @@ def _canonical_secret(payload: CredentialCreateRequest) -> str:
                 status_code=422,
                 details={"field": "secret"},
             ) from exc
-    if payload.purpose != "study_cabin":
+    if payload.purpose not in {"evaluation", "study_cabin"}:
         return value
     try:
         parsed = json.loads(value)
     except json.JSONDecodeError as exc:
         raise AppError(
             ErrorCode.INVALID_REQUEST,
-            "学习舱凭据格式无效。",
+            "学校账号凭据格式无效。",
             status_code=422,
             details={"field": "secret"},
         ) from exc
     if not isinstance(parsed, dict):
         raise AppError(
             ErrorCode.INVALID_REQUEST,
-            "学习舱凭据格式无效。",
+            "学校账号凭据格式无效。",
             status_code=422,
             details={"field": "secret"},
         )
@@ -140,7 +141,7 @@ def _canonical_secret(payload: CredentialCreateRequest) -> str:
     ):
         raise AppError(
             ErrorCode.INVALID_REQUEST,
-            "学习舱凭据格式无效。",
+            "学校账号凭据格式无效。",
             status_code=422,
             details={"field": "secret"},
         )

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, unquote, urljoin, urlparse
 
 import httpx
 
@@ -43,6 +43,33 @@ class Qun100Client:
     async def verify_token(self, token: str) -> dict[str, Any]:
         response = await self._request("GET", "/v1/storage_space/status", token=token)
         return self._require_success(response)
+
+    async def resolve_form_id(self, input_value: str) -> str | None:
+        text = input_value.strip()
+        direct = _extract_form_id(text)
+        if direct is not None:
+            return direct
+        candidate = text if text.startswith(("http://", "https://")) else f"https://{text}"
+        parsed = urlparse(candidate)
+        if parsed.scheme != "https" or not _is_qun100_host(parsed.hostname):
+            return None
+        try:
+            async with httpx.AsyncClient(
+                timeout=httpx.Timeout(self._settings.upstream_timeout_seconds),
+                follow_redirects=False,
+                trust_env=False,
+                transport=self._transport,
+            ) as client:
+                response = await client.get(candidate, headers={"User-Agent": "Mozilla/5.0"})
+        except httpx.HTTPError as exc:
+            raise Qun100Unavailable("Qun100 share link request failed") from exc
+        location = response.headers.get("location", "")
+        if location:
+            resolved = urljoin(candidate, location)
+            if not _is_qun100_host(urlparse(resolved).hostname):
+                return None
+            return _extract_form_id(unquote(resolved))
+        return _extract_form_id(unquote(str(response.url)))
 
     async def list_active_forms(self, token: str) -> list[dict[str, Any]]:
         response = await self._request(
@@ -198,3 +225,16 @@ class Qun100Client:
         if not isinstance(data, dict):
             raise Qun100Unavailable("Qun100 response data is invalid")
         return data
+
+
+def _extract_form_id(value: str) -> str | None:
+    import re
+
+    if re.fullmatch(r"\d{15,32}", value):
+        return value
+    match = re.search(r"(?:formId|fid)[=:]\s*(\d{15,32})", value, re.IGNORECASE)
+    return match.group(1) if match else None
+
+
+def _is_qun100_host(hostname: str | None) -> bool:
+    return bool(hostname and (hostname == "qun100.com" or hostname.endswith(".qun100.com")))

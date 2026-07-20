@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from datetime import datetime
+from typing import Literal
+
+from pydantic import BaseModel, Field, field_validator
 
 
 class EvaluationReference(BaseModel):
@@ -41,3 +44,24 @@ class EvaluationResult(BaseModel):
     teacher_name: str
     course_name: str
     total_score: int
+
+
+class EvaluationAutoAnswer(BaseModel):
+    indicator_code: str
+    title: str
+    selected_code: str
+    label: str
+    score: int
+
+
+class EvaluationAutomationRequest(BaseModel):
+    strategy: Literal["legacy_positive_random"] = "legacy_positive_random"
+    max_courses: int = Field(default=60, ge=1, le=60)
+    retry_until: datetime | None = None
+
+    @field_validator("retry_until")
+    @classmethod
+    def require_retry_timezone(cls, value: datetime | None) -> datetime | None:
+        if value is not None and (value.tzinfo is None or value.utcoffset() is None):
+            raise ValueError("retry_until must include a timezone")
+        return value
