@@ -1,0 +1,27 @@
+services:
+  web:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    command: ["uvicorn", "smu_reserver.web:app", "--host", "0.0.0.0", "--port", "8765"]
+    ports:
+      - "127.0.0.1:8765:8765"
+    volumes:
+      - reserver-data:/app/data
+
+  worker:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    command: python -m smu_reserver.worker_service
+    healthcheck:
+      disable: true
+    volumes:
+      - reserver-data:/app/data
+
+volumes:
+  reserver-data:

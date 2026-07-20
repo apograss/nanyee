@@ -1,0 +1,5 @@
+{% extends "base.html" %}
+{% block content %}<h1>系统设置</h1><section class="form-card"><h2>SMU 账号</h2>
+{% if credentials_saved %}<p class="success">已保存。为安全起见不回显账号和密码。</p>{% else %}<p>尚未保存。</p>{% endif %}
+<form method="post" action="/settings/credentials"><input type="hidden" name="csrf" value="{{ csrf }}"><label>校园网账号<input name="account" autocomplete="username" required></label><label>校园网密码<input type="password" name="password" autocomplete="current-password" required></label><button>加密保存</button></form>
+</section>{% endblock %}

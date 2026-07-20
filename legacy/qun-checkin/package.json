@@ -1,0 +1,20 @@
+{
+  "name": "qun100-checkin-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "群报数打卡 Web 应用",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node server/index.js"
+  },
+  "dependencies": {
+    "archiver": "^7.0.1",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "helmet": "^8.1.0",
+    "multer": "^1.4.5-lts.2",
+    "pdf-parse": "^2.4.5",
+    "wedecode": "^0.10.6"
+  }
+}

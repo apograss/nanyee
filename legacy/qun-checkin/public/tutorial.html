@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#FFFAED">
+  <title>Token 获取教程 - 打卡助手</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --color-brand: #E8652B;
+      --color-brand-hover: #D0551F;
+      --color-brand-light: #FFF0E8;
+      --color-dark: #1D3557;
+      --color-dark-hover: #152A45;
+      --color-mint: #A8DADC;
+      --color-paper: #FFFAED;
+      --bg-primary: var(--color-paper);
+      --bg-secondary: #FFFFFF;
+      --bg-hover: #F0E6D6;
+      --bg-muted: #EDE3D3;
+      --text-primary: var(--color-dark);
+      --text-secondary: #457B9D;
+      --text-muted: #5C7A92;
+      --border-color: var(--color-dark);
+      --border-light: #D4C8BC;
+      --color-success: #4CAF50;
+      --color-success-light: #E8F5E9;
+      --color-warning: #FF9800;
+      --color-warning-light: #FFF3E0;
+      --color-info: #2196F3;
+      --color-info-light: #E3F2FD;
+      --neo-border: 2px solid var(--border-color);
+      --neo-radius: 12px;
+      --neo-radius-sm: 8px;
+      --neo-shadow: 3px 3px 0px var(--border-color);
+      --neo-shadow-sm: 2px 2px 0px var(--border-color);
+      --font-sans: "Inter", "Noto Sans SC", -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.7;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: var(--color-brand); text-decoration: none; }
+    a:hover { color: var(--color-brand-hover); }
+
+    /* ── Back link ── */
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      font-weight: 500;
+      padding: 16px 20px;
+      transition: color 0.15s;
+    }
+    .back-link:hover { color: var(--color-brand); }
+
+    /* ── Hero ── */
+    .hero {
+      text-align: center;
+      padding: 60px 20px 48px;
+      border-bottom: var(--neo-border);
+    }
+    .hero h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 10px;
+    }
+    .hero p {
+      color: var(--text-secondary);
+      font-size: 1rem;
+      max-width: 560px;
+      margin: 0 auto;
+    }
+
+    /* ── Container ── */
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 32px 20px 80px;
+    }
+
+    /* ── Section ── */
+    .section {
+      margin-bottom: 40px;
+    }
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid var(--border-light);
+    }
+    .section-title .icon {
+      width: 36px;
+      height: 36px;
+      border-radius: var(--neo-radius-sm);
+      border: var(--neo-border);
+      box-shadow: var(--neo-shadow-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      flex-shrink: 0;
+    }
+    .section-title .icon.blue { background: var(--color-info-light); }
+    .section-title .icon.green { background: var(--color-success-light); }
+    .section-title .icon.orange { background: var(--color-warning-light); }
+
+    /* ── Info Card ── */
+    .info-card {
+      background: var(--bg-secondary);
+      border: var(--neo-border);
+      border-radius: var(--neo-radius);
+      box-shadow: var(--neo-shadow-sm);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .info-card h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--color-brand);
+    }
+    .info-card p {
+      color: var(--text-secondary);
+      font-size: 0.92rem;
+    }
+    .info-card a { font-weight: 600; }
+
+    /* ── Steps ── */
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .step {
+      background: var(--bg-secondary);
+      border: var(--neo-border);
+      border-radius: var(--neo-radius);
+      box-shadow: 1px 1px 0px var(--border-color);
+      padding: 24px;
+      transition: all 0.2s ease;
+    }
+    .step:hover {
+      transform: translate(-2px, -2px);
+      box-shadow: var(--neo-shadow);
+    }
+    .step-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    .step-num {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--neo-radius-sm);
+      background: var(--color-brand);
+      border: var(--neo-border);
+      box-shadow: var(--neo-shadow-sm);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 1.1rem;
+      flex-shrink: 0;
+    }
+    .step-header h3 {
+      font-size: 1.05rem;
+      font-weight: 700;
+    }
+    .step-body {
+      padding-left: 54px;
+    }
+    .step-body p {
+      color: var(--text-secondary);
+      margin-bottom: 10px;
+      font-size: 0.92rem;
+    }
+    .step-body code {
+      color: var(--color-brand);
+      font-weight: 600;
+      font-family: "Consolas", monospace;
+    }
+    .step-body img {
+      width: 100%;
+      border-radius: var(--neo-radius-sm);
+      border: var(--neo-border);
+      margin-top: 10px;
+    }
+
+    /* ── Download Button ── */
+    .download-section {
+      text-align: center;
+      padding: 16px 0;
+    }
+    .btn-download {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 32px;
+      background: var(--color-brand);
+      color: #fff;
+      border: var(--neo-border);
+      border-radius: var(--neo-radius);
+      box-shadow: var(--neo-shadow);
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-download:hover {
+      background: var(--color-brand-hover);
+      transform: translate(-2px, -2px);
+      box-shadow: 4px 4px 0px var(--border-color);
+      color: #fff;
+    }
+    .btn-download:active {
+      transform: translate(1px, 1px);
+      box-shadow: 0 0 0 var(--border-color);
+    }
+
+    /* ── Code Block ── */
+    .code-block {
+      background: var(--bg-muted);
+      border: var(--neo-border);
+      border-radius: var(--neo-radius-sm);
+      padding: 14px 18px;
+      font-family: "Consolas", "Monaco", monospace;
+      font-size: 0.85rem;
+      color: var(--text-primary);
+      overflow-x: auto;
+      margin: 10px 0;
+    }
+    .code-block .comment { color: var(--text-muted); }
+    .code-block .highlight { color: var(--color-brand); font-weight: 600; }
+
+    /* ── Tips ── */
+    .tip {
+      display: flex;
+      gap: 10px;
+      padding: 14px 18px;
+      border-radius: var(--neo-radius-sm);
+      margin: 14px 0;
+      font-size: 0.9rem;
+      border: 2px solid;
+    }
+    .tip.warning {
+      background: var(--color-warning-light);
+      border-color: var(--color-warning);
+      color: #7B5800;
+    }
+    .tip.success {
+      background: var(--color-success-light);
+      border-color: var(--color-success);
+      color: #2E7D32;
+    }
+    .tip.info {
+      background: var(--color-info-light);
+      border-color: var(--color-info);
+      color: #1565C0;
+    }
+    .tip .tip-icon { font-size: 1.1rem; flex-shrink: 0; }
+    .tip strong { font-weight: 700; }
+
+    /* ── FAQ ── */
+    .faq-item {
+      background: var(--bg-secondary);
+      border: var(--neo-border);
+      border-radius: var(--neo-radius);
+      margin-bottom: 8px;
+      overflow: hidden;
+      box-shadow: 1px 1px 0px var(--border-color);
+    }
+    .faq-q {
+      padding: 14px 18px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 600;
+      font-size: 0.92rem;
+      transition: background 0.15s;
+    }
+    .faq-q:hover { background: var(--bg-hover); }
+    .faq-q .arrow {
+      transition: transform 0.2s;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+    .faq-item.open .faq-q .arrow { transform: rotate(180deg); }
+    .faq-a {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+    }
+    .faq-item.open .faq-a { max-height: 500px; }
+    .faq-a-inner {
+      padding: 0 18px 14px;
+      color: var(--text-secondary);
+      font-size: 0.88rem;
+      line-height: 1.7;
+    }
+
+    /* ── Tabs ── */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      background: var(--bg-muted);
+      border-radius: var(--neo-radius);
+      padding: 4px;
+      border: var(--neo-border);
+      margin-bottom: 20px;
+    }
+    .tab {
+      flex: 1;
+      padding: 10px 14px;
+      text-align: center;
+      border-radius: var(--neo-radius-sm);
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.9rem;
+      transition: all 0.15s;
+      color: var(--text-muted);
+      border: 2px solid transparent;
+    }
+    .tab:hover { color: var(--text-primary); }
+    .tab.active {
+      background: var(--color-brand);
+      color: #fff;
+      border-color: var(--border-color);
+      box-shadow: var(--neo-shadow-sm);
+    }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* ── Responsive ── */
+    @media (max-width: 640px) {
+      .hero h1 { font-size: 1.5rem; }
+      .hero { padding: 40px 16px 32px; }
+      .step-body { padding-left: 0; padding-top: 8px; }
+      .step { padding: 18px; }
+    }
+  </style>
+</head>
+<body>
+
+<a href="./" class="back-link">&larr; 返回打卡助手</a>
+
+<section class="hero">
+  <h1>Token 获取教程</h1>
+  <p>两种方式获取群报数登录凭证，选择适合你的方案</p>
+</section>
+
+<div class="container">
+
+  <!-- 什么是 Token -->
+  <div class="section">
+    <div class="section-title">
+      <span class="icon blue">?</span>
+      什么是 Token？
+    </div>
+    <div class="info-card">
+      <h3>简单说</h3>
+      <p>Token 是你在群报数小程序的"登录凭证"。我们需要它来代替你自动完成打卡。就像你给了一把钥匙，让工具帮你开门签到。</p>
+    </div>
+    <div class="tip info">
+      <span class="tip-icon">i</span>
+      <span>Token 有效期约 <strong>7 天</strong>，过期后重新获取即可。你的微信账号完全安全，Token 仅用于打卡接口。</span>
+    </div>
+  </div>
+
+  <!-- 选择方式 -->
+  <div class="section">
+    <div class="section-title">
+      <span class="icon green">!</span>
+      选择获取方式
+    </div>
+
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab(0)">一键工具（推荐）</div>
+      <div class="tab" onclick="switchTab(1)">手动抓包</div>
+    </div>
+
+    <!-- Tab 1: 一键工具 -->
+    <div class="tab-content active" id="tab-0">
+
+      <div class="tip success">
+        <span class="tip-icon">!</span>
+        <span>推荐方式！双击运行，自动获取 Token 并复制到剪贴板，全程不到 1 分钟。</span>
+      </div>
+
+      <div class="info-card">
+        <h3>前置条件</h3>
+        <p>
+          &bull; Windows 电脑<br>
+          &bull; 安装了 <a href="https://www.python.org/downloads/">Python 3.8+</a>（安装时勾选 "Add to PATH"）<br>
+          &bull; PC 端微信已登录
+        </p>
+      </div>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-header">
+            <div class="step-num">0</div>
+            <h3>下载并安装环境 <span style="color:var(--text-muted);font-weight:400;font-size:0.85rem">（仅首次）</span></h3>
+          </div>
+          <div class="step-body">
+            <p>下载工具包后，先运行 <code>setup.bat</code> 安装 mitmproxy 和证书。</p>
+            <div class="download-section">
+              <a href="/assets/tools/token_tool.zip" class="btn-download">
+                下载 Token 获取工具
+              </a>
+            </div>
+            <div class="code-block">
+              <span class="comment">// 解压后文件结构</span><br>
+              token_tool/<br>
+              +-- <span class="highlight">setup.bat</span> &larr; 首次运行这个<br>
+              +-- <span class="highlight">get_token.bat</span> &larr; 日常运行这个<br>
+              +-- capture_token.py &larr; 自动调用
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-header">
+            <div class="step-num">1</div>
+            <h3>运行获取工具</h3>
+          </div>
+          <div class="step-body">
+            <p>双击 <code>get_token.bat</code>，看到提示界面说明工具已就绪。</p>
+            <img src="/assets/tutorial/step1_run_tool.png" alt="运行工具界面" loading="lazy">
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-header">
+            <div class="step-num">2</div>
+            <h3>打开群报数小程序</h3>
+          </div>
+          <div class="step-body">
+            <p>在 <strong>PC 微信</strong> 中打开群报数小程序，随便点进一个打卡活动即可。</p>
+            <img src="/assets/tutorial/step2_open_wechat.png" alt="打开小程序" loading="lazy">
+            <div class="tip warning">
+              <span class="tip-icon">!</span>
+              <span>必须用 <strong>PC 端微信</strong>打开小程序，手机微信无法抓包。</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-header">
+            <div class="step-num">3</div>
+            <h3>Token 自动捕获</h3>
+          </div>
+          <div class="step-body">
+            <p>工具会自动检测到 Token 并复制到剪贴板：</p>
+            <img src="/assets/tutorial/step3_success.png" alt="捕获成功" loading="lazy">
+            <div class="tip success">
+              <span class="tip-icon">!</span>
+              <span>Token 已在剪贴板！直接回到打卡助手的「设置」页面粘贴即可。</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2: 手动抓包 -->
+    <div class="tab-content" id="tab-1">
+
+      <div class="tip info">
+        <span class="tip-icon">i</span>
+        <span>如果一键工具无法使用，可以手动配置 mitmproxy 抓包。需要一定技术基础。</span>
+      </div>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-header">
+            <div class="step-num">1</div>
+            <h3>安装 mitmproxy</h3>
+          </div>
+          <div class="step-body">
+            <div class="code-block">pip install mitmproxy</div>
+            <p>安装后运行一次 mitmdump 生成 CA 证书，然后安装证书：</p>
+            <div class="code-block">
+              <span class="comment"># 安装 CA 证书到系统</span><br>
+              certutil -addstore -user root %USERPROFILE%\.mitmproxy\mitmproxy-ca-cert.cer
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-header">
+            <div class="step-num">2</div>
+            <h3>启动抓包代理</h3>
+          </div>
+          <div class="step-body">
+            <div class="code-block">mitmdump -p 8899 --ssl-insecure -q --set flow_detail=1</div>
+            <p>然后在 Windows 设置 &rarr; 网络 &rarr; 代理 &rarr; 手动代理 中设置：</p>
+            <div class="code-block">
+              地址: <span class="highlight">127.0.0.1</span><br>
+              端口: <span class="highlight">8899</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-header">
+            <div class="step-num">3</div>
+            <h3>打开小程序并找到 Token</h3>
+          </div>
+          <div class="step-body">
+            <p>在 PC 微信打开群报数小程序。在 mitmdump 输出中找到发往 <code>form.qun100.com</code> 的请求。</p>
+            <p>找到请求头中的 <code>Authorization</code> 字段，复制该值即为 Token。</p>
+            <div class="code-block">
+              <span class="comment"># 输出示例</span><br>
+              GET https://form.qun100.com/v2/activity/list<br>
+              &nbsp;&nbsp;Authorization: <span class="highlight">2XEMO6kICDthQHYxo5mMXjCH...</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-header">
+            <div class="step-num">4</div>
+            <h3>还原代理设置</h3>
+          </div>
+          <div class="step-body">
+            <p>获取完成后，<strong>务必关闭系统代理</strong>：</p>
+            <p>Windows 设置 &rarr; 网络 &rarr; 代理 &rarr; 关闭"手动代理"</p>
+            <div class="tip warning">
+              <span class="tip-icon">!</span>
+              <span>忘记关闭代理会导致网络无法正常使用！</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FAQ -->
+  <div class="section">
+    <div class="section-title">
+      <span class="icon orange">?</span>
+      常见问题
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">
+        Token 会泄露我的微信信息吗？
+        <span class="arrow">&darr;</span>
+      </div>
+      <div class="faq-a"><div class="faq-a-inner">
+        不会。Token 只是群报数小程序的会话凭证，只能用于群报数的打卡接口，无法访问你的微信聊天、通讯录等任何隐私信息。
+      </div></div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">
+        Token 多久过期？
+        <span class="arrow">&darr;</span>
+      </div>
+      <div class="faq-a"><div class="faq-a-inner">
+        大约 7 天。过期后打卡会失败，重新运行工具获取新 Token 即可。
+      </div></div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">
+        工具提示"未检测到 mitmdump"怎么办？
+        <span class="arrow">&darr;</span>
+      </div>
+      <div class="faq-a"><div class="faq-a-inner">
+        请先运行 setup.bat 安装环境。如果仍然失败，确认 Python 已正确安装并添加到 PATH 环境变量中。
+      </div></div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">
+        运行工具后网络不能用了？
+        <span class="arrow">&darr;</span>
+      </div>
+      <div class="faq-a"><div class="faq-a-inner">
+        工具正常结束会自动还原代理设置。如果异常退出，请手动关闭：Windows 设置 &rarr; 网络和 Internet &rarr; 代理 &rarr; 关闭"使用代理服务器"。
+      </div></div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">
+        Mac / Linux 能用吗？
+        <span class="arrow">&darr;</span>
+      </div>
+      <div class="faq-a"><div class="faq-a-inner">
+        目前一键工具仅支持 Windows。Mac/Linux 用户请参照"手动抓包"方式操作。
+      </div></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function switchTab(idx) {
+  document.querySelectorAll('.tab').forEach(function(t, i) { t.classList.toggle('active', i === idx); });
+  document.querySelectorAll('.tab-content').forEach(function(c, i) { c.classList.toggle('active', i === idx); });
+}
+function toggleFaq(el) {
+  el.closest('.faq-item').classList.toggle('open');
+}
+</script>
+
+</body>
+</html>

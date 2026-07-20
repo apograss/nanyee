@@ -1,0 +1,58 @@
+[project]
+name = "nanyee-workspace"
+version = "0.1.0"
+description = "Nanyee student tools backend workspace"
+requires-python = ">=3.12,<3.15"
+
+[dependency-groups]
+dev = [
+  "aiosqlite>=0.21.0",
+  "mypy>=1.15.0",
+  "pytest>=8.3.5",
+  "pytest-asyncio>=0.26.0",
+  "pytest-cov>=6.1.1",
+  "respx>=0.22.0",
+  "ruff>=0.11.0",
+]
+
+[tool.uv.workspace]
+members = ["services/platform", "services/worker"]
+
+[tool.uv.sources]
+nanyee-platform = { workspace = true }
+nanyee-worker = { workspace = true }
+
+[tool.pytest.ini_options]
+addopts = "--strict-config --strict-markers"
+asyncio_mode = "auto"
+testpaths = ["services/platform/tests", "services/worker/tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["nanyee", "nanyee_worker"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+fail_under = 70
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["legacy", "services/platform/migrations/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC", "S"]
+ignore = ["S101"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S105", "S106"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+packages = ["nanyee", "nanyee_worker"]
+mypy_path = ["services/platform/src", "services/worker/src"]
+exclude = ["legacy", "services/platform/migrations"]
+

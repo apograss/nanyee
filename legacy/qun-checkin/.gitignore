@@ -1,0 +1,32 @@
+# Runtime and local config
+node_modules/
+checkin_config.json
+.env
+.env.*
+*.local
+*.local.*
+
+# Assistant and editor state
+.claude/
+.omx/
+.vscode/
+.idea/
+
+# Temporary capture and analysis artifacts
+captured_requests.*
+capture.*
+mitmproxy-ca-*
+analyze_output.txt
+debug_*.html
+*.har
+*.pcap
+*.pcapng
+
+# Misc build/runtime junk
+dist/
+tmp/
+.tmp/
+*.log
+*.sqlite
+*.db
+__pycache__/

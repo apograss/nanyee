@@ -1,0 +1,5 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><link rel="stylesheet" href="/static/app.css"><title>登录</title></head>
+<body><main class="login-card"><h1>学习舱预约</h1>{% if error %}<p class="error">{{ error }}</p>{% endif %}
+<form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><label>面板密码<input type="password" name="password" required autofocus></label><button>登录</button></form>
+</main></body></html>

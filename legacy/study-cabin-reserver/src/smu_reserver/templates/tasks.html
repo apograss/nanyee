@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="title-row"><div><h1>预约任务</h1><p>严格匹配完整连续时段，按学习舱优先级提交。</p></div><a class="button" href="/tasks/new">新建任务</a></section>
+<div class="cards">
+{% for task in tasks %}
+<article class="card"><div class="status">{{ status_labels[task.status] }}</div><h2>{{ task.target_date }}</h2>
+<p class="time">{{ task.start_time.strftime('%H:%M') }}–{{ task.end_time.strftime('%H:%M') }}</p><p>{{ task.title }}</p>
+{% if task.status.value not in ['succeeded','cancelled','failed_timeout','failed_validation'] %}<form method="post" action="/tasks/{{ task.id }}/cancel"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="secondary">取消</button></form>{% endif %}</article>
+{% else %}<div class="empty">暂无任务</div>{% endfor %}
+</div>
+{% endblock %}

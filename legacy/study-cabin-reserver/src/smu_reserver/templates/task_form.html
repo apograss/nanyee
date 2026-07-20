@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}<h1>新建预约任务</h1>
+<form class="form-card" method="post" action="/tasks"><input type="hidden" name="csrf" value="{{ csrf }}">
+<label>目标日期<input type="date" name="target_date" min="{{ today }}" required></label>
+<div class="grid"><label>开始时间<input type="time" name="start_time" step="600" required></label><label>结束时间<input type="time" name="end_time" step="600" required></label></div>
+<label>预约主题<input name="title" value="学习" required maxlength="50"></label>
+<div class="grid"><label>开始尝试<input type="datetime-local" name="attempt_from" required></label><label>停止尝试<input type="datetime-local" name="attempt_until" required></label></div>
+<label>舱位优先级 <small>用英文逗号分隔，靠前优先</small><input name="cabin_ids" value="{% for cabin in cabins %}{{ cabin.dev_id }}{% if not loop.last %},{% endif %}{% endfor %}" required></label>
+<details><summary>学习舱编号对照</summary><ol>{% for cabin in cabins %}<li>{{ cabin.dev_id }} — {{ cabin.name }}</li>{% endfor %}</ol></details>
+<button>创建任务</button></form>{% endblock %}

@@ -1,0 +1,23 @@
+name: nanyee-dev
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: nanyee
+      POSTGRES_USER: nanyee
+      POSTGRES_PASSWORD: nanyee
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - nanyee-postgres-dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nanyee -d nanyee"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  nanyee-postgres-dev:
+
