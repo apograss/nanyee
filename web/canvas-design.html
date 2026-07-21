@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="canvas:aspect-ratio" content="16:9" />
+  <meta name="canvas:width" content="1440" />
+  <meta name="canvas:height" content="900" />
+  <title>南医工具台 · 高保真设计稿</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --seed-bg:#fff7ed; --seed-surface:#fffbf5; --seed-surface-2:#fdf3e7;
+      --seed-fg:#1c1410; --seed-primary:#ea580c; --seed-primary-strong:#c2410c;
+      --seed-success:#5b8c7b; --seed-warning:#b45309; --seed-danger:#b91c1c;
+      --seed-muted:#57534e; --seed-border:#e7d5c4; --seed-radius:12px;
+      --background:var(--seed-bg); --foreground:var(--seed-fg); --card:var(--seed-surface);
+      --muted:var(--seed-muted); --border:var(--seed-border); --primary:var(--seed-primary);
+      --primary-foreground:#fffbf5; --primary-muted:color-mix(in srgb,var(--seed-primary) 14%,var(--seed-bg));
+      --success-muted:color-mix(in srgb,var(--seed-success) 16%,var(--seed-bg));
+      --warning-muted:color-mix(in srgb,var(--seed-warning) 16%,var(--seed-bg));
+      --danger-muted:color-mix(in srgb,var(--seed-danger) 12%,var(--seed-bg));
+      --font-display:"Fraunces","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+      --font-sans:"Inter","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+      --radius:var(--seed-radius); --radius-sm:6px; --radius-lg:16px; --radius-full:9999px;
+    }
+    *{box-sizing:border-box;border-color:var(--border);}
+    html,body{margin:0;}
+    body{background:var(--background);color:var(--foreground);font-family:var(--font-sans);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased;}
+    h1,h2,h3,h4{font-family:var(--font-display);font-weight:500;letter-spacing:-.015em;line-height:1.15;margin:0;}
+    .canvas-board{display:flex;flex-direction:column;gap:40px;padding:40px 24px;background-image:radial-gradient(circle at 20% 12%,color-mix(in srgb,var(--seed-primary) 6%,transparent) 0,transparent 42%),radial-gradient(circle at 88% 0%,color-mix(in srgb,var(--seed-success) 7%,transparent) 0,transparent 38%);}
+    .screen-frame{border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;background:var(--card);box-shadow:0 1px 2px 0 color-mix(in srgb,var(--seed-fg) 6%,transparent);}
+    .screen-label{display:flex;align-items:baseline;gap:12px;padding:0 4px 8px;}
+    .screen-num{font-family:var(--font-mono,ui-monospace,monospace);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);}
+    .screen-title{font-family:var(--font-display);font-size:1.0625rem;letter-spacing:-.012em;}
+    .screen-desc{font-size:13px;color:var(--muted);margin-left:auto;}
+    .eyebrow{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;}
+    /* app shell */
+    .app-shell{display:grid;grid-template-columns:240px 1fr;min-height:520px;}
+    .sidebar{background:var(--seed-surface);border-right:1px solid var(--border);padding:16px 12px;display:flex;flex-direction:column;}
+    .brand{display:flex;align-items:center;gap:10px;padding:0 8px 16px;border-bottom:1px solid var(--border);margin-bottom:12px;}
+    .brand-mark{width:32px;height:32px;border-radius:var(--radius-sm);background:var(--seed-primary);color:var(--primary-foreground);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:500;}
+    .nav-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius);font-size:13px;color:var(--muted);}
+    .nav-item.active{background:var(--primary-muted);color:var(--seed-primary-strong);font-weight:500;}
+    .nav-group{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:color-mix(in srgb,var(--seed-muted) 70%,transparent);padding:12px 12px 4px;}
+    .topbar{height:56px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:color-mix(in srgb,var(--seed-bg) 88%,transparent);}
+    .main{padding:20px;}
+    /* components */
+    .card{border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--card);overflow:hidden;}
+    .card-pad{padding:18px;}
+    .card-head{padding:16px 18px;border-bottom:1px solid var(--border);}
+    .card-title{font-family:var(--font-display);font-size:1.0625rem;letter-spacing:-.012em;}
+    .card-desc{font-size:13px;color:var(--muted);margin-top:4px;}
+    .btn{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 14px;border-radius:var(--radius);font-size:13px;font-weight:500;letter-spacing:.01em;background:var(--seed-primary);color:var(--primary-foreground);border:0;cursor:pointer;}
+    .btn.outline{background:transparent;color:var(--foreground);border:1px solid var(--border);}
+    .btn.ghost{background:transparent;color:var(--foreground);}
+    .btn.subtle{background:var(--primary-muted);color:var(--seed-primary-strong);}
+    .badge{display:inline-flex;align-items:center;gap:4px;border-radius:var(--radius-full);padding:2px 10px;font-size:12px;font-weight:500;letter-spacing:.01em;background:var(--primary-muted);color:var(--seed-primary-strong);}
+    .badge.muted{background:color-mix(in srgb,var(--seed-muted) 14%,var(--seed-bg));color:var(--muted);}
+    .badge.success{background:var(--success-muted);color:var(--seed-success);}
+    .badge.warning{background:var(--warning-muted);color:var(--seed-warning);}
+    .badge.danger{background:var(--danger-muted);color:var(--seed-danger);}
+    .status{display:inline-flex;align-items:center;gap:5px;border-radius:var(--radius-full);padding:2px 10px;font-size:12px;font-weight:500;}
+    .status-queued{color:var(--muted);background:color-mix(in srgb,var(--seed-muted) 14%,var(--seed-bg));}
+    .status-running{color:var(--seed-primary-strong);background:var(--primary-muted);}
+    .status-retry_wait{color:var(--seed-warning);background:var(--warning-muted);}
+    .status-succeeded{color:var(--seed-success);background:var(--success-muted);}
+    .status-failed{color:var(--seed-danger);background:var(--danger-muted);}
+    .status-cancelled{color:var(--muted);background:color-mix(in srgb,var(--seed-muted) 8%,var(--seed-bg));}
+    .status-verification_required{color:var(--seed-primary-strong);background:var(--primary-muted);}
+    .input{height:40px;border:1px solid var(--border);border-radius:var(--radius);background:color-mix(in srgb,var(--seed-bg) 70%,var(--seed-fg) 6%);padding:0 12px;font-size:14px;width:100%;}
+    .label{font-size:13px;font-weight:500;letter-spacing:.01em;display:block;margin-bottom:6px;}
+    .alert{display:flex;gap:12px;border:1px solid;border-radius:var(--radius);padding:14px;font-size:13px;}
+    .alert.info{border-color:color-mix(in srgb,var(--seed-muted) 30%,transparent);background:var(--seed-surface-2);}
+    .alert.warning{border-color:color-mix(in srgb,var(--seed-warning) 40%,transparent);background:var(--warning-muted);}
+    .alert.danger{border-color:color-mix(in srgb,var(--seed-danger) 40%,transparent);background:var(--danger-muted);}
+    .alert.success{border-color:color-mix(in srgb,var(--seed-success) 40%,transparent);background:var(--success-muted);}
+    .alert-title{font-weight:500;margin-bottom:2px;}
+    .alert-body{color:var(--muted);}
+    code{font-family:ui-monospace,monospace;font-size:12px;background:var(--seed-surface-2);padding:1px 5px;border-radius:4px;}
+    table{width:100%;border-collapse:collapse;font-size:13px;}
+    th{text-align:left;font-weight:500;color:var(--muted);font-size:12px;letter-spacing:.01em;padding:10px 12px;background:var(--seed-surface-2);}
+    td{padding:12px;border-top:1px solid var(--border);}
+    .grid{display:grid;gap:14px;}
+    .row{display:flex;gap:10px;align-items:center;}
+    .icon{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;}
+    .icon-sm{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+    .timetable-grid{display:grid;grid-template-columns:48px repeat(7,minmax(64px,1fr));gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;font-size:11px;}
+    .tc{background:var(--card);min-height:44px;padding:5px 6px;}
+    .tc.head{background:var(--seed-surface-2);color:var(--muted);font-weight:500;font-size:11px;}
+    .course-block{border-radius:var(--radius-sm);padding:6px;height:100%;}
+    .cb-1{background:var(--primary-muted);color:var(--seed-primary-strong);}
+    .cb-2{background:var(--success-muted);color:var(--seed-success);}
+    .tool-card{border:1px solid var(--border);border-radius:var(--radius);padding:16px;background:var(--card);}
+    .tool-ico{width:36px;height:36px;border-radius:var(--radius);background:var(--primary-muted);color:var(--seed-primary-strong);display:flex;align-items:center;justify-content:center;margin-bottom:10px;}
+    .stat-card{border:1px solid var(--border);border-radius:var(--radius);padding:14px;background:var(--card);}
+    .stat-val{font-family:var(--font-display);font-size:1.75rem;letter-spacing:-.02em;tabular-nums:lining-nums;}
+    .progress{height:6px;border-radius:var(--radius-full);background:var(--seed-surface-2);overflow:hidden;}
+    .progress>div{height:100%;background:var(--seed-primary);}
+    .tabs{display:inline-flex;padding:4px;border:1px solid var(--border);border-radius:var(--radius-full);background:var(--seed-surface);}
+    .tab{padding:6px 16px;border-radius:var(--radius-full);font-size:13px;color:var(--muted);}
+    .tab.active{background:var(--seed-primary);color:var(--primary-foreground);font-weight:500;}
+    .turnstile{border:1px dashed color-mix(in srgb,var(--seed-primary) 40%,transparent);background:var(--primary-muted);border-radius:var(--radius);padding:14px;display:flex;align-items:center;gap:12px;}
+    .mobile-mock{width:280px;border:1px solid var(--border);border-radius:24px;overflow:hidden;background:var(--card);box-shadow:0 8px 24px -8px color-mix(in srgb,var(--seed-fg) 18%,transparent);}
+    .mobile-bar{height:44px;background:var(--seed-surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;font-size:13px;font-weight:500;}
+    @media (max-width:768px){.app-shell{grid-template-columns:1fr;}.sidebar{display:none;}}
+  </style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7M5 10v10h14V10"/></symbol>
+    <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></symbol>
+    <symbol id="i-grade" viewBox="0 0 24 24"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1 2.5 3 6 3s6-2 6-3v-5"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 4v16l8-3 8 3V4l-8 3z"/></symbol>
+    <symbol id="i-clipboard" viewBox="0 0 24 24"><rect x="6" y="4" width="12" height="18" rx="2"/><path d="M9 4V2h6v2M9 12h6M9 16h4"/></symbol>
+    <symbol id="i-armchair" viewBox="0 0 24 24"><path d="M5 11V7a2 2 0 012-2h10a2 2 0 012 2v4M3 11h18v6H3zM6 17v3M18 17v3"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5M16 8a3 3 0 010 6M21 20c0-2-1.5-4-4-4.5"/></symbol>
+    <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="8" r="4"/><path d="M11 11l8 8M16 16l2-2M19 19l2-2"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-4 8-8 9-4-1-8-4-8-9V6z"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M13 21a2 2 0 01-4 0"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></symbol>
+    <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 3l10 18H2z"/><path d="M12 9v5M12 17h.01"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 21V9M7 14l5-5 5 5M5 3h14"/></symbol>
+  </defs>
+</svg>
+
+<main class="canvas-board" data-component="CanvasBoard" data-od-id="board">
+
+  <!-- 01 登录 -->
+  <section data-component="Screen" data-od-id="auth-login">
+    <div class="screen-label"><span class="screen-num">01 / 14</span><span class="screen-title">登录</span><span class="screen-desc">平台账号 · HttpOnly Session · 双提交 CSRF</span></div>
+    <div class="screen-frame" style="display:flex;justify-content:center;padding:48px 16px;background-image:radial-gradient(circle at 20% 12%,color-mix(in srgb,var(--seed-primary) 6%,transparent) 0,transparent 42%);">
+      <div class="card" style="width:100%;max-width:380px;">
+        <div style="padding:20px 22px 0;">
+          <span class="badge"><svg class="icon-sm"><use href="#i-key"/></svg> 平台账号</span>
+          <h2 style="margin-top:10px;font-size:1.25rem;">登录南医工具台</h2>
+          <p style="font-size:13px;color:var(--muted);margin-top:4px;">Session 由 HttpOnly Cookie 保存，密码不离开本次请求。</p>
+        </div>
+        <div style="padding:18px 22px 22px;display:flex;flex-direction:column;gap:12px;">
+          <div><label class="label">用户名</label><input class="input" placeholder="学号或注册用户名"/></div>
+          <div><label class="label">密码</label><input class="input" type="password" placeholder="8–128 字符"/></div>
+          <button class="btn" style="justify-content:center;">登录</button>
+          <div class="turnstile">
+            <svg class="icon" style="color:var(--seed-primary-strong);"><use href="#i-shield"/></svg>
+            <div style="font-size:12px;line-height:1.5;"><div style="font-weight:500;color:var(--seed-primary-strong);">人机验证已触发</div><div style="color:var(--muted);">软阈值由服务器返回 sitekey+action，Token 5 分钟一次性。</div></div>
+            <div style="margin-left:auto;width:120px;height:38px;border:1px solid var(--border);border-radius:6px;background:var(--seed-surface);display:flex;align-items:center;justify-content:center;font-size:10px;letter-spacing:.06em;color:var(--muted);text-transform:uppercase;">Turnstile</div>
+          </div>
+          <div style="font-size:13px;color:var(--muted);text-align:center;">没有账号？<a style="color:var(--seed-primary-strong);">注册</a></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 答题注册 -->
+  <section data-component="Screen" data-od-id="auth-register-quiz">
+    <div class="screen-label"><span class="screen-num">02 / 14</span><span class="screen-title">答题注册</span><span class="screen-desc">Challenge 18/20 通过 · 15 分钟 · 5 次</span></div>
+    <div class="screen-frame" style="padding:24px;">
+      <div class="row" style="justify-content:space-between;margin-bottom:14px;">
+        <span class="badge"><svg class="icon-sm"><use href="#i-clipboard"/></svg> 答题 Challenge</span>
+        <span class="badge muted">15:00 剩余 · 第 2/5 次</span>
+      </div>
+      <h2 style="margin-bottom:4px;">校内答题注册</h2>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:14px;">20 道校内常识题，答对 18 题通过。题号是本次 Challenge 内位置，不是全局题库 ID。</p>
+      <div class="progress" style="margin-bottom:18px;"><div style="width:60%;"></div></div>
+      <div class="grid" style="grid-template-columns:repeat(2,1fr);">
+        <div class="card card-pad"><div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);">第 1 题</div><div style="font-size:13px;font-weight:500;margin:6px 0 10px;">南医大广州主校区位于哪个区？</div><div class="grid" style="grid-template-columns:1fr 1fr;gap:6px;"><div class="badge muted" style="justify-content:center;padding:8px;">海珠区</div><div class="badge" style="justify-content:center;padding:8px;">番禺区</div><div class="badge muted" style="justify-content:center;padding:8px;">白云区</div><div class="badge muted" style="justify-content:center;padding:8px;">天河区</div></div></div>
+        <div class="card card-pad"><div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);">第 2 题</div><div style="font-size:13px;font-weight:500;margin:6px 0 10px;">顺德校区所在城市是？</div><div class="grid" style="grid-template-columns:1fr 1fr;gap:6px;"><div class="badge" style="justify-content:center;padding:8px;">佛山</div><div class="badge muted" style="justify-content:center;padding:8px;">珠海</div><div class="badge muted" style="justify-content:center;padding:8px;">东莞</div><div class="badge muted" style="justify-content:center;padding:8px;">中山</div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 03 邮箱注册 -->
+  <section data-component="Screen" data-od-id="auth-register-email">
+    <div class="screen-label"><span class="screen-num">03 / 14</span><span class="screen-title">教育邮箱注册</span><span class="screen-desc">不暴露账号存在状态</span></div>
+    <div class="screen-frame" style="display:flex;justify-content:center;padding:32px 16px;">
+      <div class="card" style="width:100%;max-width:380px;">
+        <div style="padding:20px 22px 0;"><span class="badge"><svg class="icon-sm"><use href="#i-key"/></svg> 教育邮箱</span><h2 style="margin-top:10px;font-size:1.25rem;">教育邮箱注册</h2><p style="font-size:13px;color:var(--muted);margin-top:4px;">仅接受 .edu.cn；发送阶段不暴露账号是否存在。</p></div>
+        <div style="padding:18px 22px 22px;display:flex;flex-direction:column;gap:12px;">
+          <div><label class="label">教育邮箱</label><input class="input" placeholder="name@stu.smu.edu.cn"/></div>
+          <button class="btn outline" style="justify-content:center;">发送验证码</button>
+          <div class="alert info"><div><div class="alert-title">验证码已发送至脱敏邮箱</div><div class="alert-body">l***@stu.smu.edu.cn，验证码不会保存到本地。</div></div></div>
+          <div><label class="label">验证码</label><input class="input" placeholder="6 位数字"/></div>
+          <button class="btn" style="justify-content:center;">完成注册</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 首页 + 全局布局 -->
+  <section data-component="Screen" data-od-id="home">
+    <div class="screen-label"><span class="screen-num">04 / 14</span><span class="screen-title">首页工具入口（含全局布局）</span><span class="screen-desc">侧栏导航 · 顶栏含任务徽标与会话提示</span></div>
+    <div class="screen-frame">
+      <div class="app-shell">
+        <aside class="sidebar">
+          <div class="brand"><div class="brand-mark">南</div><div><div style="font-family:var(--font-display);font-size:15px;font-weight:500;letter-spacing:-.015em;">南医工具台</div><div style="font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;">Nanyee</div></div></div>
+          <div class="nav-item active"><svg class="icon-sm"><use href="#i-home"/></svg> 首页</div>
+          <div class="nav-group">瞬时学校工具</div>
+          <div class="nav-item"><svg class="icon-sm"><use href="#i-cal"/></svg> 课表</div>
+          <div class="nav-item"><svg class="icon-sm"><use href="#i-grade"/></svg> 成绩</div>
+          <div class="nav-group">在线确认型写操作</div>
+          <div class="nav-item"><svg class="icon-sm"><use href="#i-book"/></svg> 选课</div>
+          <div class="nav-item"><svg class="icon-sm"><use href="#i-clipboard"/></svg> 评课</div>
+          <div class="nav-group">凭据与任务</div>
+          <div class="nav-item"><svg class="icon-sm"><use href="#i-armchair"/></svg> 学习舱预约</div>
+          <div class="nav-item"><svg class="icon-sm"><use href="#i-users"/></svg> 群报数</div>
+          <div class="nav-item"><svg class="icon-sm"><use href="#i-key"/></svg> 托管凭据</div>
+          <div class="nav-item"><svg class="icon-sm"><use href="#i-list"/></svg> 任务中心</div>
+        </aside>
+        <div>
+          <div class="topbar"><span style="font-family:var(--font-display);font-size:1.0625rem;letter-spacing:-.012em;">首页</span><div class="row"><span class="badge warning"><svg class="icon-sm"><use href="#i-bell"/></svg> 待核验 1</span><span class="badge muted"><svg class="icon-sm"><use href="#i-shield"/></svg> 会话仅内存</span></div></div>
+          <div class="main">
+            <div class="eyebrow">工具台</div>
+            <h1 style="font-size:1.6rem;">你好，林一</h1>
+            <p style="font-size:13px;color:var(--muted);margin-top:4px;">当前校区 <span class="badge muted" style="margin-left:4px;">顺德</span> · 瞬时学校会话与平台账号相互独立。</p>
+            <div class="grid" style="grid-template-columns:repeat(3,1fr);margin-top:18px;">
+              <div class="tool-card"><div class="tool-ico"><svg class="icon"><use href="#i-cal"/></svg></div><div style="font-size:13px;font-weight:500;">课表查询</div><div style="font-size:12px;color:var(--muted);margin-top:2px;">瞬时登录后查周课表，导出 ICS 与 WakeUp</div></div>
+              <div class="tool-card"><div class="tool-ico"><svg class="icon"><use href="#i-grade"/></svg></div><div style="font-size:13px;font-weight:500;">成绩查询</div><div style="font-size:12px;color:var(--muted);margin-top:2px;">课程成绩与绩点汇总，默认不落库</div></div>
+              <div class="tool-card"><div class="tool-ico"><svg class="icon"><use href="#i-book"/></svg></div><div style="font-size:13px;font-weight:500;">在线选课</div><div style="font-size:12px;color:var(--muted);margin-top:2px;">刷新当前可选列表后单次提交</div></div>
+              <div class="tool-card"><div class="tool-ico"><svg class="icon"><use href="#i-clipboard"/></svg></div><div style="font-size:13px;font-weight:500;">在线评课</div><div style="font-size:12px;color:var(--muted);margin-top:2px;">逐题选择后单次提交，草稿 5 分钟</div></div>
+              <div class="tool-card"><div class="tool-ico"><svg class="icon"><use href="#i-armchair"/></svg></div><div style="font-size:13px;font-weight:500;">学习舱预约</div><div style="font-size:12px;color:var(--muted);margin-top:2px;">按优先级排舱位，到点自动抢</div></div>
+              <div class="tool-card"><div class="tool-ico"><svg class="icon"><use href="#i-users"/></svg></div><div style="font-size:13px;font-weight:500;">群报数</div><div style="font-size:12px;color:var(--muted);margin-top:2px;">Token 校验、表单同步与图片上传</div></div>
+            </div>
+            <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:18px;">
+              <div class="card card-pad"><div class="row" style="justify-content:space-between;margin-bottom:10px;"><span style="font-size:13px;font-weight:500;"><svg class="icon-sm" style="color:var(--seed-primary-strong);vertical-align:-2px;"><use href="#i-list"/></svg> 任务摘要</span><span style="font-size:12px;color:var(--seed-primary-strong);">全部</span></div>
+                <div class="row" style="justify-content:space-between;padding:8px 0;border-top:1px solid var(--border);"><span class="status status-running">运行中</span><span style="font-size:12px;color:var(--muted);">学习舱 · 周四 19:00</span></div>
+                <div class="row" style="justify-content:space-between;padding:8px 0;border-top:1px solid var(--border);"><span class="status status-verification_required">待人工核验</span><span style="font-size:12px;color:var(--muted);">群报数 · 上游未确认</span></div>
+                <div class="row" style="justify-content:space-between;padding:8px 0;border-top:1px solid var(--border);"><span class="status status-succeeded">已完成</span><span style="font-size:12px;color:var(--muted);">学习舱 · 周二 14:00</span></div>
+              </div>
+              <div class="card card-pad"><div style="font-size:13px;font-weight:500;margin-bottom:10px;">待办提醒</div>
+                <div class="alert warning" style="margin-bottom:8px;"><div><div class="alert-title">评草稿 5 分钟内一次性消费</div><div class="alert-body">有 1 份评课草稿待提交。</div></div></div>
+                <div class="alert info"><div><div class="alert-title">选课窗口提示</div><div class="alert-body">退补选阶段，目标消失返回 404。</div></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 05 课表 -->
+  <section data-component="Screen" data-od-id="timetable">
+    <div class="screen-label"><span class="screen-num">05 / 14</span><span class="screen-title">课表查询</span><span class="screen-desc">瞬时学校会话 · ICS / WakeUp 导出</span></div>
+    <div class="screen-frame" style="padding:20px;">
+      <div class="alert success" style="margin-bottom:14px;"><svg class="icon" style="color:var(--seed-success);"><use href="#i-clock"/></svg><div><div class="alert-title">瞬时学校会话已建立</div><div class="alert-body"><code>academic_session_id</code> 仅存内存，04:32 后过期需重新取验证码。</div></div></div>
+      <div class="row" style="justify-content:space-between;margin-bottom:10px;"><div><div class="card-title">第 8 周课表</div><div class="card-desc">共 20 教学周</div></div><button class="btn outline" style="height:32px;font-size:12px;">第 8 周</button></div>
+      <div class="timetable-grid">
+        <div class="tc head">节次</div><div class="tc head">周一</div><div class="tc head">周二</div><div class="tc head">周三</div><div class="tc head">周四</div><div class="tc head">周五</div><div class="tc head">周六</div><div class="tc head">周日</div>
+        <div class="tc head"><div>1</div><div style="color:var(--muted);">08:00</div></div>
+        <div class="tc"><div class="course-block cb-1">有机化学<br>A301</div></div>
+        <div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div>
+        <div class="tc head"><div>3</div><div style="color:var(--muted);">10:10</div></div>
+        <div class="tc"></div><div class="tc"></div><div class="tc"><div class="course-block cb-2">病理学<br>B205</div></div><div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div>
+        <div class="tc head"><div>5</div><div style="color:var(--muted);">14:30</div></div>
+        <div class="tc"></div><div class="tc"><div class="course-block cb-1">诊断学<br>C108</div></div><div class="tc"></div><div class="tc"><div class="course-block cb-1">诊断学<br>C108</div></div><div class="tc"></div><div class="tc"></div><div class="tc"></div>
+        <div class="tc head"><div>8</div><div style="color:var(--muted);">19:00</div></div>
+        <div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"><div class="course-block cb-2">医学英语<br>A102</div></div><div class="tc"></div><div class="tc"></div>
+      </div>
+      <div class="card" style="margin-top:14px;"><div class="card-head"><div class="card-title">导出</div><div class="card-desc">WakeUp 需指定学期周一与校区，后端不上传给第三方。</div></div><div class="card-pad row"><input class="input" style="max-width:160px;" type="date" value="2026-09-07"/><select class="input" style="max-width:160px;"><option>顺德校区</option><option>广州主校区</option></select><button class="btn outline"><svg class="icon-sm"><use href="#i-download"/></svg> ICS</button><button class="btn outline"><svg class="icon-sm"><use href="#i-download"/></svg> WakeUp</button></div></div>
+    </div>
+  </section>
+
+  <!-- 06 成绩 -->
+  <section data-component="Screen" data-od-id="grades">
+    <div class="screen-label"><span class="screen-num">06 / 14</span><span class="screen-title">成绩查询</span><span class="screen-desc">默认不落库 · 排名为脱敏区间</span></div>
+    <div class="screen-frame" style="padding:20px;">
+      <div class="grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:14px;">
+        <div class="stat-card"><div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);">总学分</div><div class="stat-val">21</div><div style="font-size:11px;color:var(--muted);">已修</div></div>
+        <div class="stat-card"><div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);">平均绩点</div><div class="stat-val">3.74</div><div style="font-size:11px;color:var(--muted);">本学期</div></div>
+        <div class="stat-card"><div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);">加权均分</div><div class="stat-val">86.8</div><div style="font-size:11px;color:var(--muted);">本学期</div></div>
+        <div class="stat-card"><div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);">通过率</div><div class="stat-val">100%</div><div style="font-size:11px;color:var(--muted);">5/5</div></div>
+      </div>
+      <div class="card"><div class="card-head"><div class="card-title">本学期成绩明细</div></div><table><thead><tr><th>课程</th><th>性质</th><th>学分</th><th>成绩</th><th>绩点</th><th>排名区间</th></tr></thead><tbody>
+        <tr><td>有机化学</td><td><span class="badge">必修</span></td><td>4</td><td>88</td><td>3.8</td><td><span style="color:var(--muted);">前 20%</span></td></tr>
+        <tr><td>病理学</td><td><span class="badge">必修</span></td><td>5</td><td>92</td><td>4.0</td><td><span style="color:var(--muted);">前 10%</span></td></tr>
+        <tr><td>诊断学</td><td><span class="badge">必修</span></td><td>6</td><td>85</td><td>3.7</td><td><span style="color:var(--muted);">前 30%</span></td></tr>
+        <tr><td>医学英语</td><td><span class="badge muted">选修</span></td><td>2</td><td>90</td><td>3.9</td><td><span style="color:var(--muted);">—</span></td></tr>
+      </tbody></table></div>
+      <div class="alert info" style="margin-top:14px;"><svg class="icon" style="color:var(--muted);"><use href="#i-shield"/></svg><div><div class="alert-title">默认不落库</div><div class="alert-body">成绩结果默认不在服务器保存；带个人成绩的完整响应属敏感态。</div></div></div>
+    </div>
+  </section>
+
+  <!-- 07 选课 -->
+  <section data-component="Screen" data-od-id="enrollment">
+    <div class="screen-label"><span class="screen-num">07 / 14</span><span class="screen-title">在线选课</span><span class="screen-desc">单次提交 · RESULT_UNKNOWN 禁止重试</span></div>
+    <div class="screen-frame" style="padding:20px;">
+      <div class="alert warning" style="margin-bottom:14px;"><svg class="icon" style="color:var(--seed-warning);"><use href="#i-warn"/></svg><div><div class="alert-title">结果未知时禁止自动重试</div><div class="alert-body">收到 RESULT_UNKNOWN 后不得自动重放，必须先去教务系统核验。</div></div></div>
+      <div class="card" style="margin-bottom:14px;"><div class="card-head"><div class="card-title">第一步 · 选课类型</div></div><div class="card-pad grid" style="grid-template-columns:1fr 1fr;">
+        <div style="border:1px solid var(--seed-primary);background:var(--primary-muted);border-radius:var(--radius);padding:14px;"><div class="row" style="justify-content:space-between;"><span style="font-size:13px;font-weight:500;">退补选 · 主修课程</span><span class="badge">已选</span></div><div style="font-size:11px;color:var(--muted);margin-top:4px;">code 12 · 截止 09-20 17:00</div></div>
+        <div style="border:1px solid var(--border);border-radius:var(--radius);padding:14px;"><div style="font-size:13px;font-weight:500;">退补选 · 通识选修</div><div style="font-size:11px;color:var(--muted);margin-top:4px;">code 13 · 截止 09-22 17:00</div></div>
+      </div></div>
+      <div class="card"><div class="card-head" class="row" style="display:flex;justify-content:space-between;align-items:center;"><div class="card-title">第二步 · 实时可选列表</div><button class="btn outline" style="height:30px;font-size:12px;"><svg class="icon-sm"><use href="#i-search"/></svg> 刷新</button></div>
+      <table><thead><tr><th>课程</th><th>教师</th><th>时间</th><th>容量</th><th>状态</th><th></th></tr></thead><tbody>
+        <tr><td><div style="font-weight:500;font-size:13px;">临床医学导论</div><code>MED-301-01</code></td><td>张教授</td><td>周三 5-6</td><td>86/120</td><td><span class="badge success">可选</span></td><td><button class="btn subtle" style="height:28px;font-size:12px;">选择</button></td></tr>
+        <tr><td><div style="font-weight:500;font-size:13px;">循证医学</div><code>MED-305-02</code></td><td>李副教授</td><td>周四 7-8</td><td>60/60</td><td><span class="badge danger">已满</span></td><td><button class="btn outline" style="height:28px;font-size:12px;opacity:.5;">选择</button></td></tr>
+        <tr><td><div style="font-weight:500;font-size:13px;">医学伦理学</div><code>GEN-210-01</code></td><td>王讲师</td><td>周二 8-9</td><td>42/80</td><td><span class="badge success">可选</span></td><td><button class="btn" style="height:28px;font-size:12px;">已选</button></td></tr>
+      </tbody></table></div>
+      <div class="alert danger" style="margin-top:14px;"><svg class="icon" style="color:var(--seed-danger);"><use href="#i-warn"/></svg><div><div class="alert-title">提交结果未知（RESULT_UNKNOWN）</div><div class="alert-body">禁止在此页面重试，请立即登录教务系统核验。核验完成前不要重复提交。</div><div class="row" style="margin-top:8px;gap:8px;"><button class="btn outline" style="height:30px;font-size:12px;">去教务系统核验</button></div></div></div>
+    </div>
+  </section>
+
+  <!-- 08 评课 -->
+  <section data-component="Screen" data-od-id="evaluations">
+    <div class="screen-label"><span class="screen-num">08 / 14</span><span class="screen-title">在线评课</span><span class="screen-desc">草稿 5 分钟一次性消费 · 不允许缺题</span></div>
+    <div class="screen-frame" style="padding:20px;">
+      <div class="alert info" style="margin-bottom:14px;"><svg class="icon" style="color:var(--muted);"><use href="#i-clock"/></svg><div><div class="alert-title">草稿倒计时</div><div class="alert-body"><code>draft_id</code> 剩余 03:42，提交尝试即消费，无法重放。</div></div></div>
+      <div class="card"><div class="card-head"><div class="card-title">逐题选择</div><div class="card-desc">indicator_code → option.code</div></div><div class="card-pad" style="display:flex;flex-direction:column;gap:12px;">
+        <div style="border:1px solid var(--border);border-radius:var(--radius);padding:14px;"><div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);">I01 · 第 1 题</div><div style="font-size:13px;font-weight:500;margin:6px 0 10px;">老师对课程内容讲解清晰</div><div class="grid" style="grid-template-columns:repeat(4,1fr);gap:6px;"><div class="badge" style="justify-content:center;padding:8px;">A 完全符合</div><div class="badge muted" style="justify-content:center;padding:8px;">B 基本符合</div><div class="badge muted" style="justify-content:center;padding:8px;">C 一般</div><div class="badge muted" style="justify-content:center;padding:8px;">D 不符合</div></div></div>
+        <div style="border:1px solid var(--border);border-radius:var(--radius);padding:14px;"><div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);">I02 · 第 2 题</div><div style="font-size:13px;font-weight:500;margin:6px 0 10px;">教学进度安排合理</div><div class="grid" style="grid-template-columns:repeat(4,1fr);gap:6px;"><div class="badge muted" style="justify-content:center;padding:8px;">A</div><div class="badge" style="justify-content:center;padding:8px;">B</div><div class="badge muted" style="justify-content:center;padding:8px;">C</div><div class="badge muted" style="justify-content:center;padding:8px;">D</div></div></div>
+      </div></div>
+      <div class="card" style="margin-top:14px;"><div class="card-pad row"><span style="font-size:13px;color:var(--muted);">confirmation_version: <code>evaluation:submit:v1</code></span><button class="btn" style="margin-left:auto;">提交评课 <svg class="icon-sm"><use href="#i-arrow"/></svg></button></div></div>
+    </div>
+  </section>
+
+  <!-- 09 托管凭据 -->
+  <section data-component="Screen" data-od-id="credentials">
+    <div class="screen-label"><span class="screen-num">09 / 14</span><span class="screen-title">托管凭据</span><span class="screen-desc">信封加密 · 创建后立即清空</span></div>
+    <div class="screen-frame" style="padding:20px;">
+      <div class="row" style="justify-content:space-between;margin-bottom:14px;"><div><div class="card-title">凭据列表</div><div class="card-desc">upstream 与 purpose 不允许混搭</div></div><button class="btn"><svg class="icon-sm"><use href="#i-plus"/></svg> 新建凭据</button></div>
+      <div class="card"><table><thead><tr><th>用途</th><th>上游</th><th>状态</th><th>脱敏提示</th><th>到期</th><th></th></tr></thead><tbody>
+        <tr><td><span class="badge">学习舱</span></td><td><code>infospace</code></td><td><span class="badge success">有效</span></td><td>2026****01</td><td>2026-12-31</td><td><button class="btn ghost" style="height:28px;font-size:12px;">撤销</button></td></tr>
+        <tr><td><span class="badge muted">群报数</span></td><td><code>qun100</code></td><td><span class="badge success">有效</span></td><td>群号 3****2</td><td>2026-10-01</td><td><button class="btn ghost" style="height:28px;font-size:12px;">撤销</button></td></tr>
+        <tr><td><span class="badge">学习舱</span></td><td><code>infospace</code></td><td><span class="badge muted">已撤销</span></td><td>2026****01</td><td>2026-06-30</td><td><button class="btn ghost" style="height:28px;font-size:12px;opacity:.5;">撤销</button></td></tr>
+      </tbody></table></div>
+      <div class="alert warning" style="margin-top:14px;"><svg class="icon" style="color:var(--seed-warning);"><use href="#i-warn"/></svg><div><div class="alert-title">提交即清空</div><div class="alert-body">创建响应永不返回明文、密文或包裹密钥；前端提交成功后立即清空密码/Token 输入。</div></div></div>
+    </div>
+  </section>
+
+  <!-- 10 任务列表 -->
+  <section data-component="Screen" data-od-id="jobs">
+    <div class="screen-label"><span class="screen-num">10 / 14</span><span class="screen-title">任务中心</span><span class="screen-desc">状态机 · verification_required 引导核验</span></div>
+    <div class="screen-frame" style="padding:20px;">
+      <div class="row" style="gap:6px;margin-bottom:14px;">
+        <span class="badge" style="border:1px solid var(--seed-primary);">全部</span>
+        <span class="badge muted">进行中</span>
+        <span class="badge warning">待核验</span>
+        <span class="badge success">已完成</span>
+        <span class="badge danger">失败</span>
+      </div>
+      <div class="card"><div style="display:flex;flex-direction:column;">
+        <div class="row" style="justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);"><span class="status status-running">运行中</span><div style="flex:1;margin-left:12px;"><div style="font-size:13px;font-weight:500;">3 号舱 · 周四 19:00-21:00</div><div style="font-size:11px;color:var(--muted);font-family:ui-monospace,monospace;">job_a1 · study_cabin:reserve</div></div><span style="font-size:11px;color:var(--muted);">09-10 19:00</span></div>
+        <div class="row" style="justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);background:color-mix(in srgb,var(--seed-primary) 4%,transparent);"><span class="status status-verification_required">待人工核验</span><div style="flex:1;margin-left:12px;"><div style="font-size:13px;font-weight:500;">周报表 · 上游未确认</div><div style="font-size:11px;color:var(--muted);font-family:ui-monospace,monospace;">job_b2 · qun_checkin:submit</div></div><span class="badge warning"><svg class="icon-sm"><use href="#i-warn"/></svg> 需核验</span></div>
+        <div class="row" style="justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);"><span class="status status-retry_wait">等待重试</span><div style="flex:1;margin-left:12px;"><div style="font-size:13px;font-weight:500;">等待释放 · 下次重试 09:30</div><div style="font-size:11px;color:var(--muted);font-family:ui-monospace,monospace;">job_d4 · study_cabin:reserve</div></div><span style="font-size:11px;color:var(--muted);">09-08 08:00</span></div>
+        <div class="row" style="justify-content:space-between;padding:12px 16px;"><span class="status status-succeeded">已完成</span><div style="flex:1;margin-left:12px;"><div style="font-size:13px;font-weight:500;">7 号舱 · 周二 14:00-16:00</div><div style="font-size:11px;color:var(--muted);font-family:ui-monospace,monospace;">job_c3 · study_cabin:reserve</div></div><span style="font-size:11px;color:var(--muted);">09-08 14:00</span></div>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- 11 任务详情 -->
+  <section data-component="Screen" data-od-id="job-detail">
+    <div class="screen-label"><span class="screen-num">11 / 14</span><span class="screen-title">任务详情</span><span class="screen-desc">payload 脱敏 · next_action 核验引导</span></div>
+    <div class="screen-frame" style="padding:20px;">
+      <div class="row" style="margin-bottom:10px;"><span class="status status-verification_required">待人工核验</span><h2 style="font-size:1.25rem;margin-left:8px;">任务详情</h2></div>
+      <div class="alert danger" style="margin-bottom:14px;"><svg class="icon" style="color:var(--seed-danger);"><use href="#i-warn"/></svg><div><div class="alert-title">待人工核验 · 禁止自动重试</div><div class="alert-body">去群报数后台核验表单提交状态；核验完成前禁止重试或创建新任务。</div><div class="row" style="margin-top:8px;gap:8px;"><button class="btn outline" style="height:30px;font-size:12px;">去核验</button></div></div></div>
+      <div class="card" style="margin-bottom:14px;"><div class="card-head"><div class="card-title">状态进度</div></div><div class="card-pad row" style="gap:8px;">
+        <span class="row" style="gap:6px;"><span style="width:10px;height:10px;border-radius:99px;background:var(--seed-success);"></span><span style="font-size:12px;color:var(--muted);">queued</span></span>
+        <span style="flex:1;height:1px;background:var(--border);"></span>
+        <span class="row" style="gap:6px;"><span style="width:10px;height:10px;border-radius:99px;background:var(--seed-success);"></span><span style="font-size:12px;color:var(--muted);">running</span></span>
+        <span style="flex:1;height:1px;background:var(--border);"></span>
+        <span class="row" style="gap:6px;"><span style="width:10px;height:10px;border-radius:99px;background:var(--seed-primary);"></span><span style="font-size:12px;color:var(--seed-primary-strong);font-weight:500;">verification_required</span></span>
+        <span style="flex:1;height:1px;background:var(--border);"></span>
+        <span class="row" style="gap:6px;"><span style="width:10px;height:10px;border-radius:99px;background:var(--seed-surface-2);border:1px solid var(--border);"></span><span style="font-size:12px;color:var(--muted);">succeeded</span></span>
+      </div></div>
+      <div class="grid" style="grid-template-columns:1fr 1fr;gap:14px;">
+        <div class="card"><div class="card-head"><div class="card-title">任务信息</div></div><div class="card-pad" style="font-size:13px;line-height:2;">
+          <div class="row" style="justify-content:space-between;"><span style="color:var(--muted);">任务 ID</span><code>job_b2</code></div>
+          <div class="row" style="justify-content:space-between;"><span style="color:var(--muted);">幂等键</span><code>idem_8c2f…</code></div>
+          <div class="row" style="justify-content:space-between;"><span style="color:var(--muted);">confirmation</span><code>qun_checkin:submit:v1</code></div>
+          <div class="row" style="justify-content:space-between;"><span style="color:var(--muted);">引用凭据</span><code>cred_b2</code></div>
+        </div></div>
+        <div class="card"><div class="card-head"><div class="card-title">payload（脱敏）</div></div><div class="card-pad"><pre style="font-size:11px;font-family:ui-monospace,monospace;background:var(--seed-surface-2);border-radius:var(--radius);padding:12px;overflow:auto;margin:0;line-height:1.6;">{
+  "form_id": "form_3a91",
+  "version": 4,
+  "title": "周报表",
+  "catalogs": [...]
+}</pre></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 12 学习舱预约 -->
+  <section data-component="Screen" data-od-id="study-cabin">
+    <div class="screen-label"><span class="screen-num">12 / 14</span><span class="screen-title">学习舱预约任务创建</span><span class="screen-desc">cabin_ids 优先级 · attempt_until · scheduled_for</span></div>
+    <div class="screen-frame" style="padding:20px;">
+      <div class="alert info" style="margin-bottom:14px;"><svg class="icon" style="color:var(--muted);"><use href="#i-shield"/></svg><div><div class="alert-title">confirmation_version 来源</div><div class="alert-body">首次缺 confirmation_version 时按错误响应 required_confirmation_version 填入。</div></div></div>
+      <div class="card" style="margin-bottom:14px;"><div class="card-head"><div class="card-title">预约信息</div><div class="card-desc">10 分钟粒度，30–240 分钟，08:00–22:50</div></div><div class="card-pad" style="display:flex;flex-direction:column;gap:12px;">
+        <div><label class="label">标题（1–30 字符）</label><input class="input" value="周四晚自习"/><div style="font-size:11px;color:var(--muted);text-align:right;">5/30</div></div>
+        <div class="grid" style="grid-template-columns:1fr 1fr 1fr;"><div><label class="label">预约日期</label><input class="input" type="date" value="2026-09-10"/></div><div><label class="label">开始时间</label><input class="input" type="time" value="19:00"/></div><div><label class="label">结束时间</label><input class="input" type="time" value="21:00"/></div></div>
+      </div></div>
+      <div class="card" style="margin-bottom:14px;"><div class="card-head"><div class="card-title">舱位优先级</div><div class="card-desc">按你的优先级排列，不能重复</div></div><div class="card-pad"><div class="grid" style="grid-template-columns:repeat(3,1fr);">
+        <div style="display:flex;gap:8px;align-items:center;border:1px solid var(--seed-primary);background:var(--primary-muted);border-radius:var(--radius-sm);padding:10px;font-size:12px;"><svg class="icon-sm"><use href="#i-armchair"/></svg><div style="flex:1;"><div style="font-weight:500;">3 号舱</div><div style="color:var(--muted);">A 区</div></div><span class="badge">第 1</span></div>
+        <div style="display:flex;gap:8px;align-items:center;border:1px solid var(--seed-primary);background:var(--primary-muted);border-radius:var(--radius-sm);padding:10px;font-size:12px;"><svg class="icon-sm"><use href="#i-armchair"/></svg><div style="flex:1;"><div style="font-weight:500;">7 号舱</div><div style="color:var(--muted);">B 区</div></div><span class="badge">第 2</span></div>
+        <div style="display:flex;gap:8px;align-items:center;border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;font-size:12px;"><svg class="icon-sm"><use href="#i-armchair"/></svg><div style="flex:1;"><div style="font-weight:500;">11 号舱</div><div style="color:var(--muted);">B 区</div></div></div>
+        <div style="display:flex;gap:8px;align-items:center;border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;font-size:12px;"><svg class="icon-sm"><use href="#i-armchair"/></svg><div style="flex:1;"><div style="font-weight:500;">1 号舱</div><div style="color:var(--muted);">A 区</div></div></div>
+      </div><div style="margin-top:10px;font-size:11px;color:var(--muted);font-family:ui-monospace,monospace;">cabin_ids: ["cabin_03", "cabin_07"]</div></div></div>
+      <div class="row"><button class="btn">创建任务 <svg class="icon-sm"><use href="#i-arrow"/></svg></button><span style="font-size:13px;color:var(--muted);margin-left:10px;">需先托管学习舱凭据</span></div>
+    </div>
+  </section>
+
+  <!-- 13 群报数 -->
+  <section data-component="Screen" data-od-id="qun">
+    <div class="screen-label"><span class="screen-num">13 / 14</span><span class="screen-title">群报数即时工具与预约</span><span class="screen-desc">Token 不落库 · 图片 ≤5MiB · 预览回填</span></div>
+    <div class="screen-frame" style="padding:20px;">
+      <div class="card" style="margin-bottom:14px;"><div class="card-head"><div class="card-title">第一步 · Token 校验</div></div><div class="card-pad" style="display:flex;gap:10px;align-items:flex-end;"><div style="flex:1;"><label class="label">群报数 Authorization Token</label><input class="input" type="password" placeholder="≥60 字符，不含空白或省略号"/></div><button class="btn"><svg class="icon-sm"><use href="#i-key"/></svg> 校验</button></div></div>
+      <div class="card" style="margin-bottom:14px;"><div class="card-head" style="display:flex;justify-content:space-between;align-items:center;"><div class="card-title">第三步 · 图片上传</div></div><div class="card-pad"><div style="border:1px dashed var(--border);border-radius:var(--radius);padding:24px;display:flex;flex-direction:column;align-items:center;gap:6px;background:color-mix(in srgb,var(--seed-primary) 3%,transparent);"><div class="tool-ico" style="margin:0;"><svg class="icon"><use href="#i-upload"/></svg></div><div style="font-size:13px;font-weight:500;">点击或拖拽上传</div><div style="font-size:11px;color:var(--muted);">JPEG / PNG / GIF / WebP · 单张 ≤ 5 MiB</div></div></div></div>
+      <div class="card"><div class="card-head"><div class="card-title">第四步 · 字段预览回填</div></div><table><thead><tr><th>字段</th><th>标签</th><th>回填值</th><th>来源</th></tr></thead><tbody>
+        <tr><td><code>c_name</code></td><td>姓名</td><td>林**</td><td><span class="badge muted">默认</span></td></tr>
+        <tr><td><code>c_class</code></td><td>班级</td><td>临床 2026 级 3 班</td><td><span class="badge">自定义</span></td></tr>
+        <tr><td><code>c_photo</code></td><td>现场照片</td><td>（已上传图片 URL）</td><td><span class="badge">图片</span></td></tr>
+      </tbody></table>
+      <div class="card-pad"><div class="alert warning" style="margin-bottom:10px;"><svg class="icon" style="color:var(--seed-warning);"><use href="#i-warn"/></svg><div><div class="alert-title">预约结果未知时禁止自动创建新任务</div><div class="alert-body">应先到群报数后台核验表单状态。</div></div></div>
+      <button class="btn">构造 qun_checkin:submit:v1 任务</button></div></div>
+    </div>
+  </section>
+
+  <!-- 14 移动端视图 -->
+  <section data-component="Screen" data-od-id="mobile">
+    <div class="screen-label"><span class="screen-num">14 / 14</span><span class="screen-title">移动端视图（响应式 9:16）</span><span class="screen-desc">侧栏折叠为抽屉 · 单栏堆叠</span></div>
+    <div class="screen-frame" style="padding:24px;display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;">
+      <div class="mobile-mock">
+        <div class="mobile-bar"><svg class="icon-sm"><use href="#i-list"/></svg> <span style="margin-left:8px;">首页</span><span class="badge warning" style="margin-left:auto;font-size:10px;padding:1px 6px;">1</span></div>
+        <div style="padding:14px;">
+          <div class="eyebrow">工具台</div>
+          <h2 style="font-size:1.25rem;">你好，林一</h2>
+          <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:12px;">
+            <div class="tool-card" style="padding:12px;"><div class="tool-ico" style="width:28px;height:28px;margin-bottom:6px;"><svg class="icon-sm"><use href="#i-cal"/></svg></div><div style="font-size:12px;font-weight:500;">课表</div></div>
+            <div class="tool-card" style="padding:12px;"><div class="tool-ico" style="width:28px;height:28px;margin-bottom:6px;"><svg class="icon-sm"><use href="#i-grade"/></svg></div><div style="font-size:12px;font-weight:500;">成绩</div></div>
+            <div class="tool-card" style="padding:12px;"><div class="tool-ico" style="width:28px;height:28px;margin-bottom:6px;"><svg class="icon-sm"><use href="#i-book"/></svg></div><div style="font-size:12px;font-weight:500;">选课</div></div>
+            <div class="tool-card" style="padding:12px;"><div class="tool-ico" style="width:28px;height:28px;margin-bottom:6px;"><svg class="icon-sm"><use href="#i-armchair"/></svg></div><div style="font-size:12px;font-weight:500;">学习舱</div></div>
+          </div>
+          <div class="card card-pad" style="margin-top:12px;padding:12px;"><div style="font-size:12px;font-weight:500;margin-bottom:6px;">任务摘要</div><div class="row" style="justify-content:space-between;padding:6px 0;border-top:1px solid var(--border);"><span class="status status-running" style="font-size:10px;">运行中</span></div><div class="row" style="justify-content:space-between;padding:6px 0;border-top:1px solid var(--border);"><span class="status status-verification_required" style="font-size:10px;">待核验</span></div></div>
+        </div>
+      </div>
+      <div style="max-width:340px;font-size:13px;color:var(--muted);line-height:1.7;padding-top:12px;">
+        <p style="color:var(--foreground);font-weight:500;margin-bottom:6px;">响应式策略</p>
+        桌面 1024px+：固定左侧栏 240px + 主区；平板/移动：侧栏折叠为抽屉，由顶栏菜单按钮唤出；网格 3 列 → 2 列 → 1 列；课表横向滚动保留 7 列。所有写操作约束（CSRF、Turnstile 按需、RESULT_UNKNOWN 禁重试）在移动端同等生效。
+      </div>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>
