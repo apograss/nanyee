@@ -71,7 +71,6 @@ function HeroCharacter() {
         src="/character.png"
         alt="和泉纱雾举着牌子"
         className="relative w-full h-auto drop-shadow-[0_4px_16px_color-mix(in_srgb,var(--seed-fg)_8%,transparent)]"
-        style={{ filter: "sepia(0.18) saturate(1.4) hue-rotate(-8deg) brightness(1.03)" }}
       />
 
       {/* 牌子文字叠加 */}
