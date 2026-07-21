@@ -20,67 +20,6 @@ const SUMMARY = [
   { state: "succeeded", title: "自动评课已完成 · 18 门", sub: "评课已完成", id: "job_004" },
 ];
 
-/* ---- 装饰：首页角色立绘占位 ----
-   以后替换为二次元角色立绘（建议 360×420，透明背景 PNG）。
-   目前用 SVG 画一个白大褂学生形象作为占位。               */
-function HeroCharacter() {
-  return (
-    <svg viewBox="0 0 200 280" fill="none" className="w-full h-full max-w-[240px]" aria-hidden="true">
-      {/* 光环 */}
-      <circle cx="100" cy="70" r="48" fill="color-mix(in srgb, var(--seed-primary) 10%, transparent)" />
-      <circle cx="100" cy="70" r="38" fill="color-mix(in srgb, var(--seed-primary) 6%, transparent)" />
-      {/* 头发后 */}
-      <path d="M55 72 Q52 38 100 35 Q148 38 145 72 L145 105 Q145 110 140 110 L60 110 Q55 110 55 105 Z" fill="var(--seed-primary)" opacity="0.82" />
-      {/* 脸 */}
-      <ellipse cx="100" cy="78" rx="30" ry="33" fill="#fff2e5" />
-      {/* 刘海 */}
-      <path d="M72 62 Q80 52 95 54 Q88 58 86 66 Q82 60 72 62Z" fill="var(--seed-primary)" opacity="0.82" />
-      <path d="M128 62 Q120 52 105 54 Q112 58 114 66 Q118 60 128 62Z" fill="var(--seed-primary)" opacity="0.82" />
-      {/* 眼睛 */}
-      <circle cx="89" cy="80" r="2.8" fill="var(--seed-fg)" />
-      <circle cx="111" cy="80" r="2.8" fill="var(--seed-fg)" />
-      <circle cx="90" cy="79" r="0.9" fill="#fff" />
-      <circle cx="112" cy="79" r="0.9" fill="#fff" />
-      {/* 腮红 */}
-      <ellipse cx="83" cy="90" rx="5" ry="3" fill="color-mix(in srgb, var(--seed-primary) 20%, transparent)" />
-      <ellipse cx="117" cy="90" rx="5" ry="3" fill="color-mix(in srgb, var(--seed-primary) 20%, transparent)" />
-      {/* 微笑 */}
-      <path d="M93 92 Q100 97 107 92" stroke="var(--seed-fg)" stroke-width="1.6" stroke-linecap="round" fill="none" opacity="0.6" />
-      {/* 白大褂身体 */}
-      <path d="M58 112 L55 230 Q55 240 65 240 L135 240 Q145 240 145 230 L142 112 Z" fill="#fffbf5" stroke="var(--seed-border)" stroke-width="1.5" />
-      {/* 领口 V 字 */}
-      <path d="M88 112 L100 138 L112 112" stroke="var(--seed-primary)" stroke-width="2.5" stroke-linecap="round" fill="none" />
-      {/* 内搭 */}
-      <path d="M88 112 L100 138 L112 112 L108 112 L100 128 L92 112 Z" fill="color-mix(in srgb, var(--seed-success) 15%, var(--seed-bg))" />
-      {/* 医学十字胸章 */}
-      <g transform="translate(100, 168)">
-        <rect x="-3.5" y="-11" width="7" height="22" rx="1.5" fill="var(--seed-primary)" opacity="0.75" />
-        <rect x="-11" y="-3.5" width="22" height="7" rx="1.5" fill="var(--seed-primary)" opacity="0.75" />
-      </g>
-      {/* 口袋 */}
-      <rect x="118" y="175" width="18" height="20" rx="2" fill="none" stroke="var(--seed-border)" stroke-width="1.2" opacity="0.7" />
-      {/* 手臂 */}
-      <path d="M58 116 Q46 155 52 195" fill="none" stroke="var(--seed-border)" stroke-width="1.5" />
-      <path d="M142 116 Q154 155 148 195" fill="none" stroke="var(--seed-border)" stroke-width="1.5" />
-      {/* 书本 */}
-      <rect x="68" y="178" width="64" height="26" rx="3" fill="var(--seed-surface-2)" stroke="var(--seed-border)" stroke-width="1" />
-      <line x1="100" y1="178" x2="100" y2="204" stroke="var(--seed-border)" stroke-width="1" />
-      <rect x="72" y="184" width="22" height="2" rx="1" fill="var(--seed-border)" opacity="0.6" />
-      <rect x="72" y="190" width="18" height="2" rx="1" fill="var(--seed-border)" opacity="0.4" />
-      <rect x="106" y="184" width="22" height="2" rx="1" fill="var(--seed-border)" opacity="0.6" />
-      <rect x="106" y="190" width="18" height="2" rx="1" fill="var(--seed-border)" opacity="0.4" />
-      {/* 闪光装饰 */}
-      <g opacity="0.55">
-        <path d="M168 45 L170 50 L175 52 L170 54 L168 59 L166 54 L161 52 L166 50 Z" fill="var(--seed-primary)" />
-        <path d="M28 110 L29.5 114 L33.5 115.5 L29.5 117 L28 121 L26.5 117 L22.5 115.5 L26.5 114 Z" fill="var(--seed-success)" />
-        <path d="M175 200 L176.5 204 L180.5 205.5 L176.5 207 L175 211 L173.5 207 L169.5 205.5 L173.5 204 Z" fill="var(--seed-warning)" />
-        <circle cx="40" cy="45" r="2" fill="var(--seed-primary)" opacity="0.5" />
-        <circle cx="165" cy="130" r="2.5" fill="var(--seed-success)" opacity="0.5" />
-      </g>
-    </svg>
-  );
-}
-
 /* ---- 装饰：首页 hero 背景图案 ---- */
 function HeroBgPattern() {
   return (
@@ -91,6 +30,26 @@ function HeroBgPattern() {
       <path d="M0 150 Q100 100 200 150 T400 150" stroke="var(--seed-primary)" stroke-width="2" fill="none" />
       <path d="M350 80 Q450 30 550 80" stroke="var(--seed-success)" stroke-width="2" fill="none" />
     </svg>
+  );
+}
+
+/* ---- 首页角色：和泉纱雾举牌 ---- */
+function HeroCharacter() {
+  return (
+    <div className="relative" data-character-slot="hero">
+      <img
+        src="/character.png"
+        alt="和泉纱雾举着牌子"
+        className="w-full h-auto drop-shadow-[0_6px_20px_color-mix(in_srgb,var(--seed-fg)_10%,transparent)]"
+      />
+      {/* 牌子文字叠加 */}
+      <div
+        className="absolute left-1/2 -translate-x-1/2 font-display text-[var(--seed-primary-strong)] font-medium whitespace-nowrap select-none"
+        style={{ top: "15.5%", fontSize: "clamp(9px,1.1vw,13px)", letterSpacing: "0.02em" }}
+      >
+        超高性能的工具~
+      </div>
+    </div>
   );
 }
 
@@ -107,8 +66,8 @@ export default function Home() {
             <h1 className="text-[clamp(1.75rem,1.3rem+1.5vw,2.25rem)] mt-1">你好，{user?.nickname || "同学"}</h1>
             <p className="text-[var(--muted)] text-sm prose-body mt-1.5">课表和成绩用学校账号登录即可查看；选课、评课、学习舱等会到点自动帮你完成。</p>
           </div>
-          {/* 角色立绘图位 —— 以后替换为二次元立绘 PNG */}
-          <div className="hidden sm:flex w-[140px] lg:w-[200px] shrink-0 items-end justify-center self-end" data-character-slot="hero">
+          {/* 角色图片：和泉纱雾举牌 */}
+          <div className="hidden sm:flex w-[160px] lg:w-[240px] shrink-0 items-end justify-center self-end" data-character-slot="hero">
             <HeroCharacter />
           </div>
         </div>

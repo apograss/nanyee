@@ -101,25 +101,6 @@ function Shell() {
             </React.Fragment>
           ))}
         </nav>
-        {/* 侧栏底部装饰带 —— 以后可放小头像/吉祥物 */}
-        <div className="px-4 pb-2" data-character-slot="sidebar-mascot">
-          <div className="relative overflow-hidden rounded-[var(--radius)] bg-gradient-to-br from-[color-mix(in_srgb,var(--seed-primary)_8%,var(--seed-surface))] to-[color-mix(in_srgb,var(--seed-success)_6%,var(--seed-surface))] border border-border p-3 flex items-center gap-2.5">
-            <svg viewBox="0 0 48 48" className="w-8 h-8 shrink-0" fill="none" aria-hidden="true">
-              <circle cx="24" cy="18" r="10" fill="#fff2e5" />
-              <path d="M14 18 Q12 8 24 7 Q36 8 34 18 L34 24 L14 24 Z" fill="var(--seed-primary)" opacity="0.8" />
-              <circle cx="20" cy="18" r="1.5" fill="var(--seed-fg)" />
-              <circle cx="28" cy="18" r="1.5" fill="var(--seed-fg)" />
-              <path d="M21 22 Q24 24 27 22" stroke="var(--seed-fg)" stroke-width="1.2" stroke-linecap="round" fill="none" opacity="0.5" />
-              <path d="M12 26 L10 40 Q10 42 12 42 L36 42 Q38 42 38 40 L36 26 Z" fill="#fffbf5" stroke="var(--seed-border)" stroke-width="1.2" />
-              <rect x="21" y="31" width="6" height="2" rx="0.5" fill="var(--seed-primary)" opacity="0.7" />
-              <rect x="22" y="28" width="4" height="1.5" rx="0.5" fill="var(--seed-primary)" opacity="0.7" />
-            </svg>
-            <div className="leading-tight">
-              <div className="text-[11px] font-medium text-[var(--seed-primary-strong)]">助手在线</div>
-              <div className="text-[10px] text-[var(--muted)]">随时帮你搞定</div>
-            </div>
-          </div>
-        </div>
         <div className="p-3 border-t border-border">
           <div className="flex items-center gap-2.5 px-2 py-2 rounded-[var(--radius)]">
             <div className="w-8 h-8 rounded-[var(--radius-full)] bg-[var(--seed-surface-2)] flex items-center justify-center text-[13px] font-medium text-[var(--seed-primary-strong)]">
