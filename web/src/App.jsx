@@ -101,6 +101,25 @@ function Shell() {
             </React.Fragment>
           ))}
         </nav>
+        {/* 侧栏底部装饰带 —— 以后可放小头像/吉祥物 */}
+        <div className="px-4 pb-2" data-character-slot="sidebar-mascot">
+          <div className="relative overflow-hidden rounded-[var(--radius)] bg-gradient-to-br from-[color-mix(in_srgb,var(--seed-primary)_8%,var(--seed-surface))] to-[color-mix(in_srgb,var(--seed-success)_6%,var(--seed-surface))] border border-border p-3 flex items-center gap-2.5">
+            <svg viewBox="0 0 48 48" className="w-8 h-8 shrink-0" fill="none" aria-hidden="true">
+              <circle cx="24" cy="18" r="10" fill="#fff2e5" />
+              <path d="M14 18 Q12 8 24 7 Q36 8 34 18 L34 24 L14 24 Z" fill="var(--seed-primary)" opacity="0.8" />
+              <circle cx="20" cy="18" r="1.5" fill="var(--seed-fg)" />
+              <circle cx="28" cy="18" r="1.5" fill="var(--seed-fg)" />
+              <path d="M21 22 Q24 24 27 22" stroke="var(--seed-fg)" stroke-width="1.2" stroke-linecap="round" fill="none" opacity="0.5" />
+              <path d="M12 26 L10 40 Q10 42 12 42 L36 42 Q38 42 38 40 L36 26 Z" fill="#fffbf5" stroke="var(--seed-border)" stroke-width="1.2" />
+              <rect x="21" y="31" width="6" height="2" rx="0.5" fill="var(--seed-primary)" opacity="0.7" />
+              <rect x="22" y="28" width="4" height="1.5" rx="0.5" fill="var(--seed-primary)" opacity="0.7" />
+            </svg>
+            <div className="leading-tight">
+              <div className="text-[11px] font-medium text-[var(--seed-primary-strong)]">助手在线</div>
+              <div className="text-[10px] text-[var(--muted)]">随时帮你搞定</div>
+            </div>
+          </div>
+        </div>
         <div className="p-3 border-t border-border">
           <div className="flex items-center gap-2.5 px-2 py-2 rounded-[var(--radius)]">
             <div className="w-8 h-8 rounded-[var(--radius-full)] bg-[var(--seed-surface-2)] flex items-center justify-center text-[13px] font-medium text-[var(--seed-primary-strong)]">
@@ -170,9 +189,31 @@ function ProtectedRoute() {
 
 function NotFound() {
   return (
-    <div className="max-w-md mx-auto py-20 text-center">
-      <h1 className="text-[2.5rem] mb-2">404</h1>
-      <p className="text-[var(--muted)] text-sm mb-6">这个页面不在工具台范围内。</p>
+    <div className="max-w-md mx-auto py-16 flex flex-col items-center text-center gap-4" data-component="NotFound">
+      <svg viewBox="0 0 160 120" fill="none" className="w-32 h-24" aria-hidden="true">
+        {/* 迷路的书本 */}
+        <rect x="50" y="30" width="60" height="48" rx="4" fill="var(--seed-surface-2)" stroke="var(--seed-border)" stroke-width="1.5" />
+        <line x1="80" y1="30" x2="80" y2="78" stroke="var(--seed-border)" stroke-width="1.5" />
+        <rect x="56" y="40" width="18" height="2" rx="1" fill="var(--seed-border)" opacity="0.5" />
+        <rect x="56" y="46" width="14" height="2" rx="1" fill="var(--seed-border)" opacity="0.3" />
+        <rect x="86" y="40" width="18" height="2" rx="1" fill="var(--seed-border)" opacity="0.5" />
+        <rect x="86" y="46" width="14" height="2" rx="1" fill="var(--seed-border)" opacity="0.3" />
+        {/* 问号 */}
+        <g transform="translate(80, 16)">
+          <text x="0" y="0" textAnchor="middle" className="font-display" fontSize="16" fill="var(--seed-primary)" opacity="0.7" fontWeight="500">?</text>
+        </g>
+        {/* 漂浮的问号 */}
+        <text x="35" y="60" className="font-display" fontSize="10" fill="color-mix(in srgb, var(--seed-muted) 40%, transparent)" fontStyle="italic">?</text>
+        <text x="128" y="55" className="font-display" fontSize="8" fill="color-mix(in srgb, var(--seed-muted) 30%, transparent)" fontStyle="italic">?</text>
+        <text x="120" y="85" className="font-display" fontSize="6" fill="color-mix(in srgb, var(--seed-muted) 25%, transparent)" fontStyle="italic">?</text>
+        {/* 闪光 */}
+        <g opacity="0.4">
+          <path d="M130 35 L131.5 39 L135.5 40.5 L131.5 42 L130 46 L128.5 42 L124.5 40.5 L128.5 39 Z" fill="var(--seed-primary)" />
+          <circle cx="30" cy="85" r="2" fill="var(--seed-success)" />
+        </g>
+      </svg>
+      <h1 className="text-[2.5rem]">404</h1>
+      <p className="text-[var(--muted)] text-sm">这个页面不在工具台范围内。</p>
       <Button onClick={() => (window.location.hash = "/")}>返回首页</Button>
     </div>
   );

@@ -192,10 +192,38 @@ export function Spinner({ className }) {
 }
 
 /* ---------- EmptyState ---------- */
+/* 装饰插画：空状态小场景 —— 以后可替换为二次元空状态插画（建议 120×120） */
+function EmptyStateArt() {
+  return (
+    <svg viewBox="0 0 120 120" fill="none" className="w-[88px] h-[88px]" aria-hidden="true">
+      {/* 书本堆 */}
+      <rect x="28" y="78" width="64" height="14" rx="3" fill="color-mix(in srgb, var(--seed-primary) 12%, var(--seed-surface))" stroke="var(--seed-border)" stroke-width="1.2" />
+      <rect x="24" y="64" width="72" height="14" rx="3" fill="color-mix(in srgb, var(--seed-success) 14%, var(--seed-surface))" stroke="var(--seed-border)" stroke-width="1.2" />
+      <rect x="32" y="50" width="56" height="14" rx="3" fill="color-mix(in srgb, var(--seed-warning) 12%, var(--seed-surface))" stroke="var(--seed-border)" stroke-width="1.2" />
+      {/* 书脊线条 */}
+      <line x1="36" y1="83" x2="48" y2="83" stroke="var(--seed-border)" stroke-width="1" opacity="0.5" />
+      <line x1="36" y1="87" x2="44" y2="87" stroke="var(--seed-border)" stroke-width="1" opacity="0.3" />
+      <line x1="72" y1="83" x2="84" y2="83" stroke="var(--seed-border)" stroke-width="1" opacity="0.5" />
+      {/* 书顶的小芽 */}
+      <path d="M60 50 Q60 40 56 36 Q60 34 64 36 Q60 40 60 50" fill="var(--seed-success)" opacity="0.6" />
+      {/* 漂浮星星 */}
+      <g opacity="0.5">
+        <path d="M88 34 L89.5 38 L93.5 39.5 L89.5 41 L88 45 L86.5 41 L82.5 39.5 L86.5 38 Z" fill="var(--seed-primary)" />
+        <path d="M28 42 L29 45 L32 46 L29 47 L28 50 L27 47 L24 46 L27 45 Z" fill="var(--seed-success)" />
+        <circle cx="96" cy="62" r="2" fill="var(--seed-warning)" />
+      </g>
+      {/* Zzz */}
+      <text x="70" y="30" className="font-display" fontSize="11" fill="color-mix(in srgb, var(--seed-muted) 50%, transparent)" opacity="0.7" fontStyle="italic">z</text>
+      <text x="78" y="24" className="font-display" fontSize="9" fill="color-mix(in srgb, var(--seed-muted) 40%, transparent)" opacity="0.6" fontStyle="italic">z</text>
+    </svg>
+  );
+}
+
 export function EmptyState({ icon: Icon, title, description, action, className }) {
   return (
-    <div className={cn("flex flex-col items-center justify-center gap-3 p-10 text-center rounded-[var(--radius)] border border-dashed border-border", className)} data-component="EmptyState">
-      {Icon && <Icon className="w-7 h-7 text-[color-mix(in_srgb,var(--seed-muted)_60%,transparent)]" />}
+    <div className={cn("flex flex-col items-center justify-center gap-3 p-10 text-center rounded-[var(--radius)] border border-dashed border-border bg-gradient-to-b from-[var(--seed-surface)] to-transparent", className)} data-component="EmptyState">
+      <EmptyStateArt />
+      {Icon && <Icon className="w-4 h-4 text-[color-mix(in_srgb,var(--seed-muted)_50%,transparent)] -mt-1" />}
       <div>
         <div className="text-sm font-medium text-foreground tracking-[0.01em]">{title}</div>
         {description && <div className="text-[13px] text-muted-foreground mt-1 max-w-[42ch]">{description}</div>}
