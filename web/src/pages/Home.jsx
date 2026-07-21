@@ -23,12 +23,14 @@ const SUMMARY = [
 /* ---- 装饰：首页 hero 背景图案 ---- */
 function HeroBgPattern() {
   return (
-    <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-[0.04]" viewBox="0 0 600 300" fill="none" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-      <circle cx="520" cy="40" r="60" fill="var(--seed-primary)" />
-      <circle cx="560" cy="200" r="80" fill="var(--seed-success)" />
-      <circle cx="480" cy="260" r="40" fill="var(--seed-primary)" />
+    <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-[0.06]" viewBox="0 0 600 300" fill="none" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <circle cx="520" cy="40" r="70" fill="var(--seed-primary)" />
+      <circle cx="560" cy="200" r="90" fill="var(--seed-success)" />
+      <circle cx="470" cy="260" r="45" fill="var(--seed-primary)" />
+      <circle cx="80" cy="280" r="55" fill="var(--seed-success)" opacity="0.7" />
       <path d="M0 150 Q100 100 200 150 T400 150" stroke="var(--seed-primary)" stroke-width="2" fill="none" />
       <path d="M350 80 Q450 30 550 80" stroke="var(--seed-success)" stroke-width="2" fill="none" />
+      <path d="M0 250 Q80 220 160 250 T320 250" stroke="var(--seed-warning)" stroke-width="1.5" fill="none" opacity="0.6" />
     </svg>
   );
 }
@@ -37,14 +39,44 @@ function HeroBgPattern() {
 function HeroCharacter() {
   return (
     <div className="relative" data-character-slot="hero">
+      {/* 暖色光晕 */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div
+          className="w-[92%] aspect-square rounded-full"
+          style={{
+            background:
+              "radial-gradient(circle, color-mix(in srgb, var(--seed-primary) 20%, transparent) 0%, color-mix(in srgb, var(--seed-primary) 10%, transparent) 35%, color-mix(in srgb, var(--seed-success) 6%, transparent) 55%, transparent 72%)",
+          }}
+        />
+      </div>
+      {/* 漂浮装饰：星星 + 圆点 */}
+      <svg className="absolute -left-2 top-[16%] w-5 h-5 pointer-events-none z-10" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path d="M10 1 L11.8 7.2 L18 9 L11.8 10.8 L10 17 L8.2 10.8 L2 9 L8.2 7.2 Z" fill="var(--seed-primary)" opacity="0.55" />
+      </svg>
+      <svg className="absolute -right-1 top-[38%] w-4 h-4 pointer-events-none z-10" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M8 1 L9.2 5.8 L14 7 L9.2 8.2 L8 13 L6.8 8.2 L2 7 L6.8 5.8 Z" fill="var(--seed-success)" opacity="0.6" />
+      </svg>
+      <svg className="absolute right-3 bottom-[10%] w-3 h-3 pointer-events-none z-10" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+        <circle cx="6" cy="6" r="4" fill="var(--seed-warning)" opacity="0.4" />
+      </svg>
+      <svg className="absolute left-0 bottom-[22%] w-3 h-3 pointer-events-none z-10" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+        <path d="M6 1 L7 4.5 L10.5 5.5 L7 6.5 L6 10 L5 6.5 L1.5 5.5 L5 4.5 Z" fill="var(--seed-primary)" opacity="0.45" />
+      </svg>
+      <svg className="absolute right-0 top-[60%] w-2.5 h-2.5 pointer-events-none z-10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+        <circle cx="5" cy="5" r="3" fill="var(--seed-success)" opacity="0.35" />
+      </svg>
+
+      {/* 角色图片 */}
       <img
         src="/character.png"
         alt="和泉纱雾举着牌子"
-        className="w-full h-auto drop-shadow-[0_6px_20px_color-mix(in_srgb,var(--seed-fg)_10%,transparent)]"
+        className="relative w-full h-auto drop-shadow-[0_4px_16px_color-mix(in_srgb,var(--seed-fg)_8%,transparent)]"
+        style={{ filter: "sepia(0.18) saturate(1.4) hue-rotate(-8deg) brightness(1.03)" }}
       />
+
       {/* 牌子文字叠加 */}
       <div
-        className="absolute left-1/2 -translate-x-1/2 font-display text-[var(--seed-primary-strong)] font-medium whitespace-nowrap select-none"
+        className="absolute left-1/2 -translate-x-1/2 font-display text-[var(--seed-primary-strong)] font-medium whitespace-nowrap select-none z-10"
         style={{ top: "15.5%", fontSize: "clamp(9px,1.1vw,13px)", letterSpacing: "0.02em" }}
       >
         超高性能的工具~
