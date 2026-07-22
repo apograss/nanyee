@@ -61,7 +61,7 @@ export default function Grades(qoderProps) {
     setError("");
     try {
       const sess = await apiPost("/smu/session", { flow_id: captcha?.flow_id, account, password, captcha: captchaCode }, {
-        mock: { academic_session_id: "as_demo_001", expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString() },
+        mock: { academic_session_id: "as_demo_001", expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() },
       });
       setSession(sess);
       setPassword(""); setCaptchaCode("");
@@ -120,7 +120,7 @@ export default function Grades(qoderProps) {
       ) : (
         <>
           <Alert variant="success" title="登录成功" data-qoder-id="qel-alert-7b7ce770" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-alert-7b7ce770&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;alert&quot;,&quot;loc&quot;:{&quot;line&quot;:94,&quot;column&quot;:11}}">
-            <span data-qoder-id="qel-span-5f650723" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-span-5f650723&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;span&quot;,&quot;loc&quot;:{&quot;line&quot;:95,&quot;column&quot;:13}}">5 分钟内可查询，过期后需重新登录。</span>
+            <span data-qoder-id="qel-span-5f650723" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-span-5f650723&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;span&quot;,&quot;loc&quot;:{&quot;line&quot;:95,&quot;column&quot;:13}}">24 小时内可查询，过期后需重新登录。</span>
           </Alert>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" data-qoder-id="qel-grid-ae3bf837" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-grid-ae3bf837&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;grid&quot;,&quot;loc&quot;:{&quot;line&quot;:98,&quot;column&quot;:11}}">

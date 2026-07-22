@@ -49,6 +49,7 @@ READ_POLICY = RateLimitPolicy(window_seconds=10 * 60, soft_limit=20, hard_limit=
 ENROLL_POLICY = RateLimitPolicy(window_seconds=60, soft_limit=3, hard_limit=6)
 ENROLL_RUN_POLICY = RateLimitPolicy(window_seconds=10 * 60, soft_limit=3, hard_limit=10)
 EVALUATION_SUBMIT_POLICY = RateLimitPolicy(window_seconds=10 * 60, soft_limit=5, hard_limit=15)
+ACADEMIC_SESSION_TTL_SECONDS = 24 * 60 * 60
 
 
 class CaptchaResponse(BaseModel):
@@ -290,7 +291,11 @@ async def create_smu_session(
         uis_cookies=uis_cookies,
     )
     encoded = json.dumps(academic_cookies, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    session_id, expires_at = await store.put(encoded, kind="smu_academic")
+    session_id, expires_at = await store.put(
+        encoded,
+        kind="smu_academic",
+        ttl_seconds=ACADEMIC_SESSION_TTL_SECONDS,
+    )
     return SmuSessionResponse(academic_session_id=session_id, expires_at=expires_at)
 
 
@@ -329,7 +334,11 @@ async def create_enrollment_cookie_session(
         ) from exc
     academic_cookies = await client.validate_academic_session(academic_cookies=submitted_cookies)
     encoded = json.dumps(academic_cookies, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    session_id, expires_at = await store.put(encoded, kind="smu_academic")
+    session_id, expires_at = await store.put(
+        encoded,
+        kind="smu_academic",
+        ttl_seconds=ACADEMIC_SESSION_TTL_SECONDS,
+    )
     return SmuSessionResponse(academic_session_id=session_id, expires_at=expires_at)
 
 
@@ -572,14 +581,16 @@ async def enrollment_submit(
         category_code=payload.category_code,
         course=course,
     )
-    if result.outcome != "conflict":
-        return result
-    return await client.enroll_course(
-        academic_cookies=cookies,
-        category_code=payload.category_code,
-        course=course,
-        confirm_conflict=True,
-    )
+    if result.outcome == "conflict":
+        result = await client.enroll_course(
+            academic_cookies=cookies,
+            category_code=payload.category_code,
+            course=course,
+            confirm_conflict=True,
+        )
+    if result.success:
+        await store.delete(payload.academic_session_id)
+    return result
 
 
 @router.post(
@@ -630,6 +641,10 @@ async def start_enrollment_run(
             status_code=404,
         ) from exc
     try:
+
+        async def delete_academic_session() -> None:
+            await store.delete(payload.academic_session_id)
+
         return await runs.create(
             user_id=auth.user.id,
             category_code=payload.category_code,
@@ -639,6 +654,7 @@ async def start_enrollment_run(
             max_attempts=payload.max_attempts,
             primary_burst_attempts=payload.primary_burst_attempts,
             confirm_conflicts=payload.confirm_conflicts,
+            on_success=delete_academic_session,
         )
     except RuntimeError as exc:
         raise AppError(

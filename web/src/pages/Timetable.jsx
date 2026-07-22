@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Inpu
 import { apiGet, apiPost, shareWakeup, CONFIRMATION_VERSIONS, mockCaptcha, mockSession, mockWakeupShare } from "@/lib/api.jsx";
 import { recognizeCaptcha, terminateOCR } from "@/lib/captcha-ocr.jsx";
 
-// 瞬时学校会话状态：idle | captcha(取验证码) | session(已登录 5min) | expired
+// 瞬时学校会话状态：idle | captcha(取验证码) | session(已登录 24h) | expired
 // flow_id 与 academic_session_id 仅内存，不入 localStorage/URL
 // 学校密码 / 验证码：仅本次请求使用，提交后立即清空
 

@@ -441,6 +441,6 @@ export const mockCaptcha = {
 };
 export const mockSession = {
   academic_session_id: "mock-academic-session-id-preview",
-  expires_at: new Date(Date.now() + 300 * 1000).toISOString(),
+  expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
 };
 export const mockWakeupShare = { share_code: "wk-preview-7K9A2F" };

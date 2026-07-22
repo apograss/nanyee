@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import random
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, time, timedelta
 from uuid import UUID
@@ -19,6 +21,7 @@ from nanyee.tools.course_selection import (
 )
 
 SHANGHAI = ZoneInfo("Asia/Shanghai")
+logger = logging.getLogger(__name__)
 TERMINAL_STATES = {
     EnrollmentRunState.SUCCEEDED,
     EnrollmentRunState.FAILED,
@@ -37,6 +40,7 @@ class _RunRecord:
     max_attempts: int
     primary_burst_attempts: int
     confirm_conflicts: bool
+    on_success: Callable[[], Awaitable[None]] | None
     state: EnrollmentRunState = EnrollmentRunState.CALIBRATING
     run_at: datetime | None = None
     attempt_count: int = 0
@@ -78,6 +82,7 @@ class EnrollmentRunManager:
         max_attempts: int,
         primary_burst_attempts: int,
         confirm_conflicts: bool,
+        on_success: Callable[[], Awaitable[None]] | None = None,
     ) -> EnrollmentRun:
         record = _RunRecord(
             id=random_token(24),
@@ -89,6 +94,7 @@ class EnrollmentRunManager:
             max_attempts=max_attempts,
             primary_burst_attempts=min(primary_burst_attempts, max_attempts),
             confirm_conflicts=confirm_conflicts,
+            on_success=on_success,
         )
         async with self._lock:
             self._purge_finished()
@@ -162,6 +168,15 @@ class EnrollmentRunManager:
             self._log(record, "error", f"自动选课异常终止：{type(exc).__name__}。")
             self._finish(record, EnrollmentRunState.FAILED)
         finally:
+            if record.state == EnrollmentRunState.SUCCEEDED and record.on_success is not None:
+                try:
+                    await record.on_success()
+                    self._log(record, "session_closed", "选课成功，学校会话已从服务器内存删除。")
+                except Exception:
+                    logger.exception(
+                        "enrollment_session_cleanup_failed",
+                        extra={"event": "enrollment_session_cleanup_failed", "run_id": record.id},
+                    )
             record.cookies.clear()
 
     async def _attempt_courses(self, record: _RunRecord) -> None:
@@ -271,6 +286,18 @@ class EnrollmentRunManager:
         )
         if len(record.events) > self._event_limit:
             del record.events[: len(record.events) - self._event_limit]
+        level = logging.WARNING if event_type in {"error", "fail"} else logging.INFO
+        logger.log(
+            level,
+            message,
+            extra={
+                "event": f"enrollment_{event_type}",
+                "run_id": record.id,
+                "attempt": attempt,
+                "course_name": course_name,
+                "state": record.state.value,
+            },
+        )
 
     @staticmethod
     def _finish(record: _RunRecord, state: EnrollmentRunState) -> None:

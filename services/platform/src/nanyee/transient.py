@@ -21,11 +21,16 @@ class TransientSecretStore:
         self._entries: dict[str, _SecretEntry] = {}
         self._lock = asyncio.Lock()
 
-    async def put(self, value: bytes, *, kind: str) -> tuple[str, datetime]:
+    async def put(
+        self, value: bytes, *, kind: str, ttl_seconds: int | None = None
+    ) -> tuple[str, datetime]:
         if not value:
             raise ValueError("transient secret cannot be empty")
+        ttl = self._ttl_seconds if ttl_seconds is None else ttl_seconds
+        if ttl < 1:
+            raise ValueError("transient secret TTL must be positive")
         now = utc_now()
-        expires_at = now + timedelta(seconds=self._ttl_seconds)
+        expires_at = now + timedelta(seconds=ttl)
         async with self._lock:
             self._purge_expired(now)
             if len(self._entries) >= self._max_entries:

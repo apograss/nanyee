@@ -127,6 +127,23 @@ export default function JobDetail() {
         </Alert>
       )}
 
+      {job.tool_id === "evaluation" && Array.isArray(job.receipt?.logs) && (
+        <Card data-component="EvaluationLog">
+          <CardHeader>
+            <CardTitle>评课日志</CardTitle>
+            <CardDescription>每门课程只有收到教务系统成功响应后才会记为提交成功。</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2">
+            {job.receipt.logs.map((entry, index) => (
+              <div key={`${entry.time || "log"}-${index}`} className="flex items-start gap-3 rounded-[var(--radius)] border border-border px-3 py-2 text-[12px]">
+                <span className="shrink-0 font-mono text-[var(--muted)]">{entry.time ? new Date(entry.time).toLocaleTimeString("zh-CN", { hour12: false }) : "--:--:--"}</span>
+                <span className="flex-1">{entry.message || entry.event}</span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       {job.state === "failed" && job.error_code && (
         <Alert variant="danger" title="任务失败">
           <span>任务未能完成。你可以取消或重新创建一个任务。</span>

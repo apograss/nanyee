@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -18,6 +19,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from nanyee_worker.runtime import ExecutionFailure, ExecutionReceipt, ensure_execution_active
 from nanyee_worker.study_cabin import DdddOcrSolver
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,6 +47,8 @@ class EvaluationHandler:
                 "CREDENTIAL_REQUIRED", retryable=False, next_action="replace_credential"
             )
         request = EvaluationAutomationRequest.model_validate(job.payload)
+        logs: list[dict[str, object]] = []
+        self._log(job, logs, "evaluation_started", "自动评课任务开始。")
         if request.retry_until is not None and datetime.now(UTC) >= request.retry_until.astimezone(
             UTC
         ):
@@ -52,8 +57,23 @@ class EvaluationHandler:
         cookies = await self._academic_session(db, job)
         try:
             pending = await self._client.fetch_pending_evaluations(academic_cookies=cookies)
+            self._log(
+                job,
+                logs,
+                "evaluation_pending_loaded",
+                f"已读取 {len(pending)} 门待评课程。",
+                pending_count=len(pending),
+            )
             submitted: list[dict[str, object]] = []
-            for item in pending[: request.max_courses]:
+            for index, item in enumerate(pending[: request.max_courses], start=1):
+                self._log(
+                    job,
+                    logs,
+                    "evaluation_course_started",
+                    f"开始提交第 {index} 门课程：{item.course_name}。",
+                    course_index=index,
+                    course_name=item.course_name,
+                )
                 draft = await self._client.fetch_evaluation_draft(
                     academic_cookies=cookies,
                     reference=item,
@@ -72,19 +92,43 @@ class EvaluationHandler:
                         "total_score": result.total_score,
                     }
                 )
+                self._log(
+                    job,
+                    logs,
+                    "evaluation_course_succeeded",
+                    f"第 {index} 门课程提交成功：{result.course_name}。",
+                    course_index=index,
+                    course_name=result.course_name,
+                    submitted_count=len(submitted),
+                )
         except AppError as exc:
             self._sessions.pop(job.credential_id, None)
+            self._log(
+                job,
+                logs,
+                "evaluation_upstream_error",
+                f"评课请求失败，将按策略重试：{exc.code}。",
+                level=logging.WARNING,
+            )
             raise ExecutionFailure(
                 str(exc.code),
                 retryable=True,
                 next_action="automatic_retry",
             ) from exc
+        self._log(
+            job,
+            logs,
+            "evaluation_completed",
+            f"自动评课完成，成功提交 {len(submitted)} 门。",
+            submitted_count=len(submitted),
+        )
         return ExecutionReceipt(
             {
                 "strategy": request.strategy,
                 "pending_count": len(pending),
                 "submitted_count": len(submitted),
                 "submissions": submitted,
+                "logs": logs,
             }
         )
 
@@ -108,6 +152,10 @@ class EvaluationHandler:
         last_error: Exception | None = None
         for attempt in range(5):
             try:
+                logger.info(
+                    "正在尝试登录教务系统并识别验证码。",
+                    extra={"event": "evaluation_login_attempt", "attempt": attempt + 1},
+                )
                 captcha = await self._client.fetch_captcha()
                 solution = await self._solver.solve(captcha.image)
                 return await self._client.authenticate(
@@ -118,6 +166,10 @@ class EvaluationHandler:
                 )
             except Exception as exc:
                 last_error = exc
+                logger.warning(
+                    "教务登录或验证码识别失败，将放缓后重试。",
+                    extra={"event": "evaluation_login_retry", "attempt": attempt + 1},
+                )
             if attempt < 4:
                 await asyncio.sleep(2**attempt)
         raise ExecutionFailure(
@@ -164,3 +216,26 @@ class EvaluationHandler:
                 "CREDENTIAL_INVALID", retryable=False, next_action="replace_credential"
             )
         return account, password
+
+    @staticmethod
+    def _log(
+        job: Job,
+        logs: list[dict[str, object]],
+        event: str,
+        message: str,
+        *,
+        level: int = logging.INFO,
+        **fields: object,
+    ) -> None:
+        entry: dict[str, object] = {
+            "time": datetime.now(UTC).isoformat(),
+            "event": event,
+            "message": message,
+        }
+        entry.update(fields)
+        logs.append(entry)
+        logger.log(
+            level,
+            message,
+            extra={"event": event, "job_id": str(job.id), "tool_id": "evaluation", **fields},
+        )

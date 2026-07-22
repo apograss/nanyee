@@ -64,10 +64,10 @@ function AcademicSessionCard({ onSession }) {
     try {
       const data = loginMode === "cookie"
         ? await createEnrollmentCookieSession(cookie, {
-            mock: { academic_session_id: "as_demo_cookie", expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString() },
+            mock: { academic_session_id: "as_demo_cookie", expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() },
           })
         : await apiPost("/smu/session", { flow_id: captcha.flow_id, account, password, captcha: captchaCode }, {
-            mock: { academic_session_id: "as_demo_001", expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString() },
+            mock: { academic_session_id: "as_demo_001", expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() },
           });
       setSession(data); onSession(data); setPassword(""); setCaptchaCode("");
       setCookie("");
@@ -82,7 +82,7 @@ function AcademicSessionCard({ onSession }) {
     <Card data-component="AcademicSessionCard" data-od-id="enrollment-session">
       <CardHeader>
         <CardTitle>学校系统登录</CardTitle>
-        <CardDescription>登录后 5 分钟内有效，请尽快完成选课。</CardDescription>
+        <CardDescription>登录后固定 24 小时有效；选课成功会自动删除本次学校会话。</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         {session ? (

@@ -178,4 +178,11 @@ async def test_evaluation_handler_submits_all_pending_courses(monkeypatch: Any) 
     assert receipt.values["pending_count"] == 1
     assert receipt.values["submitted_count"] == 1
     assert client.submitted[0]["late"] == "no"
+    assert [entry["event"] for entry in receipt.values["logs"]] == [
+        "evaluation_started",
+        "evaluation_pending_loaded",
+        "evaluation_course_started",
+        "evaluation_course_succeeded",
+        "evaluation_completed",
+    ]
     assert "password" not in str(receipt.values)

@@ -100,8 +100,8 @@ Turnstile Secret 永远不进入前端配置。所需脚本与 CSP 域名以 Clo
 2. 图片源可由 `data:${content_type};base64,${image_base64}` 构造。
 3. 在浏览器中识别验证码；可直接复用 `legacy/smu-tools/public/captcha_model.onnx` 和 `legacy/smu-tools/src/lib/captcha-ocr.ts`。普通在线工具不得调用 VPS OCR。
 4. `POST /smu/session` 提交 `flow_id`、学号、学校密码和识别结果。验证码错误时重新获取验证码并在浏览器中重试，建议最多自动重试 3 次后让用户手工输入。
-5. 成功后只得到 `academic_session_id` 和过期时间；服务器不会返回 UIS/教务 Cookie。
-6. 在 5 分钟内调用：
+5. 成功后只得到 `academic_session_id` 和过期时间；服务器不会返回 UIS/教务 Cookie。会话固定有效 24 小时，不做滑动续期。
+6. 在有效期内调用：
    - `POST /smu/timetable`；
    - `POST /smu/timetable.ics`；
    - `POST /smu/timetable.wakeup`；
@@ -109,7 +109,7 @@ Turnstile Secret 永远不进入前端配置。所需脚本与 CSP 域名以 Clo
 
 学校密码只用于第 4 步，不保存、不复用、不进入前端日志。`flow_id` 为一次性；登录失败后重新取验证码。`academic_session_id` 只放内存，页面刷新后允许用户重新登录学校系统。
 
-选课页还可以使用 `POST /smu/enrollment/session/cookie`：请求体提交 `cookie`，支持完整 `Cookie` 字符串、带 `Cookie:` 前缀的字符串或单独的 `JSESSIONID` 值。该接口要求平台登录与 CSRF，会先向教务系统校验会话，再把规范化 Cookie 放进与账号密码登录相同的 5 分钟内存会话；原 Cookie 和规范化 Cookie 都不写数据库、不返回前端。账号密码登录会使同时登录教务系统的另一台设备下线，前端必须明确提示。
+选课页还可以使用 `POST /smu/enrollment/session/cookie`：请求体提交 `cookie`，支持完整 `Cookie` 字符串、带 `Cookie:` 前缀的字符串或单独的 `JSESSIONID` 值。该接口要求平台登录与 CSRF，会先向教务系统校验会话，再把规范化 Cookie 放进与账号密码登录相同的 24 小时固定内存会话；原 Cookie 和规范化 Cookie 都不写数据库、不返回前端。账号密码登录会使同时登录教务系统的另一台设备下线，前端必须明确提示。选课成功后后端立即擦除该 `academic_session_id` 和运行中的 Cookie 副本，不调用上游全局注销。
 
 `/smu/timetable.ics` 返回 `text/calendar` 文件。`/smu/timetable.wakeup` 还需提交 `semester_monday` 和 `campus: "main" | "shunde"`，返回 `.wakeup_schedule` 文件；两者都按普通 Blob 下载处理。
 

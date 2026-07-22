@@ -61,6 +61,12 @@ async def test_enrollment_run_restores_preferences_retries_and_conflict_confirma
         delay_max_seconds=0,
     )
     user_id = uuid4()
+    session_deleted = False
+
+    async def delete_session() -> None:
+        nonlocal session_deleted
+        session_deleted = True
+
     run = await manager.create(
         user_id=user_id,
         category_code="12",
@@ -73,6 +79,7 @@ async def test_enrollment_run_restores_preferences_retries_and_conflict_confirma
         max_attempts=3,
         primary_burst_attempts=1,
         confirm_conflicts=True,
+        on_success=delete_session,
     )
 
     for _ in range(20):
@@ -96,4 +103,6 @@ async def test_enrollment_run_restores_preferences_retries_and_conflict_confirma
         ("second", False),
     ]
     assert [event.type for event in current.events].count("attempt") == 3
+    assert session_deleted is True
+    assert current.events[-1].type == "session_closed"
     await manager.close()

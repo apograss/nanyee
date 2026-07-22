@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from datetime import UTC, datetime
 
 import httpx
 import pytest
@@ -189,7 +190,8 @@ async def test_copied_academic_cookie_is_validated_and_refreshed() -> None:
 @pytest.mark.asyncio
 async def test_transient_store_is_typed_and_one_time_capable() -> None:
     store = TransientSecretStore(ttl_seconds=60, max_entries=10)
-    key, _ = await store.put(b"secret", kind="captcha")
+    key, expires_at = await store.put(b"secret", kind="captcha", ttl_seconds=24 * 60 * 60)
+    assert (expires_at - datetime.now(UTC)).total_seconds() > 23 * 60 * 60
     assert await store.get(key, kind="academic") is None
     assert await store.get(key, kind="captcha") == b"secret"
     assert await store.take(key, kind="captcha") == b"secret"
