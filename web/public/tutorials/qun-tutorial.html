@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>获取教程 · 南医工具台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #fff7ed;
+    --surface: #fffbf5;
+    --surface-2: #fdf3e7;
+    --fg: #1c1410;
+    --primary: #ea580c;
+    --primary-strong: #c2410c;
+    --success: #5b8c7b;
+    --muted: #57534e;
+    --border: #e7d5c4;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Inter", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 40px 24px 80px; }
+  .back {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 13px; font-weight: 500; color: var(--primary-strong);
+    text-decoration: none; margin-bottom: 24px;
+    padding: 6px 14px; border-radius: var(--radius);
+    border: 1px solid var(--border); background: var(--surface);
+    transition: background .15s;
+  }
+  .back:hover { background: var(--surface-2); }
+  h1 {
+    font-family: "Fraunces", Georgia, serif;
+    font-size: 2rem; font-weight: 600; letter-spacing: -0.02em;
+    margin-bottom: 8px;
+  }
+  .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 32px; }
+  section { margin-bottom: 48px; }
+  section > h2 {
+    font-family: "Fraunces", Georgia, serif;
+    font-size: 1.35rem; font-weight: 600; letter-spacing: -0.01em;
+    margin-bottom: 4px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 24px; height: 24px; padding: 0 8px;
+    border-radius: 99px; font-size: 12px; font-weight: 600;
+    background: var(--primary); color: #fff;
+  }
+  section > p.desc { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  .step {
+    display: flex; gap: 14px; margin-bottom: 20px;
+    padding: 16px 18px; border-radius: var(--radius);
+    border: 1px solid var(--border); background: var(--surface);
+  }
+  .step-num {
+    flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%;
+    background: var(--surface-2); border: 1.5px solid var(--primary);
+    color: var(--primary-strong); font-size: 13px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+    margin-top: 1px;
+  }
+  .step-body { flex: 1; min-width: 0; }
+  .step-body p { font-size: 14px; line-height: 1.7; }
+  .step-body p + p { margin-top: 6px; }
+  .step-body code {
+    font-family: "SF Mono", Consolas, monospace;
+    font-size: 12.5px; background: var(--surface-2);
+    padding: 1px 6px; border-radius: 4px; color: var(--primary-strong);
+  }
+  .step-body a { color: var(--primary); text-decoration: underline; }
+  .step-img {
+    margin-top: 10px; border-radius: 8px;
+    border: 1px solid var(--border); max-width: 100%; height: auto;
+    display: block;
+  }
+  .step-img.tight { max-width: 320px; }
+  .step-img.wide { max-width: 100%; }
+  .note {
+    margin-top: 24px; padding: 14px 18px; border-radius: var(--radius);
+    background: color-mix(in srgb, var(--success) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--success) 30%, transparent);
+    font-size: 13px; color: var(--muted);
+  }
+  .note strong { color: var(--success); }
+  .download-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 10px 20px; border-radius: var(--radius);
+    background: var(--primary); color: #fff;
+    font-size: 14px; font-weight: 600; text-decoration: none;
+    transition: background .15s;
+  }
+  .download-btn:hover { background: var(--primary-strong); }
+  .download-btn svg { width: 18px; height: 18px; }
+  .download-row { margin: 20px 0 4px; }
+  @media (max-width: 520px) {
+    .wrap { padding: 24px 16px 60px; }
+    h1 { font-size: 1.6rem; }
+    .step { flex-direction: column; gap: 8px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="javascript:history.back()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    返回
+  </a>
+  <h1>获取教程</h1>
+  <p class="subtitle">群报数 Token 和学校教务系统 Cookie 的获取方法。</p>
+
+  <!-- ====== Section A: Token ====== -->
+  <section>
+    <h2><span class="badge">A</span> 获取群报数 Token（Windows 工具）</h2>
+    <p class="desc">通过一个小工具自动抓取 PC 微信里的群报数 Token，复制到剪贴板后直接粘贴到网站。</p>
+
+    <div class="download-row">
+      <a class="download-btn" href="/downloads/qun-token-tool-windows.zip" download>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+        下载工具包
+      </a>
+    </div>
+
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <p>点击上方"下载工具包"，得到 <code>qun-token-tool-windows.zip</code>。</p>
+        <img class="step-img tight" src="img/image6.png" alt="下载得到的 zip 文件" />
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <p>右键解压到任意文件夹。解压后包含 5 个文件，先用记事本打开 <code>README.md</code> 阅读。</p>
+        <img class="step-img wide" src="img/image7.png" alt="解压后的文件列表" />
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <p>安装 Python 3.12 或更高版本。前往 <a href="https://www.python.org/downloads/" target="_blank" rel="noopener">python.org</a> 下载，安装时务必勾选 <strong>Add to PATH</strong>。</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <p>双击 <code>setup.bat</code>，它会自动安装 mitmproxy 并把根证书安装到当前 Windows 用户。安装成功后关闭窗口。</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-body">
+        <p>完全退出 PC 微信，再重新打开并登录。</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">6</div>
+      <div class="step-body">
+        <p>双击 <code>get_token.bat</code>，保持命令窗口开启。在 PC 微信中打开群报数小程序，进入任意一个表单。</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">7</div>
+      <div class="step-body">
+        <p>窗口提示成功后，Token 已复制到剪贴板。回到网站直接粘贴到上方输入框即可。</p>
+      </div>
+    </div>
+
+    <div class="note">
+      <strong>提示：</strong>Token 有效期通常只有 1-2 天，过期后重新运行 <code>get_token.bat</code> 获取即可。工具只读取 qun100.com 的 Authorization 请求头，不记录网页内容；成功或报错后自动恢复系统代理。
+    </div>
+  </section>
+
+  <!-- ====== Section B: Cookie ====== -->
+  <section>
+    <h2><span class="badge">B</span> 获取学校教务系统 Cookie</h2>
+    <p class="desc">用于选课页面的 Cookie 登录方式，通过 Edge 浏览器的 Cookie-Editor 扩展获取 JSESSIONID。</p>
+
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <p>建议使用 Microsoft Edge 浏览器。打开<a href="https://zhjw.smu.edu.cn/new/welcome.page?ui=new" target="_blank" rel="noopener">教务系统首页</a>并登录自己的账号。</p>
+        <img class="step-img tight" src="img/image1.jpeg" alt="Microsoft Edge" style="border-radius: 8px; max-width: 80px;" />
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <p>在 Edge 扩展商店搜索并安装 <strong>Cookie-Editor</strong> 扩展。</p>
+        <img class="step-img wide" src="img/image2.png" alt="Cookie-Editor 扩展商店页面" />
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <p>安装后，点击 Edge 右上角的扩展图标（拼图形状），把 Cookie-Editor 固定到工具栏。</p>
+        <img class="step-img tight" src="img/image3.png" alt="扩展图标" style="max-width: 120px;" />
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <p>回到教务系统页面，点击 Cookie-Editor 图标打开面板。</p>
+        <img class="step-img tight" src="img/image4.png" alt="Cookie-Editor 标签页" />
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-body">
+        <p>在列表中找到 <code>JSESSIONID</code>，展开后复制 Value 字段的值，粘贴到选课页面的 Cookie 输入框。</p>
+        <img class="step-img wide" src="img/image5.png" alt="Cookie-Editor 中 JSESSIONID 的值" />
+      </div>
+    </div>
+
+    <div class="note">
+      <strong>安全说明：</strong>Cookie 等同于登录凭证，不要发给他人，不要粘贴到群聊或教程截图中。使用完成后可以关闭 Cookie-Editor 面板。
+    </div>
+  </section>
+</div>
+</body>
+</html>
