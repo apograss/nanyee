@@ -109,6 +109,8 @@ Turnstile Secret 永远不进入前端配置。所需脚本与 CSP 域名以 Clo
 
 学校密码只用于第 4 步，不保存、不复用、不进入前端日志。`flow_id` 为一次性；登录失败后重新取验证码。`academic_session_id` 只放内存，页面刷新后允许用户重新登录学校系统。
 
+选课页还可以使用 `POST /smu/enrollment/session/cookie`：请求体提交 `cookie`，支持完整 `Cookie` 字符串、带 `Cookie:` 前缀的字符串或单独的 `JSESSIONID` 值。该接口要求平台登录与 CSRF，会先向教务系统校验会话，再把规范化 Cookie 放进与账号密码登录相同的 5 分钟内存会话；原 Cookie 和规范化 Cookie 都不写数据库、不返回前端。账号密码登录会使同时登录教务系统的另一台设备下线，前端必须明确提示。
+
 `/smu/timetable.ics` 返回 `text/calendar` 文件。`/smu/timetable.wakeup` 还需提交 `semester_monday` 和 `campus: "main" | "shunde"`，返回 `.wakeup_schedule` 文件；两者都按普通 Blob 下载处理。
 
 如果用户明确选择“导入 WakeUp”，可在登录平台并确认第三方上传后调用 `POST /smu/timetable.wakeup.share`，额外提交 `confirmation_version: "timetable:wakeup_share:v1"`，后端返回 `share_code`。该路径会把生成的课表上传到 WakeUp；拒绝上传时仍可下载本地文件。成绩结果默认不在服务器保存，返回的 `ranking` 包含课程和教学班范围的排名与分布。
@@ -216,6 +218,8 @@ Turnstile Secret 永远不进入前端配置。所需脚本与 CSP 域名以 Clo
 
 图片仅接受内容与声明 MIME 一致的 JPEG、PNG、GIF 或 WebP，单张最多 5 MiB。响应 URL 已经过后端上传目标和 CDN 域名校验；前端把它填入对应图片字段。预览请求携带 `auth_token`、`defaults` 和按 `cid` 索引的 `custom_fields`，返回规范化 `catalogs`。用户核对后可以把相同 Token、`form_version`、`title`、`catalogs` 发送到即时提交接口；需要定时执行时才创建托管 Token 凭据和 `qun_checkin:submit:v1` 任务。提交结果未知时禁止前端自动重放，应引导用户先到群报数核验。
 
+群报数位置选点只在浏览器完成。地图点击、地址搜索或设备定位得到的纬度、经度和地址放进预览请求的 `defaults.default_lat`、`defaults.default_lng`、`defaults.default_address`；后端沿用旧工具的 LOCATION 结构生成 `coordinates: [longitude, latitude]`。不需要也不应增加 VPS 地图或定位服务。
+
 ## 7. 自动选课与兼容接口
 
 自动选课要求平台登录、CSRF 和仍有效的 `academic_session_id`。它使用当前 API 进程内的学校会话，不保存学校密码；浏览器关闭不会主动取消，但 API 重启后无法恢复本次运行。
@@ -241,7 +245,7 @@ Turnstile Secret 永远不进入前端配置。所需脚本与 CSP 域名以 Clo
 
 4. 轮询 `GET /smu/enrollment/runs/{run_id}` 展示当前状态、尝试次数、命中课程和事件；用户停止时调用 `POST /smu/enrollment/runs/{run_id}/cancel`。
 
-后端会先校准教务服务器时间；到达计划时间后先连续尝试第一志愿，再按志愿顺序轮询，尝试间隔随机为 500–1000 毫秒，默认 15 次、最多 120 次。冲突课程可按用户确认自动执行二次确认。前端只使用接口返回的真实类型、课程和事件，不得生成示例课程或硬编码 `category_code`。
+后端会先校准教务服务器时间；到达计划时间后先连续尝试第一志愿，再按志愿顺序轮询，尝试间隔随机为 100–300 毫秒，默认 15 次、最多 120 次。检测到包含“冲突”的教务响应后，会按旧工具逻辑向同一 `/add` 接口用 `hlct=1` 二次提交；自动运行可由 `confirm_conflicts` 控制，兼容人工提交接口默认自动确认。前端只使用接口返回的真实类型、课程和事件，不得生成示例课程或硬编码 `category_code`。
 
 ### 兼容接口
 

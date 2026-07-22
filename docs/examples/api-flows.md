@@ -36,6 +36,16 @@ Content-Type: application/json
 }
 ```
 
+选课 Cookie 登录（需要平台 Session 与 CSRF）：
+
+```http
+POST /api/v1/smu/enrollment/session/cookie
+Content-Type: application/json
+X-CSRF-Token: value-from-csrf-cookie
+
+{"cookie":"JSESSIONID=从浏览器复制的值; ROUTE=..."}
+```
+
 ```http
 POST /api/v1/smu/timetable
 Content-Type: application/json

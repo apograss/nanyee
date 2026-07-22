@@ -1,10 +1,10 @@
 // Canvas design runtime editable source marker: enrollment
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { AlertTriangle, CheckCircle2, RefreshCw, X, Plus, GripVertical, Activity, Zap, StopCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, RefreshCw, X, Plus, GripVertical, Activity, Zap, StopCircle, Cookie } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Select, Label, Badge, Alert, cn } from "@/components/ui.jsx";
 import {
   fetchEnrollmentCategories, fetchEnrollmentCourses, startEnrollmentRun,
-  getEnrollmentRun, cancelEnrollmentRun, apiGet, apiPost,
+  getEnrollmentRun, cancelEnrollmentRun, createEnrollmentCookieSession, apiGet, apiPost,
   mockEnrollmentCategories, mockEnrollmentCourses, mockEnrollmentRun,
   ENROLLMENT_TERMINAL_STATES, CONFIRMATION_VERSIONS,
 } from "@/lib/api.jsx";
@@ -22,6 +22,9 @@ function AcademicSessionCard({ onSession }) {
   const [countdown, setCountdown] = useState(0);
   const [autoOCR, setAutoOCR] = useState(false);
   const [ocrBusy, setOcrBusy] = useState(false);
+  const [loginMode, setLoginMode] = useState("password");
+  const [cookie, setCookie] = useState("");
+  const [error, setError] = useState("");
 
   const fetchCaptcha = useCallback(async () => {
     try {
@@ -40,7 +43,9 @@ function AcademicSessionCard({ onSession }) {
     } catch { setCaptcha(null); }
   }, [autoOCR]);
 
-  useEffect(() => { if (!session) fetchCaptcha(); }, [session, fetchCaptcha]);
+  useEffect(() => {
+    if (!session && loginMode === "password") fetchCaptcha();
+  }, [session, loginMode, fetchCaptcha]);
 
   useEffect(() => {
     if (!session) return;
@@ -55,12 +60,21 @@ function AcademicSessionCard({ onSession }) {
 
   const login = async () => {
     setLoading(true);
+    setError("");
     try {
-      const data = await apiPost("/smu/session", { flow_id: captcha.flow_id, account, password, captcha: captchaCode }, {
-        mock: { academic_session_id: "as_demo_001", expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString() },
-      });
+      const data = loginMode === "cookie"
+        ? await createEnrollmentCookieSession(cookie, {
+            mock: { academic_session_id: "as_demo_cookie", expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString() },
+          })
+        : await apiPost("/smu/session", { flow_id: captcha.flow_id, account, password, captcha: captchaCode }, {
+            mock: { academic_session_id: "as_demo_001", expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString() },
+          });
       setSession(data); onSession(data); setPassword(""); setCaptchaCode("");
-    } catch { fetchCaptcha(); }
+      setCookie("");
+    } catch (err) {
+      setError(err?.message || "登录失败，请检查输入后重试。");
+      if (loginMode === "password") fetchCaptcha();
+    }
     setLoading(false);
   };
 
@@ -81,7 +95,15 @@ function AcademicSessionCard({ onSession }) {
           </div>
         ) : (
           <>
-            <div className="flex items-end gap-3">
+            <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="选课登录方式">
+              <Button type="button" variant={loginMode === "password" ? "default" : "outline"} onClick={() => setLoginMode("password")}>账号密码登录</Button>
+              <Button type="button" variant={loginMode === "cookie" ? "default" : "outline"} onClick={() => setLoginMode("cookie")}><Cookie className="w-4 h-4" /> Cookie 登录</Button>
+            </div>
+            {loginMode === "password" ? <>
+              <Alert variant="warning" title="账号密码登录提示">
+                <span>通过统一认证登录会让当前同时登录教务系统的另一台设备下线。若不希望影响另一台设备，请使用 Cookie 登录。</span>
+              </Alert>
+              <div className="flex items-end gap-3">
               <div className="flex flex-col gap-1.5">
                 <Label>验证码</Label>
                 {captcha ? (
@@ -99,7 +121,7 @@ function AcademicSessionCard({ onSession }) {
                 <input type="checkbox" checked={autoOCR} onChange={(e) => setAutoOCR(e.target.checked)} className="accent-[var(--seed-primary)]" />
                 开启自动识别
               </label>
-            </div>
+              </div>
             {ocrResult && (
               <div className="text-[11px] text-[var(--muted)]">已自动识别: <span className="font-mono">{ocrResult.text}</span> · 置信度 {ocrResult.confidence.toFixed(0)}%</div>
             )}
@@ -107,7 +129,27 @@ function AcademicSessionCard({ onSession }) {
               <div><Label>学号</Label><Input value={account} onChange={(e) => setAccount(e.target.value)} placeholder="20260001" /></div>
               <div><Label>学校密码</Label><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
             </div>
-            <Button onClick={login} loading={loading} disabled={!captcha || !account || !password || !captchaCode}>登录学校系统</Button>
+            <Button onClick={login} loading={loading} disabled={!captcha || !account || !password || !captchaCode}>使用账号密码登录</Button>
+            </> : <>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="enrollment-cookie">教务系统 Cookie</Label>
+                <textarea
+                  id="enrollment-cookie"
+                  value={cookie}
+                  onChange={(event) => setCookie(event.target.value)}
+                  rows={4}
+                  className="w-full rounded-[var(--radius)] border border-border bg-[var(--seed-bg)] px-3 py-2 text-[13px] font-mono outline-none focus:border-[var(--seed-primary)]"
+                  placeholder="可粘贴完整 Cookie、Cookie: ... 或单独的 JSESSIONID 值"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              </div>
+              <div id="enrollment-cookie-tutorial" data-tutorial-slot="enrollment-cookie" className="rounded-[var(--radius)] border border-dashed border-border p-4 text-[13px] text-[var(--muted)]">
+                Cookie 获取教程（待补充）
+              </div>
+              <Button onClick={login} loading={loading} disabled={!cookie.trim()}>使用 Cookie 登录</Button>
+            </>}
+            {error && <Alert variant="danger" title="登录失败"><span>{error}</span></Alert>}
           </>
         )}
       </CardContent>

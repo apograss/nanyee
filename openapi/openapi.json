@@ -2544,6 +2544,47 @@
         "title": "RiskLevel",
         "type": "string"
       },
+      "SmuCookieSessionRequest": {
+        "properties": {
+          "anti_abuse_pass": {
+            "anyOf": [
+              {
+                "maxLength": 4096,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anti Abuse Pass"
+          },
+          "cookie": {
+            "format": "password",
+            "maxLength": 8192,
+            "minLength": 1,
+            "title": "Cookie",
+            "type": "string",
+            "writeOnly": true
+          },
+          "turnstile_token": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turnstile Token"
+          }
+        },
+        "required": [
+          "cookie"
+        ],
+        "title": "SmuCookieSessionRequest",
+        "type": "object"
+      },
       "SmuSessionRequest": {
         "properties": {
           "account": {
@@ -4405,6 +4446,65 @@
           }
         },
         "summary": "Cancel Enrollment Run",
+        "tags": [
+          "smu"
+        ]
+      }
+    },
+    "/api/v1/smu/enrollment/session/cookie": {
+      "post": {
+        "operationId": "smu_enrollment_cookie_session",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SmuCookieSessionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmuSessionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Enrollment Cookie Session",
         "tags": [
           "smu"
         ]

@@ -36,6 +36,43 @@ COMMON_HEADERS = {
     "Accept-Language": "zh-CN,zh;q=0.9",
 }
 
+COOKIE_NAME_PATTERN = re.compile(r"^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$")
+
+
+def parse_academic_cookie_header(value: str) -> dict[str, str]:
+    """Parse a copied browser Cookie header without forwarding arbitrary headers."""
+    raw = value.strip()
+    if raw.lower().startswith("cookie:"):
+        raw = raw[7:].strip()
+    raw = raw.strip(" ;")
+    if not raw:
+        raise ValueError("empty Cookie header")
+    if "=" not in raw and ";" not in raw:
+        raw = f"JSESSIONID={raw}"
+
+    cookies: dict[str, str] = {}
+    for part in re.split(r"[;\r\n]+", raw):
+        item = part.strip()
+        if not item or "=" not in item:
+            continue
+        name, cookie_value = item.split("=", 1)
+        name = name.strip()
+        cookie_value = cookie_value.strip()
+        if (
+            not COOKIE_NAME_PATTERN.fullmatch(name)
+            or not cookie_value
+            or len(name) > 128
+            or len(cookie_value) > 4096
+            or any(ord(character) < 0x20 or ord(character) == 0x7F for character in cookie_value)
+        ):
+            continue
+        cookies[name] = cookie_value
+        if len(cookies) > 50:
+            raise ValueError("too many cookies")
+    if not cookies:
+        raise ValueError("Cookie header contains no usable cookies")
+    return cookies
+
 
 @dataclass(frozen=True, slots=True)
 class CaptchaData:
@@ -92,6 +129,46 @@ class SmuAcademicClient:
             cookies=uis_cookies,
         )
         return await self._establish_academic_session(ticket)
+
+    async def validate_academic_session(
+        self, *, academic_cookies: dict[str, str]
+    ) -> dict[str, str]:
+        """Validate copied academic cookies and return the refreshed cookie jar."""
+        base = self._settings.smu_academic_base_url
+        allowed_host = urlparse(base).hostname
+        current_url = f"{base}/new/welcome.page?ui=new"
+        try:
+            async with self._client(cookies=academic_cookies) as client:
+                for _ in range(5):
+                    response = await client.get(
+                        current_url,
+                        headers={**COMMON_HEADERS, "Accept": "text/html,*/*"},
+                    )
+                    if self._response_size_invalid(response):
+                        raise self._unavailable()
+                    location = response.headers.get("location")
+                    if location and response.is_redirect:
+                        candidate = urljoin(current_url, location)
+                        parsed = urlparse(candidate)
+                        if parsed.scheme != "https" or parsed.hostname != allowed_host:
+                            raise self._cookie_rejected()
+                        current_url = candidate
+                        continue
+                    if response.status_code >= 500:
+                        raise self._unavailable()
+                    if response.status_code != 200 or _is_academic_login_page(response.text):
+                        raise self._cookie_rejected()
+                    refreshed = {
+                        cookie.name: cookie.value
+                        for cookie in client.cookies.jar
+                        if cookie.domain in {"", allowed_host} and isinstance(cookie.value, str)
+                    }
+                    if not refreshed:
+                        raise self._cookie_rejected()
+                    return refreshed
+        except httpx.HTTPError as exc:
+            raise self._unavailable() from exc
+        raise self._cookie_rejected()
 
     async def fetch_timetable(
         self, *, academic_cookies: dict[str, str], total_weeks: int
@@ -676,6 +753,18 @@ class SmuAcademicClient:
             "学校登录失败，请检查账号、密码和验证码。",
             status_code=401,
         )
+
+    @staticmethod
+    def _cookie_rejected() -> AppError:
+        return AppError(
+            ErrorCode.UPSTREAM_REJECTED,
+            "Cookie 会话无效或已过期，请重新复制教务系统 Cookie。",
+            status_code=401,
+        )
+
+
+def _is_academic_login_page(html: str) -> bool:
+    return all(keyword in html for keyword in ("统一认证登录", "扫码登录", "密码登录"))
 
 
 def _parse_enrollment_categories(html: str) -> list[CourseCategory]:

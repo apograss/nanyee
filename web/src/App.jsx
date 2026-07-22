@@ -3,9 +3,9 @@ import React, { useEffect } from "react";
 import { Routes, Route, Navigate, Outlet, useLocation, useNavigate, Link } from "react-router-dom";
 import {
   Home, CalendarDays, GraduationCap, BookOpen, ClipboardCheck, Armchair,
-  Users, KeyRound, ListTodo, LogOut, Bell, ShieldCheck,
+  Users, KeyRound, ListTodo, LogOut, Bell, ShieldCheck, Compass,
 } from "lucide-react";
-import { AuthProvider, useAuth } from "@/lib/api.jsx";
+import { AuthProvider, useAuth, apiPost } from "@/lib/api.jsx";
 import { Button, Badge, cn } from "@/components/ui.jsx";
 
 import AuthPages from "@/pages/AuthPages.jsx";
@@ -19,6 +19,7 @@ import Qun from "@/pages/Qun.jsx";
 import Credentials from "@/pages/Credentials.jsx";
 import Jobs from "@/pages/Jobs.jsx";
 import JobDetail from "@/pages/JobDetail.jsx";
+import Recommendations from "@/pages/Recommendations.jsx";
 
 const NAV = [
   { to: "/", label: "首页", icon: Home, end: true },
@@ -30,6 +31,7 @@ const NAV = [
   { to: "/tools/qun", label: "群报数", icon: Users },
   { to: "/credentials", label: "我的凭据", icon: KeyRound },
   { to: "/jobs", label: "任务列表", icon: ListTodo },
+  { to: "/recommendations", label: "其它推荐", icon: Compass, group: "更多" },
 ];
 
 function NavItem({ item, onNavigate }) {
@@ -113,7 +115,7 @@ function Shell() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => { clearOnExit(); navigate("/auth/login"); }}
+              onClick={() => { apiPost("/auth/logout").catch(() => {}); clearOnExit(); navigate("/auth/login"); }}
               aria-label="退出登录"
               data-component="LogoutButton"
             >
@@ -218,6 +220,7 @@ export default function App() {
             <Route path="/credentials" element={<Credentials />} />
             <Route path="/jobs" element={<Jobs />} />
             <Route path="/jobs/:id" element={<JobDetail />} />
+            <Route path="/recommendations" element={<Recommendations />} />
           </Route>
         </Route>
         <Route path="*" element={<NotFound />} />

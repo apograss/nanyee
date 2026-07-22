@@ -16,7 +16,7 @@ from nanyee.db import get_db_session
 from nanyee.errors import AppError, ErrorCode
 from nanyee.identity.router import current_auth
 from nanyee.identity.sessions import AuthContext, settings_from_request
-from nanyee.integrations.smu.client import SmuAcademicClient
+from nanyee.integrations.smu.client import SmuAcademicClient, parse_academic_cookie_header
 from nanyee.integrations.smu.enrollment_runs import EnrollmentRunManager
 from nanyee.integrations.wakeup import WakeUpClient, WakeUpShareError
 from nanyee.tools.course_selection import (
@@ -70,6 +70,12 @@ class SmuSessionRequest(BaseModel):
 class SmuSessionResponse(BaseModel):
     academic_session_id: str
     expires_at: datetime
+
+
+class SmuCookieSessionRequest(BaseModel):
+    cookie: SecretStr = Field(min_length=1, max_length=8192)
+    turnstile_token: str | None = Field(default=None, max_length=2048)
+    anti_abuse_pass: str | None = Field(default=None, max_length=4096)
 
 
 class AcademicSessionRequest(BaseModel):
@@ -283,6 +289,45 @@ async def create_smu_session(
         captcha=payload.captcha,
         uis_cookies=uis_cookies,
     )
+    encoded = json.dumps(academic_cookies, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    session_id, expires_at = await store.put(encoded, kind="smu_academic")
+    return SmuSessionResponse(academic_session_id=session_id, expires_at=expires_at)
+
+
+@router.post(
+    "/enrollment/session/cookie",
+    response_model=SmuSessionResponse,
+    operation_id="smu_enrollment_cookie_session",
+)
+async def create_enrollment_cookie_session(
+    payload: SmuCookieSessionRequest,
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    store: Annotated[TransientSecretStore, Depends(get_transient_store)],
+    client: Annotated[SmuAcademicClient, Depends(get_smu_client)],
+    auth: Annotated[AuthContext, Depends(current_auth)],
+    csrf_header: Annotated[str | None, Header(alias="X-CSRF-Token")] = None,
+) -> SmuSessionResponse:
+    require_csrf(request, auth, csrf_header)
+    await AntiAbuseGate(settings_from_request(request)).check(
+        db,
+        request,
+        action="smu_cookie_login",
+        identity=str(auth.user.id),
+        policy=LOGIN_POLICY,
+        turnstile_token=payload.turnstile_token,
+        anti_abuse_pass=payload.anti_abuse_pass,
+    )
+    try:
+        submitted_cookies = parse_academic_cookie_header(payload.cookie.get_secret_value())
+    except ValueError as exc:
+        raise AppError(
+            ErrorCode.INVALID_REQUEST,
+            "Cookie 格式无效，可粘贴完整 Cookie 或单独的 JSESSIONID。",
+            status_code=422,
+            details={"field": "cookie"},
+        ) from exc
+    academic_cookies = await client.validate_academic_session(academic_cookies=submitted_cookies)
     encoded = json.dumps(academic_cookies, sort_keys=True, separators=(",", ":")).encode("utf-8")
     session_id, expires_at = await store.put(encoded, kind="smu_academic")
     return SmuSessionResponse(academic_session_id=session_id, expires_at=expires_at)
@@ -522,10 +567,18 @@ async def enrollment_submit(
             "课程不在当前可选列表中。",
             status_code=404,
         )
+    result = await client.enroll_course(
+        academic_cookies=cookies,
+        category_code=payload.category_code,
+        course=course,
+    )
+    if result.outcome != "conflict":
+        return result
     return await client.enroll_course(
         academic_cookies=cookies,
         category_code=payload.category_code,
         course=course,
+        confirm_conflict=True,
     )
 
 

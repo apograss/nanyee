@@ -6,7 +6,7 @@ import httpx
 import pytest
 from nanyee.config import Settings
 from nanyee.errors import AppError, ErrorCode
-from nanyee.integrations.smu.client import SmuAcademicClient
+from nanyee.integrations.smu.client import SmuAcademicClient, parse_academic_cookie_header
 from nanyee.transient import TransientSecretStore
 
 
@@ -146,6 +146,44 @@ async def test_smu_sso_rejects_external_redirect() -> None:
             uis_cookies={"UISID": "value"},
         )
     assert error.value.code == ErrorCode.UPSTREAM_UNAVAILABLE
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("Cookie: JSESSIONID=abc; ROUTE=two", {"JSESSIONID": "abc", "ROUTE": "two"}),
+        ("just-the-session-id", {"JSESSIONID": "just-the-session-id"}),
+    ],
+)
+def test_academic_cookie_header_parser_accepts_browser_and_session_id_formats(
+    raw: str, expected: dict[str, str]
+) -> None:
+    assert parse_academic_cookie_header(raw) == expected
+
+
+@pytest.mark.parametrize("raw", ["", "Cookie:", "invalid", "name=\x01bad"])
+def test_academic_cookie_header_parser_rejects_invalid_values(raw: str) -> None:
+    if raw == "invalid":
+        assert parse_academic_cookie_header(raw) == {"JSESSIONID": "invalid"}
+        return
+    with pytest.raises(ValueError):
+        parse_academic_cookie_header(raw)
+
+
+@pytest.mark.asyncio
+async def test_copied_academic_cookie_is_validated_and_refreshed() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.headers["cookie"] == "JSESSIONID=old"
+        return httpx.Response(
+            200,
+            text="欢迎使用教务系统",
+            headers={"set-cookie": "JSESSIONID=new; Path=/; HttpOnly"},
+        )
+
+    client = SmuAcademicClient(Settings(app_env="test"), transport=httpx.MockTransport(handler))
+    cookies = await client.validate_academic_session(academic_cookies={"JSESSIONID": "old"})
+
+    assert cookies == {"JSESSIONID": "new"}
 
 
 @pytest.mark.asyncio

@@ -1,6 +1,6 @@
-# Nanyee 后端
+# Nanyee 学生工具平台
 
-Nanyee 是面向学生的小型工具平台后端。当前仓库把旧工具统一到一个 FastAPI 模块化单体与独立 Worker 中；前端由其他实现者依据固定 OpenAPI 和接入文档开发，本仓库不提供页面、组件或视觉方案。
+Nanyee 是面向学生的小型工具平台。当前仓库把旧工具统一到 FastAPI 模块化单体、独立 Worker 与 React 前端中；视觉层可以继续独立迭代，接口行为以固定 OpenAPI 和接入文档为准。
 
 ## 已实现的后端基础
 
@@ -10,10 +10,10 @@ Nanyee 是面向学生的小型工具平台后端。当前仓库把旧工具统�
 - PostgreSQL 持久限流、Cloudflare Turnstile 软门槛与不可绕过的硬门槛。
 - 瞬时学校登录：UIS/教务 Cookie 仅在服务端内存保存 5 分钟。
 - 课表查询、聚合、ICS/WakeUp 文件导出与可选 WakeUp 分享；成绩汇总、逐科排名和分数段分布。
-- 自动选课：多级志愿、教务服务器校时、定时启动、15–120 次自动尝试、冲突确认、运行日志与取消。
+- 自动选课：账号密码/Cookie 两种登录、多级志愿、教务服务器校时、定时启动、100–300 毫秒随机间隔、15–120 次自动尝试、冲突确认、运行日志与取消。
 - VPS 自动评课：加密托管教务凭据，Worker 自动 OCR 登录、读取全部待评课程并按旧版高分策略批量提交；OCR 和网络错误持久化退避重试。
 - 学习舱预约：18 个舱位优先级、开放/冻结时段判断、加密学校凭据、OCR 退避登录与持续重试。
-- 群报数即时 Token 校验、链接解析、表单同步、受限图片上传、字段预览、临时 Token 立即提交与托管预约提交。
+- 群报数即时 Token 校验、链接解析、表单同步、浏览器地图选点、受限图片上传、字段预览、临时 Token 立即提交与托管预约提交。
 - 托管凭据信封加密：每条凭据独立 AES-256-GCM 数据密钥，可用 Azure Key Vault RSA-OAEP-256 或本地主密钥包裹。
 - 持久任务：幂等键、计划时间、租约、心跳、取消、持续重试和人工核验状态。
 - 固定 OpenAPI、结构化错误码和字段白名单日志。
@@ -50,6 +50,17 @@ uv run python scripts/tasks.py openapi
 uv run python scripts/tasks.py migrate
 uv run nanyee-worker
 ```
+
+前端开发与构建：
+
+```powershell
+Set-Location web
+npm ci
+npm run dev
+npm run build
+```
+
+地图默认复用旧群报数工具的高德 Web JS 配置；需要更换时设置前端构建变量 `VITE_AMAP_KEY` 与 `VITE_AMAP_SECURITY_CODE`。
 
 ## 配置与秘密
 

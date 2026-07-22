@@ -132,8 +132,8 @@ export function useAuth() {
 //   turnstileToken(已取到的 token), antiAbusePass(已取到的 pass)
 export async function apiFetch(path, options = {}) {
   const { method = "GET", body, headers = {}, mock, action } = options;
-  // 设计预览：后端不可达时直接返回 mock
-  if (mock !== undefined && !window.__NANYEE_LIVE__) {
+  // 仅显式开启设计预览时使用 mock；生产与普通开发默认请求真实后端。
+  if (mock !== undefined && window.__NANYEE_MOCK__ === true) {
     await new Promise((r) => setTimeout(r, 280));
     return mock;
   }
@@ -300,6 +300,10 @@ export function cancelEnrollmentRun(runId, opts) {
   return apiPost(`/smu/enrollment/runs/${runId}/cancel`, undefined, opts);
 }
 
+export function createEnrollmentCookieSession(cookie, opts) {
+  return apiPost("/smu/enrollment/session/cookie", { cookie }, opts);
+}
+
 // 课表 WakeUp 分享
 export function shareWakeup(body, opts) {
   return apiPost("/smu/timetable.wakeup.share", body, opts);
@@ -380,9 +384,9 @@ export const mockEnrollmentRun = {
     { sequence: 3, created_at: "2026-07-20T09:00:03+08:00", type: "attempt", message: "余量 44，尝试中…", attempt: 1, course_name: "大学生心理健康" },
     { sequence: 4, created_at: "2026-07-20T09:00:04+08:00", type: "attempt", message: "余量 44，尝试中…", attempt: 2, course_name: "大学生心理健康" },
     { sequence: 5, created_at: "2026-07-20T09:00:05+08:00", type: "burst_end", message: "首轮连续尝试结束（5次），切换轮询模式", attempt: 5, course_name: null },
-    { sequence: 6, created_at: "2026-07-20T09:00:06+08:00", type: "poll", message: "轮询第一志愿，间隔 500-1000ms", attempt: 6, course_name: "大学生心理健康" },
-    { sequence: 7, created_at: "2026-07-20T09:00:07+08:00", type: "poll", message: "轮询第一志愿，间隔 500-1000ms", attempt: 7, course_name: "大学生心理健康" },
-    { sequence: 8, created_at: "2026-07-20T09:00:08+08:00", type: "poll", message: "轮询第一志愿，间隔 500-1000ms", attempt: 8, course_name: "大学生心理健康" },
+    { sequence: 6, created_at: "2026-07-20T09:00:06+08:00", type: "poll", message: "轮询第一志愿，间隔 100-300ms", attempt: 6, course_name: "大学生心理健康" },
+    { sequence: 7, created_at: "2026-07-20T09:00:07+08:00", type: "poll", message: "轮询第一志愿，间隔 100-300ms", attempt: 7, course_name: "大学生心理健康" },
+    { sequence: 8, created_at: "2026-07-20T09:00:08+08:00", type: "poll", message: "轮询第一志愿，间隔 100-300ms", attempt: 8, course_name: "大学生心理健康" },
   ],
   created_at: "2026-07-20T09:00:00+08:00",
   finished_at: null,

@@ -84,3 +84,31 @@ async def test_enrollment_is_single_submit_and_unknown_response_is_not_retried()
     assert raised.value.code == ErrorCode.RESULT_UNKNOWN
     assert raised.value.retryable is False
     assert route.call_count == 2
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_enrollment_conflict_confirmation_uses_hlct_one() -> None:
+    course = CourseItem(task_code="task-1", name="医学伦理")
+    route = respx.post("https://zhjw.smu.edu.cn/new/student/xsxk/xklx/12/add").mock(
+        side_effect=[
+            httpx.Response(200, json={"code": 1, "message": "与已选课程上课时间有冲突"}),
+            httpx.Response(200, json={"code": 0, "message": "成功"}),
+        ]
+    )
+    client = SmuAcademicClient(Settings(app_env="test"))
+
+    conflict = await client.enroll_course(
+        academic_cookies={"sid": "value"}, category_code="12", course=course
+    )
+    confirmed = await client.enroll_course(
+        academic_cookies={"sid": "value"},
+        category_code="12",
+        course=course,
+        confirm_conflict=True,
+    )
+
+    assert conflict.outcome == "conflict"
+    assert confirmed.success is True
+    assert httpx.QueryParams(route.calls[0].request.content.decode())["hlct"] == "0"
+    assert httpx.QueryParams(route.calls[1].request.content.decode())["hlct"] == "1"

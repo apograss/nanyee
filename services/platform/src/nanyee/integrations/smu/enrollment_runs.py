@@ -55,8 +55,8 @@ class EnrollmentRunManager:
         *,
         max_runs: int = 1000,
         event_limit: int = 500,
-        delay_min_seconds: float = 0.5,
-        delay_max_seconds: float = 1.0,
+        delay_min_seconds: float = 0.1,
+        delay_max_seconds: float = 0.3,
     ) -> None:
         self._client = client
         self._max_runs = max_runs

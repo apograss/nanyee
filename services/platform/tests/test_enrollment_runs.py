@@ -45,6 +45,13 @@ class FakeEnrollmentClient:
         )
 
 
+def test_enrollment_run_default_interval_is_100_to_300_ms() -> None:
+    manager = EnrollmentRunManager(FakeEnrollmentClient())  # type: ignore[arg-type]
+
+    assert manager._delay_min_seconds == 0.1
+    assert manager._delay_max_seconds == 0.3
+
+
 @pytest.mark.asyncio
 async def test_enrollment_run_restores_preferences_retries_and_conflict_confirmation() -> None:
     client = FakeEnrollmentClient()
