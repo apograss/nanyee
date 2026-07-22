@@ -1,6 +1,6 @@
 // Canvas design runtime editable source marker: enrollment
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { AlertTriangle, CheckCircle2, RefreshCw, X, Plus, GripVertical, Activity, Zap, StopCircle, Cookie } from "lucide-react";
+import { AlertTriangle, CheckCircle2, RefreshCw, X, Plus, GripVertical, Activity, Zap, StopCircle, Cookie, ExternalLink } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Select, Label, Badge, Alert, cn } from "@/components/ui.jsx";
 import {
   fetchEnrollmentCategories, fetchEnrollmentCourses, startEnrollmentRun,
@@ -144,8 +144,11 @@ function AcademicSessionCard({ onSession }) {
                   spellCheck={false}
                 />
               </div>
-              <div id="enrollment-cookie-tutorial" data-tutorial-slot="enrollment-cookie" className="rounded-[var(--radius)] border border-dashed border-border p-4 text-[13px] text-[var(--muted)]">
-                Cookie 获取教程（待补充）
+              <div id="enrollment-cookie-tutorial" data-tutorial-slot="enrollment-cookie" className="flex items-center justify-between rounded-[var(--radius)] border border-dashed border-border p-3.5">
+                <span className="text-[13px] text-[var(--muted)]">不知道怎么获取 Cookie？查看图文教程。</span>
+                <a href="/tutorials/enrollment-tutorial.html" target="_blank" rel="noopener" className="inline-flex items-center gap-1.5 rounded-[var(--radius)] border border-border px-3 h-8 text-[13px] font-medium text-[var(--seed-primary-strong)] hover:bg-[var(--seed-surface-2)] transition-colors shrink-0">
+                  <ExternalLink className="w-3.5 h-3.5" /> 图文教程
+                </a>
               </div>
               <Button onClick={login} loading={loading} disabled={!cookie.trim()}>使用 Cookie 登录</Button>
             </>}
