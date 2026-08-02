@@ -327,3 +327,69 @@ button { font-family: inherit; }
 .index-row:hover::before { transform: scaleY(1); }
 .index-row .index-arrow { transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), color 0.2s; }
 .index-row:hover .index-arrow { transform: translateX(6px); color: var(--seed-primary-strong); }
+
+/* ---------- 描边空心字 ---------- */
+.text-outline {
+  color: transparent;
+  -webkit-text-stroke: 1.5px color-mix(in srgb, var(--seed-fg) 16%, transparent);
+}
+.text-outline-strong {
+  color: transparent;
+  -webkit-text-stroke: 1.5px color-mix(in srgb, var(--seed-fg) 62%, transparent);
+}
+
+/* ---------- Marquee 分隔带 ---------- */
+@keyframes marquee-x {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee-x 38s linear infinite;
+}
+.marquee:hover .marquee-track { animation-play-state: paused; }
+
+/* ---------- 深色反转区块（两主题下都保持暖墨底） ---------- */
+.ink-panel {
+  --seed-bg: #17110d;
+  --seed-surface: #211a14;
+  --seed-surface-2: #2a2119;
+  --seed-fg: #f5ead9;
+  --seed-primary: #f4732a;
+  --seed-primary-strong: #ffab7a;
+  --seed-success: #7fb69f;
+  --seed-warning: #d99a3d;
+  --seed-danger: #e26a5c;
+  --seed-muted: #a89a84;
+  --seed-border: #3a2e22;
+  --primary-foreground: #241207;
+  --success-foreground: #12201a;
+  --danger-foreground: #2a0f0b;
+
+  /* 语义层与派生层在面板作用域内重声明，按暗色种子重新解析
+     （自定义属性在声明处求值，仅覆盖种子影响不到 :root 已解析的派生值） */
+  --background: var(--seed-bg);
+  --foreground: var(--seed-fg);
+  --card: var(--seed-surface);
+  --card-foreground: var(--seed-fg);
+  --muted: var(--seed-muted);
+  --muted-foreground: color-mix(in srgb, var(--seed-fg) 62%, transparent);
+  --border: var(--seed-border);
+  --input: color-mix(in srgb, var(--seed-bg) 70%, var(--seed-fg) 6%);
+  --ring: color-mix(in srgb, var(--seed-primary) 45%, transparent);
+  --primary: var(--seed-primary);
+  --primary-muted: color-mix(in srgb, var(--seed-primary) 14%, var(--seed-bg));
+  --success: var(--seed-success);
+  --success-muted: color-mix(in srgb, var(--seed-success) 16%, var(--seed-bg));
+  --warning: var(--seed-warning);
+  --warning-muted: color-mix(in srgb, var(--seed-warning) 16%, var(--seed-bg));
+  --danger: var(--seed-danger);
+  --danger-muted: color-mix(in srgb, var(--seed-danger) 12%, var(--seed-bg));
+
+  background: var(--seed-bg);
+  color: var(--seed-fg);
+}
+[data-theme="dark"] .ink-panel {
+  border: 1px solid color-mix(in srgb, var(--seed-fg) 10%, transparent);
+}

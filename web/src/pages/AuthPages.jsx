@@ -488,7 +488,16 @@ function BrandAside() {
         </motion.div>
       </div>
 
-      {/* 底部签条 */}
+      {/* 底部巨字 + 签条 */}
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 1, ease: EASE, delay: 0.8 }}
+        className="relative font-display font-bold text-[clamp(3.5rem,6.5vw,6.5rem)] leading-[0.85] tracking-[-0.04em] text-outline select-none whitespace-nowrap"
+        aria-hidden="true"
+      >
+        NANYEE
+      </motion.div>
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}

@@ -1,10 +1,10 @@
 // Canvas design runtime editable source marker: home
 import React from "react";
 import { Link } from "react-router-dom";
-import { motion } from "motion/react";
+import { motion, useMotionValue, useSpring, useTransform, useReducedMotion } from "motion/react";
 import {
   CalendarDays, GraduationCap, BookOpen, ClipboardCheck, Armchair, Users,
-  ArrowRight, ArrowUpRight, Activity,
+  ArrowRight, ArrowUpRight, Activity, Asterisk,
 } from "lucide-react";
 import { StatusBadge, Alert } from "@/components/ui.jsx";
 import { useAuth } from "@/lib/api.jsx";
@@ -113,38 +113,97 @@ function HeroArt() {
   );
 }
 
+/* ---- Marquee 分隔带 ---- */
+function MarqueeStrip() {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      whileInView={{ opacity: 1 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.8 }}
+      className="marquee border-y border-border py-3.5 overflow-hidden select-none"
+      aria-hidden="true"
+    >
+      <div className="marquee-track">
+        {[0, 1].map((dup) => (
+          <div key={dup} className="flex items-center shrink-0">
+            {TOOLS.map((t) => (
+              <span key={`${dup}-${t.en}`} className="flex items-center gap-3 px-6 whitespace-nowrap">
+                <span className="kicker !text-[12px]">{t.en}</span>
+                <span className="text-[12px] text-[var(--muted)]">{t.label}</span>
+                <Asterisk className="w-3.5 h-3.5 text-[var(--seed-primary)]" />
+              </span>
+            ))}
+          </div>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
 export default function Home() {
   const { user } = useAuth();
   const today = new Date().toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric", weekday: "long" });
 
+  /* 鼠标视差：构图跟手，标题反向轻移 */
+  const reduceMotion = useReducedMotion();
+  const mx = useMotionValue(0);
+  const my = useMotionValue(0);
+  const sx = useSpring(mx, { stiffness: 55, damping: 18 });
+  const sy = useSpring(my, { stiffness: 55, damping: 18 });
+  const artX = useTransform(sx, (v) => v * 18);
+  const artY = useTransform(sy, (v) => v * 14);
+  const headX = useTransform(sx, (v) => v * -7);
+  const headY = useTransform(sy, (v) => v * -5);
+
+  const onHeroMove = (e) => {
+    if (reduceMotion) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    mx.set((e.clientX - r.left) / r.width - 0.5);
+    my.set((e.clientY - r.top) / r.height - 0.5);
+  };
+  const onHeroLeave = () => { mx.set(0); my.set(0); };
+
   return (
     <div className="max-w-6xl mx-auto flex flex-col gap-14 sm:gap-20 pb-6" data-component="HomePage" data-od-id="home">
       {/* ---------- 叙事式 Hero ---------- */}
-      <section className="relative pt-6 sm:pt-10" data-component="HeroBanner">
+      <section
+        className="relative pt-6 sm:pt-10"
+        data-component="HeroBanner"
+        onMouseMove={onHeroMove}
+        onMouseLeave={onHeroLeave}
+      >
         <div className="grain-overlay rounded-[var(--radius-lg)]" />
+        {/* 背景巨字 */}
+        <div
+          className="absolute -bottom-4 right-0 font-display font-bold text-[clamp(5rem,15vw,12.5rem)] leading-[0.85] tracking-[-0.04em] text-outline select-none pointer-events-none"
+          aria-hidden="true"
+        >
+          NANYEE
+        </div>
         {/* kicker 行 */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.7 }}
-          className="flex items-center gap-4"
+          className="relative flex items-center gap-4"
         >
           <span className="kicker"><strong>Nanyee Toolkit</strong></span>
           <span className="rule-line flex-1" />
           <span className="kicker hidden sm:block">{today}</span>
         </motion.div>
 
-        <div className="mt-8 sm:mt-12 grid grid-cols-1 lg:grid-cols-[1.25fr_1fr] gap-10 items-center">
-          <div>
+        <div className="relative mt-8 sm:mt-12 grid grid-cols-1 lg:grid-cols-[1.25fr_1fr] gap-10 items-center">
+          <motion.div style={{ x: headX, y: headY }}>
             <h1 className="display-hero">
               <span className="block overflow-hidden pb-1">
                 <motion.span className="block" variants={lineReveal} custom={0} initial="hidden" animate="show">
-                  把琐事交给机器，
+                  把琐事交给<span className="text-outline-strong">机器</span>，
                 </motion.span>
               </span>
               <span className="block overflow-hidden pb-2">
                 <motion.span className="block" variants={lineReveal} custom={1} initial="hidden" animate="show">
-                  把时间还给<span className="text-[var(--seed-primary-strong)]">学习</span>。
+                  把时间还给<span className="text-[var(--seed-primary)]">学习</span>。
                 </motion.span>
               </span>
             </h1>
@@ -182,11 +241,11 @@ export default function Home() {
                 <ArrowUpRight className="w-4 h-4" />
               </Link>
             </motion.div>
-          </div>
+          </motion.div>
 
-          <div className="hidden lg:block">
+          <motion.div className="hidden lg:block" style={{ x: artX, y: artY }}>
             <HeroArt />
-          </div>
+          </motion.div>
         </div>
 
         {/* 事实条 */}
@@ -194,16 +253,19 @@ export default function Home() {
           variants={stagger}
           initial="hidden"
           animate="show"
-          className="mt-12 sm:mt-16 grid grid-cols-1 sm:grid-cols-3 border-t border-border"
+          className="relative mt-12 sm:mt-16 grid grid-cols-1 sm:grid-cols-3 border-t border-border"
         >
           {FACTS.map((f) => (
             <motion.div key={f.label} variants={fadeUp} className="flex items-baseline gap-3 py-4 sm:py-5 sm:px-6 sm:first:pl-0 border-b sm:border-b-0 border-border last:border-b-0">
-              <span className="font-display text-[1.375rem] tracking-[-0.01em]">{f.n}</span>
+              <span className="font-display text-[1.375rem] font-semibold tracking-[-0.01em]">{f.n}</span>
               <span className="kicker">{f.label}</span>
             </motion.div>
           ))}
         </motion.div>
       </section>
+
+      {/* ---------- Marquee 分隔带 ---------- */}
+      <MarqueeStrip />
 
       {/* ---------- 工具索引 ---------- */}
       <section data-component="ToolIndex">
@@ -232,12 +294,12 @@ export default function Home() {
                     data-od-id={t.to}
                     className="index-row group grid grid-cols-[auto_1fr_auto] items-center gap-4 sm:gap-8 py-5 sm:py-6 px-2 sm:px-4 border-b border-border no-underline"
                   >
-                    <span className="kicker w-7 tabular-nums">{String(i + 1).padStart(2, "0")}</span>
+                    <span className="accent-en text-[22px] w-9 leading-none">{String(i + 1).padStart(2, "0")}</span>
                     <span className="flex flex-wrap items-baseline gap-x-4 gap-y-1 min-w-0">
-                      <span className="font-display text-[clamp(1.25rem,1rem+1vw,1.75rem)] tracking-[-0.01em] text-foreground">
+                      <span className="font-display text-[clamp(1.25rem,1rem+1vw,1.75rem)] font-semibold tracking-[-0.02em] text-foreground">
                         {t.label}
                       </span>
-                      <span className="accent-en text-[13px] hidden sm:inline">{t.en}</span>
+                      <span className="accent-en text-[13px] hidden sm:inline group-hover:text-[var(--seed-primary-strong)] transition-colors">{t.en}</span>
                       <span className="hidden md:inline text-[13px] text-[var(--muted)] truncate">{t.desc}</span>
                     </span>
                     <span className="flex items-center gap-3">
@@ -252,52 +314,56 @@ export default function Home() {
         </motion.div>
       </section>
 
-      {/* ---------- 进行中的事务 ---------- */}
+      {/* ---------- 进行中的事务（深色反转区块） ---------- */}
       <section data-component="TaskSummary" data-od-id="task-summary">
         <motion.div
           variants={stagger}
           initial="hidden"
           whileInView="show"
           viewport={{ once: true, margin: "-80px" }}
+          className="ink-panel relative rounded-[var(--radius-lg)] overflow-hidden"
         >
-          <motion.div variants={fadeUp} className="flex items-end justify-between gap-6 mb-6">
-            <div>
-              <div className="kicker"><strong>Ongoing</strong> — 进行中的事务</div>
-              <h2 className="display-lede mt-3">任务与提醒</h2>
+          <div className="grain-overlay" />
+          <div className="relative p-6 sm:p-8">
+            <motion.div variants={fadeUp} className="flex items-end justify-between gap-6 mb-6">
+              <div>
+                <div className="kicker"><strong>Ongoing</strong> — 进行中的事务</div>
+                <h2 className="display-lede mt-3">任务与提醒</h2>
+              </div>
+              <Link to="/jobs" className="kicker inline-flex items-center gap-1.5 text-[var(--seed-muted)] hover:text-[var(--seed-primary-strong)] transition-colors no-underline">
+                全部任务 <ArrowUpRight className="w-3.5 h-3.5" />
+              </Link>
+            </motion.div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-px bg-[var(--border)] border border-border rounded-[var(--radius)] overflow-hidden">
+              <motion.div variants={fadeUp} className="bg-card p-5 sm:p-6">
+                <div className="flex items-center gap-2 text-sm font-medium tracking-[0.01em] mb-4">
+                  <Activity className="w-4 h-4 text-[var(--seed-primary-strong)]" /> 任务摘要
+                </div>
+                <div className="flex flex-col divide-y divide-border">
+                  {SUMMARY.map((s) => (
+                    <Link to={`/jobs/${s.id}`} key={s.id} className="flex items-center gap-3 py-3.5 first:pt-0 last:pb-0 no-underline group">
+                      <StatusBadge status={s.state} />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[13px] font-medium truncate text-foreground group-hover:text-[var(--seed-primary-strong)] transition-colors">{s.title}</div>
+                        <div className="text-[11px] text-[var(--muted)] tracking-[0.01em]">{s.sub}</div>
+                      </div>
+                      <ArrowUpRight className="w-4 h-4 text-[var(--muted)] opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </Link>
+                  ))}
+                </div>
+              </motion.div>
+
+              <motion.div variants={fadeUp} className="bg-card p-5 sm:p-6 flex flex-col gap-3">
+                <div className="text-sm font-medium tracking-[0.01em] mb-1">待办提醒</div>
+                <Alert variant="warning" title="学习舱预约待核验">
+                  <span>有一个学习舱预约需要你手动确认结果，请在任务列表中查看详情。</span>
+                </Alert>
+                <Alert variant="info" title="自动选课运行中">
+                  <span>选课正在自动进行中，可随时取消。先连续尝试几轮，之后自动轮询直到成功或超时。</span>
+                </Alert>
+              </motion.div>
             </div>
-            <Link to="/jobs" className="kicker inline-flex items-center gap-1.5 hover:text-[var(--seed-primary-strong)] transition-colors no-underline">
-              全部任务 <ArrowUpRight className="w-3.5 h-3.5" />
-            </Link>
-          </motion.div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-px bg-[var(--border)] border border-border rounded-[var(--radius-lg)] overflow-hidden">
-            <motion.div variants={fadeUp} className="bg-card p-5 sm:p-7">
-              <div className="flex items-center gap-2 text-sm font-medium tracking-[0.01em] mb-4">
-                <Activity className="w-4 h-4 text-[var(--seed-primary-strong)]" /> 任务摘要
-              </div>
-              <div className="flex flex-col divide-y divide-border">
-                {SUMMARY.map((s) => (
-                  <Link to={`/jobs/${s.id}`} key={s.id} className="flex items-center gap-3 py-3.5 first:pt-0 last:pb-0 no-underline group">
-                    <StatusBadge status={s.state} />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[13px] font-medium truncate text-foreground group-hover:text-[var(--seed-primary-strong)] transition-colors">{s.title}</div>
-                      <div className="text-[11px] text-[var(--muted)] tracking-[0.01em]">{s.sub}</div>
-                    </div>
-                    <ArrowUpRight className="w-4 h-4 text-[var(--muted)] opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </Link>
-                ))}
-              </div>
-            </motion.div>
-
-            <motion.div variants={fadeUp} className="bg-card p-5 sm:p-7 flex flex-col gap-3">
-              <div className="text-sm font-medium tracking-[0.01em] mb-1">待办提醒</div>
-              <Alert variant="warning" title="学习舱预约待核验">
-                <span>有一个学习舱预约需要你手动确认结果，请在任务列表中查看详情。</span>
-              </Alert>
-              <Alert variant="info" title="自动选课运行中">
-                <span>选课正在自动进行中，可随时取消。先连续尝试几轮，之后自动轮询直到成功或超时。</span>
-              </Alert>
-            </motion.div>
           </div>
         </motion.div>
       </section>
