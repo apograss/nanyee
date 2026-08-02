@@ -1,6 +1,7 @@
 // Canvas design runtime editable source marker: enrollment
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { AlertTriangle, CheckCircle2, RefreshCw, X, Plus, GripVertical, Activity, Zap, StopCircle, Cookie, ExternalLink } from "lucide-react";
+import { motion } from "motion/react";
+import { AlertTriangle, CheckCircle2, RefreshCw, X, Plus, GripVertical, Activity, Zap, StopCircle, Cookie, ExternalLink, ArrowUp, ArrowDown } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Select, Label, Badge, Alert, cn } from "@/components/ui.jsx";
 import {
   fetchEnrollmentCategories, fetchEnrollmentCourses, startEnrollmentRun,
@@ -9,6 +10,17 @@ import {
   ENROLLMENT_TERMINAL_STATES, CONFIRMATION_VERSIONS,
 } from "@/lib/api.jsx";
 import { recognizeCaptcha } from "@/lib/captcha-ocr.jsx";
+
+/* ---------- 入场动效（与首页同一组曲线，克制使用） ---------- */
+const EASE = [0.22, 1, 0.36, 1];
+const fadeUp = {
+  hidden: { opacity: 0, y: 26 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.7, ease: EASE } },
+};
+const stagger = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.07, delayChildren: 0.05 } },
+};
 
 /* ---------- 学校登录 ---------- */
 function AcademicSessionCard({ onSession }) {
@@ -81,6 +93,7 @@ function AcademicSessionCard({ onSession }) {
   return (
     <Card data-component="AcademicSessionCard" data-od-id="enrollment-session">
       <CardHeader>
+        <div className="kicker"><strong>Academic Session</strong></div>
         <CardTitle>学校系统登录</CardTitle>
         <CardDescription>登录后固定 24 小时有效；选课成功会自动删除本次学校会话。</CardDescription>
       </CardHeader>
@@ -176,7 +189,8 @@ function RunStatusView({ run, onCancel }) {
   return (
     <Card data-component="RunStatusView" data-od-id="enrollment-run">
       <CardHeader className="flex-row items-start justify-between">
-        <div>
+        <div className="flex flex-col gap-1.5">
+          <div className="kicker"><strong>Run Status</strong></div>
           <CardTitle>选课任务</CardTitle>
           <CardDescription>查看本次选课的运行情况。</CardDescription>
         </div>
@@ -193,7 +207,7 @@ function RunStatusView({ run, onCancel }) {
           <span className="text-[13px] tabular-nums text-[var(--muted)]">{run.attempt_count}/{run.max_attempts}</span>
         </div>
         <div className="flex flex-col gap-1.5">
-          <div className="text-[11px] tracking-[0.06em] uppercase text-[var(--muted)]">志愿顺序</div>
+          <div className="kicker">志愿顺序</div>
           {run.preferences.map((p, i) => (
             <div key={p.task_code} className="flex items-center gap-2 text-[13px]">
               <Badge variant={i === 0 ? "default" : "outline"}>第{i + 1}志愿</Badge>
@@ -211,7 +225,7 @@ function RunStatusView({ run, onCancel }) {
           </div>
         )}
         <div className="rounded-[var(--radius)] border border-border overflow-hidden" data-component="EventStream">
-          <div className="px-4 py-2 bg-[var(--seed-surface-2)] text-[11px] tracking-[0.06em] uppercase text-[var(--muted)] flex items-center gap-1.5">
+          <div className="px-4 py-2 bg-[var(--seed-surface-2)] kicker flex items-center gap-1.5">
             <Activity className="w-3 h-3" /> 运行动态
           </div>
           <div className="max-h-[240px] overflow-y-auto flex flex-col">
@@ -323,175 +337,207 @@ export default function Enrollment() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto flex flex-col gap-5" data-component="EnrollmentPage" data-od-id="enrollment">
-      <div className="flex flex-col gap-1">
-        <div className="text-[11px] tracking-[0.1em] uppercase text-[var(--muted)]">自动选课</div>
-        <h1>在线选课</h1>
-        <p className="text-[var(--muted)] text-sm">登录学校系统后，按志愿顺序选择课程，到达指定时间后系统会自动帮你尝试选课。</p>
-      </div>
+    <motion.div
+      variants={stagger}
+      initial="hidden"
+      animate="show"
+      className="max-w-5xl mx-auto flex flex-col gap-5"
+      data-component="EnrollmentPage"
+      data-od-id="enrollment"
+    >
+      {/* ---------- 编辑风页头 ---------- */}
+      <motion.div variants={fadeUp} className="flex flex-col gap-3">
+        <div className="flex items-center gap-4">
+          <span className="kicker"><strong>Enrollment</strong> — 自动选课</span>
+          <span className="rule-line flex-1" />
+        </div>
+        <h1 className="display-lede">在线选课</h1>
+        <p className="text-[15px] text-[var(--muted)] prose-body">登录学校系统后，按志愿顺序选择课程，到达指定时间后系统会自动帮你尝试选课。</p>
+      </motion.div>
 
-      <Alert variant="info" title="浏览器关闭不取消">
-        <span>关闭浏览器不会取消本次选课。但若服务重启，本次选课将无法继续。</span>
-      </Alert>
+      <motion.div variants={fadeUp}>
+        <Alert variant="info" title="浏览器关闭不取消">
+          <span>关闭浏览器不会取消本次选课。但若服务重启，本次选课将无法继续。</span>
+        </Alert>
+      </motion.div>
 
-      {!academicSession && <AcademicSessionCard onSession={setAcademicSession} />}
+      {!academicSession && (
+        <motion.div variants={fadeUp}>
+          <AcademicSessionCard onSession={setAcademicSession} />
+        </motion.div>
+      )}
 
       {academicSession && !run && (
         <>
-          <Card>
-            <CardHeader className="flex-row items-start justify-between">
-              <div>
-                <CardTitle>选课类型</CardTitle>
-                <CardDescription>选择本次要参与的选课类型。</CardDescription>
-              </div>
-              <Button variant="outline" size="sm" onClick={loadCategories}><RefreshCw className="w-4 h-4" /> 刷新</Button>
-            </CardHeader>
-            <CardContent>
-              {categories.length === 0 ? (
-                <div className="text-[13px] text-[var(--muted)]">加载中…</div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {categories.map((c) => (
-                    <button
-                      key={c.code}
-                      onClick={() => loadCourses(c)}
-                      className={cn(
-                        "text-left p-4 rounded-[var(--radius)] border transition-colors",
-                        selectedCategory?.code === c.code ? "border-[var(--seed-primary)] bg-[var(--primary-muted)]" : "border-border hover:bg-[var(--seed-surface-2)]"
-                      )}
-                      data-component="CategoryCard"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium tracking-[0.01em]">{c.title}</span>
-                        {selectedCategory?.code === c.code && <Badge>已选</Badge>}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {selectedCategory && (
+          <motion.div variants={fadeUp}>
             <Card>
-              <CardHeader>
-                <CardTitle>可选课程</CardTitle>
-                <CardDescription>按优先级选择 1–4 门，点击箭头调整志愿顺序。</CardDescription>
+              <CardHeader className="flex-row items-start justify-between">
+                <div className="flex flex-col gap-1.5">
+                  <div className="kicker"><strong>Category</strong></div>
+                  <CardTitle>选课类型</CardTitle>
+                  <CardDescription>选择本次要参与的选课类型。</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" onClick={loadCategories}><RefreshCw className="w-4 h-4" /> 刷新</Button>
               </CardHeader>
-              <CardContent className="flex flex-col gap-4">
-                {preferences.length > 0 && (
-                  <div className="flex flex-col gap-1.5">
-                    <div className="text-[11px] tracking-[0.06em] uppercase text-[var(--muted)]">已选志愿（优先级从高到低）</div>
-                    {preferences.map((p, i) => (
-                      <div key={p.task_code} className="flex items-center gap-2 rounded-[var(--radius)] border border-border p-2.5 bg-[var(--seed-surface-2)]">
-                        <GripVertical className="w-4 h-4 text-[var(--muted)]" />
-                        <Badge variant={i === 0 ? "default" : "outline"}>第{i + 1}志愿</Badge>
-                        <span className="text-[13px] font-medium flex-1">{p.name}</span>
-                        <div className="flex items-center gap-0.5">
-                          <Button size="icon" variant="ghost" className="h-7 w-7" disabled={i === 0} onClick={() => movePreference(i, -1)}>↑</Button>
-                          <Button size="icon" variant="ghost" className="h-7 w-7" disabled={i === preferences.length - 1} onClick={() => movePreference(i, 1)}>↓</Button>
-                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => removePreference(p.task_code)}><X className="w-3.5 h-3.5" /></Button>
+              <CardContent>
+                {categories.length === 0 ? (
+                  <div className="text-[13px] text-[var(--muted)]">加载中…</div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {categories.map((c) => (
+                      <button
+                        key={c.code}
+                        onClick={() => loadCourses(c)}
+                        className={cn(
+                          "text-left p-4 rounded-[var(--radius)] border transition-colors",
+                          selectedCategory?.code === c.code ? "border-[var(--seed-primary)] bg-[var(--primary-muted)]" : "border-border hover:bg-[var(--seed-surface-2)]"
+                        )}
+                        data-component="CategoryCard"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium tracking-[0.01em]">{c.title}</span>
+                          {selectedCategory?.code === c.code && <Badge>已选</Badge>}
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 )}
-
-                <div className="w-full overflow-x-auto rounded-[var(--radius)] border border-border">
-                  <table className="w-full text-sm">
-                    <thead className="bg-[var(--seed-surface-2)]">
-                      <tr>
-                        <th className="text-left font-medium tracking-[0.01em] text-[var(--muted)] px-4 py-2.5 text-[13px] whitespace-nowrap">课程</th>
-                        <th className="text-left font-medium tracking-[0.01em] text-[var(--muted)] px-4 py-2.5 text-[13px] whitespace-nowrap">教师</th>
-                        <th className="text-left font-medium tracking-[0.01em] text-[var(--muted)] px-4 py-2.5 text-[13px] whitespace-nowrap">时间</th>
-                        <th className="text-left font-medium tracking-[0.01em] text-[var(--muted)] px-4 py-2.5 text-[13px] whitespace-nowrap">容量</th>
-                        <th className="px-4 py-2.5"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {courses.map((c) => {
-                        const selected = preferences.find((p) => p.task_code === c.task_code);
-                        const full = c.selected_count >= c.capacity;
-                        return (
-                          <tr key={c.task_code} className="border-t border-border hover:bg-[var(--seed-surface-2)]">
-                            <td className="px-4 py-3">
-                              <div className="font-medium text-[13px]">{c.name}</div>
-                              <div className="text-[11px] text-[var(--muted)] mt-0.5">{c.department} · {c.credits}学分 · {c.hours}学时</div>
-                            </td>
-                            <td className="px-4 py-3 text-[13px]">{c.teacher}</td>
-                            <td className="px-4 py-3 text-[13px] text-[var(--muted)]">{c.schedule}</td>
-                            <td className="px-4 py-3 text-[13px] tabular-nums">{c.selected_count}/{c.capacity}</td>
-                            <td className="px-4 py-3 text-right">
-                              {selected ? (
-                                <Badge>已选</Badge>
-                              ) : (
-                                <Button size="sm" variant="outline" disabled={full || preferences.length >= 4} onClick={() => addPreference(c)}>
-                                  <Plus className="w-3.5 h-3.5" /> 添加
-                                </Button>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
               </CardContent>
             </Card>
+          </motion.div>
+
+          {selectedCategory && (
+            <motion.div variants={fadeUp}>
+              <Card>
+                <CardHeader>
+                  <div className="kicker"><strong>Courses</strong></div>
+                  <CardTitle>可选课程</CardTitle>
+                  <CardDescription>按优先级选择 1–4 门，点击箭头调整志愿顺序。</CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-4">
+                  {preferences.length > 0 && (
+                    <div className="flex flex-col gap-1.5">
+                      <div className="kicker">已选志愿（优先级从高到低）</div>
+                      {preferences.map((p, i) => (
+                        <div key={p.task_code} className="flex items-center gap-2 rounded-[var(--radius)] border border-border p-2.5 bg-[var(--seed-surface-2)]">
+                          <GripVertical className="w-4 h-4 text-[var(--muted)]" />
+                          <Badge variant={i === 0 ? "default" : "outline"}>第{i + 1}志愿</Badge>
+                          <span className="text-[13px] font-medium flex-1">{p.name}</span>
+                          <div className="flex items-center gap-0.5">
+                            <Button size="icon" variant="ghost" className="h-7 w-7" disabled={i === 0} onClick={() => movePreference(i, -1)} aria-label="上移志愿"><ArrowUp className="w-3.5 h-3.5" /></Button>
+                            <Button size="icon" variant="ghost" className="h-7 w-7" disabled={i === preferences.length - 1} onClick={() => movePreference(i, 1)} aria-label="下移志愿"><ArrowDown className="w-3.5 h-3.5" /></Button>
+                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => removePreference(p.task_code)}><X className="w-3.5 h-3.5" /></Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="w-full overflow-x-auto rounded-[var(--radius)] border border-border">
+                    <table className="w-full text-sm">
+                      <thead className="bg-[var(--seed-surface-2)]">
+                        <tr>
+                          <th className="text-left font-medium tracking-[0.01em] text-[var(--muted)] px-4 py-2.5 text-[13px] whitespace-nowrap">课程</th>
+                          <th className="text-left font-medium tracking-[0.01em] text-[var(--muted)] px-4 py-2.5 text-[13px] whitespace-nowrap">教师</th>
+                          <th className="text-left font-medium tracking-[0.01em] text-[var(--muted)] px-4 py-2.5 text-[13px] whitespace-nowrap">时间</th>
+                          <th className="text-left font-medium tracking-[0.01em] text-[var(--muted)] px-4 py-2.5 text-[13px] whitespace-nowrap">容量</th>
+                          <th className="px-4 py-2.5"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {courses.map((c) => {
+                          const selected = preferences.find((p) => p.task_code === c.task_code);
+                          const full = c.selected_count >= c.capacity;
+                          return (
+                            <tr key={c.task_code} className="border-t border-border hover:bg-[var(--seed-surface-2)]">
+                              <td className="px-4 py-3">
+                                <div className="font-medium text-[13px]">{c.name}</div>
+                                <div className="text-[11px] text-[var(--muted)] mt-0.5">{c.department} · {c.credits}学分 · {c.hours}学时</div>
+                              </td>
+                              <td className="px-4 py-3 text-[13px]">{c.teacher}</td>
+                              <td className="px-4 py-3 text-[13px] text-[var(--muted)]">{c.schedule}</td>
+                              <td className="px-4 py-3 text-[13px] tabular-nums">{c.selected_count}/{c.capacity}</td>
+                              <td className="px-4 py-3 text-right">
+                                {selected ? (
+                                  <Badge>已选</Badge>
+                                ) : (
+                                  <Button size="sm" variant="outline" disabled={full || preferences.length >= 4} onClick={() => addPreference(c)}>
+                                    <Plus className="w-3.5 h-3.5" /> 添加
+                                  </Button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
           )}
 
           {preferences.length > 0 && (
-            <Card data-component="RunConfig" data-od-id="enrollment-config">
-              <CardHeader>
-                <CardTitle>运行配置</CardTitle>
-                <CardDescription>到达计划时间后自动开始选课。</CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <Label>计划时间</Label>
-                    <Input type="time" step="1" value={scheduledTime} onChange={(e) => setScheduledTime(e.target.value)} />
-                    <div className="text-[11px] text-[var(--muted)] mt-1">留空则立即开始</div>
+            <motion.div variants={fadeUp}>
+              <Card data-component="RunConfig" data-od-id="enrollment-config">
+                <CardHeader>
+                  <div className="kicker"><strong>Run Config</strong></div>
+                  <CardTitle>运行配置</CardTitle>
+                  <CardDescription>到达计划时间后自动开始选课。</CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <Label>计划时间</Label>
+                      <Input type="time" step="1" value={scheduledTime} onChange={(e) => setScheduledTime(e.target.value)} />
+                      <div className="text-[11px] text-[var(--muted)] mt-1">留空则立即开始</div>
+                    </div>
+                    <div>
+                      <Label>最大尝试次数</Label>
+                      <Input type="number" min="1" max="120" value={maxAttempts} onChange={(e) => setMaxAttempts(Number(e.target.value))} />
+                      <div className="text-[11px] text-[var(--muted)] mt-1">默认 15，上限 120</div>
+                    </div>
+                    <div>
+                      <Label>首轮连续尝试</Label>
+                      <Input type="number" min="0" max="120" value={primaryBurst} onChange={(e) => setPrimaryBurst(Number(e.target.value))} />
+                      <div className="text-[11px] text-[var(--muted)] mt-1">到达后先连续尝试第一志愿</div>
+                    </div>
+                    <div>
+                      <Label>冲突自动二次确认</Label>
+                      <Select value={confirmConflicts ? "yes" : "no"} onChange={(e) => setConfirmConflicts(e.target.value === "yes")}>
+                        <option value="yes">开启</option>
+                        <option value="no">关闭</option>
+                      </Select>
+                      <div className="text-[11px] text-[var(--muted)] mt-1">冲突课程自动执行二次确认</div>
+                    </div>
                   </div>
-                  <div>
-                    <Label>最大尝试次数</Label>
-                    <Input type="number" min="1" max="120" value={maxAttempts} onChange={(e) => setMaxAttempts(Number(e.target.value))} />
-                    <div className="text-[11px] text-[var(--muted)] mt-1">默认 15，上限 120</div>
+                  <div className="rounded-[var(--radius)] border border-border p-4 bg-[var(--seed-surface-2)] text-[13px] flex flex-col gap-1.5">
+                    <div className="flex justify-between"><span className="text-[var(--muted)]">志愿数</span><span className="font-medium">{preferences.length} 门</span></div>
+                    <div className="flex justify-between"><span className="text-[var(--muted)]">第一志愿</span><span className="font-medium">{preferences[0]?.name}</span></div>
                   </div>
-                  <div>
-                    <Label>首轮连续尝试</Label>
-                    <Input type="number" min="0" max="120" value={primaryBurst} onChange={(e) => setPrimaryBurst(Number(e.target.value))} />
-                    <div className="text-[11px] text-[var(--muted)] mt-1">到达后先连续尝试第一志愿</div>
-                  </div>
-                  <div>
-                    <Label>冲突自动二次确认</Label>
-                    <Select value={confirmConflicts ? "yes" : "no"} onChange={(e) => setConfirmConflicts(e.target.value === "yes")}>
-                      <option value="yes">开启</option>
-                      <option value="no">关闭</option>
-                    </Select>
-                    <div className="text-[11px] text-[var(--muted)] mt-1">冲突课程自动执行二次确认</div>
-                  </div>
-                </div>
-                <div className="rounded-[var(--radius)] border border-border p-4 bg-[var(--seed-surface-2)] text-[13px] flex flex-col gap-1.5">
-                  <div className="flex justify-between"><span className="text-[var(--muted)]">志愿数</span><span className="font-medium">{preferences.length} 门</span></div>
-                  <div className="flex justify-between"><span className="text-[var(--muted)]">第一志愿</span><span className="font-medium">{preferences[0]?.name}</span></div>
-                </div>
-                <Button onClick={startRun} loading={loading} disabled={preferences.length === 0}>
-                  <Zap className="w-4 h-4" /> 启动自动选课
-                </Button>
-              </CardContent>
-            </Card>
+                  <Button onClick={startRun} loading={loading} disabled={preferences.length === 0}>
+                    <Zap className="w-4 h-4" /> 启动自动选课
+                  </Button>
+                </CardContent>
+              </Card>
+            </motion.div>
           )}
         </>
       )}
 
-      {run && <RunStatusView run={run} onCancel={doCancel} />}
+      {run && (
+        <motion.div variants={fadeUp}>
+          <RunStatusView run={run} onCancel={doCancel} />
+        </motion.div>
+      )}
 
       {run?.state === "failed" && (
-        <Alert variant="danger" title="选课失败">
-          <span>已达到最大尝试次数或遇到错误。请检查课程余量或稍后重试。</span>
-        </Alert>
+        <motion.div variants={fadeUp}>
+          <Alert variant="danger" title="选课失败">
+            <span>已达到最大尝试次数或遇到错误。请检查课程余量或稍后重试。</span>
+          </Alert>
+        </motion.div>
       )}
-    </div>
+    </motion.div>
   );
 }

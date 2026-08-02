@@ -1,5 +1,6 @@
 // Canvas design runtime editable source marker: timetable
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { motion } from "motion/react";
 import { CalendarDays, Download, Image as ImageIcon, Clock, RefreshCw, ScanLine, Copy, Check, Share2 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Label, Select, Badge, Alert, Checkbox, Spinner, cn } from "@/components/ui.jsx";
 import { apiGet, apiPost, shareWakeup, CONFIRMATION_VERSIONS, mockCaptcha, mockSession, mockWakeupShare } from "@/lib/api.jsx";
@@ -25,6 +26,17 @@ const MOCK_COURSES = [
 ];
 
 const COLORS = ["bg-[var(--primary-muted)] text-[var(--seed-primary-strong)]", "bg-[var(--success-muted)] text-[var(--success)]"];
+
+// 入场动效（与首页一致的编辑风 fadeUp/stagger，克制使用）
+const EASE = [0.22, 1, 0.36, 1];
+const fadeUp = {
+  hidden: { opacity: 0, y: 26 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.7, ease: EASE } },
+};
+const stagger = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.07, delayChildren: 0.05 } },
+};
 
 // 验证码 mock 字符（仅设计预览，与 inline SVG 一致；真实接口返回 base64 图像后由 ONNX 识别）
 const MOCK_CAPTCHA_TEXT = "7294";
@@ -256,184 +268,208 @@ export default function Timetable() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto flex flex-col gap-5" data-component="TimetablePage" data-od-id="timetable">
-      <div className="flex flex-col gap-1">
-        <div className="text-[11px] tracking-[0.1em] uppercase text-[var(--muted)]">学校查询</div>
-        <h1>课表查询</h1>
-        <p className="text-[var(--muted)] text-sm prose-body">用学校账号登录后即可查看课表，验证码可以自动识别，密码仅用于本次登录。</p>
-      </div>
+    <div className="max-w-6xl mx-auto flex flex-col gap-8 sm:gap-10" data-component="TimetablePage" data-od-id="timetable">
+      {/* ---------- 编辑风页面头 ---------- */}
+      <motion.header variants={stagger} initial="hidden" animate="show" className="flex flex-col gap-3 pt-2">
+        <motion.div variants={fadeUp} className="flex items-center gap-4">
+          <span className="kicker"><strong>Timetable</strong> — 学校查询</span>
+          <span className="rule-line flex-1" />
+          <span className="kicker hidden sm:block">共 20 教学周</span>
+        </motion.div>
+        <motion.h1 variants={fadeUp} className="display-lede">课表查询</motion.h1>
+        <motion.p variants={fadeUp} className="text-[var(--muted)] text-sm prose-body">用学校账号登录后即可查看课表，验证码可以自动识别，密码仅用于本次登录。</motion.p>
+      </motion.header>
 
-      {!session ? (
-        <Card data-component="SchoolLogin" data-od-id="school-login">
-          <CardHeader>
-            <CardTitle>学校登录</CardTitle>
-            <CardDescription>登录失败需重新输入验证码；学校密码只用于本次登录，不会保存。</CardDescription>
+      {/* ---------- 学校登录 / 会话倒计时 ---------- */}
+      <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true, margin: "-60px" }}>
+        {!session ? (
+          <Card data-component="SchoolLogin" data-od-id="school-login">
+            <CardHeader>
+              <div className="kicker"><strong>School Login</strong></div>
+              <CardTitle>学校登录</CardTitle>
+              <CardDescription>登录失败需重新输入验证码；学校密码只用于本次登录，不会保存。</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form className="flex flex-col gap-4" onSubmit={login}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="acc">学号</Label>
+                    <Input id="acc" value={account} onChange={(e) => setAccount(e.target.value)} placeholder="20260001" required />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="pw">学校密码</Label>
+                    <Input id="pw" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="仅本次请求使用" required />
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label>验证码</Label>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <CaptchaImage src={captchaDataUrl} />
+                    <Input value={captcha} onChange={(e) => setCaptcha(e.target.value)} placeholder="输入图中字符" className="max-w-[180px]" required />
+                    <Button type="button" variant="ghost" size="icon" onClick={refreshCaptcha} aria-label="刷新验证码" disabled={loginLoading}><RefreshCw className="w-4 h-4" /></Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => runOcr(captchaDataUrl)}
+                      disabled={ocrLoading}
+                      loading={ocrLoading}
+                    >
+                      {ocrLoading ? <Spinner /> : <ScanLine className="w-4 h-4" />}
+                      自动识别
+                    </Button>
+                    <label className="inline-flex items-center gap-1.5 text-[13px] text-[var(--muted)] cursor-pointer select-none">
+                      <Checkbox checked={autoOcr} onChange={setAutoOcr} />
+                      自动识别验证码
+                    </label>
+                  </div>
+                  {ocrResult && !ocrResult.error && (
+                    <div className="text-[12px] text-[var(--muted)] flex items-center gap-1.5">
+                      <Check className="w-3 h-3 text-[var(--success)]" />
+                      已识别：<span className="font-mono text-foreground">{ocrResult.text}</span>
+                      {ocrResult.mock && <Badge variant="muted" className="ml-1">预览</Badge>}
+                    </div>
+                  )}
+                  {ocrResult?.error && (
+                    <div className="text-[12px] text-[var(--warning)]">识别失败，请手动输入或刷新验证码。</div>
+                  )}
+                </div>
+                {loginError && (
+                  <Alert variant="warning" title="登录失败">{loginError}</Alert>
+                )}
+                <Button type="submit" className="self-start" loading={loginLoading}>登录学校系统</Button>
+              </form>
+            </CardContent>
+          </Card>
+        ) : (
+          <AcademicSessionCard session={session} onExpire={() => { setSession(null); fetchCaptcha(); }} />
+        )}
+      </motion.div>
+
+      {/* ---------- 周课表网格 ---------- */}
+      <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true, margin: "-60px" }}>
+        <Card>
+          <CardHeader className="flex-row items-start justify-between">
+            <div className="flex flex-col gap-1">
+              <div className="kicker"><strong>Weekly Grid</strong></div>
+              <CardTitle className="flex items-center gap-2">
+                <CalendarDays className="w-4 h-4 text-[var(--seed-primary-strong)]" />
+                第 {week} 周课表
+              </CardTitle>
+              <CardDescription>共 20 教学周；当前周次可切换。</CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Select value={String(week)} onChange={(e) => setWeek(Number(e.target.value))} className="w-[110px]">
+                {Array.from({ length: 20 }, (_, i) => <option key={i} value={i + 1}>第 {i + 1} 周</option>)}
+              </Select>
+              <Button variant="outline" size="icon" onClick={() => { setSession(null); fetchCaptcha(); }} aria-label="刷新会话" disabled={!session}><RefreshCw className="w-4 h-4" /></Button>
+            </div>
           </CardHeader>
           <CardContent>
-            <form className="flex flex-col gap-4" onSubmit={login}>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="acc">学号</Label>
-                  <Input id="acc" value={account} onChange={(e) => setAccount(e.target.value)} placeholder="20260001" required />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="pw">学校密码</Label>
-                  <Input id="pw" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="仅本次请求使用" required />
-                </div>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label>验证码</Label>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <CaptchaImage src={captchaDataUrl} />
-                  <Input value={captcha} onChange={(e) => setCaptcha(e.target.value)} placeholder="输入图中字符" className="max-w-[180px]" required />
-                  <Button type="button" variant="ghost" size="icon" onClick={refreshCaptcha} aria-label="刷新验证码" disabled={loginLoading}><RefreshCw className="w-4 h-4" /></Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => runOcr(captchaDataUrl)}
-                    disabled={ocrLoading}
-                    loading={ocrLoading}
-                  >
-                    {ocrLoading ? <Spinner /> : <ScanLine className="w-4 h-4" />}
-                    自动识别
-                  </Button>
-                  <label className="inline-flex items-center gap-1.5 text-[13px] text-[var(--muted)] cursor-pointer select-none">
-                    <Checkbox checked={autoOcr} onChange={setAutoOcr} />
-                    自动识别验证码
-                  </label>
-                </div>
-                {ocrResult && !ocrResult.error && (
-                  <div className="text-[12px] text-[var(--muted)] flex items-center gap-1.5">
-                    <Check className="w-3 h-3 text-[var(--success)]" />
-                    已识别：<span className="font-mono text-foreground">{ocrResult.text}</span>
-                    {ocrResult.mock && <Badge variant="muted" className="ml-1">预览</Badge>}
+            <div className="timetable-grid" data-component="TimetableGrid" data-od-id="timetable-grid">
+              <div className="timetable-cell timetable-head">节次</div>
+              {DAYS.map((d) => <div key={d} className="timetable-cell timetable-head">{d}</div>)}
+              {SECTIONS.map((s) => (
+                <React.Fragment key={s.n}>
+                  <div className="timetable-cell timetable-head" data-component="SectionCell">
+                    <div className="font-medium">{s.n}</div>
+                    <div className="text-[11px] text-[var(--muted)]">{s.time}</div>
                   </div>
-                )}
-                {ocrResult?.error && (
-                  <div className="text-[12px] text-[var(--warning)]">识别失败，请手动输入或刷新验证码。</div>
-                )}
-              </div>
-              {loginError && (
-                <Alert variant="warning" title="登录失败">{loginError}</Alert>
-              )}
-              <Button type="submit" className="self-start" loading={loginLoading}>登录学校系统</Button>
-            </form>
+                  {DAYS.map((_, di) => {
+                    const course = MOCK_COURSES.find((c) => c.day === di && c.sec === s.n);
+                    return (
+                      <div key={di} className="timetable-cell" style={course && course.len > 1 ? { gridRow: `span ${course.len}` } : undefined}>
+                        {course && (
+                          <div className={cn("rounded-[var(--radius-sm)] p-2 h-full", COLORS[di % 2])} data-component="CourseCell">
+                            <div className="text-[12px] font-medium leading-tight">{course.name}</div>
+                            <div className="text-[10px] mt-0.5 opacity-80">{course.room}</div>
+                            <div className="text-[10px] opacity-70">{course.teacher} · {course.weeks}</div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </React.Fragment>
+              ))}
+            </div>
           </CardContent>
         </Card>
-      ) : (
-        <AcademicSessionCard session={session} onExpire={() => { setSession(null); fetchCaptcha(); }} />
-      )}
+      </motion.div>
 
-      <Card>
-        <CardHeader className="flex-row items-start justify-between">
-          <div>
-            <CardTitle>第 {week} 周课表</CardTitle>
-            <CardDescription>共 20 教学周；当前周次可切换。</CardDescription>
-          </div>
-          <div className="flex items-center gap-2">
-            <Select value={String(week)} onChange={(e) => setWeek(Number(e.target.value))} className="w-[110px]">
-              {Array.from({ length: 20 }, (_, i) => <option key={i} value={i + 1}>第 {i + 1} 周</option>)}
-            </Select>
-            <Button variant="outline" size="icon" onClick={() => { setSession(null); fetchCaptcha(); }} aria-label="刷新会话" disabled={!session}><RefreshCw className="w-4 h-4" /></Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="timetable-grid" data-component="TimetableGrid" data-od-id="timetable-grid">
-            <div className="timetable-cell timetable-head">节次</div>
-            {DAYS.map((d) => <div key={d} className="timetable-cell timetable-head">{d}</div>)}
-            {SECTIONS.map((s) => (
-              <React.Fragment key={s.n}>
-                <div className="timetable-cell timetable-head" data-component="SectionCell">
-                  <div className="font-medium">{s.n}</div>
-                  <div className="text-[11px] text-[var(--muted)]">{s.time}</div>
-                </div>
-                {DAYS.map((_, di) => {
-                  const course = MOCK_COURSES.find((c) => c.day === di && c.sec === s.n);
-                  return (
-                    <div key={di} className="timetable-cell" style={course && course.len > 1 ? { gridRow: `span ${course.len}` } : undefined}>
-                      {course && (
-                        <div className={cn("rounded-[var(--radius-sm)] p-2 h-full", COLORS[di % 2])} data-component="CourseCell">
-                          <div className="text-[12px] font-medium leading-tight">{course.name}</div>
-                          <div className="text-[10px] mt-0.5 opacity-80">{course.room}</div>
-                          <div className="text-[10px] opacity-70">{course.teacher} · {course.weeks}</div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </React.Fragment>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>导出课表</CardTitle>
-          <CardDescription>ICS 可导入系统日历；WakeUp 文件可导入 WakeUp 应用，不会上传到任何第三方。</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <div className="flex flex-col sm:flex-row sm:items-end gap-3">
-            <div className="flex flex-col gap-1.5 flex-1">
-              <Label htmlFor="sm">学期周一</Label>
-              <Input id="sm" type="date" value={semesterMonday} onChange={(e) => setSemesterMonday(e.target.value)} />
-            </div>
-            <div className="flex flex-col gap-1.5 flex-1">
-              <Label htmlFor="campus">校区</Label>
-              <Select id="campus" value={campus} onChange={(e) => setCampus(e.target.value)}>
-                <option value="main">广州主校区</option>
-                <option value="shunde">顺德校区</option>
-              </Select>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={exportIcs} disabled={!session || exporting} loading={exporting === "ics"}>
-              <Download className="w-4 h-4" /> 导出 ICS
-            </Button>
-            <Button variant="outline" onClick={exportWakeup} disabled={!session || exporting} loading={exporting === "wakeup"}>
-              <ImageIcon className="w-4 h-4" /> 导出 WakeUp 文件
-            </Button>
-            {!session && <span className="text-[13px] text-[var(--muted)] self-center">需先登录学校系统</span>}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card data-component="WakeupShare" data-od-id="wakeup-share">
-        <CardHeader>
-          <CardTitle>分享到 WakeUp</CardTitle>
-          <CardDescription>直接把课表上传到 WakeUp 应用，生成分享码后即可在 App 中导入。</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <Alert variant="info" title="需要你确认">
-            这会把你的课表上传到 WakeUp。如果不想上传，可以用上方的"导出 WakeUp 文件"下载后手动导入。
-          </Alert>
-          <label className="inline-flex items-start gap-2 text-[13px] text-foreground cursor-pointer select-none">
-            <Checkbox checked={shareConsent} onChange={setShareConsent} className="mt-0.5" />
-            <span>我已了解这会把课表上传到 WakeUp，并同意继续。</span>
-          </label>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button onClick={shareToWakeup} disabled={!session || !shareConsent || sharing} loading={sharing}>
-              <Share2 className="w-4 h-4" /> 分享到 WakeUp
-            </Button>
-            {!session && <span className="text-[13px] text-[var(--muted)] self-center">需先登录学校系统</span>}
-          </div>
-          {shareError && <Alert variant="warning" title="分享失败">{shareError}</Alert>}
-          {shareCode && (
-            <Alert variant="success" title="分享成功">
-              <div className="flex flex-col gap-2">
-                <span>分享码已生成，在 WakeUp 应用中导入即可。请尽快使用，码会过期。</span>
-                <div className="flex items-center gap-2">
-                  <Input ref={shareInputRef} value={shareCode} readOnly className="font-mono text-[13px]" />
-                  <Button variant="outline" size="icon" onClick={copyShareCode} aria-label="复制分享码">
-                    {copied ? <Check className="w-4 h-4 text-[var(--success)]" /> : <Copy className="w-4 h-4" />}
-                  </Button>
-                </div>
+      {/* ---------- 导出课表 ---------- */}
+      <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true, margin: "-60px" }}>
+        <Card>
+          <CardHeader>
+            <div className="kicker"><strong>Export</strong></div>
+            <CardTitle>导出课表</CardTitle>
+            <CardDescription>ICS 可导入系统日历；WakeUp 文件可导入 WakeUp 应用，不会上传到任何第三方。</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+              <div className="flex flex-col gap-1.5 flex-1">
+                <Label htmlFor="sm">学期周一</Label>
+                <Input id="sm" type="date" value={semesterMonday} onChange={(e) => setSemesterMonday(e.target.value)} />
               </div>
+              <div className="flex flex-col gap-1.5 flex-1">
+                <Label htmlFor="campus">校区</Label>
+                <Select id="campus" value={campus} onChange={(e) => setCampus(e.target.value)}>
+                  <option value="main">广州主校区</option>
+                  <option value="shunde">顺德校区</option>
+                </Select>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={exportIcs} disabled={!session || exporting} loading={exporting === "ics"}>
+                <Download className="w-4 h-4" /> 导出 ICS
+              </Button>
+              <Button variant="outline" onClick={exportWakeup} disabled={!session || exporting} loading={exporting === "wakeup"}>
+                <ImageIcon className="w-4 h-4" /> 导出 WakeUp 文件
+              </Button>
+              {!session && <span className="text-[13px] text-[var(--muted)] self-center">需先登录学校系统</span>}
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* ---------- 分享到 WakeUp ---------- */}
+      <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={{ once: true, margin: "-60px" }}>
+        <Card data-component="WakeupShare" data-od-id="wakeup-share">
+          <CardHeader>
+            <div className="kicker"><strong>Wakeup Share</strong></div>
+            <CardTitle>分享到 WakeUp</CardTitle>
+            <CardDescription>直接把课表上传到 WakeUp 应用，生成分享码后即可在 App 中导入。</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <Alert variant="info" title="需要你确认">
+              这会把你的课表上传到 WakeUp。如果不想上传，可以用上方的"导出 WakeUp 文件"下载后手动导入。
             </Alert>
-          )}
-        </CardContent>
-      </Card>
+            <label className="inline-flex items-start gap-2 text-[13px] text-foreground cursor-pointer select-none">
+              <Checkbox checked={shareConsent} onChange={setShareConsent} className="mt-0.5" />
+              <span>我已了解这会把课表上传到 WakeUp，并同意继续。</span>
+            </label>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button onClick={shareToWakeup} disabled={!session || !shareConsent || sharing} loading={sharing}>
+                <Share2 className="w-4 h-4" /> 分享到 WakeUp
+              </Button>
+              {!session && <span className="text-[13px] text-[var(--muted)] self-center">需先登录学校系统</span>}
+            </div>
+            {shareError && <Alert variant="warning" title="分享失败">{shareError}</Alert>}
+            {shareCode && (
+              <Alert variant="success" title="分享成功">
+                <div className="flex flex-col gap-2">
+                  <span>分享码已生成，在 WakeUp 应用中导入即可。请尽快使用，码会过期。</span>
+                  <div className="flex items-center gap-2">
+                    <Input ref={shareInputRef} value={shareCode} readOnly className="font-mono text-[13px]" />
+                    <Button variant="outline" size="icon" onClick={copyShareCode} aria-label="复制分享码">
+                      {copied ? <Check className="w-4 h-4 text-[var(--success)]" /> : <Copy className="w-4 h-4" />}
+                    </Button>
+                  </div>
+                </div>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
     </div>
   );
 }

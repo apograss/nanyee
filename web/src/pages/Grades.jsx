@@ -1,8 +1,19 @@
 // Canvas design runtime editable source marker: grades
 import React, { useState, useEffect, useCallback } from "react";
 import { GraduationCap, ShieldCheck, TrendingUp, BarChart3, RefreshCw } from "lucide-react";
+import { motion } from "motion/react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Label, Table, Alert, Badge, cn } from "@/components/ui.jsx";
 import { apiGet, apiPost, mockGrades } from "@/lib/api.jsx";
+
+const EASE = [0.22, 1, 0.36, 1];
+const fadeUp = {
+  hidden: { opacity: 0, y: 26 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.7, ease: EASE } },
+};
+const stagger = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.07, delayChildren: 0.05 } },
+};
 
 function RankBadge({ ranking, ...qoderProps }) {
   if (!ranking) return <span className={["text-[var(--muted)] text-[13px]", qoderProps?.className].filter(Boolean).join(" ")} style={qoderProps?.style} data-qoder-id={qoderProps?.["data-qoder-id"]} data-qoder-source={qoderProps?.["data-qoder-source"]}>—</span>;
@@ -77,17 +88,21 @@ export default function Grades(qoderProps) {
   const s = grades?.summary;
 
   return (
-    <div className={["max-w-6xl mx-auto flex flex-col gap-5", qoderProps?.className].filter(Boolean).join(" ")} data-component="GradesPage" data-od-id="grades" style={qoderProps?.style} data-qoder-id={qoderProps?.["data-qoder-id"]} data-qoder-source={qoderProps?.["data-qoder-source"]}>
-      <div className="flex flex-col gap-1" data-qoder-id="qel-flex-9194a89a" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-flex-9194a89a&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;flex&quot;,&quot;loc&quot;:{&quot;line&quot;:62,&quot;column&quot;:7}}">
-        <div className="text-[11px] tracking-[0.1em] uppercase text-[var(--muted)]" data-qoder-id="qel-text-11px-9a7dbc67" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-text-11px-9a7dbc67&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;text-11px&quot;,&quot;loc&quot;:{&quot;line&quot;:63,&quot;column&quot;:9}}">学校工具</div>
-        <h1 data-qoder-id="qel-h1-26826d83" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-h1-26826d83&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;h1&quot;,&quot;loc&quot;:{&quot;line&quot;:64,&quot;column&quot;:9}}">成绩查询</h1>
+    <div className={["max-w-6xl mx-auto flex flex-col gap-6", qoderProps?.className].filter(Boolean).join(" ")} data-component="GradesPage" data-od-id="grades" style={qoderProps?.style} data-qoder-id={qoderProps?.["data-qoder-id"]} data-qoder-source={qoderProps?.["data-qoder-source"]}>
+      <motion.div variants={fadeUp} initial="hidden" animate="show" className="flex flex-col gap-3" data-qoder-id="qel-flex-9194a89a" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-flex-9194a89a&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;flex&quot;,&quot;loc&quot;:{&quot;line&quot;:62,&quot;column&quot;:7}}">
+        <div className="flex items-center gap-4">
+          <span className="kicker" data-qoder-id="qel-text-11px-9a7dbc67" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-text-11px-9a7dbc67&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;text-11px&quot;,&quot;loc&quot;:{&quot;line&quot;:63,&quot;column&quot;:9}}"><strong>Grades</strong> — 学校工具</span>
+          <span className="rule-line flex-1" />
+        </div>
+        <h1 className="display-lede" data-qoder-id="qel-h1-26826d83" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-h1-26826d83&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;h1&quot;,&quot;loc&quot;:{&quot;line&quot;:64,&quot;column&quot;:9}}">成绩查询</h1>
         <p className="text-[var(--muted)] text-sm" data-qoder-id="qel-text-var-muted-27f2ba91" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-text-var-muted-27f2ba91&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;text-var-muted&quot;,&quot;loc&quot;:{&quot;line&quot;:65,&quot;column&quot;:9}}">成绩不会保存在服务器，查询结果包含班级和课程排名。</p>
-      </div>
+      </motion.div>
 
       {!session ? (
+        <motion.div variants={fadeUp} initial="hidden" animate="show">
         <Card data-qoder-id="qel-card-3cdc14c7" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-card-3cdc14c7&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;card&quot;,&quot;loc&quot;:{&quot;line&quot;:69,&quot;column&quot;:9}}">
           <CardHeader data-qoder-id="qel-cardheader-a05c13d8" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-cardheader-a05c13d8&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;cardheader&quot;,&quot;loc&quot;:{&quot;line&quot;:70,&quot;column&quot;:11}}">
-            <CardTitle data-qoder-id="qel-cardtitle-8a28de39" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-cardtitle-8a28de39&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;cardtitle&quot;,&quot;loc&quot;:{&quot;line&quot;:71,&quot;column&quot;:13}}">学校系统登录</CardTitle>
+            <CardTitle className="flex items-center gap-2" data-qoder-id="qel-cardtitle-8a28de39" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-cardtitle-8a28de39&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;cardtitle&quot;,&quot;loc&quot;:{&quot;line&quot;:71,&quot;column&quot;:13}}"><ShieldCheck className="w-4 h-4 text-[var(--seed-primary-strong)]" />学校系统登录</CardTitle>
             <CardDescription data-qoder-id="qel-carddescription-88c73238" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-carddescription-88c73238&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;carddescription&quot;,&quot;loc&quot;:{&quot;line&quot;:72,&quot;column&quot;:13}}">验证码仅用一次，学校密码只用于本次登录。</CardDescription>
           </CardHeader>
           <CardContent data-qoder-id="qel-cardcontent-854a04a3" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-cardcontent-854a04a3&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;cardcontent&quot;,&quot;loc&quot;:{&quot;line&quot;:74,&quot;column&quot;:11}}">
@@ -117,13 +132,16 @@ export default function Grades(qoderProps) {
             {error && <Alert variant="danger" title="登录失败"><span>{error}</span></Alert>}
           </CardContent>
         </Card>
+        </motion.div>
       ) : (
-        <>
+        <motion.div className="flex flex-col gap-6" variants={stagger} initial="hidden" animate="show">
+          <motion.div variants={fadeUp}>
           <Alert variant="success" title="登录成功" data-qoder-id="qel-alert-7b7ce770" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-alert-7b7ce770&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;alert&quot;,&quot;loc&quot;:{&quot;line&quot;:94,&quot;column&quot;:11}}">
             <span data-qoder-id="qel-span-5f650723" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-span-5f650723&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;span&quot;,&quot;loc&quot;:{&quot;line&quot;:95,&quot;column&quot;:13}}">24 小时内可查询，过期后需重新登录。</span>
           </Alert>
+          </motion.div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" data-qoder-id="qel-grid-ae3bf837" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-grid-ae3bf837&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;grid&quot;,&quot;loc&quot;:{&quot;line&quot;:98,&quot;column&quot;:11}}">
+          <motion.div variants={fadeUp} className="grid grid-cols-2 sm:grid-cols-4 gap-3" data-qoder-id="qel-grid-ae3bf837" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-grid-ae3bf837&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;grid&quot;,&quot;loc&quot;:{&quot;line&quot;:98,&quot;column&quot;:11}}">
             {[
               { k: "总学分", v: s?.total_credits?.toFixed(1) || "—", s: `${s?.total_courses || 0} 门` },
               { k: "加权绩点", v: s?.weighted_gpa?.toFixed(2) || "—", s: `必修 ${s?.required_gpa?.toFixed(2) || "—"}` },
@@ -132,18 +150,19 @@ export default function Grades(qoderProps) {
             ].map((m) => (
               <Card key={m.k} data-component="GradeStat" data-od-id={`stat-${m.k}`} data-qoder-id="qel-gradestat-71c66e16" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-gradestat-71c66e16&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;gradestat&quot;,&quot;loc&quot;:{&quot;line&quot;:105,&quot;column&quot;:15}}">
                 <CardContent className="p-4" data-qoder-id="qel-p-4-7a164a8e" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-p-4-7a164a8e&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;p-4&quot;,&quot;loc&quot;:{&quot;line&quot;:106,&quot;column&quot;:17}}">
-                  <div className="text-[11px] tracking-[0.08em] uppercase text-[var(--muted)]" data-qoder-id="qel-text-11px-89792476" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-text-11px-89792476&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;text-11px&quot;,&quot;loc&quot;:{&quot;line&quot;:107,&quot;column&quot;:19}}">{m.k}</div>
+                  <div className="kicker" data-qoder-id="qel-text-11px-89792476" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-text-11px-89792476&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;text-11px&quot;,&quot;loc&quot;:{&quot;line&quot;:107,&quot;column&quot;:19}}">{m.k}</div>
                   <div className="font-display text-[1.75rem] tracking-[-0.02em] text-foreground mt-1 tabular-nums" data-qoder-id="qel-font-display-456f38ed" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-font-display-456f38ed&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;font-display&quot;,&quot;loc&quot;:{&quot;line&quot;:108,&quot;column&quot;:19}}">{m.v}</div>
                   <div className="text-[11px] text-[var(--muted)] mt-0.5" data-qoder-id="qel-text-11px-87792150" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-text-11px-87792150&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;text-11px&quot;,&quot;loc&quot;:{&quot;line&quot;:109,&quot;column&quot;:19}}">{m.s}</div>
                 </CardContent>
               </Card>
             ))}
-          </div>
+          </motion.div>
 
+          <motion.div variants={fadeUp}>
           <Card data-qoder-id="qel-card-a9d6b030" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-card-a9d6b030&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;card&quot;,&quot;loc&quot;:{&quot;line&quot;:115,&quot;column&quot;:11}}">
             <CardHeader className="flex-row items-start justify-between" data-qoder-id="qel-flex-row-7f8b472a" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-flex-row-7f8b472a&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;flex-row&quot;,&quot;loc&quot;:{&quot;line&quot;:116,&quot;column&quot;:13}}">
               <div data-qoder-id="qel-div-c5dda7fb" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-div-c5dda7fb&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;div&quot;,&quot;loc&quot;:{&quot;line&quot;:117,&quot;column&quot;:15}}">
-                <CardTitle data-qoder-id="qel-cardtitle-8a35aa2c" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-cardtitle-8a35aa2c&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;cardtitle&quot;,&quot;loc&quot;:{&quot;line&quot;:118,&quot;column&quot;:17}}">成绩明细</CardTitle>
+                <CardTitle className="flex items-center gap-2" data-qoder-id="qel-cardtitle-8a35aa2c" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-cardtitle-8a35aa2c&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;cardtitle&quot;,&quot;loc&quot;:{&quot;line&quot;:118,&quot;column&quot;:17}}"><GraduationCap className="w-4 h-4 text-[var(--seed-primary-strong)]" />成绩明细</CardTitle>
                 <CardDescription data-qoder-id="qel-carddescription-0ed33e1d" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-carddescription-0ed33e1d&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;carddescription&quot;,&quot;loc&quot;:{&quot;line&quot;:119,&quot;column&quot;:17}}">排名包含班级和课程范围，分布为各分段人数。</CardDescription>
               </div>
               <Badge variant="muted" className="gap-1" data-qoder-id="qel-gap-1-db6db621" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-gap-1-db6db621&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;gap-1&quot;,&quot;loc&quot;:{&quot;line&quot;:121,&quot;column&quot;:15}}"><BarChart3 className="w-3 h-3"  data-qoder-id="qel-w-3-6a0d1bdc" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-w-3-6a0d1bdc&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;w-3&quot;,&quot;loc&quot;:{&quot;line&quot;:121,&quot;column&quot;:56}}"/> 含排名分布</Badge>
@@ -177,11 +196,14 @@ export default function Grades(qoderProps) {
               </div>
             </CardContent>
           </Card>
+          </motion.div>
 
+          <motion.div variants={fadeUp}>
           <Alert variant="info" title="默认不保存" data-qoder-id="qel-alert-13890fab" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-alert-13890fab&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;alert&quot;,&quot;loc&quot;:{&quot;line&quot;:153,&quot;column&quot;:11}}">
             <span data-qoder-id="qel-span-f5712c38" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-span-f5712c38&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;span&quot;,&quot;loc&quot;:{&quot;line&quot;:154,&quot;column&quot;:13}}">成绩不会保存在服务器，关闭页面后需重新登录查询。为保护隐私，成绩信息不存储、不上报。</span>
           </Alert>
-        </>
+          </motion.div>
+        </motion.div>
       )}
     </div>
   );

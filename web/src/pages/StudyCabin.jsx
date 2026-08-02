@@ -1,13 +1,21 @@
 // Canvas design runtime editable source marker: study-cabin
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Armchair, ArrowRight, GripVertical, Clock, ShieldCheck, AlertTriangle, CheckCircle2, RefreshCw } from "lucide-react";
+import { motion } from "motion/react";
+import { Armchair, ArrowRight, ChevronDown, ChevronUp, GripVertical, Clock, ShieldCheck, AlertTriangle, CheckCircle2, RefreshCw } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Label, Badge, Alert, StatusBadge, Spinner, cn } from "@/components/ui.jsx";
 import {
   fetchStudyCabins, listCredentials, createCredential, createJob,
   CONFIRMATION_VERSIONS, CREDENTIAL_PURPOSES,
   mockStudyCabins, mockCredentials, mockJobs,
 } from "@/lib/api.jsx";
+
+const EASE = [0.22, 1, 0.36, 1];
+const fadeUp = {
+  hidden: { opacity: 0, y: 26 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.7, ease: EASE } },
+};
+const inView = { once: true, margin: "-60px" };
 
 export default function StudyCabin(qoderProps) {
   const navigate = useNavigate();
@@ -164,20 +172,27 @@ export default function StudyCabin(qoderProps) {
   }, [cabins]);
 
   return (
-    <div className={["max-w-3xl mx-auto flex flex-col gap-5", qoderProps?.className].filter(Boolean).join(" ")} data-component="StudyCabinPage" data-od-id="study-cabin" style={qoderProps?.style} data-qoder-id={qoderProps?.["data-qoder-id"]} data-qoder-source={qoderProps?.["data-qoder-source"]}>
-      <div className="flex flex-col gap-1" data-qoder-id="qel-flex-169d6cc7" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-flex-169d6cc7&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;flex&quot;,&quot;loc&quot;:{&quot;line&quot;:156,&quot;column&quot;:7}}">
-        <div className="text-[11px] tracking-[0.1em] uppercase text-[var(--muted)]" data-qoder-id="qel-text-11px-f8c8a73f" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-text-11px-f8c8a73f&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;text-11px&quot;,&quot;loc&quot;:{&quot;line&quot;:157,&quot;column&quot;:9}}">凭据与任务</div>
-        <h1 data-qoder-id="qel-h1-94145017" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-h1-94145017&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;h1&quot;,&quot;loc&quot;:{&quot;line&quot;:158,&quot;column&quot;:9}}">学习舱预约任务</h1>
-        <p className="text-[var(--muted)] text-sm prose-body" data-qoder-id="qel-text-var-muted-e2692a4d" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-text-var-muted-e2692a4d&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;text-var-muted&quot;,&quot;loc&quot;:{&quot;line&quot;:159,&quot;column&quot;:9}}">选好舱位，到点自动帮你抢。</p>
-      </div>
+    <div className={["max-w-3xl mx-auto flex flex-col gap-6 sm:gap-8 pb-6", qoderProps?.className].filter(Boolean).join(" ")} data-component="StudyCabinPage" data-od-id="study-cabin" style={qoderProps?.style} data-qoder-id={qoderProps?.["data-qoder-id"]} data-qoder-source={qoderProps?.["data-qoder-source"]}>
+      <motion.div variants={fadeUp} initial="hidden" animate="show" className="flex flex-col gap-3 pt-2" data-qoder-id="qel-flex-169d6cc7" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-flex-169d6cc7&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;flex&quot;,&quot;loc&quot;:{&quot;line&quot;:156,&quot;column&quot;:7}}">
+        <div className="flex items-center gap-4" data-qoder-id="qel-text-11px-f8c8a73f" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-text-11px-f8c8a73f&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;text-11px&quot;,&quot;loc&quot;:{&quot;line&quot;:157,&quot;column&quot;:9}}">
+          <span className="kicker"><strong>Study Cabin</strong> — 凭据与任务</span>
+          <span className="rule-line flex-1" />
+        </div>
+        <h1 className="display-lede" data-qoder-id="qel-h1-94145017" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-h1-94145017&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;h1&quot;,&quot;loc&quot;:{&quot;line&quot;:158,&quot;column&quot;:9}}">学习舱预约任务</h1>
+        <p className="text-[var(--muted)] text-[15px] prose-body" data-qoder-id="qel-text-var-muted-e2692a4d" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-text-var-muted-e2692a4d&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;text-var-muted&quot;,&quot;loc&quot;:{&quot;line&quot;:159,&quot;column&quot;:9}}">选好舱位，到点自动帮你抢。</p>
+      </motion.div>
 
-      <Alert variant="info" title="小提示" data-qoder-id="qel-alert-96579e77" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-alert-96579e77&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;alert&quot;,&quot;loc&quot;:{&quot;line&quot;:162,&quot;column&quot;:7}}">
-        <span data-qoder-id="qel-span-40b35e64" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-span-40b35e64&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;span&quot;,&quot;loc&quot;:{&quot;line&quot;:163,&quot;column&quot;:9}}">建议提前几分钟创建任务，留出系统准备时间。</span>
-      </Alert>
+      <motion.div variants={fadeUp} initial="hidden" animate="show" transition={{ delay: 0.12 }}>
+        <Alert variant="info" title="小提示" data-qoder-id="qel-alert-96579e77" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-alert-96579e77&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;alert&quot;,&quot;loc&quot;:{&quot;line&quot;:162,&quot;column&quot;:7}}">
+          <span data-qoder-id="qel-span-40b35e64" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-span-40b35e64&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;span&quot;,&quot;loc&quot;:{&quot;line&quot;:163,&quot;column&quot;:9}}">建议提前几分钟创建任务，留出系统准备时间。</span>
+        </Alert>
+      </motion.div>
 
       {/* 凭据状态 */}
+      <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={inView}>
       <Card data-component="CredentialStatus" data-od-id="credential-status" data-qoder-id="qel-credentialstatus-a8de31e8" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-credentialstatus-a8de31e8&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;credentialstatus&quot;,&quot;loc&quot;:{&quot;line&quot;:167,&quot;column&quot;:7}}">
         <CardHeader data-qoder-id="qel-cardheader-26561a9c" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-cardheader-26561a9c&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;cardheader&quot;,&quot;loc&quot;:{&quot;line&quot;:168,&quot;column&quot;:9}}">
+          <div className="kicker"><strong>01</strong> — Credential</div>
           <CardTitle data-qoder-id="qel-cardtitle-c22371ba" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-cardtitle-c22371ba&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;cardtitle&quot;,&quot;loc&quot;:{&quot;line&quot;:169,&quot;column&quot;:11}}">学习舱凭据</CardTitle>
           <CardDescription data-qoder-id="qel-carddescription-762ed445" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-carddescription-762ed445&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;carddescription&quot;,&quot;loc&quot;:{&quot;line&quot;:170,&quot;column&quot;:11}}">
             用于代你登录学校系统抢舱位的账号密码。
@@ -231,10 +246,12 @@ export default function StudyCabin(qoderProps) {
           </div>
         </CardContent>
       </Card>
+      </motion.div>
 
       {/* 预约信息 */}
+      <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={inView}>
       <Card data-qoder-id="qel-card-248b4782" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-card-248b4782&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;card&quot;,&quot;loc&quot;:{&quot;line&quot;:224,&quot;column&quot;:7}}">
-        <CardHeader data-qoder-id="qel-cardheader-8798025d" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-cardheader-8798025d&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;cardheader&quot;,&quot;loc&quot;:{&quot;line&quot;:225,&quot;column&quot;:9}}"><CardTitle data-qoder-id="qel-cardtitle-bb3032a8" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-cardtitle-bb3032a8&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;cardtitle&quot;,&quot;loc&quot;:{&quot;line&quot;:225,&quot;column&quot;:21}}">预约信息</CardTitle><CardDescription data-qoder-id="qel-carddescription-713b9859" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-carddescription-713b9859&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;carddescription&quot;,&quot;loc&quot;:{&quot;line&quot;:225,&quot;column&quot;:48}}">时间 10 分钟粒度，时长 30–240 分钟，范围 08:00–22:50。</CardDescription></CardHeader>
+        <CardHeader data-qoder-id="qel-cardheader-8798025d" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-cardheader-8798025d&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;cardheader&quot;,&quot;loc&quot;:{&quot;line&quot;:225,&quot;column&quot;:9}}"><div className="kicker"><strong>02</strong> — Reservation</div><CardTitle data-qoder-id="qel-cardtitle-bb3032a8" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-cardtitle-bb3032a8&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;cardtitle&quot;,&quot;loc&quot;:{&quot;line&quot;:225,&quot;column&quot;:21}}">预约信息</CardTitle><CardDescription data-qoder-id="qel-carddescription-713b9859" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-carddescription-713b9859&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;carddescription&quot;,&quot;loc&quot;:{&quot;line&quot;:225,&quot;column&quot;:48}}">时间 10 分钟粒度，时长 30–240 分钟，范围 08:00–22:50。</CardDescription></CardHeader>
         <CardContent className="flex flex-col gap-4" data-qoder-id="qel-flex-e1e61c26" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-flex-e1e61c26&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;flex&quot;,&quot;loc&quot;:{&quot;line&quot;:226,&quot;column&quot;:9}}">
           <div className="flex flex-col gap-1.5" data-qoder-id="qel-flex-0ccd3bdb" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-flex-0ccd3bdb&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;flex&quot;,&quot;loc&quot;:{&quot;line&quot;:227,&quot;column&quot;:11}}">
             <Label htmlFor="t" data-qoder-id="qel-label-34dedf64" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-label-34dedf64&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;label&quot;,&quot;loc&quot;:{&quot;line&quot;:228,&quot;column&quot;:13}}">标题（1–30 字符）</Label>
@@ -257,11 +274,14 @@ export default function StudyCabin(qoderProps) {
           </div>
         </CardContent>
       </Card>
+      </motion.div>
 
       {/* 舱位优先级（来自 GET /study-cabin/cabins） */}
+      <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={inView}>
       <Card data-qoder-id="qel-card-b5861b97" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-card-b5861b97&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;card&quot;,&quot;loc&quot;:{&quot;line&quot;:250,&quot;column&quot;:7}}">
         <CardHeader className="flex-row items-start justify-between" data-qoder-id="qel-flex-row-1375e4a9" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-flex-row-1375e4a9&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;flex-row&quot;,&quot;loc&quot;:{&quot;line&quot;:251,&quot;column&quot;:9}}">
-          <div data-qoder-id="qel-div-4acbcb7d" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-div-4acbcb7d&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;div&quot;,&quot;loc&quot;:{&quot;line&quot;:252,&quot;column&quot;:11}}">
+          <div className="flex flex-col gap-1.5" data-qoder-id="qel-div-4acbcb7d" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-div-4acbcb7d&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;div&quot;,&quot;loc&quot;:{&quot;line&quot;:252,&quot;column&quot;:11}}">
+            <div className="kicker"><strong>03</strong> — Priority</div>
             <CardTitle data-qoder-id="qel-cardtitle-2f2ad916" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-cardtitle-2f2ad916&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;cardtitle&quot;,&quot;loc&quot;:{&quot;line&quot;:253,&quot;column&quot;:13}}">舱位优先级</CardTitle>
             <CardDescription data-qoder-id="qel-carddescription-01366adb" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-carddescription-01366adb&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;carddescription&quot;,&quot;loc&quot;:{&quot;line&quot;:254,&quot;column&quot;:13}}">从学校系统获取舱位列表，点击按你的优先级加入，不能重复。系统会按顺序帮你抢，抢到即止。</CardDescription>
           </div>
@@ -310,8 +330,8 @@ export default function StudyCabin(qoderProps) {
                     <span data-qoder-id="qel-span-bc470477" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-span-bc470477&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;span&quot;,&quot;loc&quot;:{&quot;line&quot;:298,&quot;column&quot;:21}}">第 {i + 1}</span>
                     <span className="text-[var(--muted)]" data-qoder-id="qel-text-var-muted-d37ff1e7" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-text-var-muted-d37ff1e7&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;text-var-muted&quot;,&quot;loc&quot;:{&quot;line&quot;:299,&quot;column&quot;:21}}">·</span>
                     <span data-qoder-id="qel-span-be47079d" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-span-be47079d&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;span&quot;,&quot;loc&quot;:{&quot;line&quot;:300,&quot;column&quot;:21}}">{cabinName(devId)}</span>
-                    <Button type="button" variant="ghost" size="icon" className="h-5 w-5 -mr-1" onClick={() => moveCabin(i, -1)} disabled={i === 0} aria-label="上移" data-qoder-id="qel-button-26f4c3ae" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-button-26f4c3ae&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;button&quot;,&quot;loc&quot;:{&quot;line&quot;:301,&quot;column&quot;:21}}">↑</Button>
-                    <Button type="button" variant="ghost" size="icon" className="h-5 w-5 -mr-1" onClick={() => moveCabin(i, 1)} disabled={i === selected.length - 1} aria-label="下移" data-qoder-id="qel-button-21f4bbcf" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-button-21f4bbcf&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;button&quot;,&quot;loc&quot;:{&quot;line&quot;:302,&quot;column&quot;:21}}">↓</Button>
+                    <Button type="button" variant="ghost" size="icon" className="h-5 w-5 -mr-1" onClick={() => moveCabin(i, -1)} disabled={i === 0} aria-label="上移" data-qoder-id="qel-button-26f4c3ae" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-button-26f4c3ae&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;button&quot;,&quot;loc&quot;:{&quot;line&quot;:301,&quot;column&quot;:21}}"><ChevronUp className="w-3 h-3" /></Button>
+                    <Button type="button" variant="ghost" size="icon" className="h-5 w-5 -mr-1" onClick={() => moveCabin(i, 1)} disabled={i === selected.length - 1} aria-label="下移" data-qoder-id="qel-button-21f4bbcf" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-button-21f4bbcf&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;button&quot;,&quot;loc&quot;:{&quot;line&quot;:302,&quot;column&quot;:21}}"><ChevronDown className="w-3 h-3" /></Button>
                   </Badge>
                 ))}
               </div>
@@ -319,10 +339,12 @@ export default function StudyCabin(qoderProps) {
           )}
         </CardContent>
       </Card>
+      </motion.div>
 
       {/* 调度与截止 */}
+      <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={inView}>
       <Card data-qoder-id="qel-card-a2950838" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-card-a2950838&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;card&quot;,&quot;loc&quot;:{&quot;line&quot;:312,&quot;column&quot;:7}}">
-        <CardHeader data-qoder-id="qel-cardheader-058bfcc4" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-cardheader-058bfcc4&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;cardheader&quot;,&quot;loc&quot;:{&quot;line&quot;:313,&quot;column&quot;:9}}"><CardTitle data-qoder-id="qel-cardtitle-b30fd265" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-cardtitle-b30fd265&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;cardtitle&quot;,&quot;loc&quot;:{&quot;line&quot;:313,&quot;column&quot;:21}}">调度与截止</CardTitle><CardDescription data-qoder-id="qel-carddescription-034339f4" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-carddescription-034339f4&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;carddescription&quot;,&quot;loc&quot;:{&quot;line&quot;:313,&quot;column&quot;:49}}">设置停止尝试时间和首次尝试时间。</CardDescription></CardHeader>
+        <CardHeader data-qoder-id="qel-cardheader-058bfcc4" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-cardheader-058bfcc4&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;cardheader&quot;,&quot;loc&quot;:{&quot;line&quot;:313,&quot;column&quot;:9}}"><div className="kicker"><strong>04</strong> — Schedule</div><CardTitle data-qoder-id="qel-cardtitle-b30fd265" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-cardtitle-b30fd265&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;cardtitle&quot;,&quot;loc&quot;:{&quot;line&quot;:313,&quot;column&quot;:21}}">调度与截止</CardTitle><CardDescription data-qoder-id="qel-carddescription-034339f4" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-carddescription-034339f4&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;carddescription&quot;,&quot;loc&quot;:{&quot;line&quot;:313,&quot;column&quot;:49}}">设置停止尝试时间和首次尝试时间。</CardDescription></CardHeader>
         <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4" data-qoder-id="qel-grid-0db4244e" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-grid-0db4244e&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;grid&quot;,&quot;loc&quot;:{&quot;line&quot;:314,&quot;column&quot;:9}}">
           <div className="flex flex-col gap-1.5" data-qoder-id="qel-flex-8ac13642" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-flex-8ac13642&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;flex&quot;,&quot;loc&quot;:{&quot;line&quot;:315,&quot;column&quot;:11}}">
             <Label htmlFor="au" data-qoder-id="qel-label-bce67141" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-label-bce67141&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;label&quot;,&quot;loc&quot;:{&quot;line&quot;:316,&quot;column&quot;:13}}">停止尝试时间</Label>
@@ -334,9 +356,12 @@ export default function StudyCabin(qoderProps) {
           </div>
         </CardContent>
       </Card>
+      </motion.div>
 
       {/* 提交 */}
-      <div className="flex flex-col gap-3" data-qoder-id="qel-flex-5f04e6aa" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-flex-5f04e6aa&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;flex&quot;,&quot;loc&quot;:{&quot;line&quot;:327,&quot;column&quot;:7}}">
+      <motion.div variants={fadeUp} initial="hidden" whileInView="show" viewport={inView} className="flex flex-col gap-3" data-qoder-id="qel-flex-5f04e6aa" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-flex-5f04e6aa&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;flex&quot;,&quot;loc&quot;:{&quot;line&quot;:327,&quot;column&quot;:7}}">
+        <div className="rule-line" />
+        <div className="kicker"><strong>05</strong> — Submit</div>
         <Alert variant="info" title="关于超时" data-qoder-id="qel-alert-a637f461" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-alert-a637f461&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;alert&quot;,&quot;loc&quot;:{&quot;line&quot;:328,&quot;column&quot;:9}}">
           <span data-qoder-id="qel-span-29114d28" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-span-29114d28&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;span&quot;,&quot;loc&quot;:{&quot;line&quot;:329,&quot;column&quot;:11}}">若学校系统响应超时，任务会进入待核验状态，需手动处理。成功结果只显示舱位、日期和时间。</span>
         </Alert>
@@ -366,7 +391,7 @@ export default function StudyCabin(qoderProps) {
             {credential && !valid && <span className="text-[13px] text-[var(--muted)] self-center" data-qoder-id="qel-text-13px-17d79de1" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-text-13px-17d79de1&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;text-13px&quot;,&quot;loc&quot;:{&quot;line&quot;:354,&quot;column&quot;:38}}">请补全标题、日期、时间段并选择至少一个舱位</span>}
           </div>
         )}
-      </div>
+      </motion.div>
     </div>
   );
 }
