@@ -7,6 +7,8 @@
    ============================================================ */
 
 :root {
+  color-scheme: light;
+
   /* 种子 token —— Nudge 微调入口 */
   --seed-bg: #fff7ed; /* 奶油白底 */
   --seed-surface: #fffbf5; /* 卡片面，更白 */
@@ -43,8 +45,10 @@
   --danger-foreground: #fff7ed;
   --danger-muted: color-mix(in srgb, var(--seed-danger) 12%, var(--seed-bg));
 
-  /* 字体 —— Fraunces 拉丁衬线标题，中文回退无衬线保持工具清晰感 */
-  --font-display: "Fraunces", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
+  /* 字体 —— 标题用粗无衬线 grotesque（CJK 显示级排版更稳），
+     Fraunces 斜体只作英文点缀；宋体栈保留给引言类场景 */
+  --font-display: "Inter", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
+  --font-serif: "Fraunces", "Songti SC", "STSong", "SimSun", "Noto Serif CJK SC", "Noto Serif SC", serif;
   --font-sans: "Inter", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
   --font-mono: ui-monospace, "Cascadia Code", "Source Code Pro", monospace;
 
@@ -59,6 +63,33 @@
 
   /* 排版与密度种子（Nudge 可调） */
   --seed-base-size: 16px;
+}
+
+/* ============================================================
+   暗色主题 —— 暖墨底色 + 提亮琥珀，只覆盖种子 token，
+   派生 token 经 color-mix 自动级联
+   ============================================================ */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --seed-bg: #17110d; /* 暖墨底 */
+  --seed-surface: #211a14; /* 卡片面 */
+  --seed-surface-2: #2a2119; /* 次级面 */
+  --seed-fg: #f5ead9; /* 暖米白文字 */
+  --seed-primary: #f4732a; /* 提亮琥珀 */
+  --seed-primary-strong: #ffab7a; /* 暗底下保证文字对比度 */
+  --seed-success: #7fb69f;
+  --seed-warning: #d99a3d;
+  --seed-danger: #e26a5c;
+  --seed-muted: #a89a84; /* 暖灰 */
+  --seed-border: #3a2e22;
+
+  --primary-foreground: #241207;
+  --success-foreground: #12201a;
+  --danger-foreground: #2a0f0b;
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.35);
+  --shadow-md: 0 4px 14px -2px rgb(0 0 0 / 0.45);
 }
 
 /* Tailwind v4 映射：让 bg-background / text-foreground / border-border 等类可用 */
@@ -81,6 +112,7 @@
   --color-danger-foreground: var(--danger-foreground);
   --font-sans: var(--font-sans);
   --font-display: var(--font-display);
+  --font-serif: var(--font-serif);
   --font-mono: var(--font-mono);
   --radius: var(--radius);
 }
@@ -106,14 +138,15 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display);
-  font-weight: 500;
+  font-weight: 600;
   color: var(--foreground);
-  letter-spacing: -0.015em;
-  line-height: 1.15;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
   margin: 0;
 }
 h1 { font-size: clamp(1.75rem, 1.2rem + 2vw, 2.5rem); letter-spacing: -0.02em; }
@@ -216,3 +249,81 @@ button { font-family: inherit; }
   .timetable-grid { grid-template-columns: 44px repeat(7, minmax(72px, 1fr)); }
   .timetable-cell { min-height: 44px; font-size: 12px; }
 }
+
+/* ============================================================
+   编辑风打样工具类 —— 首页 / 登录页新视觉
+   ============================================================ */
+
+/* 巨型标题（粗 grotesque，紧字距） */
+.display-hero {
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 1.7rem + 3.6vw, 4.375rem);
+  font-weight: 650;
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+  color: var(--foreground);
+}
+.display-lede {
+  font-family: var(--font-display);
+  font-size: clamp(1.375rem, 1.1rem + 1.2vw, 1.875rem);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+
+/* 小号大写英文标注 */
+.kicker {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.kicker strong { color: var(--seed-primary-strong); font-weight: 600; }
+
+/* 斜体 Fraunces 英文点缀 */
+.accent-en {
+  font-family: "Fraunces", serif;
+  font-style: italic;
+  font-weight: 500;
+  color: var(--seed-primary);
+}
+
+/* 编辑分隔线 */
+.rule-line { height: 1px; background: var(--border); border: 0; }
+.rule-dotted {
+  height: 1px;
+  background-image: linear-gradient(to right, var(--border) 45%, transparent 45%);
+  background-size: 8px 1px;
+}
+
+/* 噪点纹理覆盖层（明暗通用，经 token 控强度） */
+.grain-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+  mix-blend-mode: multiply;
+}
+[data-theme="dark"] .grain-overlay { mix-blend-mode: screen; opacity: 0.35; }
+
+/* 编辑索引行（工具导航） */
+.index-row {
+  position: relative;
+  isolation: isolate;
+}
+.index-row::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: color-mix(in srgb, var(--seed-primary) 7%, var(--seed-bg));
+  transform: scaleY(0);
+  transform-origin: bottom;
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.index-row:hover::before { transform: scaleY(1); }
+.index-row .index-arrow { transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), color 0.2s; }
+.index-row:hover .index-arrow { transform: translateX(6px); color: var(--seed-primary-strong); }
