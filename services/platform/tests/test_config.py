@@ -22,7 +22,8 @@ def production_settings(**overrides: object) -> Settings:
         "credential_local_master_key": SecretStr(b64encode(b"k" * 32).decode("ascii")),
     }
     values.update(overrides)
-    return Settings(**values)  # type: ignore[arg-type]
+    # 不读本地 .env：开发环境的 .env（如 CloudMail 配置）不应影响测试
+    return Settings(_env_file=None, **values)  # type: ignore[arg-type]
 
 
 def test_safe_production_settings_are_accepted() -> None:
@@ -53,6 +54,21 @@ def test_production_rejects_turnstile_test_keys() -> None:
             turnstile_secret_key=SecretStr("1x0000000000000000000000000000000AA"),
             turnstile_expected_hostnames=["nanyee.de"],
         )
+
+
+def test_cloudmail_gateway_requires_url_and_token_together() -> None:
+    with pytest.raises(ValidationError, match="Cloudmail gateway"):
+        production_settings(cloudmail_gateway_url="https://cloudmail.apograss.workers.dev")
+    with pytest.raises(ValidationError, match="Cloudmail gateway"):
+        production_settings(cloudmail_gateway_token=SecretStr("gateway-token"))
+
+
+def test_cloudmail_gateway_pair_is_accepted_in_production() -> None:
+    settings = production_settings(
+        cloudmail_gateway_url="https://cloudmail.apograss.workers.dev",
+        cloudmail_gateway_token=SecretStr("gateway-token"),
+    )
+    assert settings.cloudmail_gateway_url == "https://cloudmail.apograss.workers.dev"
 
 
 @pytest.mark.parametrize(

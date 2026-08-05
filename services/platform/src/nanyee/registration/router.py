@@ -22,7 +22,11 @@ from nanyee.identity.models import RegistrationTrustLevel, User
 from nanyee.identity.passwords import hash_password
 from nanyee.identity.router import AuthResponse, UserResponse
 from nanyee.identity.sessions import create_session, set_session_cookies, settings_from_request
-from nanyee.registration.mailer import SmtpVerificationMailer, VerificationMailer
+from nanyee.registration.mailer import (
+    CloudmailVerificationMailer,
+    SmtpVerificationMailer,
+    VerificationMailer,
+)
 from nanyee.registration.models import RegistrationChallenge, RegistrationMethod
 from nanyee.registration.quiz import grade_answers, load_quiz_bank, pick_question_ids
 from nanyee.security import as_utc, keyed_digest, secure_compare, utc_now
@@ -118,7 +122,10 @@ def get_mailer(request: Request) -> VerificationMailer:
     mailer = getattr(request.app.state, "verification_mailer", None)
     if mailer is not None:
         return cast(VerificationMailer, mailer)
-    return SmtpVerificationMailer(settings_from_request(request))
+    settings = settings_from_request(request)
+    if settings.cloudmail_gateway_url and settings.cloudmail_gateway_token.get_secret_value():
+        return CloudmailVerificationMailer(settings)
+    return SmtpVerificationMailer(settings)
 
 
 @router.post("/challenges", response_model=ChallengeResponse, operation_id="create_challenge")
