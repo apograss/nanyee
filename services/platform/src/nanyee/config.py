@@ -78,6 +78,16 @@ class Settings(BaseSettings):
     smtp_password: SecretStr | None = None
     mail_from: str | None = None
 
+    cloudmail_gateway_url: str = ""
+    cloudmail_gateway_token: SecretStr = SecretStr("")
+
+    # 学校侧出口代理（Cloudflare Worker 多 IP 池，见 infra/cloudflare/egress-proxy/）
+    school_egress_proxy_url: str = ""
+    school_egress_proxy_token: SecretStr = SecretStr("")
+    # 可选：访问 Worker 域名本身要走的上游代理（workers.dev 在国内被封锁时指向本机代理；
+    # 生产 VPS 可直连则留空）
+    school_egress_proxy_via: str = ""
+
     credential_key_provider: Literal["local_file", "azure"] = "local_file"
     credential_local_master_key: SecretStr | None = None
     credential_local_key_version: str = "local-v1"
@@ -109,6 +119,18 @@ class Settings(BaseSettings):
                 raise ValueError("Turnstile keys are required when Turnstile is enabled")
             if not self.turnstile_expected_hostnames:
                 raise ValueError("Turnstile expected hostnames are required when enabled")
+
+        cloudmail_url_set = bool(self.cloudmail_gateway_url)
+        cloudmail_token_set = bool(self.cloudmail_gateway_token.get_secret_value())
+        if cloudmail_url_set != cloudmail_token_set:
+            raise ValueError("Cloudmail gateway URL and token must be configured together")
+
+        egress_url_set = bool(self.school_egress_proxy_url)
+        egress_token_set = bool(self.school_egress_proxy_token.get_secret_value())
+        if egress_url_set != egress_token_set:
+            raise ValueError("School egress proxy URL and token must be configured together")
+        if self.school_egress_proxy_via and not egress_url_set:
+            raise ValueError("School egress proxy 'via' requires the proxy URL")
 
         if self.app_env == "production":
             self._validate_production_security()

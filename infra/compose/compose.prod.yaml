@@ -79,11 +79,15 @@ services:
         condition: service_completed_successfully
 
   gateway:
-    image: nginx:1.28-alpine
+    build:
+      context: ..
+      dockerfile: infra/docker/web.Dockerfile
+      args:
+        VITE_AMAP_KEY: ${VITE_AMAP_KEY:-}
+        VITE_AMAP_SECURITY_CODE: ${VITE_AMAP_SECURITY_CODE:-}
+    image: nanyee-web:local
     ports:
       - "127.0.0.1:8080:8080"
-    volumes:
-      - ../nginx/nanyee.conf:/etc/nginx/conf.d/default.conf:ro
     read_only: true
     tmpfs:
       - /var/cache/nginx:size=16m

@@ -3,13 +3,14 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
 import re
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from email.utils import parsedate_to_datetime
 from typing import Any
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urlencode, urljoin, urlparse
 from zoneinfo import ZoneInfo
 
 import httpx
@@ -17,6 +18,7 @@ from bs4 import BeautifulSoup, Tag
 
 from nanyee.config import Settings
 from nanyee.errors import AppError, ErrorCode
+from nanyee.integrations.egress import egress_transport_from_settings
 from nanyee.tools.course_selection import CourseCategory, CourseItem, EnrollmentResult
 from nanyee.tools.evaluation import (
     EvaluationDraft,
@@ -37,6 +39,8 @@ COMMON_HEADERS = {
 }
 
 COOKIE_NAME_PATTERN = re.compile(r"^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$")
+
+logger = logging.getLogger(__name__)
 
 
 def parse_academic_cookie_header(value: str) -> dict[str, str]:
@@ -86,7 +90,7 @@ class SmuAcademicClient:
         self, settings: Settings, *, transport: httpx.AsyncBaseTransport | None = None
     ) -> None:
         self._settings = settings
-        self._transport = transport
+        self._transport = transport or egress_transport_from_settings(settings)
 
     async def fetch_captcha(self) -> CaptchaData:
         try:
@@ -177,9 +181,9 @@ class SmuAcademicClient:
             raise ValueError("total_weeks must be between 1 and 30")
         async with self._client(cookies=academic_cookies) as client:
             try:
-                page = await client.get(
+                page = await self._get_following_redirects(
+                    client,
                     f"{self._settings.smu_academic_base_url}/new/student/xsgrkb/main.page",
-                    headers={**COMMON_HEADERS, "Accept": "text/html,*/*"},
                 )
             except httpx.HTTPError as exc:
                 raise self._unavailable() from exc
@@ -202,9 +206,9 @@ class SmuAcademicClient:
         base = self._settings.smu_academic_base_url
         async with self._client(cookies=academic_cookies) as client:
             try:
-                page = await client.get(
+                page = await self._get_following_redirects(
+                    client,
                     f"{base}/new/student/xskccj/kccjList.page",
-                    headers={**COMMON_HEADERS, "Accept": "text/html,*/*"},
                 )
                 self._ensure_success(page)
                 body = (
@@ -230,26 +234,26 @@ class SmuAcademicClient:
                 grades = parse_grades(response.json())
             except (ValueError, TypeError) as exc:
                 raise self._unavailable() from exc
-            enriched: list[GradeRecord] = []
-            for grade in grades:
-                ranking = (
-                    await self._fetch_grade_ranking(client, grade.grade_id)
-                    if grade.grade_id
-                    else None
-                )
-                enriched.append(grade.model_copy(update={"ranking": ranking}))
-            return enriched
+            # 排名页并发补全（有界）：串行 25+ 次请求会让成绩页空转数秒
+            semaphore = asyncio.Semaphore(5)
+
+            async def enrich(grade: GradeRecord) -> GradeRecord:
+                if not grade.grade_id:
+                    return grade
+                async with semaphore:
+                    ranking = await self._fetch_grade_ranking(client, grade.grade_id)
+                return grade.model_copy(update={"ranking": ranking})
+
+            return list(await asyncio.gather(*(enrich(grade) for grade in grades)))
 
     async def _fetch_grade_ranking(
         self, client: httpx.AsyncClient, grade_id: str
     ) -> RankingInfo | None:
+        url = f"{self._settings.smu_academic_base_url}/new/student/xskccj/kccjfxd.page"
+        url = f"{url}?{urlencode({'cjdm': grade_id})}"
         try:
-            response = await client.get(
-                f"{self._settings.smu_academic_base_url}/new/student/xskccj/kccjfxd.page",
-                params={"cjdm": grade_id},
-                headers={**COMMON_HEADERS, "Accept": "text/html,*/*"},
-            )
-        except httpx.HTTPError:
+            response = await self._get_following_redirects(client, url)
+        except (httpx.HTTPError, AppError):
             return None
         if response.status_code != 200 or self._response_size_invalid(response):
             return None
@@ -696,6 +700,42 @@ class SmuAcademicClient:
         if not isinstance(ticket, str) or not ticket or len(ticket) > 2048:
             raise self._rejected()
         return ticket
+
+    def _allowed_page_hosts(self) -> set[str | None]:
+        return {
+            urlparse(self._settings.smu_academic_base_url).hostname,
+            urlparse(self._settings.smu_uis_base_url).hostname,
+        }
+
+    async def _get_following_redirects(self, client: httpx.AsyncClient, url: str) -> httpx.Response:
+        """跟随正方的 302 自检跳转链并逐跳校验域名。
+
+        携带有效会话首次访问模块页时，zhjw 常先 302 到 ssoLogin 再自动回跳，
+        直接把非 200 当失败会误杀正常流程；手动跟随可复刻浏览器的正常行为，
+        同时避免被重定向到不可信主机。
+        """
+        allowed_hosts = self._allowed_page_hosts()
+        current = url
+        # 正方模块页校验 Referer 做防深链，缺失会 302 回首页；与 legacy 行为保持一致
+        headers = {
+            **COMMON_HEADERS,
+            "Accept": "text/html,*/*",
+            "Referer": f"{self._settings.smu_academic_base_url}/",
+        }
+        for _ in range(5):
+            response = await client.get(current, headers=headers)
+            location = response.headers.get("location")
+            if not response.is_redirect or not location:
+                return response
+            candidate = urljoin(current, location)
+            parsed = urlparse(candidate)
+            if parsed.scheme != "https" or parsed.hostname not in allowed_hosts:
+                raise self._unavailable()
+            logger.info(
+                "smu page redirect hop: %s -> %s (%s)", current, candidate, response.status_code
+            )
+            current = candidate
+        raise self._unavailable()
 
     async def _establish_academic_session(self, ticket: str) -> dict[str, str]:
         allowed_host = urlparse(self._settings.smu_academic_base_url).hostname

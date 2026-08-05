@@ -17,6 +17,8 @@ secrets
 **/.mypy_cache
 **/.ruff_cache
 **/tests
+**/node_modules
+web/dist
 coverage.xml
 htmlcov
 *.db
