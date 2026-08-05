@@ -43,9 +43,10 @@ from nanyee.tools.timetable import (
 from nanyee.transient import TransientSecretStore
 
 router = APIRouter(prefix="/smu", tags=["smu"])
-CAPTCHA_POLICY = RateLimitPolicy(window_seconds=10 * 60, soft_limit=5, hard_limit=15)
-LOGIN_POLICY = RateLimitPolicy(window_seconds=10 * 60, soft_limit=3, hard_limit=10)
-READ_POLICY = RateLimitPolicy(window_seconds=10 * 60, soft_limit=20, hard_limit=60)
+# 正常使用一节课表会话只需 1-2 个验证码；限流主要用于挡脚本，保留量级但放宽到不误伤真人
+CAPTCHA_POLICY = RateLimitPolicy(window_seconds=10 * 60, soft_limit=12, hard_limit=36)
+LOGIN_POLICY = RateLimitPolicy(window_seconds=10 * 60, soft_limit=6, hard_limit=15)
+READ_POLICY = RateLimitPolicy(window_seconds=10 * 60, soft_limit=40, hard_limit=120)
 ENROLL_POLICY = RateLimitPolicy(window_seconds=60, soft_limit=3, hard_limit=6)
 ENROLL_RUN_POLICY = RateLimitPolicy(window_seconds=10 * 60, soft_limit=3, hard_limit=10)
 EVALUATION_SUBMIT_POLICY = RateLimitPolicy(window_seconds=10 * 60, soft_limit=5, hard_limit=15)
