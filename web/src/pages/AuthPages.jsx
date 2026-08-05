@@ -2,19 +2,12 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { motion } from "motion/react";
-import { ShieldCheck, ArrowRight, ArrowUpRight, CheckCircle2 } from "lucide-react";
-import { Button, Input, Label, Alert, Badge, cn } from "@/components/ui.jsx";
+import { ArrowRight, ArrowUpRight, CheckCircle2 } from "lucide-react";
+import { Button, Input, Label, Alert, Badge, Spinner, cn } from "@/components/ui.jsx";
 import { useTurnstile, useAuth, apiPost } from "@/lib/api.jsx";
 import { ThemeToggle } from "@/lib/theme.jsx";
 
 const EASE = [0.22, 1, 0.36, 1];
-
-const MOCK_QUIZ_QUESTIONS = [
-  { id: 0, q: "南医大广州主校区位于哪个区？", options: ["海珠区", "番禺区", "白云区", "天河区"] },
-  { id: 1, q: "顺德校区所在城市是？", options: ["佛山", "珠海", "东莞", "中山"] },
-  { id: 2, q: "教学信息服务平台简称？", options: ["UIS", "JWC", "JWXT", "EDU"] },
-  { id: 3, q: "学习舱预约开放时间为？", options: ["次日 22:00", "当日 22:00", "次日 06:00", "当日 18:00"] },
-];
 
 /* ---------- 编辑风表单面板 ---------- */
 function AuthPanel({ kicker, title, description, children, wide = false, ...props }) {
@@ -35,20 +28,6 @@ function AuthPanel({ kicker, title, description, children, wide = false, ...prop
   );
 }
 
-function TurnstileSlot() {
-  const { challenge } = useTurnstile();
-  return (
-    <div data-component="TurnstileSlot" data-od-id="turnstile" className="rounded-[var(--radius)] border border-dashed border-[color-mix(in_srgb,var(--seed-primary)_40%,transparent)] bg-[var(--primary-muted)] p-4 flex items-center gap-3">
-      <ShieldCheck className="w-5 h-5 text-[var(--seed-primary-strong)]" />
-      <div className="text-[13px] leading-[1.5]">
-        <div className="font-medium text-[var(--seed-primary-strong)] tracking-[0.01em]">人机验证已触发</div>
-        <div className="text-[var(--muted)]">系统检测到需要验证时自动出现，完成后 5 分钟内有效。</div>
-      </div>
-      <div className="ml-auto w-[140px] h-[42px] rounded-[var(--radius-sm)] bg-[var(--seed-surface)] border border-border flex items-center justify-center text-[11px] text-[var(--muted)] tracking-[0.06em] uppercase">验证中</div>
-    </div>
-  );
-}
-
 function LoginForm() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -56,24 +35,38 @@ function LoginForm() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [challengeOpen, setChallengeOpen] = useState(false);
   const [error, setError] = useState("");
+  const { replayWithChallenge, widget } = useTurnstile();
 
   const submit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
     try {
-      await apiPost("/auth/login", { username, password }, {
-        mock: { id: "usr_2c7f9a", username: "linyi", nickname: "林一", role: "student", status: "active", registration_trust_level: "community_quiz" },
-      });
+      await apiPost("/auth/login", { username, password }, { action: "login" });
       await refresh();
       setPassword("");
       const from = location.state?.from || "/";
       navigate(from, { replace: true });
     } catch (err) {
-      if (err.code === "RATE_LIMIT_CHALLENGE_REQUIRED") {
-        setChallengeOpen(true);
+      if (err.code === "RATE_LIMIT_CHALLENGE_REQUIRED" && err.turnstileChallenge) {
+        // 触发 Turnstile 挑战：渲染 widget 取 token 后重放登录请求
+        const { sitekey, action } = err.turnstileChallenge;
+        try {
+          await replayWithChallenge(
+            (t) => apiPost("/auth/login", { username, password }, { turnstileToken: t, action: "login" }),
+            action,
+            sitekey
+          );
+          await refresh();
+          setPassword("");
+          const from = location.state?.from || "/";
+          navigate(from, { replace: true });
+        } catch (retryErr) {
+          setError(retryErr?.code === "HUMAN_VERIFICATION_FAILED" ? "人机验证失败，请重试" : retryErr?.message || "登录失败，请检查用户名和密码。");
+        }
+      } else if (err.code === "HUMAN_VERIFICATION_FAILED") {
+        setError("人机验证失败，请重试");
       } else {
         setError(err?.message || "登录失败，请检查用户名和密码。");
       }
@@ -89,6 +82,11 @@ function LoginForm() {
       data-component="LoginForm"
       data-od-id="login"
     >
+      {location.state?.from && (
+        <div className="mb-4">
+          <Alert variant="info" title="需要平台账号">这个操作需要登录平台账号，登录后会自动回到之前的页面。</Alert>
+        </div>
+      )}
       <form className="flex flex-col gap-4" onSubmit={submit}>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="u">用户名</Label>
@@ -100,7 +98,7 @@ function LoginForm() {
         </div>
         <Button type="submit" loading={loading} className="w-full h-11 mt-1">登录</Button>
       </form>
-      {challengeOpen && <div className="mt-4"><TurnstileSlot /></div>}
+      {widget && <div className="mt-4">{widget}</div>}
       {error && <div className="mt-4"><Alert variant="danger" title="登录失败"><span>{error}</span></Alert></div>}
       <div className="text-[13px] text-[var(--muted)] mt-6 flex items-center gap-2">
         没有账号？
@@ -113,13 +111,16 @@ function LoginForm() {
 }
 
 /* ---------- 答题注册 ---------- */
+// 用户名规则（与后端一致）：2–24 字符，字母、数字或下划线
+const USERNAME_PATTERN = /^[A-Za-z0-9_]{2,24}$/;
+
 function QuizRegister() {
   const navigate = useNavigate();
-  const [questions, setQuestions] = useState(MOCK_QUIZ_QUESTIONS);
+  const { refresh } = useAuth();
+  const [questions, setQuestions] = useState([]);
   const [challengeId, setChallengeId] = useState(null);
-  const [answers, setAnswers] = useState(() => Array(MOCK_QUIZ_QUESTIONS.length).fill(null));
+  const [answers, setAnswers] = useState([]);
   const [phase, setPhase] = useState("quiz"); // quiz → verifying → verified → register → done
-  const [verificationToken, setVerificationToken] = useState(null);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -128,15 +129,13 @@ function QuizRegister() {
   // 拉取答题题目
   const fetchChallenges = useCallback(async () => {
     try {
-      const data = await apiPost("/registration/challenges", { method: "community_quiz" }, {
-        mock: { challenge_id: "ch_demo_001", questions: MOCK_QUIZ_QUESTIONS },
-      });
+      const data = await apiPost("/registration/challenges", { method: "quiz" }, { action: "registration_quiz" });
       setChallengeId(data.challenge_id);
       if (data.questions?.length) {
         setQuestions(data.questions);
         setAnswers(Array(data.questions.length).fill(null));
       }
-    } catch { /* 设计预览用本地题目 */ }
+    } catch {}
   }, []);
 
   useEffect(() => { fetchChallenges(); }, [fetchChallenges]);
@@ -148,55 +147,46 @@ function QuizRegister() {
     setLoading(true);
     setError("");
     try {
-      const data = await apiPost("/registration/verify", {
-        challenge_id: challengeId,
-        answers: answers.map((a, i) => ({ question_id: questions[i]?.id ?? i, answer_index: a })),
-      }, {
-        mock: { verification_token: "vt_demo_001", passed: true },
-      });
-      if (data.verification_token) {
-        setVerificationToken(data.verification_token);
+      // answers：按题目顺序的选项下标数组
+      const data = await apiPost(`/registration/challenges/${challengeId}/verify`, { answers }, { action: "registration_quiz" });
+      if (data.verified) {
         setPhase("register");
       }
     } catch (err) {
-      setError(err?.message || "答题验证失败，请重新作答。");
+      let msg = err?.message || "答题验证失败，请重新作答。";
+      if (err?.details?.score != null) {
+        msg += `（得分 ${err.details.score} / 需 ${err.details.required_score}）`;
+      }
+      setError(msg);
     }
     setLoading(false);
   };
 
   const complete = async () => {
-    setLoading(true);
     setError("");
+    if (!USERNAME_PATTERN.test(username)) {
+      setError("用户名需为 2–24 个字符，仅限字母、数字或下划线。");
+      return;
+    }
+    setLoading(true);
     try {
-      await apiPost("/registration", { verification_token: verificationToken, username, password }, {
-        mock: { id: "usr_new", username, nickname: username, role: "student", status: "active", registration_trust_level: "community_quiz" },
-      });
-      setPhase("done");
+      // 注册成功即种会话 Cookie：刷新用户态后直接进首页
+      await apiPost("/registration", { challenge_id: challengeId, username, password }, { action: "register" });
+      await refresh();
       setPassword("");
+      navigate("/", { replace: true });
     } catch (err) {
       setError(err?.message || "注册失败，请更换用户名重试。");
     }
     setLoading(false);
   };
 
-  if (phase === "done") {
-    return (
-      <AuthPanel kicker="Done — 注册完成" title="注册成功" data-component="QuizRegister" data-od-id="register-quiz">
-        <div className="flex flex-col items-start gap-4">
-          <CheckCircle2 className="w-10 h-10 text-[var(--success)]" />
-          <div className="text-[13px] text-[var(--muted)]">现在可以用新账号登录了。</div>
-          <Button onClick={() => navigate("/auth/login")} className="h-11">前往登录 <ArrowRight className="w-4 h-4" /></Button>
-        </div>
-      </AuthPanel>
-    );
-  }
-
   if (phase === "register") {
     return (
       <AuthPanel
         kicker="Step 02 — 设置账号"
         title="设置账号密码"
-        description="用户名 3–32 字符，密码 8–128 字符。"
+        description="用户名 2–24 字符（字母、数字或下划线），密码 8–128 字符。"
         data-component="QuizRegister"
         data-od-id="register-quiz"
       >
@@ -204,7 +194,7 @@ function QuizRegister() {
           <Badge variant="success" className="self-start"><CheckCircle2 className="w-3 h-3" /> 答题已通过</Badge>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="ru">用户名</Label>
-            <Input id="ru" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="3–32 字符" />
+            <Input id="ru" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="2–24 字符，字母、数字或下划线" />
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="rp">密码</Label>
@@ -226,6 +216,9 @@ function QuizRegister() {
       data-component="QuizRegister"
       data-od-id="register-quiz"
     >
+      {questions.length === 0 ? (
+        <div className="flex items-center gap-2 text-[13px] text-[var(--muted)] py-6"><Spinner /> 加载题目…</div>
+      ) : (
       <div className="flex flex-col gap-3">
         <div className="flex items-center gap-3 text-[13px]">
           <div className="flex-1 h-1 rounded-[var(--radius-full)] bg-[var(--seed-surface-2)] overflow-hidden">
@@ -241,7 +234,7 @@ function QuizRegister() {
         {questions.map((item, i) => (
           <div key={item.id ?? i} className="rounded-[var(--radius)] border border-border bg-card p-4 sm:p-5">
             <div className="kicker mb-1.5">第 {String(i + 1).padStart(2, "0")} 题</div>
-            <div className="text-sm font-medium mb-3 tracking-[0.01em]">{item.q}</div>
+            <div className="text-sm font-medium mb-3 tracking-[0.01em]">{item.question}</div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {item.options.map((opt, oi) => {
                 const sel = answers[i] === oi;
@@ -267,6 +260,7 @@ function QuizRegister() {
           提交验证 <ArrowRight className="w-4 h-4" />
         </Button>
       </div>
+      )}
     </AuthPanel>
   );
 }
@@ -274,11 +268,12 @@ function QuizRegister() {
 /* ---------- 邮箱注册 ---------- */
 function EmailRegister() {
   const navigate = useNavigate();
+  const { refresh } = useAuth();
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [challengeId, setChallengeId] = useState(null);
+  const [maskedEmail, setMaskedEmail] = useState("");
   const [phase, setPhase] = useState("send"); // send → verify → register → done
-  const [verificationToken, setVerificationToken] = useState(null);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -288,10 +283,9 @@ function EmailRegister() {
     setLoading(true);
     setError("");
     try {
-      const data = await apiPost("/registration/challenges", { method: "email", email }, {
-        mock: { challenge_id: "ch_email_demo" },
-      });
+      const data = await apiPost("/registration/challenges", { method: "email", email }, { action: "registration_email" });
       setChallengeId(data.challenge_id);
+      setMaskedEmail(data.masked_email || "");
       setPhase("verify");
     } catch (err) {
       setError(err?.message || "验证码发送失败，请检查邮箱地址。");
@@ -303,11 +297,8 @@ function EmailRegister() {
     setLoading(true);
     setError("");
     try {
-      const data = await apiPost("/registration/verify", { challenge_id: challengeId, code }, {
-        mock: { verification_token: "vt_email_demo" },
-      });
-      if (data.verification_token) {
-        setVerificationToken(data.verification_token);
+      const data = await apiPost(`/registration/challenges/${challengeId}/verify`, { code }, { action: "registration_email" });
+      if (data.verified) {
         setPhase("register");
       }
     } catch (err) {
@@ -317,38 +308,30 @@ function EmailRegister() {
   };
 
   const complete = async () => {
-    setLoading(true);
     setError("");
+    if (!USERNAME_PATTERN.test(username)) {
+      setError("用户名需为 2–24 个字符，仅限字母、数字或下划线。");
+      return;
+    }
+    setLoading(true);
     try {
-      await apiPost("/registration", { verification_token: verificationToken, username, password }, {
-        mock: { id: "usr_new", username, nickname: username, role: "student", status: "active", registration_trust_level: "community_quiz" },
-      });
-      setPhase("done");
+      // 注册成功即种会话 Cookie：刷新用户态后直接进首页
+      await apiPost("/registration", { challenge_id: challengeId, username, password }, { action: "register" });
+      await refresh();
       setPassword("");
+      navigate("/", { replace: true });
     } catch (err) {
       setError(err?.message || "注册失败，请更换用户名重试。");
     }
     setLoading(false);
   };
 
-  if (phase === "done") {
-    return (
-      <AuthPanel kicker="Done — 注册完成" title="注册成功" data-component="EmailRegister" data-od-id="register-email">
-        <div className="flex flex-col items-start gap-4">
-          <CheckCircle2 className="w-10 h-10 text-[var(--success)]" />
-          <div className="text-[13px] text-[var(--muted)]">现在可以用新账号登录了。</div>
-          <Button onClick={() => navigate("/auth/login")} className="h-11">前往登录 <ArrowRight className="w-4 h-4" /></Button>
-        </div>
-      </AuthPanel>
-    );
-  }
-
   if (phase === "register") {
     return (
       <AuthPanel
         kicker="Step 02 — 设置账号"
         title="设置账号密码"
-        description="用户名 3–32 字符，密码 8–128 字符。"
+        description="用户名 2–24 字符（字母、数字或下划线），密码 8–128 字符。"
         data-component="EmailRegister"
         data-od-id="register-email"
       >
@@ -356,7 +339,7 @@ function EmailRegister() {
           <Badge variant="success" className="self-start"><CheckCircle2 className="w-3 h-3" /> 邮箱已验证</Badge>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="eu">用户名</Label>
-            <Input id="eu" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="3–32 字符" />
+            <Input id="eu" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="2–24 字符，字母、数字或下划线" />
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="ep">密码</Label>
@@ -374,7 +357,7 @@ function EmailRegister() {
       <AuthPanel
         kicker="Step 01 — 验证邮箱"
         title="输入验证码"
-        description={`验证码已发送至 ${email}，请查收邮件。`}
+        description={`验证码已发送至 ${maskedEmail || email}，请查收邮件。`}
         data-component="EmailRegister"
         data-od-id="register-email"
       >

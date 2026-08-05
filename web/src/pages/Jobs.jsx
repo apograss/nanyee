@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { motion } from "motion/react";
 import { ListTodo, AlertTriangle, Search, RefreshCw, ArrowUpRight } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, StatusBadge, EmptyState, Badge, Spinner, cn } from "@/components/ui.jsx";
-import { listJobs, TERMINAL_STATES, mockJobs } from "@/lib/api.jsx";
+import { listJobs, TERMINAL_STATES } from "@/lib/api.jsx";
 
 const EASE = [0.22, 1, 0.36, 1];
 
@@ -62,7 +62,7 @@ export default function Jobs() {
     setLoading(true);
     setError(null);
     try {
-      const data = await listJobs({ mock: mockJobs });
+      const data = await listJobs();
       const arr = Array.isArray(data) ? data : (data?.items || []);
       setJobs(arr);
     } catch (err) {

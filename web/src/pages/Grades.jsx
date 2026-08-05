@@ -1,9 +1,10 @@
 // Canvas design runtime editable source marker: grades
 import React, { useState, useEffect, useCallback } from "react";
-import { GraduationCap, ShieldCheck, TrendingUp, BarChart3, RefreshCw } from "lucide-react";
+import { GraduationCap, ShieldCheck, TrendingUp, BarChart3, RefreshCw, ScanLine, Check } from "lucide-react";
 import { motion } from "motion/react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Label, Table, Alert, Badge, cn } from "@/components/ui.jsx";
-import { apiGet, apiPost, mockGrades } from "@/lib/api.jsx";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Label, Table, Alert, Badge, Checkbox, Spinner, cn } from "@/components/ui.jsx";
+import { apiGet, apiPost } from "@/lib/api.jsx";
+import { recognizeCaptcha, terminateOCR } from "@/lib/captcha-ocr.jsx";
 
 const EASE = [0.22, 1, 0.36, 1];
 const fadeUp = {
@@ -50,15 +51,17 @@ export default function Grades(qoderProps) {
   const [password, setPassword] = useState("");
   const [captcha, setCaptcha] = useState(null);
   const [captchaCode, setCaptchaCode] = useState("");
+  const [autoOcr, setAutoOcr] = useState(true);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrResult, setOcrResult] = useState(null); // { text, confidence } | { error } | null
   const [loading, setLoading] = useState(false);
   const [grades, setGrades] = useState(null);
   const [error, setError] = useState("");
 
   const fetchCaptcha = useCallback(async () => {
+    setOcrResult(null);
     try {
-      const data = await apiGet("/smu/captcha", {
-        mock: { flow_id: "flow_demo_001", image_base64: "iVBORw0KGgoAAAANSUhEUgAAAFAAAAAcCAYAAAABqWjNAAAACXBIWXMAAA7DAAAOwwHHb6kHAAAAJ0lEQVR4nO3BMQEAAADCoPdpr0IDyUBRcKPQo1MBBqVQAwAXjCQBAOerCgAAAABJRU5ErkJggg==", content_type: "image/png", expires_at: new Date(Date.now() + 120000).toISOString() },
-      });
+      const data = await apiGet("/smu/captcha", { action: "smu_captcha" });
       const dataUrl = `data:${data.content_type};base64,${data.image_base64}`;
       setCaptcha({ flow_id: data.flow_id, dataUrl, expires_at: data.expires_at });
       setCaptchaCode("");
@@ -67,22 +70,65 @@ export default function Grades(qoderProps) {
 
   useEffect(() => { if (!session) fetchCaptcha(); }, [session, fetchCaptcha]);
 
+  // 卸载时释放 ONNX session
+  useEffect(() => () => { terminateOCR(); }, []);
+
+  // OCR 识别：仅在有真实图像时调用
+  const runOcr = useCallback(async (dataUrl) => {
+    if (!dataUrl) return;
+    setOcrLoading(true);
+    try {
+      const result = await recognizeCaptcha(dataUrl);
+      if (result) {
+        setOcrResult(result);
+        setCaptchaCode(result.text);
+      } else {
+        setOcrResult({ error: true });
+      }
+    } catch {
+      setOcrResult({ error: true });
+    } finally {
+      setOcrLoading(false);
+    }
+  }, []);
+
+  // 自动 OCR：取到验证码图像且 autoOcr 打开时自动识别
+  useEffect(() => {
+    if (autoOcr && captcha?.dataUrl) runOcr(captcha.dataUrl);
+  }, [captcha?.dataUrl, autoOcr, runOcr]);
+
+  const loadGrades = useCallback(async (sessionId) => {
+    setLoading(true);
+    setError("");
+    try {
+      const data = await apiPost("/smu/grades", { academic_session_id: sessionId }, { action: "smu_grades" });
+      setGrades(data);
+    } catch (err) {
+      if (err?.status === 410) {
+        // 学校会话已在服务端失效：回到登录卡（session 置空后 useEffect 会重新取验证码）
+        setSession(null);
+      } else {
+        setError(err?.message || "成绩加载失败，请稍后重试。");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const login = async () => {
     setLoading(true);
     setError("");
     try {
-      const sess = await apiPost("/smu/session", { flow_id: captcha?.flow_id, account, password, captcha: captchaCode }, {
-        mock: { academic_session_id: "as_demo_001", expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() },
-      });
+      const sess = await apiPost("/smu/session", { flow_id: captcha?.flow_id, account, password, captcha: captchaCode }, { action: "smu_login" });
       setSession(sess);
       setPassword(""); setCaptchaCode("");
-      const data = await apiPost("/smu/grades", { academic_session_id: sess.academic_session_id }, { mock: mockGrades });
-      setGrades(data);
+      setLoading(false);
+      loadGrades(sess.academic_session_id);
     } catch (err) {
       setError(err?.message || "登录失败，请检查输入后重试。");
       fetchCaptcha();
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const s = grades?.summary;
@@ -117,15 +163,39 @@ export default function Grades(qoderProps) {
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label>验证码</Label>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   {captcha ? (
                     <img src={captcha.dataUrl} alt="验证码" className="h-9 rounded-[var(--radius)] border border-border" />
                   ) : (
                     <div className="h-9 w-[100px] rounded-[var(--radius)] border border-border flex items-center justify-center text-[11px] text-[var(--muted)]">加载中…</div>
                   )}
                   <Button type="button" variant="ghost" size="icon" onClick={fetchCaptcha} aria-label="刷新验证码"><RefreshCw className="w-4 h-4" /></Button>
-                  <Input value={captchaCode} onChange={(e) => setCaptchaCode(e.target.value)} placeholder="输入图中字符" className="flex-1" />
+                  <Input value={captchaCode} onChange={(e) => setCaptchaCode(e.target.value)} placeholder="输入图中字符" className="flex-1 min-w-[110px]" />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => runOcr(captcha?.dataUrl)}
+                    disabled={ocrLoading || !captcha}
+                    loading={ocrLoading}
+                  >
+                    {ocrLoading ? <Spinner /> : <ScanLine className="w-4 h-4" />}
+                    自动识别
+                  </Button>
                 </div>
+                <label className="inline-flex items-center gap-1.5 text-[12px] text-[var(--muted)] cursor-pointer select-none">
+                  <Checkbox checked={autoOcr} onChange={setAutoOcr} />
+                  自动识别验证码
+                </label>
+                {ocrResult && !ocrResult.error && (
+                  <div className="text-[12px] text-[var(--muted)] flex items-center gap-1.5">
+                    <Check className="w-3 h-3 text-[var(--success)]" />
+                    已识别：<span className="font-mono text-foreground">{ocrResult.text}</span>
+                  </div>
+                )}
+                {ocrResult?.error && (
+                  <div className="text-[12px] text-[var(--warning)]">识别失败，请手动输入或刷新验证码。</div>
+                )}
               </div>
             </div>
             <div className="mt-3"><Button onClick={login} loading={loading} disabled={!captcha || !account || !password || !captchaCode}>登录并查询</Button></div>
@@ -141,6 +211,28 @@ export default function Grades(qoderProps) {
           </Alert>
           </motion.div>
 
+          {loading && !grades && (
+            <motion.div variants={fadeUp}>
+              <Card>
+                <CardContent className="py-10 flex items-center justify-center gap-2 text-[13px] text-[var(--muted)]">
+                  <Spinner /> 正在加载成绩与排名分布，约需几秒钟…
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+
+          {error && !loading && (
+            <motion.div variants={fadeUp}>
+              <Alert variant="warning" title="成绩加载失败">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span>{error}</span>
+                  <Button variant="outline" size="sm" onClick={() => loadGrades(session.academic_session_id)}>重试</Button>
+                </div>
+              </Alert>
+            </motion.div>
+          )}
+
+          {grades && (<>
           <motion.div variants={fadeUp} className="grid grid-cols-2 sm:grid-cols-4 gap-3" data-qoder-id="qel-grid-ae3bf837" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-grid-ae3bf837&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;grid&quot;,&quot;loc&quot;:{&quot;line&quot;:98,&quot;column&quot;:11}}">
             {[
               { k: "总学分", v: s?.total_credits?.toFixed(1) || "—", s: `${s?.total_courses || 0} 门` },
@@ -197,6 +289,7 @@ export default function Grades(qoderProps) {
             </CardContent>
           </Card>
           </motion.div>
+          </>)}
 
           <motion.div variants={fadeUp}>
           <Alert variant="info" title="默认不保存" data-qoder-id="qel-alert-13890fab" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-alert-13890fab&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;alert&quot;,&quot;loc&quot;:{&quot;line&quot;:153,&quot;column&quot;:11}}">

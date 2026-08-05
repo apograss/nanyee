@@ -4,7 +4,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import { ArrowLeft, AlertTriangle, ExternalLink, Ban, CheckCircle2, RefreshCw, Clock } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, StatusBadge, Alert, Badge, Spinner, cn } from "@/components/ui.jsx";
-import { getJob, cancelJob, TERMINAL_STATES, isRetryableState, mockJobs } from "@/lib/api.jsx";
+import { getJob, cancelJob, TERMINAL_STATES, isRetryableState } from "@/lib/api.jsx";
 
 const EASE = [0.22, 1, 0.36, 1];
 
@@ -45,9 +45,7 @@ export default function JobDetail() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      // 设计预览：从 mockJobs 找一条匹配 id 的，找不到则回退到 mockJobs[1]（verification_required）
-      const mock = mockJobs.find((m) => m.id === id) || mockJobs[1];
-      const data = await getJob(id, { mock: { ...mock, id: id || mock.id } });
+      const data = await getJob(id);
       setJob(data);
     } catch (err) {
       setError(err?.message || "任务加载失败");
@@ -79,7 +77,7 @@ export default function JobDetail() {
     setCancelError(null);
     setCancelling(true);
     try {
-      await cancelJob(id, { mock: { ...job, state: "cancelled", cancel_requested_at: new Date().toISOString() } });
+      await cancelJob(id);
       setJob((j) => ({ ...j, state: "cancelled", cancel_requested_at: new Date().toISOString() }));
     } catch (err) {
       setCancelError(err?.message || "取消失败");

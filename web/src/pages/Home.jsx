@@ -1,5 +1,5 @@
 // Canvas design runtime editable source marker: home
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { motion, useMotionValue, useSpring, useTransform, useReducedMotion } from "motion/react";
 import {
@@ -7,7 +7,7 @@ import {
   ArrowRight, ArrowUpRight, Activity, Asterisk,
 } from "lucide-react";
 import { StatusBadge, Alert } from "@/components/ui.jsx";
-import { useAuth } from "@/lib/api.jsx";
+import { useAuth, listJobs, TERMINAL_STATES } from "@/lib/api.jsx";
 
 const TOOLS = [
   { to: "/tools/timetable", label: "课表查询", en: "Timetable", desc: "登录学校系统后查看周课表，可导出日历", icon: CalendarDays },
@@ -18,11 +18,12 @@ const TOOLS = [
   { to: "/tools/qun", label: "群报数", en: "Check-in", desc: "每日打卡自动提交，支持图片上传", icon: Users },
 ];
 
-const SUMMARY = [
-  { state: "running", title: "自动评课进行中", sub: "正在自动评课", id: "job_001" },
-  { state: "verification_required", title: "学习舱预约待核验", sub: "需要手动确认", id: "job_002" },
-  { state: "succeeded", title: "自动评课已完成 · 18 门", sub: "评课已完成", id: "job_004" },
-];
+const TOOL_NAMES = {
+  evaluation: "自动评课",
+  study_cabin: "学习舱预约",
+  qun_checkin: "群报数",
+  enrollment: "自动选课",
+};
 
 const FACTS = [
   { n: "06", label: "校园工具" },
@@ -144,6 +145,24 @@ function MarqueeStrip() {
 export default function Home() {
   const { user } = useAuth();
   const today = new Date().toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric", weekday: "long" });
+
+  /* 真实任务数据：仅登录后拉取，无任务时隐藏整个区块 */
+  const [jobs, setJobs] = useState(null);
+  useEffect(() => {
+    if (!user) { setJobs(null); return; }
+    let alive = true;
+    listJobs()
+      .then((data) => { if (alive) setJobs(Array.isArray(data) ? data : (data?.items || [])); })
+      .catch(() => { if (alive) setJobs([]); });
+    return () => { alive = false; };
+  }, [user]);
+
+  const jobList = jobs || [];
+  const ongoing = jobList.filter((j) => !TERMINAL_STATES.includes(j.state));
+  const verifyJobs = ongoing.filter((j) => j.state === "verification_required");
+  const runningJobs = ongoing.filter((j) => j.state !== "verification_required");
+  const summaryJobs = (ongoing.length ? ongoing : jobList).slice(0, 3);
+  const showTasks = jobList.length > 0;
 
   /* 鼠标视差：构图跟手，标题反向轻移 */
   const reduceMotion = useReducedMotion();
@@ -314,7 +333,8 @@ export default function Home() {
         </motion.div>
       </section>
 
-      {/* ---------- 进行中的事务（深色反转区块） ---------- */}
+      {/* ---------- 进行中的事务（深色反转区块，真实任务数据，无任务时隐藏） ---------- */}
+      {showTasks && (
       <section data-component="TaskSummary" data-od-id="task-summary">
         <motion.div
           variants={stagger}
@@ -341,12 +361,12 @@ export default function Home() {
                   <Activity className="w-4 h-4 text-[var(--seed-primary-strong)]" /> 任务摘要
                 </div>
                 <div className="flex flex-col divide-y divide-border">
-                  {SUMMARY.map((s) => (
-                    <Link to={`/jobs/${s.id}`} key={s.id} className="flex items-center gap-3 py-3.5 first:pt-0 last:pb-0 no-underline group">
-                      <StatusBadge status={s.state} />
+                  {summaryJobs.map((j) => (
+                    <Link to={`/jobs/${j.id}`} key={j.id} className="flex items-center gap-3 py-3.5 first:pt-0 last:pb-0 no-underline group">
+                      <StatusBadge status={j.state} />
                       <div className="flex-1 min-w-0">
-                        <div className="text-[13px] font-medium truncate text-foreground group-hover:text-[var(--seed-primary-strong)] transition-colors">{s.title}</div>
-                        <div className="text-[11px] text-[var(--muted)] tracking-[0.01em]">{s.sub}</div>
+                        <div className="text-[13px] font-medium truncate text-foreground group-hover:text-[var(--seed-primary-strong)] transition-colors">{TOOL_NAMES[j.tool_id] || j.tool_id}</div>
+                        <div className="text-[11px] text-[var(--muted)] tracking-[0.01em]">{j.operation}</div>
                       </div>
                       <ArrowUpRight className="w-4 h-4 text-[var(--muted)] opacity-0 group-hover:opacity-100 transition-opacity" />
                     </Link>
@@ -356,17 +376,25 @@ export default function Home() {
 
               <motion.div variants={fadeUp} className="bg-card p-5 sm:p-6 flex flex-col gap-3">
                 <div className="text-sm font-medium tracking-[0.01em] mb-1">待办提醒</div>
-                <Alert variant="warning" title="学习舱预约待核验">
-                  <span>有一个学习舱预约需要你手动确认结果，请在任务列表中查看详情。</span>
-                </Alert>
-                <Alert variant="info" title="自动选课运行中">
-                  <span>选课正在自动进行中，可随时取消。先连续尝试几轮，之后自动轮询直到成功或超时。</span>
-                </Alert>
+                {verifyJobs.length > 0 && (
+                  <Alert variant="warning" title="任务待核验">
+                    <span>有 {verifyJobs.length} 个任务需要你手动确认结果，请在任务列表中查看详情。</span>
+                  </Alert>
+                )}
+                {runningJobs.length > 0 && (
+                  <Alert variant="info" title="任务自动运行中">
+                    <span>有 {runningJobs.length} 个任务正在后台自动执行，可在任务列表中查看进度或随时取消。</span>
+                  </Alert>
+                )}
+                {verifyJobs.length === 0 && runningJobs.length === 0 && (
+                  <div className="text-[13px] text-[var(--muted)]">暂无待办提醒。</div>
+                )}
               </motion.div>
             </div>
           </div>
         </motion.div>
       </section>
+      )}
 
       {/* ---------- 页脚签条 ---------- */}
       <motion.footer

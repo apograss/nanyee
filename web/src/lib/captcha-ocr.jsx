@@ -7,6 +7,12 @@
  */
 import * as ort from "onnxruntime-web";
 
+// onnxruntime 的 wasm 二进制不进打包产物：由 scripts/copy-ort-wasm.mjs
+// 拷到 public/ort-wasm/，这里显式指向前缀；否则默认路径 404 到 SPA
+// fallback（HTML），wasm 编译直接失败。
+ort.env.wasm.wasmPaths = "/ort-wasm/";
+ort.env.wasm.numThreads = 1;
+
 const MODEL_URL = "/captcha_model.onnx";
 const IMG_WIDTH = 80;
 const IMG_HEIGHT = 28;
@@ -19,7 +25,6 @@ async function ensureSession() {
   if (!initPromise) {
     initPromise = (async () => {
       try {
-        ort.env.wasm.numThreads = 1;
         session = await ort.InferenceSession.create(MODEL_URL, {
           executionProviders: ["wasm"],
         });

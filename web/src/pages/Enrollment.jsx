@@ -6,7 +6,6 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Inpu
 import {
   fetchEnrollmentCategories, fetchEnrollmentCourses, startEnrollmentRun,
   getEnrollmentRun, cancelEnrollmentRun, createEnrollmentCookieSession, apiGet, apiPost,
-  mockEnrollmentCategories, mockEnrollmentCourses, mockEnrollmentRun,
   ENROLLMENT_TERMINAL_STATES, CONFIRMATION_VERSIONS,
 } from "@/lib/api.jsx";
 import { recognizeCaptcha } from "@/lib/captcha-ocr.jsx";
@@ -40,9 +39,7 @@ function AcademicSessionCard({ onSession }) {
 
   const fetchCaptcha = useCallback(async () => {
     try {
-      const data = await apiGet("/smu/captcha", {
-        mock: { flow_id: "flow_demo_001", image_base64: "iVBORw0KGgoAAAANSUhEUgAAAFAAAAAcCAYAAAABqWjNAAAACXBIWXMAAA7DAAAOwwHHb6kHAAAAJ0lEQVR4nO3BMQEAAADCoPdpr0IDyUBRcKPQo1MBBqVQAwAXjCQBAOerCgAAAABJRU5ErkJggg==", content_type: "image/png", expires_at: new Date(Date.now() + 120000).toISOString() },
-      });
+      const data = await apiGet("/smu/captcha", { action: "smu_captcha" });
       const dataUrl = `data:${data.content_type};base64,${data.image_base64}`;
       setCaptcha({ flow_id: data.flow_id, dataUrl, expires_at: data.expires_at });
       setCaptchaCode(""); setOcrResult(null);
@@ -75,12 +72,8 @@ function AcademicSessionCard({ onSession }) {
     setError("");
     try {
       const data = loginMode === "cookie"
-        ? await createEnrollmentCookieSession(cookie, {
-            mock: { academic_session_id: "as_demo_cookie", expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() },
-          })
-        : await apiPost("/smu/session", { flow_id: captcha.flow_id, account, password, captcha: captchaCode }, {
-            mock: { academic_session_id: "as_demo_001", expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() },
-          });
+        ? await createEnrollmentCookieSession(cookie)
+        : await apiPost("/smu/session", { flow_id: captcha.flow_id, account, password, captcha: captchaCode }, { action: "smu_login" });
       setSession(data); onSession(data); setPassword(""); setCaptchaCode("");
       setCookie("");
     } catch (err) {
@@ -267,9 +260,15 @@ export default function Enrollment() {
   const loadCategories = async () => {
     if (!academicSession) return;
     try {
-      const data = await fetchEnrollmentCategories(academicSession.academic_session_id, { mock: mockEnrollmentCategories });
+      const data = await fetchEnrollmentCategories(academicSession.academic_session_id);
       setCategories(data);
-    } catch { setCategories([]); }
+    } catch (err) {
+      setCategories([]);
+      if (err?.status === 410) {
+        // 学校会话已在服务端失效：回到学校登录卡
+        setAcademicSession(null);
+      }
+    }
   };
   useEffect(() => { if (academicSession) loadCategories(); }, [academicSession]);
 
@@ -277,9 +276,15 @@ export default function Enrollment() {
     setSelectedCategory(cat);
     setPreferences([]);
     try {
-      const data = await fetchEnrollmentCourses(academicSession.academic_session_id, cat.code, { mock: mockEnrollmentCourses });
+      const data = await fetchEnrollmentCourses(academicSession.academic_session_id, cat.code);
       setCourses(data);
-    } catch { setCourses([]); }
+    } catch (err) {
+      setCourses([]);
+      if (err?.status === 410) {
+        // 学校会话已在服务端失效：回到学校登录卡
+        setAcademicSession(null);
+      }
+    }
   };
 
   const addPreference = (course) => {
@@ -308,7 +313,7 @@ export default function Enrollment() {
         primary_burst_attempts: primaryBurst,
         confirm_conflicts: confirmConflicts,
         confirmation_version: CONFIRMATION_VERSIONS.enrollmentRun,
-      }, { mock: mockEnrollmentRun });
+      });
       setRun(data);
     } catch {}
     setLoading(false);
@@ -318,20 +323,22 @@ export default function Enrollment() {
     if (!run || ENROLLMENT_TERMINAL_STATES.includes(run.state)) return;
     pollRef.current = setInterval(async () => {
       try {
-        const nextAttempt = Math.min(run.attempt_count + 1, run.max_attempts);
-        const isDone = nextAttempt >= run.max_attempts;
-        const data = await getEnrollmentRun(run.id, {
-          mock: { ...mockEnrollmentRun, attempt_count: nextAttempt, state: isDone ? "succeeded" : run.state, result: isDone ? { success: true, course_name: run.preferences[0]?.name, outcome: "选课成功", message: "余量充足，自动确认" } : null },
-        });
+        const data = await getEnrollmentRun(run.id);
         setRun(data);
-      } catch {}
+      } catch (err) {
+        if (err?.status === 410) {
+          // 学校会话已在服务端失效：停止轮询并清空会话，回到学校登录卡
+          clearInterval(pollRef.current);
+          setAcademicSession(null);
+        }
+      }
     }, 2000);
     return () => clearInterval(pollRef.current);
   }, [run]);
 
   const doCancel = async () => {
     try {
-      const data = await cancelEnrollmentRun(run.id, { mock: { ...run, state: "cancelled", finished_at: new Date().toISOString() } });
+      const data = await cancelEnrollmentRun(run.id);
       setRun(data);
     } catch {}
   };

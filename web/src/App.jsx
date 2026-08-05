@@ -3,9 +3,9 @@ import React, { useEffect } from "react";
 import { Routes, Route, Navigate, Outlet, useLocation, useNavigate, Link } from "react-router-dom";
 import {
   Home, CalendarDays, GraduationCap, BookOpen, ClipboardCheck, Armchair,
-  Users, KeyRound, ListTodo, LogOut, Bell, ShieldCheck, Compass,
+  Users, KeyRound, ListTodo, LogOut, LogIn, Bell, ShieldCheck, Compass,
 } from "lucide-react";
-import { AuthProvider, useAuth, apiPost } from "@/lib/api.jsx";
+import { AuthProvider, useAuth, apiPost, listJobs } from "@/lib/api.jsx";
 import { ThemeProvider, ThemeToggle } from "@/lib/theme.jsx";
 import { MotionConfig, motion } from "motion/react";
 import { Button, Badge, cn } from "@/components/ui.jsx";
@@ -93,6 +93,21 @@ function Shell() {
 
   const currentLabel = [...NAV].reverse().find((n) => location.pathname.startsWith(n.to))?.label || "首页";
 
+  // 待核验任务数（state=verification_required 的持久任务），仅登录后拉取
+  const [verifyCount, setVerifyCount] = React.useState(0);
+  useEffect(() => {
+    if (!user) { setVerifyCount(0); return; }
+    let alive = true;
+    listJobs({ silent401: true })
+      .then((data) => {
+        if (!alive) return;
+        const arr = Array.isArray(data) ? data : (data?.items || []);
+        setVerifyCount(arr.filter((j) => j.state === "verification_required").length);
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [user]);
+
   return (
     <div className="min-h-screen flex" data-component="AppShell" data-od-id="shell">
       {/* 侧栏 */}
@@ -132,15 +147,27 @@ function Shell() {
               <div className="text-[13px] font-medium truncate">{user?.nickname || "未登录"}</div>
               <div className="text-[11px] text-[var(--muted)] truncate">{user?.username ? `@${user.username}` : "平台账号"}</div>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => { apiPost("/auth/logout").catch(() => {}); clearOnExit(); navigate("/auth/login"); }}
-              aria-label="退出登录"
-              data-component="LogoutButton"
-            >
-              <LogOut className="w-4 h-4" />
-            </Button>
+            {user ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => { apiPost("/auth/logout").catch(() => {}); clearOnExit(); navigate("/auth/login"); }}
+                aria-label="退出登录"
+                data-component="LogoutButton"
+              >
+                <LogOut className="w-4 h-4" />
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate("/auth/login", { state: { from: location.pathname } })}
+                aria-label="登录平台账号"
+                data-component="LoginButton"
+              >
+                <LogIn className="w-4 h-4" />
+              </Button>
+            )}
           </div>
         </div>
       </aside>
@@ -166,12 +193,16 @@ function Shell() {
             <span className="text-[13px] font-medium tracking-[0.01em] truncate">{currentLabel}</span>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="warning" className="hidden sm:inline-flex" data-component="VerifyBadge">
-              <Bell className="w-3 h-3" /> 待核验 1
-            </Badge>
-            <Badge variant="muted" className="hidden sm:inline-flex">
-              <ShieldCheck className="w-3 h-3" /> 安全登录
-            </Badge>
+            {user && verifyCount > 0 && (
+              <Badge variant="warning" className="hidden sm:inline-flex" data-component="VerifyBadge">
+                <Bell className="w-3 h-3" /> 待核验 {verifyCount}
+              </Badge>
+            )}
+            {user && (
+              <Badge variant="muted" className="hidden sm:inline-flex">
+                <ShieldCheck className="w-3 h-3" /> 安全登录
+              </Badge>
+            )}
             <ThemeToggle />
           </div>
         </header>
@@ -235,19 +266,21 @@ export default function App() {
           <Routes>
             <Route path="/auth/login" element={<AuthPages mode="login" />} />
             <Route path="/auth/register" element={<AuthPages mode="register" />} />
-            <Route element={<ProtectedRoute />}>
-              <Route element={<Shell />}>
-                <Route path="/" element={<HomePage />} />
-                <Route path="/tools/timetable" element={<Timetable />} />
-                <Route path="/tools/grades" element={<Grades />} />
-                <Route path="/tools/enrollment" element={<Enrollment />} />
-                <Route path="/tools/evaluations" element={<Evaluations />} />
-                <Route path="/tools/study-cabin" element={<StudyCabin />} />
-                <Route path="/tools/qun" element={<Qun />} />
+            <Route element={<Shell />}>
+              {/* 公开页面：无需平台登录，学校查询走学校账号会话 */}
+              <Route path="/" element={<HomePage />} />
+              <Route path="/tools/timetable" element={<Timetable />} />
+              <Route path="/tools/grades" element={<Grades />} />
+              <Route path="/tools/enrollment" element={<Enrollment />} />
+              <Route path="/tools/evaluations" element={<Evaluations />} />
+              <Route path="/tools/study-cabin" element={<StudyCabin />} />
+              <Route path="/tools/qun" element={<Qun />} />
+              <Route path="/recommendations" element={<Recommendations />} />
+              {/* 平台账号页面：整页数据依赖登录态，访问时提醒并跳登录 */}
+              <Route element={<ProtectedRoute />}>
                 <Route path="/credentials" element={<Credentials />} />
                 <Route path="/jobs" element={<Jobs />} />
                 <Route path="/jobs/:id" element={<JobDetail />} />
-                <Route path="/recommendations" element={<Recommendations />} />
               </Route>
             </Route>
             <Route path="*" element={<NotFound />} />

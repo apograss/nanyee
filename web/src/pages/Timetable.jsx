@@ -2,8 +2,8 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { motion } from "motion/react";
 import { CalendarDays, Download, Image as ImageIcon, Clock, RefreshCw, ScanLine, Copy, Check, Share2 } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Label, Select, Badge, Alert, Checkbox, Spinner, cn } from "@/components/ui.jsx";
-import { apiGet, apiPost, shareWakeup, CONFIRMATION_VERSIONS, mockCaptcha, mockSession, mockWakeupShare } from "@/lib/api.jsx";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Label, Select, Alert, Checkbox, Spinner, cn } from "@/components/ui.jsx";
+import { apiGet, apiPost, apiDownload, shareWakeup, CONFIRMATION_VERSIONS } from "@/lib/api.jsx";
 import { recognizeCaptcha, terminateOCR } from "@/lib/captcha-ocr.jsx";
 
 // 瞬时学校会话状态：idle | captcha(取验证码) | session(已登录 24h) | expired
@@ -15,14 +15,6 @@ const SECTIONS = [
   { n: 1, time: "08:00-08:45" }, { n: 2, time: "08:55-09:40" }, { n: 3, time: "10:10-10:55" },
   { n: 4, time: "11:05-11:50" }, { n: 5, time: "14:30-15:15" }, { n: 6, time: "15:25-16:10" },
   { n: 7, time: "16:30-17:15" }, { n: 8, time: "19:00-19:45" }, { n: 9, time: "19:55-20:40" },
-];
-
-const MOCK_COURSES = [
-  { day: 0, sec: 1, len: 2, name: "有机化学", teacher: "陈老师", room: "教学楼 A301", weeks: "1-18" },
-  { day: 2, sec: 3, len: 2, name: "病理学", teacher: "林老师", room: "科研楼 B205", weeks: "1-16" },
-  { day: 1, sec: 5, len: 2, name: "诊断学", teacher: "王老师", room: "附属医院 C108", weeks: "1-18" },
-  { day: 3, sec: 5, len: 2, name: "诊断学", teacher: "王老师", room: "附属医院 C108", weeks: "1-18" },
-  { day: 4, sec: 8, len: 2, name: "医学英语", teacher: "李老师", room: "教学楼 A102", weeks: "3-14" },
 ];
 
 const COLORS = ["bg-[var(--primary-muted)] text-[var(--seed-primary-strong)]", "bg-[var(--success-muted)] text-[var(--success)]"];
@@ -38,29 +30,12 @@ const stagger = {
   show: { transition: { staggerChildren: 0.07, delayChildren: 0.05 } },
 };
 
-// 验证码 mock 字符（仅设计预览，与 inline SVG 一致；真实接口返回 base64 图像后由 ONNX 识别）
-const MOCK_CAPTCHA_TEXT = "7294";
-
 function CaptchaImage({ src }) {
-  // 真实接口：src 为 data:image/png;base64,...；设计预览：src 为空时回退到 inline SVG
-  if (src) {
-    return (
-      <div className="w-[120px] h-[48px] rounded-[var(--radius-sm)] border border-border bg-[var(--seed-surface)] flex items-center justify-center overflow-hidden shrink-0">
-        <img src={src} alt="学校验证码" className="w-full h-full object-cover" />
-      </div>
-    );
-  }
+  // 真实接口：src 为 data:image/png;base64,...；src 为空时不渲染
+  if (!src) return null;
   return (
     <div className="w-[120px] h-[48px] rounded-[var(--radius-sm)] border border-border bg-[var(--seed-surface)] flex items-center justify-center overflow-hidden shrink-0">
-      <svg viewBox="0 0 120 48" className="w-full h-full" aria-label="学校验证码（预览）">
-        <rect width="120" height="48" fill="var(--seed-surface)" />
-        <path d="M2 8 Q 30 24 60 14 T 118 22" stroke="color-mix(in srgb, var(--seed-muted) 30%, transparent)" fill="none" strokeWidth="1" />
-        <path d="M4 38 Q 40 28 80 40 T 118 32" stroke="color-mix(in srgb, var(--seed-primary) 22%, transparent)" fill="none" strokeWidth="1" />
-        <text x="14" y="32" fontFamily="var(--font-display)" fontSize="22" fill="var(--seed-fg)" transform="rotate(-6 14 32)">7</text>
-        <text x="38" y="30" fontFamily="var(--font-display)" fontSize="22" fill="var(--seed-primary-strong)" transform="rotate(4 38 30)">2</text>
-        <text x="62" y="33" fontFamily="var(--font-display)" fontSize="22" fill="var(--seed-fg)" transform="rotate(-3 62 33)">9</text>
-        <text x="86" y="30" fontFamily="var(--font-display)" fontSize="22" fill="var(--seed-primary-strong)" transform="rotate(5 86 30)">4</text>
-      </svg>
+      <img src={src} alt="学校验证码" className="w-full h-full object-cover" />
     </div>
   );
 }
@@ -103,6 +78,11 @@ export default function Timetable() {
   const [campus, setCampus] = useState("shunde");
   const [semesterMonday, setSemesterMonday] = useState("2026-09-07");
   const [exporting, setExporting] = useState(null); // "ics" | "wakeup" | null
+  const [exportError, setExportError] = useState(null);
+  // 课表事件：仅内存，会话过期/手动刷新时清空
+  const [events, setEvents] = useState(null);
+  const [gridLoading, setGridLoading] = useState(false);
+  const [gridError, setGridError] = useState(null);
 
   // WakeUp 分享
   const [shareConsent, setShareConsent] = useState(false);
@@ -117,7 +97,7 @@ export default function Timetable() {
     setOcrResult(null);
     setCaptcha("");
     try {
-      const data = await apiGet("/smu/captcha", { mock: mockCaptcha });
+      const data = await apiGet("/smu/captcha", { action: "smu_captcha" });
       const flow = data.flow_id || null;
       const dataUrl = data.image_base64
         ? `data:${data.content_type || "image/png"};base64,${data.image_base64}`
@@ -137,17 +117,9 @@ export default function Timetable() {
     return () => { terminateOCR(); }; // 卸载时释放 ONNX session
   }, [fetchCaptcha]);
 
-  // OCR 识别：仅在有真实图像时调用；设计预览（mock 无 image_base64）回退到 mock 文本
+  // OCR 识别：仅在有真实图像时调用
   const runOcr = useCallback(async (dataUrl) => {
-    if (!dataUrl) {
-      // 设计预览：mock 验证码无真实图像，回退到 mock 结果，仅用于演示交互
-      setOcrLoading(true);
-      await new Promise((r) => setTimeout(r, 450));
-      setOcrResult({ text: MOCK_CAPTCHA_TEXT, confidence: 92.5, mock: true });
-      setCaptcha(MOCK_CAPTCHA_TEXT);
-      setOcrLoading(false);
-      return;
-    }
+    if (!dataUrl) return;
     setOcrLoading(true);
     try {
       const result = await recognizeCaptcha(dataUrl);
@@ -171,6 +143,28 @@ export default function Timetable() {
     }
   }, [captchaDataUrl, autoOcr, runOcr]);
 
+  // 拉取课表：POST /smu/timetable { academic_session_id, total_weeks } → events 仅内存
+  const loadTimetable = useCallback(async (academicSessionId) => {
+    setGridLoading(true);
+    setGridError(null);
+    try {
+      const data = await apiPost("/smu/timetable", { academic_session_id: academicSessionId, total_weeks: 20 }, { action: "smu_timetable" });
+      setEvents(data.events || []);
+    } catch (err) {
+      setEvents(null);
+      if (err.status === 410) {
+        // 学校会话已在服务端失效：清空会话，回到学校登录卡
+        setSession(null);
+        setGridError(null);
+        fetchCaptcha();
+      } else {
+        setGridError(err.message || "课表获取失败，请稍后重试");
+      }
+    } finally {
+      setGridLoading(false);
+    }
+  }, [fetchCaptcha]);
+
   // 登录学校系统：POST /smu/session { flow_id, account, password, captcha }
   const login = async (e) => {
     e.preventDefault();
@@ -181,13 +175,14 @@ export default function Timetable() {
     setLoginError(null);
     setLoginLoading(true);
     try {
-      const data = await apiPost("/smu/session", { flow_id: flowId, account, password, captcha }, { mock: mockSession });
+      const data = await apiPost("/smu/session", { flow_id: flowId, account, password, captcha }, { action: "smu_login" });
       setSession({ academic_session_id: data.academic_session_id, expires_at: data.expires_at });
       setPassword(""); // 学校密码只用于本次登录请求，立即清空
       setCaptcha("");
       setOcrResult(null);
       setFlowId(null);
       setCaptchaDataUrl("");
+      loadTimetable(data.academic_session_id);
     } catch (err) {
       setLoginError(err.message || "登录失败，请重新取验证码后重试");
       // 登录失败需重新取验证码
@@ -203,28 +198,45 @@ export default function Timetable() {
     fetchCaptcha();
   };
 
-  // 导出 ICS：POST /smu/timetable.ics { academic_session_id, total_weeks } → Blob 下载
+  // 导出 ICS：POST /smu/timetable.ics { academic_session_id, total_weeks, semester_monday } → 浏览器下载 .ics
   const exportIcs = async () => {
     if (!session) return;
     setExporting("ics");
+    setExportError(null);
     try {
-      // 设计预览：模拟 Blob 下载
-      await new Promise((r) => setTimeout(r, 600));
-      // const blob = await apiPost("/smu/timetable.ics", { academic_session_id: session.academic_session_id, total_weeks: 20 });
-      // saveAs(blob, "timetable.ics");
+      await apiDownload("/smu/timetable.ics", { academic_session_id: session.academic_session_id, total_weeks: 20, semester_monday: semesterMonday }, "nanyee-timetable.ics", { action: "smu_timetable" });
+    } catch (err) {
+      if (err.status === 410) {
+        // 学校会话已在服务端失效：清空会话，回到学校登录卡
+        setSession(null);
+        setEvents(null);
+        setGridError(null);
+        fetchCaptcha();
+      } else {
+        setExportError(err.message || "ICS 导出失败，请稍后重试");
+      }
     } finally {
       setExporting(null);
     }
   };
 
-  // 导出 WakeUp 文件：POST /smu/timetable.wakeup { academic_session_id, total_weeks, semester_monday, campus } → Blob 下载
+  // 导出 WakeUp 文件：POST /smu/timetable.wakeup { academic_session_id, total_weeks, semester_monday, campus } → 浏览器下载 .wakeup_schedule
   const exportWakeup = async () => {
     if (!session) return;
     setExporting("wakeup");
+    setExportError(null);
     try {
-      await new Promise((r) => setTimeout(r, 600));
-      // const blob = await apiPost("/smu/timetable.wakeup", { academic_session_id: session.academic_session_id, total_weeks: 20, semester_monday: semesterMonday, campus });
-      // saveAs(blob, "timetable.wakeup_schedule");
+      await apiDownload("/smu/timetable.wakeup", { academic_session_id: session.academic_session_id, total_weeks: 20, semester_monday: semesterMonday, campus }, "nanyee.wakeup_schedule", { action: "smu_timetable" });
+    } catch (err) {
+      if (err.status === 410) {
+        // 学校会话已在服务端失效：清空会话，回到学校登录卡
+        setSession(null);
+        setEvents(null);
+        setGridError(null);
+        fetchCaptcha();
+      } else {
+        setExportError(err.message || "WakeUp 文件导出失败，请稍后重试");
+      }
     } finally {
       setExporting(null);
     }
@@ -244,10 +256,18 @@ export default function Timetable() {
         campus,
         total_weeks: 20,
         confirmation_version: CONFIRMATION_VERSIONS.wakeupShare,
-      }, { mock: mockWakeupShare });
+      });
       setShareCode(data.share_code);
     } catch (err) {
-      setShareError(err.message || "分享失败，可改用本地文件导入");
+      if (err.status === 410) {
+        // 学校会话已在服务端失效：清空会话，回到学校登录卡
+        setSession(null);
+        setEvents(null);
+        setGridError(null);
+        fetchCaptcha();
+      } else {
+        setShareError(err.message || "分享失败，可改用本地文件导入");
+      }
     } finally {
       setSharing(false);
     }
@@ -327,7 +347,6 @@ export default function Timetable() {
                     <div className="text-[12px] text-[var(--muted)] flex items-center gap-1.5">
                       <Check className="w-3 h-3 text-[var(--success)]" />
                       已识别：<span className="font-mono text-foreground">{ocrResult.text}</span>
-                      {ocrResult.mock && <Badge variant="muted" className="ml-1">预览</Badge>}
                     </div>
                   )}
                   {ocrResult?.error && (
@@ -342,7 +361,7 @@ export default function Timetable() {
             </CardContent>
           </Card>
         ) : (
-          <AcademicSessionCard session={session} onExpire={() => { setSession(null); fetchCaptcha(); }} />
+          <AcademicSessionCard session={session} onExpire={() => { setSession(null); setEvents(null); setGridError(null); fetchCaptcha(); }} />
         )}
       </motion.div>
 
@@ -362,36 +381,50 @@ export default function Timetable() {
               <Select value={String(week)} onChange={(e) => setWeek(Number(e.target.value))} className="w-[110px]">
                 {Array.from({ length: 20 }, (_, i) => <option key={i} value={i + 1}>第 {i + 1} 周</option>)}
               </Select>
-              <Button variant="outline" size="icon" onClick={() => { setSession(null); fetchCaptcha(); }} aria-label="刷新会话" disabled={!session}><RefreshCw className="w-4 h-4" /></Button>
+              <Button variant="outline" size="icon" onClick={() => { setSession(null); setEvents(null); setGridError(null); fetchCaptcha(); }} aria-label="刷新会话" disabled={!session}><RefreshCw className="w-4 h-4" /></Button>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="timetable-grid" data-component="TimetableGrid" data-od-id="timetable-grid">
-              <div className="timetable-cell timetable-head">节次</div>
-              {DAYS.map((d) => <div key={d} className="timetable-cell timetable-head">{d}</div>)}
-              {SECTIONS.map((s) => (
-                <React.Fragment key={s.n}>
-                  <div className="timetable-cell timetable-head" data-component="SectionCell">
-                    <div className="font-medium">{s.n}</div>
-                    <div className="text-[11px] text-[var(--muted)]">{s.time}</div>
-                  </div>
-                  {DAYS.map((_, di) => {
-                    const course = MOCK_COURSES.find((c) => c.day === di && c.sec === s.n);
-                    return (
-                      <div key={di} className="timetable-cell" style={course && course.len > 1 ? { gridRow: `span ${course.len}` } : undefined}>
-                        {course && (
-                          <div className={cn("rounded-[var(--radius-sm)] p-2 h-full", COLORS[di % 2])} data-component="CourseCell">
-                            <div className="text-[12px] font-medium leading-tight">{course.name}</div>
-                            <div className="text-[10px] mt-0.5 opacity-80">{course.room}</div>
-                            <div className="text-[10px] opacity-70">{course.teacher} · {course.weeks}</div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </React.Fragment>
-              ))}
-            </div>
+            {!session ? (
+              <div className="py-10 text-center text-[13px] text-[var(--muted)]">登录学校系统后显示你的课表。</div>
+            ) : gridLoading ? (
+              <div className="py-10 flex items-center justify-center gap-2 text-[13px] text-[var(--muted)]"><Spinner /> 课表加载中…</div>
+            ) : gridError ? (
+              <Alert variant="warning" title="课表加载失败">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span>{gridError}</span>
+                  <Button variant="outline" size="sm" onClick={() => loadTimetable(session.academic_session_id)}>重试</Button>
+                </div>
+              </Alert>
+            ) : (
+              <div className="timetable-grid" data-component="TimetableGrid" data-od-id="timetable-grid">
+                <div className="timetable-cell timetable-head">节次</div>
+                {DAYS.map((d) => <div key={d} className="timetable-cell timetable-head">{d}</div>)}
+                {SECTIONS.map((s) => (
+                  <React.Fragment key={s.n}>
+                    <div className="timetable-cell timetable-head" data-component="SectionCell">
+                      <div className="font-medium">{s.n}</div>
+                      <div className="text-[11px] text-[var(--muted)]">{s.time}</div>
+                    </div>
+                    {DAYS.map((_, di) => {
+                      const course = (events || []).find((c) => c.week === week && c.weekday - 1 === di && c.start_node === s.n);
+                      const span = course ? course.end_node - course.start_node + 1 : 1;
+                      return (
+                        <div key={di} className="timetable-cell" style={span > 1 ? { gridRow: `span ${span}` } : undefined}>
+                          {course && (
+                            <div className={cn("rounded-[var(--radius-sm)] p-2 h-full", COLORS[di % 2])} data-component="CourseCell">
+                              <div className="text-[12px] font-medium leading-tight">{course.name}</div>
+                              <div className="text-[10px] mt-0.5 opacity-80">{course.location}</div>
+                              <div className="text-[10px] opacity-70">{course.teachers}</div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </React.Fragment>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </motion.div>
@@ -427,6 +460,7 @@ export default function Timetable() {
               </Button>
               {!session && <span className="text-[13px] text-[var(--muted)] self-center">需先登录学校系统</span>}
             </div>
+            {exportError && <Alert variant="warning" title="导出失败">{exportError}</Alert>}
           </CardContent>
         </Card>
       </motion.div>
