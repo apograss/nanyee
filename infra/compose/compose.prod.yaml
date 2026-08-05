@@ -10,7 +10,8 @@ x-app: &app
   build:
     context: ../..
     dockerfile: infra/docker/Dockerfile
-  image: nanyee-backend:local
+  image: ghcr.io/apograss/nanyee-backend:latest
+  pull_policy: always
   env_file:
     - ../../.env.production
   restart: unless-stopped
@@ -113,7 +114,8 @@ services:
       args:
         VITE_AMAP_KEY: ${VITE_AMAP_KEY:-}
         VITE_AMAP_SECURITY_CODE: ${VITE_AMAP_SECURITY_CODE:-}
-    image: nanyee-web:local
+    image: ghcr.io/apograss/nanyee-web:latest
+    pull_policy: always
     ports:
       - "127.0.0.1:8080:8080"
     read_only: true

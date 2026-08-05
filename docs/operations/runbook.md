@@ -7,11 +7,11 @@
 1. 安装 Docker Engine 与 Compose 插件，防火墙只允许 SSH、HTTP 和 HTTPS；Compose 网关只绑定 `127.0.0.1:8080`。
 2. 复制 `.env.production.example` 为未纳入版本控制的 `.env.production`，逐项替换占位符。Session Secret、数据库密码与本地主密钥分别随机生成，禁止复用。
 3. 由宿主机已有 TLS 反向代理（Cloudflare 之后）把 `nanyee.de` 与 `www.nanyee.de` 转发到 `127.0.0.1:8080`，并保留客户端 IP 头（`X-Forwarded-For` / `X-Real-IP`）。Compose 内 `NANYEE_TRUSTED_PROXY_IPS` 已预置为 gateway 的固定内网地址（`172.28.0.10`），一般无需改动；只有调整宿主代理链路时才需要核对。Compose 的 gateway 镜像已包含前端构建产物（`web/dist`）并直接服务静态文件，`/api` 由 gateway 反代到 `api:8000`，宿主 nginx 无需再服务前端或区分 `/api`。
-4. 先运行配置渲染与镜像构建，再运行迁移任务；任何一步失败都不启动 API/Worker。
+4. 先运行配置渲染并拉取镜像，再运行迁移任务；任何一步失败都不启动 API/Worker。镜像由 GitHub Actions 构建并发布到 GHCR（见「镜像构建与分发」节），VPS 不执行构建。
 
 ```bash
 docker compose --env-file .env.production -f infra/compose/compose.prod.yaml config
-docker compose --env-file .env.production -f infra/compose/compose.prod.yaml build
+docker compose --env-file .env.production -f infra/compose/compose.prod.yaml pull
 docker compose --env-file .env.production -f infra/compose/compose.prod.yaml run --rm migrate
 docker compose --env-file .env.production -f infra/compose/compose.prod.yaml up -d api worker gateway
 ```
@@ -38,20 +38,23 @@ docker compose --env-file .env.production -f infra/compose/compose.prod.yaml up 
 
 代码回滚不等于数据库回退。迁移应用后默认只回滚 API/Worker 镜像；数据库 downgrade 必须先确认迁移是否可逆并完成加密备份。旧站和新站不得同时接受写流量。远端 `main` 覆盖前必须建立可恢复标签并记录候选镜像摘要。
 
-## 站外构建（Apple Silicon Mac → x86_64 VPS）
+## 镜像构建与分发（GitHub Actions → GHCR）
 
-VPS 是 x86_64；在 Apple Silicon Mac 上必须跨平台构建。镜像在 Mac 构建后经 save/load 传到 VPS，VPS 上不执行 `compose build`：
+镜像**不在 VPS 也不在本地构建**：`.github/workflows/docker.yml` 在每次 push 到 main 后用 GitHub runner（原生 x86_64）构建 `nanyee-backend` 与 `nanyee-web` 两个 linux/amd64 镜像并推到 GHCR（`ghcr.io/apograss/nanyee-backend:latest`、`ghcr.io/apograss/nanyee-web:latest`，另有 sha 标签可回溯）。compose 里 `pull_policy: always`，`up` 时自动拉最新。
+
+一次性准备：
+
+- 首次 workflow 运行后，到 GitHub 的 Packages 页面把两个 package 的可见性设为 public（镜像内无密钥，高德 key 本就随前端公开）；不设的话 VPS 需要先 `docker login ghcr.io`（PAT 勾选 `read:packages`）。
+
+VPS 部署/更新：
 
 ```bash
-# 在 Mac 仓库根目录（构建参数按需，高德 key 锁了域名就随包分发也无妨）
-docker buildx build --platform linux/amd64 -f infra/docker/Dockerfile -t nanyee-backend:local --load .
-docker buildx build --platform linux/amd64 -f infra/docker/web.Dockerfile -t nanyee-web:local --load .
-docker save nanyee-backend:local nanyee-web:local | gzip > nanyee-images.tar.gz
-scp nanyee-images.tar.gz ubuntu@<vps>:~
-ssh ubuntu@<vps> "docker load < nanyee-images.tar.gz"
+docker compose --env-file .env.production -f infra/compose/compose.prod.yaml config
+docker compose --env-file .env.production -f infra/compose/compose.prod.yaml run --rm migrate   # 首次或迁移有更新时
+docker compose --env-file .env.production -f infra/compose/compose.prod.yaml up -d api worker gateway
 ```
 
-VPS 上需要一份仓库检出（提供 compose 文件与迁移配置）和仓库根目录的 `.env.production`；compose 里 `image:` 已固定为上述 tag，镜像存在时 `up` 不会重新构建。后端镜像含 Chromium，save 后约 1GB+，上传带宽低时传输要有耐心。
+备选：离线构建（Apple Silicon Mac）时必须 `docker buildx build --platform linux/amd64 ... --load`，再 `docker save | ssh docker load`；镜像 1GB+，仅当 GHCR 不可用时走这条路。
 
 ## 加密备份与恢复演练
 
