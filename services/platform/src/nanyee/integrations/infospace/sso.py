@@ -80,7 +80,9 @@ class PlaywrightBrowserLogin:
             await route.fulfill(response=response)
 
         async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
+            browser = await p.chromium.launch(
+                headless=True, args=self._settings.playwright_launch_args
+            )
             try:
                 context = await browser.new_context()
                 await context.route("**/login/login.do", intercept_login)

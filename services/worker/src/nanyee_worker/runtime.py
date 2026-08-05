@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections.abc import Mapping
 from contextlib import suppress
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Protocol
 from uuid import UUID
 
@@ -85,6 +87,7 @@ class WorkerRuntime:
         retry_interval_seconds: int,
         handlers: Mapping[str, JobHandler],
         service: JobService | None = None,
+        heartbeat_file: str | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._worker_id = worker_id
@@ -92,8 +95,21 @@ class WorkerRuntime:
         self._retry_interval_seconds = retry_interval_seconds
         self._handlers = dict(handlers)
         self._service = service or JobService()
+        self._heartbeat_file = heartbeat_file
+
+    def _touch_heartbeat(self) -> None:
+        if self._heartbeat_file is None:
+            return
+        try:
+            Path(self._heartbeat_file).write_text(str(time.time()), encoding="utf-8")
+        except OSError:
+            logger.warning(
+                "worker_heartbeat_write_failed",
+                extra={"event": "worker_heartbeat_write_failed", "path": self._heartbeat_file},
+            )
 
     async def run_once(self) -> bool:
+        self._touch_heartbeat()
         async with self._session_factory() as db:
             job = await self._service.claim_next(
                 db,
@@ -213,3 +229,4 @@ class WorkerRuntime:
                     extra={"event": "job_heartbeat_rejected", "job_id": str(job_id)},
                 )
                 return
+            self._touch_heartbeat()

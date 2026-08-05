@@ -43,6 +43,7 @@ async def serve() -> None:
         worker_id=worker_id,
         lease_seconds=settings.worker_lease_seconds,
         retry_interval_seconds=settings.worker_retry_interval_seconds,
+        heartbeat_file=settings.worker_heartbeat_file or None,
         handlers={
             "evaluation": EvaluationHandler(settings, vault, solver),
             "study_cabin": handler,

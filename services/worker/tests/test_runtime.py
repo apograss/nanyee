@@ -278,3 +278,24 @@ async def test_heartbeat_loop_stops_after_lease_loss() -> None:
     await asyncio.wait_for(runtime._heartbeat_loop(job_id), timeout=5)
     assert service.heartbeat_results == [False]
     await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_run_once_touches_heartbeat_file(tmp_path) -> None:
+    engine = _build_engine()
+    async with engine.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    heartbeat = tmp_path / "worker-heartbeat"
+    runtime = WorkerRuntime(
+        factory,
+        worker_id="test-worker",
+        lease_seconds=60,
+        retry_interval_seconds=5,
+        handlers={"study_cabin": SuccessfulHandler()},
+        heartbeat_file=str(heartbeat),
+    )
+    # 空闲轮询（无任务可领）也必须刷新心跳文件，供容器 healthcheck 探测事件循环卡死
+    assert await runtime.run_once() is False
+    assert heartbeat.read_text(encoding="utf-8").strip()
+    await engine.dispose()

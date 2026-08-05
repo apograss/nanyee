@@ -1,5 +1,11 @@
 name: nanyee
 
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 x-app: &app
   build:
     context: ../..
@@ -16,6 +22,7 @@ x-app: &app
     - no-new-privileges:true
   cap_drop:
     - ALL
+  logging: *logging
   networks:
     - backend
 
@@ -34,6 +41,7 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
+    logging: *logging
     networks:
       - backend
 
@@ -56,6 +64,9 @@ services:
       - "8000"
       - --proxy-headers
       - --forwarded-allow-ips=172.16.0.0/12
+    environment:
+      # gateway 固定内网地址（见 networks.backend.ipam），限流按真实客户端 IP 分桶的前提
+      NANYEE_TRUSTED_PROXY_IPS: '["172.28.0.10"]'
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -64,7 +75,7 @@ services:
         - CMD
         - python
         - -c
-        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=2)"
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=2)"
       interval: 15s
       timeout: 3s
       retries: 5
@@ -73,10 +84,27 @@ services:
   worker:
     <<: *app
     command: ["nanyee-worker"]
+    tmpfs:
+      # Chromium --disable-dev-shm-usage 会把共享内存文件写进 /tmp，覆盖 anchor 的 64m
+      - /tmp:size=256m,mode=1777
+    environment:
+      # 非 root + cap_drop ALL 运行 Chromium 必须 --no-sandbox；--disable-dev-shm-usage
+      # 避免依赖 /dev/shm（容器默认只有 64MB）
+      NANYEE_PLAYWRIGHT_LAUNCH_ARGS: '["--no-sandbox", "--disable-dev-shm-usage"]'
+      NANYEE_WORKER_HEARTBEAT_FILE: /tmp/nanyee-worker-heartbeat
     stop_grace_period: 30s
     depends_on:
       migrate:
         condition: service_completed_successfully
+    healthcheck:
+      # worker 每次轮询/续租都会 touch 心跳文件；120s 未刷新说明事件循环卡死
+      test:
+        - CMD-SHELL
+        - "test -f /tmp/nanyee-worker-heartbeat && test $$(( $$(date +%s) - $$(stat -c %Y /tmp/nanyee-worker-heartbeat) )) -lt 120"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
   gateway:
     build:
@@ -102,15 +130,21 @@ services:
       - SETGID
       - SETUID
     restart: unless-stopped
+    logging: *logging
     depends_on:
       api:
         condition: service_healthy
     networks:
-      - backend
+      backend:
+        ipv4_address: 172.28.0.10
 
+# 不能设 internal: true——api/worker 需要出站访问学校上游、群报数、Turnstile、
+# 邮件网关和 Cloudflare 出口代理。入站隔离靠不发布端口（仅 gateway 绑 127.0.0.1:8080）。
 networks:
   backend:
-    internal: true
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
 
 volumes:
   postgres-data:

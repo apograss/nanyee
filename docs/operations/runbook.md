@@ -6,7 +6,7 @@
 
 1. 安装 Docker Engine 与 Compose 插件，防火墙只允许 SSH、HTTP 和 HTTPS；Compose 网关只绑定 `127.0.0.1:8080`。
 2. 复制 `.env.production.example` 为未纳入版本控制的 `.env.production`，逐项替换占位符。Session Secret、数据库密码与本地主密钥分别随机生成，禁止复用。
-3. 由宿主机已有 TLS 反向代理（Cloudflare 之后）把 `nanyee.de` 与 `www.nanyee.de` 转发到 `127.0.0.1:8080`，并保留客户端 IP 头（`X-Forwarded-For` / `X-Real-IP`）；把实际代理地址加入 `NANYEE_TRUSTED_PROXY_IPS`。Compose 的 gateway 镜像已包含前端构建产物（`web/dist`）并直接服务静态文件，`/api` 由 gateway 反代到 `api:8000`，宿主 nginx 无需再服务前端或区分 `/api`。
+3. 由宿主机已有 TLS 反向代理（Cloudflare 之后）把 `nanyee.de` 与 `www.nanyee.de` 转发到 `127.0.0.1:8080`，并保留客户端 IP 头（`X-Forwarded-For` / `X-Real-IP`）。Compose 内 `NANYEE_TRUSTED_PROXY_IPS` 已预置为 gateway 的固定内网地址（`172.28.0.10`），一般无需改动；只有调整宿主代理链路时才需要核对。Compose 的 gateway 镜像已包含前端构建产物（`web/dist`）并直接服务静态文件，`/api` 由 gateway 反代到 `api:8000`，宿主 nginx 无需再服务前端或区分 `/api`。
 4. 先运行配置渲染与镜像构建，再运行迁移任务；任何一步失败都不启动 API/Worker。
 
 ```bash
@@ -20,9 +20,9 @@ docker compose --env-file .env.production -f infra/compose/compose.prod.yaml up 
 
 以下为当前生产事实，切换 `nanyee.de` 前必须逐项确认：
 
-- `nanyee.de` 当前由 PM2 托管的 Next.js 旧站占用（监听 `:3000`），宿主 TLS nginx 现转发到该端口。
-- `chat.nanyee.de` 的 Flarum 论坛通过旧站的 OAuth（`/oauth/consent`、`/.well-known/openid-configuration`）做单点登录。把 `nanyee.de` 切到新站会让旧站下线、论坛 SSO 失效；此动作需用户明确确认后执行。
+- `nanyee.de` 当前由 PM2 托管的 Next.js 旧站占用（监听 `:3000`），宿主 TLS nginx 现转发到该端口。**用户已确认旧站（含 `chat.nanyee.de` Flarum 论坛的 SSO，依赖旧站 OAuth）可以随切换全部下线**，无需保留兼容。
 - Cloudflare Turnstile 密钥尚未创建：需在 Cloudflare 控制台为 hostname `nanyee.de` 创建站点，拿到 site key 与 secret key 后填入 `.env.production`，并把 `NANYEE_TURNSTILE_ENABLED` 改回 `true`（当前示例为 `false`，占位 key 虽能通过启动校验，但运行时所有人机校验都会被拒绝）。
+- 后端镜像已内置 Chromium + 系统依赖（学习舱 Infospace 登录的真实浏览器需求），worker 服务在 compose 里以 `--no-sandbox --disable-dev-shm-usage` 启动参数运行；首次构建镜像会多下载约 200MB。
 
 ## 验收
 

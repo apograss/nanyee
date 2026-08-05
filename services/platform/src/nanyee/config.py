@@ -108,6 +108,10 @@ class Settings(BaseSettings):
     worker_poll_interval_seconds: float = Field(default=2.0, ge=0.2, le=30)
     worker_lease_seconds: int = Field(default=120, ge=30, le=600)
     worker_retry_interval_seconds: int = Field(default=30, ge=5, le=300)
+    # 非空时 worker 每次轮询和续租都会 touch 该文件，供容器 healthcheck 探测事件循环卡死
+    worker_heartbeat_file: str = ""
+    # 生产容器内 Chromium 需要 ["--no-sandbox", "--disable-dev-shm-usage"]（非 root + cap_drop ALL）
+    playwright_launch_args: list[str] = []
 
     @model_validator(mode="after")
     def validate_cross_field_security(self) -> Settings:
