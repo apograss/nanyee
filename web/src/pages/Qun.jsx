@@ -1,12 +1,24 @@
 // Canvas design runtime editable source marker: qun
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
-import { Image as ImageIcon, CheckCircle2, ArrowRight, KeyRound, MapPin, Send, Download, ExternalLink } from "lucide-react";
+import { Image as ImageIcon, CheckCircle2, ArrowRight, KeyRound, MapPin, Send, Download, ExternalLink, Link2, CalendarClock } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Label, Badge, Alert, Table, EmptyState } from "@/components/ui.jsx";
 import AmapLocationPicker from "@/components/AmapLocationPicker.jsx";
-import { apiFetch, apiPost, CONFIRMATION_VERSIONS } from "@/lib/api.jsx";
+import { apiFetch, apiPost, listCredentials, createCredential, revealCredential, deleteCredential, createJob, CONFIRMATION_VERSIONS } from "@/lib/api.jsx";
 
 const EMPTY_LOCATION = { lat: "", lng: "", address: "" };
+
+// datetime-local → ISO 8601 带本地时区（后端要求 +08:00 格式）
+function toISOWithTimezone(datetimeLocal) {
+  if (!datetimeLocal) return null;
+  const date = new Date(datetimeLocal);
+  if (isNaN(date.getTime())) return null;
+  const pad = (n) => String(n).padStart(2, "0");
+  const offset = -date.getTimezoneOffset();
+  const sign = offset >= 0 ? "+" : "-";
+  const absOffset = Math.abs(offset);
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}${sign}${pad(Math.floor(absOffset / 60))}:${pad(absOffset % 60)}`;
+}
 
 const EASE = [0.22, 1, 0.36, 1];
 
@@ -30,13 +42,21 @@ export default function Qun() {
   const [verified, setVerified] = useState(false);
   const [forms, setForms] = useState([]);
   const [selectedForm, setSelectedForm] = useState(null);
+  const [linkInput, setLinkInput] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [location, setLocation] = useState(EMPTY_LOCATION);
   const [preview, setPreview] = useState(null);
   const [uploadedUrl, setUploadedUrl] = useState("");
+  const [scheduledFor, setScheduledFor] = useState("");
   const [message, setMessage] = useState(null);
   const [loading, setLoading] = useState(false);
   const fileRef = useRef(null);
+  const messageRef = useRef(null);
+
+  // 操作结果提示渲染在第一步下方，提交等底部操作后必须滚动回去让用户看到
+  useEffect(() => {
+    if (message) messageRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [message]);
 
   const run = async (action) => {
     setLoading(true);
@@ -51,13 +71,21 @@ export default function Qun() {
   };
 
   const verify = () => run(async () => {
-    await apiPost("/qun/token/verify", { auth_token: token });
-    const data = await apiPost("/qun/forms", { auth_token: token });
+    await apiPost("/qun/token/verify", { auth_token: token }, { action: "qun_read" });
+    const data = await apiPost("/qun/forms", { auth_token: token }, { action: "qun_read" });
     setVerified(true);
     setForms(data);
     setSelectedForm(null);
     setPreview(null);
     setMessage({ variant: "success", title: "凭证有效", text: `已读取 ${data.length} 个可用表单。` });
+  });
+
+  const resolveLink = () => run(async () => {
+    const form = await apiPost("/qun/forms/resolve", { auth_token: token, input: linkInput.trim() }, { action: "qun_read" });
+    setForms((current) => current.some((item) => item.form_id === form.form_id) ? current : [form, ...current]);
+    setSelectedForm(form);
+    setPreview(null);
+    setMessage({ variant: "success", title: "解析成功", text: `已解析出表单「${form.title || form.form_id}」，可直接预览提交。` });
   });
 
   const loadPreview = () => run(async () => {
@@ -71,7 +99,7 @@ export default function Qun() {
         default_address: location.address,
       },
       custom_fields: {},
-    });
+    }, { action: "qun_read" });
     if (uploadedUrl) {
       data.catalogs = data.catalogs.map((catalog) => (
         catalog.type === "IMAGE" ? { ...catalog, value: [uploadedUrl] } : catalog
@@ -91,7 +119,7 @@ export default function Qun() {
       const body = new FormData();
       body.append("auth_token", token);
       body.append("file", file);
-      const result = await apiFetch("/qun/images", { method: "POST", body });
+      const result = await apiFetch("/qun/images", { method: "POST", body, action: "qun_upload" });
       setUploadedUrl(result.url);
       setPreview((current) => current ? {
         ...current,
@@ -110,8 +138,53 @@ export default function Qun() {
       title: preview.title,
       catalogs: preview.catalogs,
       confirmation_version: CONFIRMATION_VERSIONS.qunSubmit,
-    });
+    }, { action: "qun_submit" });
     setMessage({ variant: "success", title: "提交成功", text: `${result.title || "表单"} 已提交。` });
+  });
+
+  // 预约打卡：Token 必须托管为凭据（worker 到点自取），与页面里粘贴的 Token 保持一致
+  const ensureHostedCredential = async () => {
+    const list = await listCredentials();
+    const existing = (Array.isArray(list) ? list : []).find((c) => c.purpose === "qun_checkin" && c.status === "active");
+    if (existing) {
+      const { secret } = await revealCredential(existing.id);
+      if (secret === token.trim()) return { credential: existing, created: false };
+      await deleteCredential(existing.id);
+    }
+    const credential = await createCredential({
+      upstream: "qun100",
+      purpose: "qun_checkin",
+      secret: token.trim(),
+      consent_version: CONFIRMATION_VERSIONS.credentialHosting,
+    });
+    return { credential, created: true };
+  };
+
+  const schedule = () => run(async () => {
+    const when = new Date(scheduledFor);
+    if (isNaN(when.getTime()) || when.getTime() <= Date.now()) {
+      setMessage({ variant: "danger", title: "时间无效", text: "请选择将来的打卡时间。" });
+      return;
+    }
+    const { credential, created } = await ensureHostedCredential();
+    await createJob({
+      tool_id: "qun_checkin",
+      operation: "submit",
+      payload: {
+        form_id: preview.form_id,
+        form_version: preview.version,
+        title: preview.title,
+        catalogs: preview.catalogs,
+      },
+      credential_id: credential.id,
+      confirmation_version: CONFIRMATION_VERSIONS.qunSubmit,
+      scheduled_for: toISOWithTimezone(scheduledFor),
+    });
+    setMessage({
+      variant: "success",
+      title: "预约打卡已创建",
+      text: `将于 ${when.toLocaleString("zh-CN", { hour12: false })} 自动提交「${preview.title || preview.form_id}」，日期字段按执行当天刷新。${created ? "Token 已托管为凭据，" : ""}可在「任务列表」查看结果。`,
+    });
   });
 
   return (
@@ -157,7 +230,7 @@ export default function Qun() {
         </motion.div>
 
         {message && (
-          <motion.div variants={fadeUp}>
+          <motion.div variants={fadeUp} ref={messageRef}>
             <Alert variant={message.variant} title={message.title}><span>{message.text}</span></Alert>
           </motion.div>
         )}
@@ -181,9 +254,16 @@ export default function Qun() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-baseline gap-3">第三步 · 选择表单 <span className="accent-en text-[13px] font-normal">step 03</span></CardTitle>
-                <CardDescription>从当前账号的可用表单中选择。</CardDescription>
+                <CardDescription>从当前账号的可用表单中选择，或粘贴分享链接/FormId 直接解析。</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="qun-link">分享链接解析</Label>
+                  <div className="flex gap-2">
+                    <Input id="qun-link" value={linkInput} onChange={(event) => setLinkInput(event.target.value)} placeholder="https://s.qun100.com/link/… 或 FormId" autoComplete="off" />
+                    <Button variant="outline" onClick={resolveLink} loading={loading} disabled={!linkInput.trim()} className="shrink-0"><Link2 className="w-4 h-4" /> 解析</Button>
+                  </div>
+                </div>
                 {forms.length ? <Table
                   head={["表单", "版本", "状态", ""]}
                   rows={forms.map((form) => [
@@ -234,6 +314,14 @@ export default function Qun() {
                   />
                   <Button onClick={submit} loading={loading}><Send className="w-4 h-4" /> 确认提交</Button>
                   <div className="text-[12px] text-[var(--muted)] flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> 提交结果未知时不会自动重复提交。</div>
+                  <div className="rounded-[var(--radius)] border border-border p-4 flex flex-col gap-2.5">
+                    <div className="text-[13px] font-medium flex items-center gap-1.5"><CalendarClock className="w-4 h-4" /> 预约打卡</div>
+                    <div className="text-[12px] text-[var(--muted)]">到点由服务器自动提交，日期字段按执行当天刷新。Token 会托管为凭据，可随时在「凭据」页删除。</div>
+                    <div className="flex gap-2">
+                      <Input type="datetime-local" value={scheduledFor} onChange={(event) => setScheduledFor(event.target.value)} aria-label="预约打卡时间" />
+                      <Button variant="outline" onClick={schedule} loading={loading} disabled={!scheduledFor} className="shrink-0"><CalendarClock className="w-4 h-4" /> 创建预约</Button>
+                    </div>
+                  </div>
                 </>}
               </CardContent>
             </Card>

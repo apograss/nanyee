@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 from nanyee.config import Settings
 from nanyee.credentials.service import CredentialVaultService
 from nanyee.integrations.qun100 import (
@@ -13,6 +16,19 @@ from nanyee.tools.qun_checkin import QunSubmitRequest, validate_auth_token
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nanyee_worker.runtime import ExecutionFailure, ExecutionReceipt, ensure_execution_active
+
+SHANGHAI = ZoneInfo("Asia/Shanghai")
+
+
+def _catalogs_for_execution(request: QunSubmitRequest) -> list[dict[str, object]]:
+    # DATE 字段在预览时生成，预约执行时必须刷新为执行当日，否则打卡日期是预览那天的
+    now = datetime.now(SHANGHAI).strftime("%Y-%m-%d %H:%M")
+    return [
+        {**item.model_dump(mode="json"), "value": now}
+        if item.type == "DATE"
+        else item.model_dump(mode="json")
+        for item in request.catalogs
+    ]
 
 
 class QunCheckinHandler:
@@ -47,7 +63,7 @@ class QunCheckinHandler:
             await self._client.submit(
                 request.form_id,
                 form_version=request.form_version,
-                catalogs=[item.model_dump(mode="json") for item in request.catalogs],
+                catalogs=_catalogs_for_execution(request),
                 token=token,
             )
         except Qun100SubmissionUnknown as exc:
@@ -58,8 +74,15 @@ class QunCheckinHandler:
                 next_action="verify_upstream",
             ) from exc
         except Qun100Rejected as exc:
+            if str(exc.code) == "13314":
+                raise ExecutionFailure(
+                    "UPSTREAM_REJECTED", retryable=False, next_action="replace_credential"
+                ) from exc
+            reason = (exc.message or "表单可能已截止或被发布者修改")[:100]
             raise ExecutionFailure(
-                "UPSTREAM_REJECTED", retryable=False, next_action="replace_credential"
+                "UPSTREAM_REJECTED",
+                retryable=False,
+                next_action=f"群报数拒绝了提交：{reason}",
             ) from exc
         except Qun100Unavailable as exc:
             raise ExecutionFailure("UPSTREAM_UNAVAILABLE", retryable=True) from exc

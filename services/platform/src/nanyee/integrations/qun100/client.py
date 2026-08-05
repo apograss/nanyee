@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Any
 from urllib.parse import quote, unquote, urljoin, urlparse
 
 import httpx
 
 from nanyee.config import Settings
+
+logger = logging.getLogger(__name__)
 
 QUN100_APP_ID = "wxfc4ef6d539d03373"
 
@@ -20,9 +23,10 @@ class Qun100Unavailable(Qun100Error):
 
 
 class Qun100Rejected(Qun100Error):
-    def __init__(self, code: int | str | None = None) -> None:
+    def __init__(self, code: int | str | None = None, message: str | None = None) -> None:
         super().__init__("Qun100 rejected the request")
         self.code = code
+        self.message = message
 
 
 class Qun100SubmissionUnknown(Qun100Error):
@@ -139,7 +143,8 @@ class Qun100Client:
         )
         code = response.get("code")
         if code != 0:
-            raise Qun100Rejected(code)
+            message = response.get("message")
+            raise Qun100Rejected(code, message if isinstance(message, str) else None)
         data = response.get("data")
         return data if isinstance(data, dict) else {}
 
@@ -191,6 +196,18 @@ class Qun100Client:
                 raise Qun100SubmissionUnknown("Qun100 submission result is unknown") from exc
             raise Qun100Unavailable("Qun100 request failed") from exc
         if response.is_redirect or response.status_code != 200 or self._too_large(response):
+            # 群报数会用 4xx（如 422）返回结构化业务拒绝：{"code":..., "message":...}
+            rejected = self._rejection_payload(response)
+            if rejected is not None:
+                logger.warning(
+                    "qun100 upstream rejected %s %s: status=%s code=%r message=%r",
+                    method,
+                    path,
+                    response.status_code,
+                    rejected.code,
+                    rejected.message,
+                )
+                raise rejected
             if method == "POST":
                 raise Qun100SubmissionUnknown("Qun100 submission response is unknown")
             raise Qun100Unavailable("Qun100 returned an invalid response")
@@ -217,10 +234,24 @@ class Qun100Client:
         return len(response.content) > self._settings.upstream_max_response_bytes
 
     @staticmethod
+    def _rejection_payload(response: httpx.Response) -> Qun100Rejected | None:
+        if response.is_redirect:
+            return None
+        try:
+            payload = response.json()
+        except ValueError:
+            return None
+        if not isinstance(payload, dict) or "code" not in payload:
+            return None
+        message = payload.get("message")
+        return Qun100Rejected(payload.get("code"), message if isinstance(message, str) else None)
+
+    @staticmethod
     def _require_success(response: dict[str, Any]) -> dict[str, Any]:
         code = response.get("code")
         if code != 0:
-            raise Qun100Rejected(code)
+            message = response.get("message")
+            raise Qun100Rejected(code, message if isinstance(message, str) else None)
         data = response.get("data")
         if not isinstance(data, dict):
             raise Qun100Unavailable("Qun100 response data is invalid")

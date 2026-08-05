@@ -4,7 +4,7 @@ import httpx
 import pytest
 import respx
 from nanyee.config import Settings
-from nanyee.integrations.qun100 import Qun100Client, Qun100SubmissionUnknown
+from nanyee.integrations.qun100 import Qun100Client, Qun100Rejected, Qun100SubmissionUnknown
 
 TOKEN = "a" * 60
 
@@ -87,3 +87,40 @@ async def test_qun100_resolves_direct_and_shared_form_links() -> None:
         )
     )
     assert await client.resolve_form_id("https://qun100.com/share/abc") == "123456789012345"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_qun100_rejection_body_is_exposed_on_http_error() -> None:
+    respx.post("https://form.qun100.com/v1/123456789012345/form_data").mock(
+        return_value=httpx.Response(422, json={"code": 13399, "message": "表单已截止，无法提交"})
+    )
+    client = Qun100Client(Settings(app_env="test"))
+
+    with pytest.raises(Qun100Rejected) as excinfo:
+        await client.submit(
+            "123456789012345",
+            form_version=1,
+            catalogs=[{"cid": "field", "type": "WORD", "value": "正常"}],
+            token=TOKEN,
+        )
+
+    assert excinfo.value.code == 13399
+    assert excinfo.value.message == "表单已截止，无法提交"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_qun100_http_error_without_body_stays_unknown() -> None:
+    respx.post("https://form.qun100.com/v1/123456789012345/form_data").mock(
+        return_value=httpx.Response(502, text="bad gateway")
+    )
+    client = Qun100Client(Settings(app_env="test"))
+
+    with pytest.raises(Qun100SubmissionUnknown):
+        await client.submit(
+            "123456789012345",
+            form_version=1,
+            catalogs=[{"cid": "field", "type": "WORD", "value": "正常"}],
+            token=TOKEN,
+        )

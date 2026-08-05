@@ -130,10 +130,18 @@ def _map_error(exc: Exception) -> AppError:
             details={"next_action": "verify_upstream"},
         )
     if isinstance(exc, Qun100Rejected):
+        if str(exc.code) == "13314":
+            return AppError(
+                ErrorCode.UPSTREAM_REJECTED,
+                "群报数 Token 已失效，请重新获取。",
+                status_code=401,
+            )
+        message = exc.message or "群报数拒绝了本次提交。"
         return AppError(
             ErrorCode.UPSTREAM_REJECTED,
-            "群报数 Token 已失效或请求被拒绝。",
-            status_code=401,
+            f"群报数拒绝了请求：{message}",
+            status_code=422,
+            details={"upstream_code": exc.code},
         )
     return AppError(
         ErrorCode.UPSTREAM_UNAVAILABLE,
