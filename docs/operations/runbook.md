@@ -38,6 +38,21 @@ docker compose --env-file .env.production -f infra/compose/compose.prod.yaml up 
 
 代码回滚不等于数据库回退。迁移应用后默认只回滚 API/Worker 镜像；数据库 downgrade 必须先确认迁移是否可逆并完成加密备份。旧站和新站不得同时接受写流量。远端 `main` 覆盖前必须建立可恢复标签并记录候选镜像摘要。
 
+## 站外构建（Apple Silicon Mac → x86_64 VPS）
+
+VPS 是 x86_64；在 Apple Silicon Mac 上必须跨平台构建。镜像在 Mac 构建后经 save/load 传到 VPS，VPS 上不执行 `compose build`：
+
+```bash
+# 在 Mac 仓库根目录（构建参数按需，高德 key 锁了域名就随包分发也无妨）
+docker buildx build --platform linux/amd64 -f infra/docker/Dockerfile -t nanyee-backend:local --load .
+docker buildx build --platform linux/amd64 -f infra/docker/web.Dockerfile -t nanyee-web:local --load .
+docker save nanyee-backend:local nanyee-web:local | gzip > nanyee-images.tar.gz
+scp nanyee-images.tar.gz ubuntu@<vps>:~
+ssh ubuntu@<vps> "docker load < nanyee-images.tar.gz"
+```
+
+VPS 上需要一份仓库检出（提供 compose 文件与迁移配置）和仓库根目录的 `.env.production`；compose 里 `image:` 已固定为上述 tag，镜像存在时 `up` 不会重新构建。后端镜像含 Chromium，save 后约 1GB+，上传带宽低时传输要有耐心。
+
 ## 加密备份与恢复演练
 
 `infra/scripts/backup.sh` 要求 PostgreSQL 客户端、`age` 和已登录的 Azure CLI。它把 `pg_dump --format=custom` 直接送入 `age`，只把加密临时文件上传到 Blob；容器已有数据或本次上传将达到 4 GiB 时失败关闭。脚本不自动删除云端对象，7 日/4 周/3 月保留策略在首次生产演练确认具体 Blob 后另行配置。

@@ -108,7 +108,7 @@ services:
 
   gateway:
     build:
-      context: ..
+      context: ../..
       dockerfile: infra/docker/web.Dockerfile
       args:
         VITE_AMAP_KEY: ${VITE_AMAP_KEY:-}
