@@ -8,6 +8,7 @@ from urllib.parse import urljoin, urlparse
 import httpx
 
 from nanyee.config import Settings
+from nanyee.integrations.egress import egress_transport_from_settings
 from nanyee.tools.study_cabin import ReservationPayload, RoomAvailability, TimeBlock
 
 
@@ -45,7 +46,7 @@ class InfospaceClient:
         self,
         settings: Settings,
         *,
-        cookies: dict[str, str],
+        cookies: dict[str, str] | None = None,
         token: str | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
@@ -53,7 +54,7 @@ class InfospaceClient:
         self._base_url = settings.smu_infospace_base_url.rstrip("/") + "/"
         self._cookies = cookies
         self._token = token
-        self._transport = transport
+        self._transport = transport or egress_transport_from_settings(settings)
 
     async def get_user_info(self) -> UserInfo:
         data = await self._request("GET", "auth/userInfo")

@@ -88,6 +88,30 @@ def test_choose_room_respects_priority_full_interval_and_freezing_time() -> None
     assert selected.dev_id == 29817270
 
 
+def test_choose_room_treats_equal_open_times_as_open_all_day() -> None:
+    # 顺德学习舱真实数据：openStart=openEnd=00:00 表示 24 小时开放
+    rooms = [
+        RoomAvailability(
+            dev_id=29817269,
+            name="西侧学习舱1",
+            open_start=time(0, 0),
+            open_end=time(0, 0),
+            freezing_minutes=0,
+        ),
+    ]
+
+    selected = choose_room(
+        rooms,
+        ordered_dev_ids=[29817269],
+        target_date=date(2026, 8, 5),
+        start=time(19, 0),
+        end=time(21, 0),
+    )
+
+    assert selected is not None
+    assert selected.dev_id == 29817269
+
+
 def test_reservation_payload_matches_infospace_contract() -> None:
     payload = ReservationPayload(
         account="student",

@@ -8,12 +8,12 @@ from uuid import uuid4
 import pytest
 from nanyee.config import Settings
 from nanyee.credentials.service import CredentialVaultService
-from nanyee.integrations.infospace.client import BusinessError, UserInfo
-from nanyee.integrations.infospace.sso import AuthenticationRejected
+from nanyee.integrations.infospace.client import BusinessError, UpstreamUnavailable
+from nanyee.integrations.infospace.sso import AuthenticationRejected, InfospaceSession
 from nanyee.jobs.models import Job
 from nanyee.tools.study_cabin import RoomAvailability
 from nanyee_worker.runtime import ExecutionFailure
-from nanyee_worker.study_cabin import DdddOcrSolver, StudyCabinHandler
+from nanyee_worker.study_cabin import StudyCabinHandler
 
 
 class FakeVault:
@@ -22,9 +22,11 @@ class FakeVault:
 
 
 class FakeAuthenticator:
-    async def login(self, account: str, password: str) -> dict[str, str]:
+    async def login(self, account: str, password: str) -> InfospaceSession:
         assert (account, password) == ("student", "password")
-        return {"ic-cookie": "session"}
+        return InfospaceSession(
+            token="api-token", acc_no="student", display_name="测试", cookies={}
+        )
 
 
 class FakeInfospaceClient:
@@ -32,9 +34,6 @@ class FakeInfospaceClient:
 
     def __init__(self, *_args: object, **_kwargs: object) -> None:
         pass
-
-    async def get_user_info(self) -> UserInfo:
-        return UserInfo(acc_no="student", display_name="测试", token="api-token")
 
     async def list_rooms(self, _target_date: date, *, kind_id: int) -> list[RoomAvailability]:
         assert kind_id == 29816776
@@ -97,7 +96,6 @@ async def test_handler_uses_priority_then_falls_through_on_conflict(monkeypatch:
     handler = StudyCabinHandler(
         Settings(app_env="test"),
         cast(CredentialVaultService, FakeVault()),
-        DdddOcrSolver(),
     )
     handler._authenticator = cast(Any, FakeAuthenticator())
 
@@ -115,27 +113,30 @@ async def test_handler_stops_after_attempt_deadline() -> None:
     handler = StudyCabinHandler(
         Settings(app_env="test"),
         cast(CredentialVaultService, FakeVault()),
-        DdddOcrSolver(),
     )
 
     with pytest.raises(ExecutionFailure) as raised:
         await handler.execute(cast(Any, object()), job)
-    assert raised.value.error_code == "NO_AVAILABILITY"
+    assert raised.value.error_code == "ATTEMPT_WINDOW_EXPIRED"
     assert raised.value.retryable is False
 
 
 @pytest.mark.asyncio
-async def test_study_cabin_login_retries_ocr_rejections_with_backoff(monkeypatch: Any) -> None:
+async def test_study_cabin_login_retries_upstream_failures_with_backoff(
+    monkeypatch: Any,
+) -> None:
     import nanyee_worker.study_cabin as module
 
     class FlakyAuthenticator:
         calls = 0
 
-        async def login(self, _account: str, _password: str) -> dict[str, str]:
+        async def login(self, _account: str, _password: str) -> InfospaceSession:
             self.calls += 1
             if self.calls < 3:
-                raise AuthenticationRejected("captcha rejected")
-            return {"ic-cookie": "session"}
+                raise UpstreamUnavailable("login endpoint unavailable")
+            return InfospaceSession(
+                token="api-token", acc_no="student", display_name="测试", cookies={}
+            )
 
     delays: list[float] = []
 
@@ -146,11 +147,35 @@ async def test_study_cabin_login_retries_ocr_rejections_with_backoff(monkeypatch
     handler = StudyCabinHandler(
         Settings(app_env="test"),
         cast(CredentialVaultService, FakeVault()),
-        DdddOcrSolver(),
     )
     handler._authenticator = cast(Any, FlakyAuthenticator())
 
-    cookies = await handler._login_with_backoff("student", "password")
+    session = await handler._login_with_backoff("student", "password")
 
-    assert cookies == {"ic-cookie": "session"}
+    assert session.token == "api-token"
     assert delays == [1, 2]
+
+
+@pytest.mark.asyncio
+async def test_study_cabin_login_rejection_is_not_retried() -> None:
+    class RejectingAuthenticator:
+        calls = 0
+
+        async def login(self, _account: str, _password: str) -> InfospaceSession:
+            self.calls += 1
+            raise AuthenticationRejected("wrong password")
+
+    handler = StudyCabinHandler(
+        Settings(app_env="test"),
+        cast(CredentialVaultService, FakeVault()),
+    )
+    authenticator = RejectingAuthenticator()
+    handler._authenticator = cast(Any, authenticator)
+
+    with pytest.raises(ExecutionFailure) as raised:
+        await handler._login_with_backoff("student", "wrong")
+
+    assert raised.value.error_code == "INFOSPACE_LOGIN_REJECTED"
+    assert raised.value.retryable is False
+    assert raised.value.next_action == "replace_credential"
+    assert authenticator.calls == 1

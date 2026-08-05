@@ -17,7 +17,12 @@ from nanyee.integrations.infospace.client import (
     SubmissionUnknown,
     UpstreamUnavailable,
 )
-from nanyee.integrations.infospace.sso import AuthenticationRejected, SsoAuthenticator
+from nanyee.integrations.infospace.sso import (
+    AuthenticationRejected,
+    CaptchaSolver,
+    InfospaceSession,
+    SsoAuthenticator,
+)
 from nanyee.jobs.models import Job
 from nanyee.tools.study_cabin import (
     SHUNDE_SINGLE_CABIN_KIND_ID,
@@ -46,14 +51,17 @@ class DdddOcrSolver:
             import ddddocr  # type: ignore[import-untyped]
 
             self._engine = ddddocr.DdddOcr(show_ad=False, beta=True)
-        return str(self._engine.classification(image)).strip()
+        result = str(self._engine.classification(image)).strip()
+        if len(result) != 4:
+            raise ValueError("验证码识别结果格式错误")
+        return result
 
 
 @dataclass(frozen=True, slots=True)
 class CachedSession:
-    cookies: dict[str, str]
     token: str
     account: str
+    cookies: dict[str, str]
     expires_at: float
 
 
@@ -73,15 +81,15 @@ class SessionCache:
         return value
 
     def put(
-        self, credential_id: UUID, *, cookies: dict[str, str], token: str, account: str
+        self, credential_id: UUID, *, token: str, account: str, cookies: dict[str, str]
     ) -> None:
         if len(self._values) >= self._max_entries and credential_id not in self._values:
             oldest = min(self._values, key=lambda key: self._values[key].expires_at)
             self._values.pop(oldest, None)
         self._values[credential_id] = CachedSession(
-            cookies=dict(cookies),
             token=token,
             account=account,
+            cookies=cookies,
             expires_at=monotonic_time.monotonic() + self._ttl_seconds,
         )
 
@@ -94,13 +102,13 @@ class StudyCabinHandler:
         self,
         settings: Settings,
         vault: CredentialVaultService,
-        solver: DdddOcrSolver,
+        solver: CaptchaSolver | None = None,
         *,
         cache: SessionCache | None = None,
     ) -> None:
         self._settings = settings
         self._vault = vault
-        self._authenticator = SsoAuthenticator(settings, solver)
+        self._authenticator = SsoAuthenticator(settings, solver or DdddOcrSolver())
         self._cache = cache or SessionCache()
 
     async def execute(self, db: AsyncSession, job: Job) -> ExecutionReceipt:
@@ -110,33 +118,25 @@ class StudyCabinHandler:
             )
         request = StudyCabinReservationRequest.model_validate(job.payload)
         if datetime.now(UTC) >= request.attempt_until.astimezone(UTC):
-            raise ExecutionFailure("NO_AVAILABILITY", retryable=False)
+            raise ExecutionFailure("ATTEMPT_WINDOW_EXPIRED", retryable=False)
 
         session = self._cache.get(job.credential_id)
         if session is None:
             account, password = await self._load_login(db, job)
             try:
-                cookies = await self._login_with_backoff(account, password)
-                client = InfospaceClient(self._settings, cookies=cookies)
-                user = await client.get_user_info()
-            except UpstreamUnavailable as exc:
-                raise ExecutionFailure("UPSTREAM_UNAVAILABLE", retryable=True) from exc
+                login = await self._login_with_backoff(account, password)
             finally:
                 password = ""
             self._cache.put(
                 job.credential_id,
-                cookies=cookies,
-                token=user.token,
-                account=user.acc_no,
+                token=login.token,
+                account=login.acc_no,
+                cookies=login.cookies,
             )
             session = self._cache.get(job.credential_id)
             assert session is not None
 
-        client = InfospaceClient(
-            self._settings,
-            cookies=session.cookies,
-            token=session.token,
-        )
+        client = InfospaceClient(self._settings, token=session.token, cookies=session.cookies)
         try:
             rooms = await client.list_rooms(
                 request.target_date,
@@ -191,7 +191,7 @@ class StudyCabinHandler:
             raise ExecutionFailure("UPSTREAM_REJECTED", retryable=False) from exc
 
         if datetime.now(UTC) >= request.attempt_until.astimezone(UTC):
-            raise ExecutionFailure("NO_AVAILABILITY", retryable=False)
+            raise ExecutionFailure("ATTEMPT_WINDOW_EXPIRED", retryable=False)
         raise ExecutionFailure("NO_AVAILABILITY", retryable=True)
 
     async def _load_login(self, db: AsyncSession, job: Job) -> tuple[str, str]:
@@ -235,12 +235,18 @@ class StudyCabinHandler:
             )
         return account, password
 
-    async def _login_with_backoff(self, account: str, password: str) -> dict[str, str]:
+    async def _login_with_backoff(self, account: str, password: str) -> InfospaceSession:
         last_error: Exception | None = None
         for attempt in range(5):
             try:
                 return await self._authenticator.login(account, password)
-            except (AuthenticationRejected, UpstreamUnavailable) as exc:
+            except AuthenticationRejected as exc:
+                raise ExecutionFailure(
+                    "INFOSPACE_LOGIN_REJECTED",
+                    retryable=False,
+                    next_action="replace_credential",
+                ) from exc
+            except UpstreamUnavailable as exc:
                 last_error = exc
             if attempt < 4:
                 await asyncio.sleep(2**attempt)

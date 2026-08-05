@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import date
-from urllib.parse import quote
 
 import httpx
 import pytest
@@ -13,14 +12,42 @@ from nanyee.integrations.infospace.client import (
     SubmissionUnknown,
     UpstreamUnavailable,
 )
-from nanyee.integrations.infospace.sso import SsoAuthenticator
+from nanyee.integrations.infospace.sso import (
+    AuthenticationRejected,
+    CaptchaSolver,
+    SsoAuthenticator,
+)
 from nanyee.tools.study_cabin import ReservationPayload
 
 
 class FakeSolver:
     async def solve(self, image: bytes) -> str:
-        assert image == b"captcha-image"
-        return "1234"
+        return "2285"
+
+
+class FakeDriver:
+    def __init__(
+        self,
+        cookies: dict[str, str] | None = None,
+        error: Exception | None = None,
+    ) -> None:
+        self.cookies = cookies or {"ic-cookie": "cookie-value", "UNI_AUTH_JSESSIONID": "sess"}
+        self.error = error
+        self.calls: list[tuple[str, str]] = []
+
+    async def acquire_session_cookies(
+        self, account: str, password: str, solver: CaptchaSolver
+    ) -> dict[str, str]:
+        self.calls.append((account, password))
+        if self.error is not None:
+            raise self.error
+        return dict(self.cookies)
+
+
+def _mock_user_info(payload: dict[str, object]) -> respx.Route:
+    return respx.get("https://infospace.smu.edu.cn/ic-web/auth/userInfo").mock(
+        return_value=httpx.Response(200, json=payload)
+    )
 
 
 @pytest.mark.asyncio
@@ -50,7 +77,7 @@ async def test_infospace_parses_rooms_and_does_not_retry_unknown_submission() ->
             },
         )
     )
-    client = InfospaceClient(Settings(app_env="test"), cookies={"ic-cookie": "session"})
+    client = InfospaceClient(Settings(app_env="test"), token="api-token")
     rooms = await client.list_rooms(date(2026, 7, 22), kind_id=29816776)
 
     assert rooms[0].dev_id == 29817269
@@ -78,7 +105,7 @@ async def test_infospace_redirect_is_classified_as_expired_session() -> None:
     respx.get("https://infospace.smu.edu.cn/ic-web/auth/userInfo").mock(
         return_value=httpx.Response(302, headers={"Location": "https://uis.smu.edu.cn/login.jsp"})
     )
-    client = InfospaceClient(Settings(app_env="test"), cookies={"ic-cookie": "expired"})
+    client = InfospaceClient(Settings(app_env="test"), token="expired-token")
 
     with pytest.raises(SessionExpired):
         await client.get_user_info()
@@ -86,47 +113,50 @@ async def test_infospace_redirect_is_classified_as_expired_session() -> None:
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_sso_login_uses_infospace_app_id_and_returns_only_cookies() -> None:
-    service = "https://infospace.smu.edu.cn/ic-web/authcenter/callback"
-    start = respx.get("https://infospace.smu.edu.cn/ic-web/authcenter/toLoginPage").mock(
-        return_value=httpx.Response(
-            302,
-            headers={"Location": f"https://uis.smu.edu.cn/login.jsp?service={quote(service)}"},
-        )
+async def test_sso_login_exchanges_cookies_for_api_token() -> None:
+    route = _mock_user_info(
+        {
+            "code": 0,
+            "data": {
+                "token": "c3dc5187dd614945b107a4f4e2a6a80c",
+                "accNo": 100233614,
+                "trueName": "测试",
+            },
+        }
     )
-    respx.get("https://uis.smu.edu.cn/login.jsp").mock(return_value=httpx.Response(200))
-    respx.get("https://uis.smu.edu.cn/imageServlet.do").mock(
-        return_value=httpx.Response(200, content=b"captcha-image")
-    )
+    driver = FakeDriver()
 
-    def login_response(request: httpx.Request) -> httpx.Response:
-        body = request.read().decode()
-        assert "appid=3458975" in body
-        assert "password=5f4dcc3b5aa765d61d8327deb882cf99" in body
-        return httpx.Response(200, json={"ticket": "ticket-value"})
-
-    respx.post("https://uis.smu.edu.cn/login/login.do").mock(side_effect=login_response)
-    respx.get(service).mock(
-        return_value=httpx.Response(
-            200,
-            headers={"Set-Cookie": "ic-cookie=session-value; Path=/; HttpOnly"},
-        )
-    )
-
-    cookies = await SsoAuthenticator(Settings(app_env="test"), FakeSolver()).login(
+    session = await SsoAuthenticator(Settings(app_env="test"), FakeSolver(), driver=driver).login(
         "student", "password"
     )
 
-    assert start.called
-    assert cookies == {"ic-cookie": "session-value"}
+    assert driver.calls == [("student", "password")]
+    assert session.token == "c3dc5187dd614945b107a4f4e2a6a80c"
+    assert session.acc_no == "100233614"
+    assert session.display_name == "测试"
+    assert session.cookies == {"ic-cookie": "cookie-value", "UNI_AUTH_JSESSIONID": "sess"}
+    request = route.calls[0].request
+    assert "ic-cookie=cookie-value" in request.headers["cookie"]
+    assert "token" not in request.headers
 
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_sso_rejects_redirect_to_untrusted_host() -> None:
-    respx.get("https://infospace.smu.edu.cn/ic-web/authcenter/toLoginPage").mock(
-        return_value=httpx.Response(302, headers={"Location": "https://evil.example/login"})
-    )
+async def test_sso_login_wrong_password_is_rejected() -> None:
+    driver = FakeDriver(error=AuthenticationRejected("用户名或密码错误"))
 
-    with pytest.raises(UpstreamUnavailable, match="untrusted URL"):
-        await SsoAuthenticator(Settings(app_env="test"), FakeSolver()).login("student", "password")
+    with pytest.raises(AuthenticationRejected):
+        await SsoAuthenticator(Settings(app_env="test"), FakeSolver(), driver=driver).login(
+            "student", "wrong"
+        )
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_sso_login_incomplete_user_info_is_unavailable() -> None:
+    _mock_user_info({"code": 300, "message": "用户未登录", "data": None})
+
+    with pytest.raises(UpstreamUnavailable):
+        await SsoAuthenticator(Settings(app_env="test"), FakeSolver(), driver=FakeDriver()).login(
+            "student", "password"
+        )

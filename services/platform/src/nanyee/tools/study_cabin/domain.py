@@ -89,6 +89,9 @@ def _covers(
 ) -> bool:
     open_start = datetime.combine(target_date, room.open_start)
     open_end = datetime.combine(target_date, room.open_end)
+    if room.open_end <= room.open_start:
+        # 上游用 00:00-00:00 表示全天开放；结束早于开始则视为跨午夜
+        open_end += timedelta(days=1)
     if requested_start < open_start or requested_end > open_end or requested_end <= requested_start:
         return False
     freeze = timedelta(minutes=room.freezing_minutes)

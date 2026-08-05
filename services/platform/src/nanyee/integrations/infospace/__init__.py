@@ -7,13 +7,18 @@ from nanyee.integrations.infospace.client import (
     UpstreamUnavailable,
     UserInfo,
 )
-from nanyee.integrations.infospace.sso import CaptchaSolver, SsoAuthenticator
+from nanyee.integrations.infospace.sso import (
+    AuthenticationRejected,
+    InfospaceSession,
+    SsoAuthenticator,
+)
 
 __all__ = [
+    "AuthenticationRejected",
     "BusinessError",
-    "CaptchaSolver",
     "InfospaceClient",
     "InfospaceError",
+    "InfospaceSession",
     "SessionExpired",
     "SsoAuthenticator",
     "SubmissionUnknown",
