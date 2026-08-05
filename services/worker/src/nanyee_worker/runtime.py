@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Mapping
+from contextlib import suppress
 from dataclasses import dataclass
 from typing import Protocol
+from uuid import UUID
 
 from nanyee.credentials.models import CredentialStatus, HostedCredential
+from nanyee.errors import AppError, ErrorCode
 from nanyee.identity.models import User, UserStatus
 from nanyee.jobs.models import Job
 from nanyee.jobs.service import JobService
@@ -100,6 +104,27 @@ class WorkerRuntime:
         if job is None:
             return False
 
+        heartbeat_task = asyncio.create_task(self._heartbeat_loop(job.id))
+        try:
+            return await self._execute(job)
+        except AppError as exc:
+            if exc.code is not ErrorCode.CONFLICT:
+                raise
+            logger.warning(
+                "job_lease_lost",
+                extra={
+                    "event": "job_lease_lost",
+                    "job_id": str(job.id),
+                    "tool_id": job.tool_id,
+                },
+            )
+            return True
+        finally:
+            heartbeat_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await heartbeat_task
+
+    async def _execute(self, job: Job) -> bool:
         handler = self._handlers[job.tool_id]
         try:
             async with self._session_factory() as db:
@@ -163,3 +188,28 @@ class WorkerRuntime:
             },
         )
         return True
+
+    async def _heartbeat_loop(self, job_id: UUID) -> None:
+        interval_seconds = max(1, self._lease_seconds // 3)
+        while True:
+            await asyncio.sleep(interval_seconds)
+            try:
+                async with self._session_factory() as db:
+                    renewed = await self._service.heartbeat(
+                        db,
+                        job_id=job_id,
+                        worker_id=self._worker_id,
+                        lease_seconds=self._lease_seconds,
+                    )
+            except Exception:
+                logger.exception(
+                    "job_heartbeat_error",
+                    extra={"event": "job_heartbeat_error", "job_id": str(job_id)},
+                )
+                continue
+            if not renewed:
+                logger.warning(
+                    "job_heartbeat_rejected",
+                    extra={"event": "job_heartbeat_rejected", "job_id": str(job_id)},
+                )
+                return
