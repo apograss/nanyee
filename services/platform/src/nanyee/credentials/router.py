@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime
 from typing import Annotated, Any, Literal, cast
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, Request
+from fastapi import APIRouter, Depends, Header, Request, Response
 from pydantic import BaseModel, Field, SecretStr, model_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,16 +22,19 @@ from nanyee.identity.router import current_auth
 from nanyee.identity.sessions import AuthContext, settings_from_request, validate_csrf
 from nanyee.tools.qun_checkin import validate_auth_token
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/credentials", tags=["credentials"])
 HOSTING_CONSENT_VERSION = "credential-hosting-v1"
 CREDENTIAL_CREATE_POLICY = RateLimitPolicy(window_seconds=10 * 60, soft_limit=5, hard_limit=15)
+CREDENTIAL_REVEAL_POLICY = RateLimitPolicy(window_seconds=10 * 60, soft_limit=10, hard_limit=30)
 
 
 class CredentialCreateRequest(BaseModel):
-    upstream: Literal["academic", "infospace", "qun100"]
-    purpose: Literal["evaluation", "study_cabin", "qun_checkin"]
+    upstream: Literal["academic", "infospace", "qun100", "school"]
+    purpose: Literal["evaluation", "study_cabin", "qun_checkin", "school"]
     secret: SecretStr
-    ttl_seconds: int | None = Field(default=None, ge=300, le=30 * 24 * 60 * 60)
+    ttl_seconds: int | None = Field(default=None, ge=300, le=365 * 24 * 60 * 60)
     consent_version: str
     metadata: dict[str, Any] = Field(default_factory=dict)
     turnstile_token: str | None = Field(default=None, max_length=2048)
@@ -42,6 +46,7 @@ class CredentialCreateRequest(BaseModel):
             "evaluation": "academic",
             "study_cabin": "infospace",
             "qun_checkin": "qun100",
+            "school": "school",
         }
         if self.upstream != expected[self.purpose]:
             raise ValueError("upstream does not match credential purpose")
@@ -111,7 +116,7 @@ def _canonical_secret(payload: CredentialCreateRequest) -> str:
                 status_code=422,
                 details={"field": "secret"},
             ) from exc
-    if payload.purpose not in {"evaluation", "study_cabin"}:
+    if payload.purpose not in {"evaluation", "study_cabin", "school"}:
         return value
     try:
         parsed = json.loads(value)
@@ -212,6 +217,40 @@ async def list_credentials(
     return [CredentialResponse.from_record(record) for record in records]
 
 
+class CredentialRevealResponse(BaseModel):
+    secret: str
+
+
+@router.post(
+    "/{credential_id}/reveal",
+    response_model=CredentialRevealResponse,
+    operation_id="reveal_credential",
+)
+async def reveal_credential(
+    credential_id: UUID,
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    auth: Annotated[AuthContext, Depends(current_auth)],
+    cipher: Annotated[EnvelopeCipher, Depends(get_cipher)],
+    csrf_header: Annotated[str | None, Header(alias="X-CSRF-Token")] = None,
+) -> CredentialRevealResponse:
+    require_csrf(request, auth, csrf_header)
+    await AntiAbuseGate(settings_from_request(request)).check(
+        db,
+        request,
+        action="credential_reveal",
+        identity=str(auth.user.id),
+        policy=CREDENTIAL_REVEAL_POLICY,
+    )
+    service = CredentialVaultService(cipher, settings_from_request(request))
+    secret = await service.reveal_for_owner(db, credential_id=credential_id, user_id=auth.user.id)
+    logger.info(
+        "credential_revealed",
+        extra={"user_id": str(auth.user.id), "credential_id": str(credential_id)},
+    )
+    return CredentialRevealResponse(secret=secret)
+
+
 @router.delete(
     "/{credential_id}",
     response_model=CredentialResponse,
@@ -224,8 +263,16 @@ async def revoke_credential(
     auth: Annotated[AuthContext, Depends(current_auth)],
     cipher: Annotated[EnvelopeCipher, Depends(get_cipher)],
     csrf_header: Annotated[str | None, Header(alias="X-CSRF-Token")] = None,
-) -> CredentialResponse:
+    hard: bool = False,
+) -> CredentialResponse | Response:
     require_csrf(request, auth, csrf_header)
     service = CredentialVaultService(cipher, settings_from_request(request))
+    if hard:
+        await service.delete(db, credential_id=credential_id, user_id=auth.user.id)
+        logger.info(
+            "credential_deleted",
+            extra={"user_id": str(auth.user.id), "credential_id": str(credential_id)},
+        )
+        return Response(status_code=204)
     record = await service.revoke(db, credential_id=credential_id, user_id=auth.user.id)
     return CredentialResponse.from_record(record)

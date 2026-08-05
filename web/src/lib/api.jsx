@@ -2,8 +2,7 @@
 // Nanyee API 集成层：CSRF / 401 / Turnstile / anti_abuse_pass / 敏感态内存生命周期
 // 严格遵循 docs/frontend-integration.md 契约
 //
-// 说明：设计预览阶段后端未必运行，故提供 mock 数据驱动 UI 展示完整交互状态；
-// 真实 apiFetch 封装已按契约实现（credentials:include、X-CSRF-Token、统一错误解析）。
+// 说明：apiFetch 封装已按契约实现（credentials:include、X-CSRF-Token、统一错误解析）。
 import React, { createContext, useContext, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 export const API_BASE = "/api/v1";
@@ -96,10 +95,12 @@ export function AuthProvider({ children }) {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      // 设计预览：后端未起时用 mock user
-      const u = await apiGet("/auth/me", { mock: mockUser });
-      setUser(u);
-      return u;
+      // 后台探测登录态：未登录是正常情况，不触发全局跳登录
+      // AuthResponse = { user, csrf_header }，用户对象包在 user 键里
+      const u = await apiGet("/auth/me", { silent401: true });
+      const user = u.user;
+      setUser(user);
+      return user;
     } catch (err) {
       if (err.code === "AUTHENTICATION_REQUIRED") {
         setUser(null);
@@ -128,46 +129,50 @@ export function useAuth() {
 
 /* ---------- 核心 fetch 封装 ---------- */
 // options:
-//   method, body, headers, mock(设计预览用 mock 数据), action(用于 Turnstile),
-//   turnstileToken(已取到的 token), antiAbusePass(已取到的 pass)
+//   method, body, headers, action(用于 anti_abuse_pass 缓存与 Turnstile 挑战),
+//   turnstileToken(已取到的 token，注入 body/query/表单字段),
+//   silent401(为 true 时 401 不触发全局 nanyee:unauth 跳登录，用于后台探测类请求)
 export async function apiFetch(path, options = {}) {
-  const { method = "GET", body, headers = {}, mock, action } = options;
-  // 仅显式开启设计预览时使用 mock；生产与普通开发默认请求真实后端。
-  if (mock !== undefined && window.__NANYEE_MOCK__ === true) {
-    await new Promise((r) => setTimeout(r, 280));
-    return mock;
-  }
+  const { method = "GET", body, headers = {}, action, silent401 } = options;
   const opts = {
     method,
     credentials: "include",
     headers: { ...headers },
   };
+  // anti_abuse_pass / turnstile_token 是请求体字段：
+  // JSON body 注入字段；GET 拼 query；multipart 走表单字段
+  const pass = action ? getAntiAbusePass(action) : null;
+  const turnstileToken = options.turnstileToken || null;
+  let url = API_BASE + path;
   if (body !== undefined && !(body instanceof FormData)) {
+    const payload = { ...body };
+    if (pass) payload.anti_abuse_pass = pass;
+    if (turnstileToken) payload.turnstile_token = turnstileToken;
     opts.headers["Content-Type"] = "application/json";
-    opts.body = JSON.stringify(body);
+    opts.body = JSON.stringify(payload);
   } else if (body instanceof FormData) {
+    if (pass) body.append("anti_abuse_pass", pass);
+    if (turnstileToken) body.append("turnstile_token", turnstileToken);
     opts.body = body;
+  } else if (method.toUpperCase() === "GET") {
+    const params = [];
+    if (pass) params.push(`anti_abuse_pass=${encodeURIComponent(pass)}`);
+    if (turnstileToken) params.push(`turnstile_token=${encodeURIComponent(turnstileToken)}`);
+    if (params.length) url += (url.includes("?") ? "&" : "?") + params.join("&");
   }
   if (isWriteMethod(method)) {
     const csrf = getCsrfToken();
     if (csrf) opts.headers["X-CSRF-Token"] = csrf;
   }
-  // 注入 anti_abuse_pass（同 action）
-  if (action) {
-    const pass = getAntiAbusePass(action);
-    if (pass) opts.headers["anti-abuse-pass"] = pass;
-  }
-  // 注入 turnstile_token（调用方已通过 useTurnstile 取到）
-  if (options.turnstileToken) opts.headers["turnstile-token"] = options.turnstileToken;
 
-  const resp = await fetch(API_BASE + path, opts);
+  const resp = await fetch(url, opts);
   const isJson = (resp.headers.get("content-type") || "").includes("application/json");
   const data = isJson ? await resp.json() : await resp.text();
 
   if (!resp.ok) {
     const err = new ApiError(isJson ? data : undefined, resp.status);
-    // 401：清理内存用户态，跳登录
-    if (err.code === "AUTHENTICATION_REQUIRED") {
+    // 401：清理内存用户态，跳登录（silent401 时不打扰，由调用方自行处理）
+    if (err.code === "AUTHENTICATION_REQUIRED" && !silent401) {
       window.dispatchEvent(new CustomEvent("nanyee:unauth"));
     }
     // RATE_LIMIT_CHALLENGE_REQUIRED：交给 useTurnstile 处理
@@ -267,10 +272,14 @@ export const ENROLLMENT_TERMINAL_STATES = ["succeeded", "failed", "cancelled"];
 
 /* ---------- 凭证用途与上游映射 ---------- */
 export const CREDENTIAL_PURPOSES = [
+  { purpose: "school", upstream: "school", label: "学校统一认证", secretType: "school_account" },
   { purpose: "evaluation", upstream: "academic", label: "自动评课", secretType: "school_account" },
   { purpose: "study_cabin", upstream: "infospace", label: "自习室预约", secretType: "school_account" },
   { purpose: "qun_checkin", upstream: "qun100", label: "群报数", secretType: "qun_token" },
 ];
+
+// 学校统一认证凭据（school）可同时用于这些工具用途
+export const SCHOOL_SHARED_PURPOSES = ["school", "evaluation", "study_cabin"];
 
 /* ---------- 确认版本常量 ---------- */
 export const CONFIRMATION_VERSIONS = {
@@ -283,15 +292,16 @@ export const CONFIRMATION_VERSIONS = {
 };
 
 /* ---------- API 端点封装 ---------- */
+// action 写死在后端 gate 名上，用于 anti_abuse_pass 缓存与 Turnstile 挑战
 // 选课
 export function fetchEnrollmentCategories(academicSessionId, opts) {
-  return apiPost("/smu/enrollment/categories", { academic_session_id: academicSessionId }, opts);
+  return apiPost("/smu/enrollment/categories", { academic_session_id: academicSessionId }, { ...opts, action: "smu_enrollment_read" });
 }
 export function fetchEnrollmentCourses(academicSessionId, categoryCode, opts) {
-  return apiPost("/smu/enrollment/courses", { academic_session_id: academicSessionId, category_code: categoryCode }, opts);
+  return apiPost("/smu/enrollment/courses", { academic_session_id: academicSessionId, category_code: categoryCode }, { ...opts, action: "smu_enrollment_read" });
 }
 export function startEnrollmentRun(body, opts) {
-  return apiPost("/smu/enrollment/runs", body, opts);
+  return apiPost("/smu/enrollment/runs", body, { ...opts, action: "smu_enrollment_run" });
 }
 export function getEnrollmentRun(runId, opts) {
   return apiGet(`/smu/enrollment/runs/${runId}`, opts);
@@ -301,12 +311,12 @@ export function cancelEnrollmentRun(runId, opts) {
 }
 
 export function createEnrollmentCookieSession(cookie, opts) {
-  return apiPost("/smu/enrollment/session/cookie", { cookie }, opts);
+  return apiPost("/smu/enrollment/session/cookie", { cookie }, { ...opts, action: "smu_cookie_login" });
 }
 
 // 课表 WakeUp 分享
 export function shareWakeup(body, opts) {
-  return apiPost("/smu/timetable.wakeup.share", body, opts);
+  return apiPost("/smu/timetable.wakeup.share", body, { ...opts, action: "smu_timetable" });
 }
 
 // 自习室舱位列表
@@ -321,7 +331,7 @@ export function fetchTools(opts) {
 
 // 凭证
 export function createCredential(body, opts) {
-  return apiPost("/credentials", body, opts);
+  return apiPost("/credentials", body, { ...opts, action: "credential_create" });
 }
 export function listCredentials(opts) {
   return apiGet("/credentials", opts);
@@ -329,10 +339,16 @@ export function listCredentials(opts) {
 export function revokeCredential(id, opts) {
   return apiDelete(`/credentials/${id}`, opts);
 }
+export function revealCredential(id, opts) {
+  return apiPost(`/credentials/${id}/reveal`, undefined, { ...opts, action: "credential_reveal" });
+}
+export function deleteCredential(id, opts) {
+  return apiDelete(`/credentials/${id}?hard=true`, opts);
+}
 
 // 任务
 export function createJob(body, opts) {
-  return apiFetch("/jobs", { ...opts, method: "POST", body, headers: { ...(opts?.headers || {}), "Idempotency-Key": opts?.idempotencyKey || crypto.randomUUID() } });
+  return apiFetch("/jobs", { ...opts, method: "POST", body, action: "job_create", headers: { ...(opts?.headers || {}), "Idempotency-Key": opts?.idempotencyKey || crypto.randomUUID() } });
 }
 export function listJobs(opts) {
   return apiGet("/jobs", opts);
@@ -344,103 +360,39 @@ export function cancelJob(id, opts) {
   return apiPost(`/jobs/${id}/cancel`, undefined, opts);
 }
 
-/* ---------- 设计预览 mock 数据 ---------- */
-export const mockUser = {
-  id: "usr_2c7f9a", username: "linyi", nickname: "林一", role: "student",
-  status: "active", registration_trust_level: "community_quiz",
-};
+/* ---------- 文件下载（ICS / WakeUp 课表导出） ---------- */
+// POST 后以 Blob 触发浏览器下载；错误结构与 apiFetch 一致
+// opts.action：与 apiFetch 相同，anti_abuse_pass / turnstile_token 注入 JSON body
+export async function apiDownload(path, body, filename, opts = {}) {
+  const headers = { "Content-Type": "application/json" };
+  const csrf = getCsrfToken();
+  if (csrf) headers["X-CSRF-Token"] = csrf;
+  const payload = { ...body };
+  const pass = opts.action ? getAntiAbusePass(opts.action) : null;
+  if (pass) payload.anti_abuse_pass = pass;
+  if (opts.turnstileToken) payload.turnstile_token = opts.turnstileToken;
+  const resp = await fetch(API_BASE + path, {
+    method: "POST",
+    credentials: "include",
+    headers,
+    body: JSON.stringify(payload),
+  });
+  if (!resp.ok) {
+    const isJson = (resp.headers.get("content-type") || "").includes("application/json");
+    const err = new ApiError(isJson ? await resp.json() : undefined, resp.status);
+    if (err.code === "AUTHENTICATION_REQUIRED") {
+      window.dispatchEvent(new CustomEvent("nanyee:unauth"));
+    }
+    throw err;
+  }
+  const blob = await resp.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
 
-export const mockEnrollmentCategories = [
-  { code: "12", title: "公共选修课" },
-  { code: "05", title: "专业基础课" },
-  { code: "21", title: "通识核心课" },
-  { code: "08", title: "体育课程" },
-];
-
-export const mockEnrollmentCourses = [
-  { task_code: "TC0001", name: "大学生心理健康", capacity: 200, selected_count: 156, credits: 2, department: "心理系", hours: 32, location: "教A-301", schedule: "周二 3-4节 1-16周", teacher: "王老师" },
-  { task_code: "TC0002", name: "中国近现代史纲要", capacity: 150, selected_count: 148, credits: 3, department: "马院", hours: 48, location: "教B-201", schedule: "周四 1-2节 1-16周", teacher: "李老师" },
-  { task_code: "TC0003", name: "人工智能导论", capacity: 80, selected_count: 79, credits: 2, department: "计算机学院", hours: 32, location: "实验楼-501", schedule: "周五 5-6节 1-16周", teacher: "张教授" },
-  { task_code: "TC0004", name: "音乐鉴赏", capacity: 100, selected_count: 42, credits: 2, department: "艺术学院", hours: 32, location: "艺A-101", schedule: "周三 7-8节 1-16周", teacher: "刘老师" },
-  { task_code: "TC0005", name: "生物多样性保护", capacity: 60, selected_count: 23, credits: 2, department: "生科院", hours: 32, location: "生A-203", schedule: "周一 9-10节 1-16周", teacher: "陈老师" },
-];
-
-export const mockEnrollmentRun = {
-  id: "run_8a3f2c",
-  state: "running",
-  category_code: "12",
-  preferences: [
-    { task_code: "TC0001", name: "大学生心理健康" },
-    { task_code: "TC0003", name: "人工智能导论" },
-  ],
-  scheduled_time: "09:00:00",
-  run_at: "2026-07-20T09:00:00+08:00",
-  attempt_count: 8,
-  max_attempts: 15,
-  result: null,
-  events: [
-    { sequence: 1, created_at: "2026-07-20T09:00:01+08:00", type: "calibrated", message: "教务服务器时间校准完成，偏差 +0.3s", attempt: null, course_name: null },
-    { sequence: 2, created_at: "2026-07-20T09:00:02+08:00", type: "burst_start", message: "开始连续尝试第一志愿", attempt: 1, course_name: "大学生心理健康" },
-    { sequence: 3, created_at: "2026-07-20T09:00:03+08:00", type: "attempt", message: "余量 44，尝试中…", attempt: 1, course_name: "大学生心理健康" },
-    { sequence: 4, created_at: "2026-07-20T09:00:04+08:00", type: "attempt", message: "余量 44，尝试中…", attempt: 2, course_name: "大学生心理健康" },
-    { sequence: 5, created_at: "2026-07-20T09:00:05+08:00", type: "burst_end", message: "首轮连续尝试结束（5次），切换轮询模式", attempt: 5, course_name: null },
-    { sequence: 6, created_at: "2026-07-20T09:00:06+08:00", type: "poll", message: "轮询第一志愿，间隔 100-300ms", attempt: 6, course_name: "大学生心理健康" },
-    { sequence: 7, created_at: "2026-07-20T09:00:07+08:00", type: "poll", message: "轮询第一志愿，间隔 100-300ms", attempt: 7, course_name: "大学生心理健康" },
-    { sequence: 8, created_at: "2026-07-20T09:00:08+08:00", type: "poll", message: "轮询第一志愿，间隔 100-300ms", attempt: 8, course_name: "大学生心理健康" },
-  ],
-  created_at: "2026-07-20T09:00:00+08:00",
-  finished_at: null,
-};
-
-export const mockStudyCabins = [
-  { dev_id: 29817269, name: "自习室 A301" },
-  { dev_id: 29817270, name: "自习室 A302" },
-  { dev_id: 29817271, name: "自习室 B201" },
-  { dev_id: 29817272, name: "自习室 B202" },
-  { dev_id: 29817273, name: "自习室 C105" },
-  { dev_id: 29817274, name: "自习室 C106" },
-  { dev_id: 29817275, name: "自习室 D301" },
-  { dev_id: 29817276, name: "自习室 D302" },
-];
-
-export const mockCredentials = [
-  { id: "cred_001", upstream: "academic", purpose: "evaluation", status: "active", expires_at: "2026-08-20T00:00:00+08:00", created_at: "2026-07-20T10:00:00+08:00", last_used_at: "2026-07-20T14:30:00+08:00", metadata: { account_hint: "尾号 0001" }, consent_version: "credential-hosting-v1" },
-  { id: "cred_002", upstream: "infospace", purpose: "study_cabin", status: "active", expires_at: "2026-07-27T00:00:00+08:00", created_at: "2026-07-20T11:00:00+08:00", last_used_at: null, metadata: { account_hint: "尾号 0001" }, consent_version: "credential-hosting-v1" },
-  { id: "cred_003", upstream: "qun100", purpose: "qun_checkin", status: "active", expires_at: "2026-07-21T00:00:00+08:00", created_at: "2026-07-20T12:00:00+08:00", last_used_at: "2026-07-20T15:00:00+08:00", metadata: { account_hint: "尾号 6789" }, consent_version: "credential-hosting-v1" },
-];
-
-export const mockGrades = {
-  summary: {
-    total_credits: 42.5, total_courses: 18, weighted_gpa: 3.65, required_gpa: 3.72,
-    average_score: 85.2, required_average_score: 86.1, failed_count: 0,
-    semesters: ["2025-2026-1", "2025-2026-2"],
-  },
-  grades: [
-    { name: "高等数学A", raw_score: "92", numeric_score: 92, grade_point: 4.0, credits: 5, semester: "2025-2026-1", ranking: { class_rank: 3, class_total: 120, course_rank: 5, course_total: 350, distribution: { gte90: 28, s80to90: 65, s70to80: 40, s60to70: 15, lt60: 2 } } },
-    { name: "大学英语", raw_score: "88", numeric_score: 88, grade_point: 3.8, credits: 4, semester: "2025-2026-1", ranking: { class_rank: 12, class_total: 120, course_rank: 45, course_total: 350, distribution: { gte90: 20, s80to90: 80, s70to80: 100, s60to70: 40, lt60: 10 } } },
-    { name: "线性代数", raw_score: "85", numeric_score: 85, grade_point: 3.7, credits: 3, semester: "2025-2026-1", ranking: { class_rank: 20, class_total: 120, course_rank: 60, course_total: 350, distribution: { gte90: 15, s80to90: 70, s70to80: 120, s60to70: 35, lt60: 10 } } },
-    { name: "数据结构", raw_score: "95", numeric_score: 95, grade_point: 4.0, credits: 4, semester: "2025-2026-2", ranking: { class_rank: 1, class_total: 80, course_rank: 2, course_total: 240, distribution: { gte90: 30, s80to90: 90, s70to80: 80, s60to70: 30, lt60: 10 } } },
-    { name: "操作系统", raw_score: "82", numeric_score: 82, grade_point: 3.5, credits: 3.5, semester: "2025-2026-2", ranking: null },
-  ],
-};
-
-export const mockJobs = [
-  { id: "job_001", tool_id: "evaluation", operation: "submit", state: "running", credential_id: "cred_001", scheduled_for: "2026-07-20T10:00:00+08:00", attempt_count: 3, max_attempts: 15, receipt: null, error_code: null, next_action: null, created_at: "2026-07-20T10:00:00+08:00", updated_at: "2026-07-20T14:30:00+08:00", cancel_requested_at: null, payload: { strategy: "legacy_positive_random", max_courses: 60 } },
-  { id: "job_002", tool_id: "study_cabin", operation: "reserve", state: "verification_required", credential_id: "cred_002", scheduled_for: "2026-07-21T23:59:00+08:00", attempt_count: 5, max_attempts: 120, receipt: null, error_code: null, next_action: "上游提交超时，请到自习室系统核验预约结果", created_at: "2026-07-20T11:00:00+08:00", updated_at: "2026-07-20T23:59:05+08:00", cancel_requested_at: null, payload: { target_date: "2026-07-22", start_time: "09:00", end_time: "11:00", title: "学习" } },
-  { id: "job_003", tool_id: "qun_checkin", operation: "submit", state: "succeeded", credential_id: "cred_003", scheduled_for: "2026-07-20T15:00:00+08:00", attempt_count: 1, max_attempts: 1, receipt: { form_id: "123456789012345", title: "每日打卡", submitted: true }, error_code: null, next_action: null, created_at: "2026-07-20T12:00:00+08:00", updated_at: "2026-07-20T15:00:02+08:00", cancel_requested_at: null, payload: { form_id: "123456789012345" } },
-  { id: "job_004", tool_id: "evaluation", operation: "submit", state: "succeeded", credential_id: "cred_001", scheduled_for: "2026-07-19T08:00:00+08:00", attempt_count: 2, max_attempts: 15, receipt: { courses_evaluated: 18, strategy: "legacy_positive_random" }, error_code: null, next_action: null, created_at: "2026-07-19T08:00:00+08:00", updated_at: "2026-07-19T09:30:00+08:00", cancel_requested_at: null, payload: { strategy: "legacy_positive_random", max_courses: 60 } },
-];
-
-/* 课表相关 mock */
-// 设计预览：image_base64 留空时前端以 inline SVG 回退展示
-export const mockCaptcha = {
-  flow_id: "mock-flow-id-preview-only",
-  image_base64: "",
-  content_type: "image/png",
-  expires_at: new Date(Date.now() + 120 * 1000).toISOString(),
-};
-export const mockSession = {
-  academic_session_id: "mock-academic-session-id-preview",
-  expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-};
-export const mockWakeupShare = { share_code: "wk-preview-7K9A2F" };

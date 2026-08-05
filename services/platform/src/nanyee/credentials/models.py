@@ -16,6 +16,21 @@ class CredentialStatus(StrEnum):
     DELETED = "deleted"
 
 
+SHARED_SCHOOL_PURPOSE = "school"
+SCHOOL_SHARED_TOOL_IDS = frozenset({"evaluation", "study_cabin"})
+
+
+def purpose_satisfies(credential_purpose: str, required: str) -> bool:
+    """凭据用途是否满足任务/解密要求。
+
+    学校统一认证（school）凭据同时覆盖 evaluation 与 study_cabin；
+    其余用途必须精确匹配。
+    """
+    if credential_purpose == required:
+        return True
+    return credential_purpose == SHARED_SCHOOL_PURPOSE and required in SCHOOL_SHARED_TOOL_IDS
+
+
 class HostedCredential(TimestampMixin, Base):
     __tablename__ = "hosted_credentials"
 

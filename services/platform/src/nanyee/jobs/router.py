@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from nanyee.anti_abuse.gate import AntiAbuseGate
 from nanyee.anti_abuse.rate_limit import RateLimitPolicy
-from nanyee.credentials.models import CredentialStatus, HostedCredential
+from nanyee.credentials.models import CredentialStatus, HostedCredential, purpose_satisfies
 from nanyee.credentials.router import require_csrf
 from nanyee.db import get_db_session
 from nanyee.errors import AppError, ErrorCode
@@ -113,7 +113,7 @@ async def _validate_credential(
         or as_utc(credential.expires_at) <= utc_now()
     ):
         raise AppError(ErrorCode.FORBIDDEN, "凭据不可用于该任务。", status_code=403)
-    if credential.purpose != tool_id:
+    if not purpose_satisfies(credential.purpose, tool_id):
         raise AppError(ErrorCode.FORBIDDEN, "凭据用途与任务不匹配。", status_code=403)
 
 

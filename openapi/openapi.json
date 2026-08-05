@@ -598,7 +598,8 @@
             "enum": [
               "evaluation",
               "study_cabin",
-              "qun_checkin"
+              "qun_checkin",
+              "school"
             ],
             "title": "Purpose",
             "type": "string"
@@ -612,7 +613,7 @@
           "ttl_seconds": {
             "anyOf": [
               {
-                "maximum": 2592000.0,
+                "maximum": 31536000.0,
                 "minimum": 300.0,
                 "type": "integer"
               },
@@ -638,7 +639,8 @@
             "enum": [
               "academic",
               "infospace",
-              "qun100"
+              "qun100",
+              "school"
             ],
             "title": "Upstream",
             "type": "string"
@@ -740,6 +742,19 @@
           "consent_version"
         ],
         "title": "CredentialResponse",
+        "type": "object"
+      },
+      "CredentialRevealResponse": {
+        "properties": {
+          "secret": {
+            "title": "Secret",
+            "type": "string"
+          }
+        },
+        "required": [
+          "secret"
+        ],
+        "title": "CredentialRevealResponse",
         "type": "object"
       },
       "CredentialStatus": {
@@ -3340,6 +3355,16 @@
             }
           },
           {
+            "in": "query",
+            "name": "hard",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Hard",
+              "type": "boolean"
+            }
+          },
+          {
             "in": "header",
             "name": "X-CSRF-Token",
             "required": false,
@@ -3379,6 +3404,65 @@
           }
         },
         "summary": "Revoke Credential",
+        "tags": [
+          "credentials"
+        ]
+      }
+    },
+    "/api/v1/credentials/{credential_id}/reveal": {
+      "post": {
+        "operationId": "reveal_credential",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "credential_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Credential Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredentialRevealResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reveal Credential",
         "tags": [
           "credentials"
         ]

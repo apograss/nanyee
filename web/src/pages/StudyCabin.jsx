@@ -6,8 +6,7 @@ import { Armchair, ArrowRight, ChevronDown, ChevronUp, GripVertical, Clock, Shie
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Label, Badge, Alert, StatusBadge, Spinner, cn } from "@/components/ui.jsx";
 import {
   fetchStudyCabins, listCredentials, createCredential, createJob,
-  CONFIRMATION_VERSIONS, CREDENTIAL_PURPOSES,
-  mockStudyCabins, mockCredentials, mockJobs,
+  CONFIRMATION_VERSIONS, CREDENTIAL_PURPOSES, useAuth,
 } from "@/lib/api.jsx";
 
 const EASE = [0.22, 1, 0.36, 1];
@@ -19,7 +18,8 @@ const inView = { once: true, margin: "-60px" };
 
 export default function StudyCabin(qoderProps) {
   const navigate = useNavigate();
-  const purpose = CREDENTIAL_PURPOSES.find((p) => p.purpose === "study_cabin");
+  const { user } = useAuth();
+  const purpose = CREDENTIAL_PURPOSES.find((p) => p.purpose === "school");
 
   // datetime-local → ISO 8601 with本地时区（后端要求 +08:00 格式）
   const toISOWithTimezone = (datetimeLocal) => {
@@ -38,7 +38,7 @@ export default function StudyCabin(qoderProps) {
   const [cabinsLoading, setCabinsLoading] = useState(true);
   const [cabinsError, setCabinsError] = useState(null);
 
-  // 已托管的学习舱凭据（purpose=study_cabin, status=active）
+  // 已托管的学校统一认证凭据（purpose=school，兼容旧版 purpose=study_cabin，status=active）
   const [credential, setCredential] = useState(null);
   const [credLoading, setCredLoading] = useState(true);
 
@@ -68,7 +68,7 @@ export default function StudyCabin(qoderProps) {
     setCabinsLoading(true);
     setCabinsError(null);
     try {
-      const data = await fetchStudyCabins({ mock: mockStudyCabins });
+      const data = await fetchStudyCabins();
       setCabins(Array.isArray(data) ? data : []);
     } catch (err) {
       setCabinsError(err?.message || "舱位列表加载失败");
@@ -80,10 +80,12 @@ export default function StudyCabin(qoderProps) {
   const loadCredential = useCallback(async () => {
     setCredLoading(true);
     try {
-      const list = await listCredentials({ mock: mockCredentials });
+      const list = await listCredentials();
       const arr = Array.isArray(list) ? list : (list?.items || []);
-      const active = arr.find((c) => c.purpose === "study_cabin" && c.status === "active");
-      setCredential(active || null);
+      // 学校统一认证（school）与旧版学习舱专用凭据都可用，优先统一认证
+      const school = arr.find((c) => c.purpose === "school" && c.status === "active");
+      const legacy = arr.find((c) => c.purpose === "study_cabin" && c.status === "active");
+      setCredential(school || legacy || null);
     } catch {
       setCredential(null);
     } finally {
@@ -93,8 +95,14 @@ export default function StudyCabin(qoderProps) {
 
   useEffect(() => {
     loadCabins();
-    loadCredential();
-  }, [loadCabins, loadCredential]);
+    // 凭据是平台账号数据：未登录时不拉取（避免 401 触发跳登录），提交任务时再由接口鉴权引导登录
+    if (user) {
+      loadCredential();
+    } else {
+      setCredential(null);
+      setCredLoading(false);
+    }
+  }, [loadCabins, loadCredential, user]);
 
   const toggleCabin = (devId) => setSelected((prev) => {
     const id = Number(devId);
@@ -122,7 +130,7 @@ export default function StudyCabin(qoderProps) {
         consent_version: CONFIRMATION_VERSIONS.credentialHosting,
         ttl_seconds: ttl,
         metadata: { account_hint: accountHint || `尾号 ${account.slice(-4)}` },
-      }, { mock: { id: "cred_cabin_new", upstream: purpose.upstream, purpose: purpose.purpose, status: "active", expires_at: new Date(Date.now() + ttl * 1000).toISOString(), created_at: new Date().toISOString(), last_used_at: null, metadata: { account_hint: accountHint || `尾号 ${account.slice(-4)}` }, consent_version: CONFIRMATION_VERSIONS.credentialHosting } });
+      });
       setCredential(cred);
       setPassword(""); // 提交即清空
     } catch (err) {
@@ -146,7 +154,8 @@ export default function StudyCabin(qoderProps) {
         title,
         cabin_ids: selected, // 按用户优先级排序的 dev_id 列表
       };
-      if (attemptUntil) payload.attempt_until = toISOWithTimezone(attemptUntil);
+      // attempt_until 后端必填：未填时回退为预约开始时间（targetDate + startTime）
+      payload.attempt_until = toISOWithTimezone(attemptUntil || `${targetDate}T${startTime}`);
 
       const body = {
         tool_id: "study_cabin",
@@ -157,7 +166,7 @@ export default function StudyCabin(qoderProps) {
       };
       if (scheduledFor) body.scheduled_for = toISOWithTimezone(scheduledFor);
 
-      const job = await createJob(body, { mock: mockJobs[1] });
+      const job = await createJob(body);
       setSubmitResult({ job_id: job.id, state: job.state, next_action: job.next_action, credential_id: credential.id });
     } catch (err) {
       setSubmitError(err?.message || "任务创建失败");
@@ -195,7 +204,7 @@ export default function StudyCabin(qoderProps) {
           <div className="kicker"><strong>01</strong> — Credential</div>
           <CardTitle data-qoder-id="qel-cardtitle-c22371ba" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-cardtitle-c22371ba&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;cardtitle&quot;,&quot;loc&quot;:{&quot;line&quot;:169,&quot;column&quot;:11}}">学习舱凭据</CardTitle>
           <CardDescription data-qoder-id="qel-carddescription-762ed445" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-carddescription-762ed445&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;carddescription&quot;,&quot;loc&quot;:{&quot;line&quot;:170,&quot;column&quot;:11}}">
-            用于代你登录学校系统抢舱位的账号密码。
+            用于代你登录学校系统抢舱位的学校统一认证账号（与自动评课共用）。
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4" data-qoder-id="qel-flex-64da1e6c" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-flex-64da1e6c&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;flex&quot;,&quot;loc&quot;:{&quot;line&quot;:174,&quot;column&quot;:9}}">
@@ -211,7 +220,7 @@ export default function StudyCabin(qoderProps) {
             </Alert>
           ) : (
             <form className="flex flex-col gap-4" onSubmit={createStudyCred} data-qoder-id="qel-flex-a7175ff6" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-flex-a7175ff6&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;flex&quot;,&quot;loc&quot;:{&quot;line&quot;:186,&quot;column&quot;:13}}">
-              <Alert variant="warning" title="尚未托管学习舱凭据" data-qoder-id="qel-alert-79e470ee" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-alert-79e470ee&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;alert&quot;,&quot;loc&quot;:{&quot;line&quot;:187,&quot;column&quot;:15}}">
+              <Alert variant="warning" title="尚未托管学校统一认证凭据" data-qoder-id="qel-alert-79e470ee" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-alert-79e470ee&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;alert&quot;,&quot;loc&quot;:{&quot;line&quot;:187,&quot;column&quot;:15}}">
                 <span data-qoder-id="qel-span-ba560bdb" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-span-ba560bdb&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;span&quot;,&quot;loc&quot;:{&quot;line&quot;:188,&quot;column&quot;:17}}">请先填写学校账号密码并托管。学校密码仅用于本次创建，提交后立即从内存清空。</span>
               </Alert>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" data-qoder-id="qel-grid-23df9d05" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-grid-23df9d05&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;grid&quot;,&quot;loc&quot;:{&quot;line&quot;:190,&quot;column&quot;:15}}">
@@ -387,7 +396,7 @@ export default function StudyCabin(qoderProps) {
             <Button onClick={submit} disabled={!valid || submitting} loading={submitting} data-qoder-id="qel-button-14dc8e4e" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-button-14dc8e4e&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;button&quot;,&quot;loc&quot;:{&quot;line&quot;:350,&quot;column&quot;:13}}">
               创建任务 <ArrowRight className="w-4 h-4"  data-qoder-id="qel-w-4-af2a03b0" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-w-4-af2a03b0&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;w-4&quot;,&quot;loc&quot;:{&quot;line&quot;:351,&quot;column&quot;:20}}"/>
             </Button>
-            {!credential && <span className="text-[13px] text-[var(--muted)] self-center" data-qoder-id="qel-text-13px-14d79928" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-text-13px-14d79928&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;text-13px&quot;,&quot;loc&quot;:{&quot;line&quot;:353,&quot;column&quot;:29}}">需先托管学习舱凭据</span>}
+            {!credential && <span className="text-[13px] text-[var(--muted)] self-center" data-qoder-id="qel-text-13px-14d79928" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-text-13px-14d79928&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;text-13px&quot;,&quot;loc&quot;:{&quot;line&quot;:353,&quot;column&quot;:29}}">需先托管学校统一认证凭据</span>}
             {credential && !valid && <span className="text-[13px] text-[var(--muted)] self-center" data-qoder-id="qel-text-13px-17d79de1" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-text-13px-17d79de1&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;text-13px&quot;,&quot;loc&quot;:{&quot;line&quot;:354,&quot;column&quot;:38}}">请补全标题、日期、时间段并选择至少一个舱位</span>}
           </div>
         )}

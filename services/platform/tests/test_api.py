@@ -215,3 +215,130 @@ async def test_quiz_registration_session_and_csrf_logout(
     logout = await api_client.post("/api/v1/auth/logout", headers={"X-CSRF-Token": csrf})
     assert logout.status_code == 204
     assert (await api_client.get("/api/v1/auth/me")).status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_school_credential_shared_reveal_and_hard_delete(
+    api_client: httpx.AsyncClient,
+) -> None:
+    challenge_response = await api_client.post(
+        "/api/v1/registration/challenges", json={"method": "quiz"}
+    )
+    challenge = challenge_response.json()
+    bank_by_content = {question.content: question for question in load_quiz_bank()}
+    answers = [bank_by_content[item["question"]].correctAnswer for item in challenge["questions"]]
+    await api_client.post(
+        f"/api/v1/registration/challenges/{challenge['challenge_id']}/verify",
+        json={"answers": answers},
+    )
+    registered = await api_client.post(
+        "/api/v1/registration",
+        json={
+            "challenge_id": challenge["challenge_id"],
+            "username": "school_shared_user",
+            "password": "一段好记的密码 2026",
+            "nickname": "共享凭据",
+        },
+    )
+    assert registered.status_code == 201, registered.text
+    csrf = api_client.cookies["nanyee_csrf"]
+
+    mismatch = await api_client.post(
+        "/api/v1/credentials",
+        headers={"X-CSRF-Token": csrf},
+        json={
+            "upstream": "academic",
+            "purpose": "school",
+            "secret": '{"account":"20260001","password":"pw"}',
+            "consent_version": "credential-hosting-v1",
+        },
+    )
+    assert mismatch.status_code == 422
+
+    created = await api_client.post(
+        "/api/v1/credentials",
+        headers={"X-CSRF-Token": csrf},
+        json={
+            "upstream": "school",
+            "purpose": "school",
+            "secret": '{"account":"20260001","password":"school-password"}',
+            "consent_version": "credential-hosting-v1",
+            "metadata": {"account_hint": "尾号 0001"},
+        },
+    )
+    assert created.status_code == 201, created.text
+    credential_id = created.json()["id"]
+
+    evaluation_job = await api_client.post(
+        "/api/v1/jobs",
+        headers={"X-CSRF-Token": csrf, "Idempotency-Key": "school-eval-0001"},
+        json={
+            "tool_id": "evaluation",
+            "operation": "submit",
+            "payload": {"strategy": "legacy_positive_random", "max_courses": 60},
+            "credential_id": credential_id,
+            "confirmation_version": "evaluation:submit:v1",
+        },
+    )
+    assert evaluation_job.status_code == 201, evaluation_job.text
+
+    cabin_job = await api_client.post(
+        "/api/v1/jobs",
+        headers={"X-CSRF-Token": csrf, "Idempotency-Key": "school-cabin-0001"},
+        json={
+            "tool_id": "study_cabin",
+            "operation": "reserve",
+            "payload": {
+                "target_date": "2026-08-06",
+                "start_time": "09:00:00",
+                "end_time": "11:00:00",
+                "title": "学习",
+                "cabin_ids": [29817269],
+                "attempt_until": "2026-08-06T08:00:00+08:00",
+            },
+            "credential_id": credential_id,
+            "confirmation_version": "study_cabin:reserve:v1",
+        },
+    )
+    assert cabin_job.status_code == 201, cabin_job.text
+
+    qun_job = await api_client.post(
+        "/api/v1/jobs",
+        headers={"X-CSRF-Token": csrf, "Idempotency-Key": "school-qun-0001"},
+        json={
+            "tool_id": "qun_checkin",
+            "operation": "submit",
+            "payload": {
+                "form_id": "123456789012345",
+                "form_version": 1,
+                "title": "每日打卡",
+                "catalogs": [{"cid": "temperature", "type": "NUMBER_FLOAT", "value": "36.5"}],
+            },
+            "credential_id": credential_id,
+            "confirmation_version": "qun_checkin:submit:v1",
+        },
+    )
+    assert qun_job.status_code == 403
+
+    rejected_reveal = await api_client.post(f"/api/v1/credentials/{credential_id}/reveal")
+    assert rejected_reveal.status_code == 403
+
+    revealed = await api_client.post(
+        f"/api/v1/credentials/{credential_id}/reveal",
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert revealed.status_code == 200, revealed.text
+    assert revealed.json()["secret"] == '{"account":"20260001","password":"school-password"}'
+
+    deleted = await api_client.delete(
+        f"/api/v1/credentials/{credential_id}?hard=true",
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert deleted.status_code == 204
+    listed = await api_client.get("/api/v1/credentials")
+    assert all(item["id"] != credential_id for item in listed.json())
+    gone = await api_client.post(
+        f"/api/v1/credentials/{credential_id}/reveal",
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert gone.status_code == 404
