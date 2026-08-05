@@ -3,8 +3,8 @@ import { LocateFixed, MapPin, Search } from "lucide-react";
 import { Button, Input, Label } from "@/components/ui.jsx";
 
 const DEFAULT_CENTER = [113.28735, 22.805618];
-const DEFAULT_AMAP_KEY = "52b9f454686ff6809ca7b1f22222b4de";
-const DEFAULT_AMAP_SECURITY_CODE = "cab9b37a55c76105364d31db4881d249";
+const DEFAULT_AMAP_KEY = "2873ccf434df24c471f64ec44795942d";
+const DEFAULT_AMAP_SECURITY_CODE = "ec32b2f25b99b1b74f4ac5008c0773da";
 let amapPromise;
 
 function loadAmap() {
