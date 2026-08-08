@@ -36,8 +36,10 @@ function AcademicSessionCard({ onSession }) {
   const [loginMode, setLoginMode] = useState("password");
   const [cookie, setCookie] = useState("");
   const [error, setError] = useState("");
+  const [captchaError, setCaptchaError] = useState("");
 
   const fetchCaptcha = useCallback(async () => {
+    setCaptchaError("");
     try {
       const data = await apiGet("/smu/captcha", { action: "smu_captcha" });
       const dataUrl = `data:${data.content_type};base64,${data.image_base64}`;
@@ -45,11 +47,12 @@ function AcademicSessionCard({ onSession }) {
       setCaptchaCode(""); setOcrResult(null);
       if (autoOCR) {
         setOcrBusy(true);
-        const r = await recognizeCaptcha(dataUrl);
-        if (r) { setOcrResult(r); setCaptchaCode(r.text); }
-        setOcrBusy(false);
+        try {
+          const r = await recognizeCaptcha(dataUrl);
+          if (r) { setOcrResult(r); setCaptchaCode(r.text); }
+        } catch { setOcrResult(null); } finally { setOcrBusy(false); }
       }
-    } catch { setCaptcha(null); }
+    } catch { setCaptcha(null); setCaptchaError("验证码获取失败，请点右侧按钮重试。"); }
   }, [autoOCR]);
 
   useEffect(() => {
@@ -114,6 +117,8 @@ function AcademicSessionCard({ onSession }) {
                 <Label>验证码</Label>
                 {captcha ? (
                   <img src={captcha.dataUrl} alt="验证码" className="h-10 rounded-[var(--radius)] border border-border" />
+                ) : captchaError ? (
+                  <div className="h-10 flex items-center text-[12px] text-[var(--warning)]">{captchaError}</div>
                 ) : (
                   <div className="h-10 w-[110px] rounded-[var(--radius)] border border-border flex items-center justify-center text-[11px] text-[var(--muted)]">加载中…</div>
                 )}

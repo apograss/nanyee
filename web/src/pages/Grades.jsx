@@ -57,15 +57,20 @@ export default function Grades(qoderProps) {
   const [loading, setLoading] = useState(false);
   const [grades, setGrades] = useState(null);
   const [error, setError] = useState("");
+  const [captchaError, setCaptchaError] = useState("");
 
   const fetchCaptcha = useCallback(async () => {
     setOcrResult(null);
+    setCaptchaError("");
     try {
       const data = await apiGet("/smu/captcha", { action: "smu_captcha" });
       const dataUrl = `data:${data.content_type};base64,${data.image_base64}`;
       setCaptcha({ flow_id: data.flow_id, dataUrl, expires_at: data.expires_at });
       setCaptchaCode("");
-    } catch { setCaptcha(null); }
+    } catch (err) {
+      setCaptcha(null);
+      setCaptchaError(err?.message || "验证码获取失败，请稍后重试。");
+    }
   }, []);
 
   useEffect(() => { if (!session) fetchCaptcha(); }, [session, fetchCaptcha]);
@@ -166,6 +171,8 @@ export default function Grades(qoderProps) {
                 <div className="flex items-center gap-2 flex-wrap">
                   {captcha ? (
                     <img src={captcha.dataUrl} alt="验证码" className="h-9 rounded-[var(--radius)] border border-border" />
+                  ) : captchaError ? (
+                    <div className="h-9 flex items-center text-[12px] text-[var(--warning)]">{captchaError}</div>
                   ) : (
                     <div className="h-9 w-[100px] rounded-[var(--radius)] border border-border flex items-center justify-center text-[11px] text-[var(--muted)]">加载中…</div>
                   )}
