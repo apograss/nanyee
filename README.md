@@ -1,6 +1,6 @@
 # Nanyee 学生工具平台
 
-Nanyee 是面向学生的小型工具平台。当前仓库把旧工具统一到 FastAPI 模块化单体、独立 Worker 与 React 前端中；视觉层可以继续独立迭代，接口行为以固定 OpenAPI 和接入文档为准。
+Nanyee 是面向学生的小型工具平台，线上运行于 [nanyee.de](https://nanyee.de)。当前仓库把旧工具统一到 FastAPI 模块化单体、独立 Worker 与 React 前端中；视觉层可以继续独立迭代，接口行为以固定 OpenAPI 和接入文档为准。
 
 ## 已实现的后端基础
 
@@ -105,15 +105,15 @@ uv run pytest -q
 uv run python scripts/export_openapi.py --check
 ```
 
-## 生产候选交付物
+## 生产部署
 
 - 容器镜像：[infra/docker/Dockerfile](infra/docker/Dockerfile)
 - API/Worker/PostgreSQL/内部网关：[infra/compose/compose.prod.yaml](infra/compose/compose.prod.yaml)
 - 内部 Nginx 安全配置：[infra/nginx/nanyee.conf](infra/nginx/nanyee.conf)
 - 宿主 TLS 反代参考（Cloudflare 真实 IP 还原）：[infra/nginx/host-nanyee.conf](infra/nginx/host-nanyee.conf)
 - 加密备份与受控恢复：[infra/scripts](infra/scripts)
-- 上线前运行手册：[docs/operations/runbook.md](docs/operations/runbook.md)
+- 生产运行手册（切换记录、备份与恢复演练结果）：[docs/operations/runbook.md](docs/operations/runbook.md)
 
 生产网关只绑定宿主机 `127.0.0.1:8080`，TLS 和公网 80/443 由宿主机反向代理负责。`.env.production.example` 只含占位符，不得把复制后填入真实值的 `.env.production` 提交到仓库。
 
-生产部署、Azure/Cloudflare 资源创建、旧站停机和远端 `main` 覆盖均是独立的外部变更；本地实现不会自动执行这些操作。
+生产已于 2026-08-08 切换到本仓库实现（旧 Next.js 站保留在 VPS 作回滚）。push 到 `main` 后 GitHub Actions 构建 `nanyee-backend` / `nanyee-web` 镜像并推送到 GHCR，VPS 按 `pull_policy: always` 拉取更新。数据库每日 03:17 UTC 加密备份到 Azure Blob（90 天生命周期），备份与恢复流程见运行手册。
