@@ -3,7 +3,7 @@ import React, { useEffect } from "react";
 import { Routes, Route, Navigate, Outlet, useLocation, useNavigate, Link } from "react-router-dom";
 import {
   Home, CalendarDays, GraduationCap, BookOpen, ClipboardCheck, Armchair,
-  Users, KeyRound, ListTodo, LogOut, LogIn, Bell, ShieldCheck, Compass,
+  Users, KeyRound, ListTodo, LogOut, LogIn, Bell, ShieldCheck, Compass, Info,
 } from "lucide-react";
 import { AuthProvider, useAuth, apiPost, listJobs } from "@/lib/api.jsx";
 import { ThemeProvider, ThemeToggle } from "@/lib/theme.jsx";
@@ -22,6 +22,7 @@ import Credentials from "@/pages/Credentials.jsx";
 import Jobs from "@/pages/Jobs.jsx";
 import JobDetail from "@/pages/JobDetail.jsx";
 import Recommendations from "@/pages/Recommendations.jsx";
+import About from "@/pages/About.jsx";
 
 const NAV = [
   { to: "/", label: "首页", icon: Home, end: true },
@@ -34,6 +35,7 @@ const NAV = [
   { to: "/credentials", label: "我的凭据", icon: KeyRound },
   { to: "/jobs", label: "任务列表", icon: ListTodo },
   { to: "/recommendations", label: "其它推荐", icon: Compass, group: "更多" },
+  { to: "/about", label: "关于", icon: Info },
 ];
 
 function NavItem({ item, onNavigate }) {
@@ -276,6 +278,7 @@ export default function App() {
               <Route path="/tools/study-cabin" element={<StudyCabin />} />
               <Route path="/tools/qun" element={<Qun />} />
               <Route path="/recommendations" element={<Recommendations />} />
+              <Route path="/about" element={<About />} />
               {/* 平台账号页面：整页数据依赖登录态，访问时提醒并跳登录 */}
               <Route element={<ProtectedRoute />}>
                 <Route path="/credentials" element={<Credentials />} />
