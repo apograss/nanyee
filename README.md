@@ -110,6 +110,7 @@ uv run python scripts/export_openapi.py --check
 - 容器镜像：[infra/docker/Dockerfile](infra/docker/Dockerfile)
 - API/Worker/PostgreSQL/内部网关：[infra/compose/compose.prod.yaml](infra/compose/compose.prod.yaml)
 - 内部 Nginx 安全配置：[infra/nginx/nanyee.conf](infra/nginx/nanyee.conf)
+- 宿主 TLS 反代参考（Cloudflare 真实 IP 还原）：[infra/nginx/host-nanyee.conf](infra/nginx/host-nanyee.conf)
 - 加密备份与受控恢复：[infra/scripts](infra/scripts)
 - 上线前运行手册：[docs/operations/runbook.md](docs/operations/runbook.md)
 
