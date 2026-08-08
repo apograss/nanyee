@@ -1,4 +1,4 @@
-# 生产运行手册（上线前草案）
+# 生产运行手册
 
 本文件只描述候选环境操作，不授权执行旧站停机、生产部署、数据库删除、Cloudflare/Azure 资源创建或远端 `main` 覆盖。执行这些动作前需逐项确认精确目标。
 
@@ -20,7 +20,7 @@ docker compose --env-file .env.production -f infra/compose/compose.prod.yaml up 
 
 以下为当前生产事实，切换 `nanyee.de` 前必须逐项确认：
 
-- `nanyee.de` 当前由 PM2 托管的 Next.js 旧站占用（监听 `:3000`），宿主 TLS nginx 现转发到该端口。**用户已确认旧站（含 `chat.nanyee.de` Flarum 论坛的 SSO，依赖旧站 OAuth）可以随切换全部下线**，无需保留兼容。
+- ~~`nanyee.de` 当前由 PM2 托管的 Next.js 旧站占用~~（2026-08-08 已切换）：宿主 nginx 已指向容器网关 `127.0.0.1:8080`，旧站 `pm2 stop nanyee` + `pm2 save`（重启不复活，进程与代码保留作回滚）；`chat.nanyee.de` Flarum SSO 随之下线。旧 nginx server 块备份在 VPS `~/nginx-backup/nanyee.de.nextjs-20260808072751`。
 - ~~Cloudflare Turnstile 密钥尚未创建~~（2026-08 已完成）：已为 hostname `nanyee.de` 创建站点，真实 site/secret key 已填入 `.env.production`，`NANYEE_TURNSTILE_ENABLED=true`，生产配置校验已通过。
 - 后端镜像已内置 Chromium + 系统依赖（学习舱 Infospace 登录的真实浏览器需求），worker 服务在 compose 里以 `--no-sandbox --disable-dev-shm-usage` 启动参数运行；首次构建镜像会多下载约 200MB。
 
@@ -58,7 +58,15 @@ docker compose --env-file .env.production -f infra/compose/compose.prod.yaml up 
 
 ## 加密备份与恢复演练
 
-`infra/scripts/backup.sh` 要求 PostgreSQL 客户端、`age` 和已登录的 Azure CLI。它把 `pg_dump --format=custom` 直接送入 `age`，只把加密临时文件上传到 Blob；容器已有数据或本次上传将达到 4 GiB 时失败关闭。脚本不自动删除云端对象，7 日/4 周/3 月保留策略在首次生产演练确认具体 Blob 后另行配置。
+`infra/scripts/backup.sh` 要求 PostgreSQL 客户端、`age` 和已登录的 Azure CLI。它把 `pg_dump --format=custom` 直接送入 `age`，只把加密临时文件上传到 Blob；容器已有数据或本次上传将达到 4 GiB 时失败关闭。
+
+生产实例（2026-08-08 首次演练完成：上传到 `daily/nanyee-20260808T074640Z.dump.age`，恢复进隔离库校验 7 张表 + alembic head 通过）：
+
+- 存储：资源组 `nanyee-prod`、账号 `nanyeebkbb430e`（southeastasia——订阅区域政策只允许部分区域）、容器 `nanyee-backup`、`daily/` 前缀；生命周期规则 `expire-daily-backups` 90 天自动删除，配合脚本内 4 GiB 硬顶控制规模。
+- VPS 上 `pg_dump`/`pg_restore` 是 `~/.local/bin/` 下的 shim，委托给 postgres 容器内大版本一致的客户端（宿主 apt 装到旧大版本会 dump 失败）。
+- 加密身份：私钥 `~/nanyee-backup-age-key.txt`（600，**必须另有离线副本**，否则丢 VPS 等于备份全废）；接收方公钥与数据库 URL 在 `~/nanyee-backup.env`（600）。
+- 定时：cron 每日 03:17 UTC 跑 `~/nanyee-backup-run.sh`，日志 `~/nanyee-backup.log`。
+- 认证：`--auth-mode login` 用的是 `apograss@outlook.com` 的用户态 token（Storage Blob Data Contributor 按对象 ID 分配在存储账号上）；refresh token 过期后备份会在日志里报认证错误，重新 `az login --use-device-code` 即可。
 
 `infra/scripts/restore.sh` 只应对隔离数据库运行。它要求 `NANYEE_CONFIRM_RESTORE` 与目标数据库名完全一致，下载的仍是加密文件，解密内容通过管道交给 `pg_restore`。该脚本包含 `--clean --if-exists`，会替换目标库内同名对象；每次执行前都要再次确认精确目标和备份 Blob。
 
