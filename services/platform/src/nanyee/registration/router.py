@@ -33,9 +33,48 @@ from nanyee.security import as_utc, keyed_digest, secure_compare, utc_now
 
 router = APIRouter(prefix="/registration", tags=["registration"])
 USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9_]{2,24}$")
+RESERVED_USERNAME_PREFIXES = ("admin", "root", "system", "official", "nanyee")
+RESERVED_USERNAMES = frozenset(
+    {
+        "abuse",
+        "api",
+        "bot",
+        "guest",
+        "help",
+        "helpdesk",
+        "hostmaster",
+        "mail",
+        "manager",
+        "master",
+        "mod",
+        "moderator",
+        "nobody",
+        "null",
+        "operator",
+        "owner",
+        "postmaster",
+        "security",
+        "service",
+        "smu",
+        "smtp",
+        "staff",
+        "superuser",
+        "support",
+        "sysadmin",
+        "undefined",
+        "webmaster",
+        "www",
+    }
+)
 EMAIL_POLICY = RateLimitPolicy(window_seconds=3600, soft_limit=3, hard_limit=8)
 QUIZ_POLICY = RateLimitPolicy(window_seconds=3600, soft_limit=5, hard_limit=15)
 REGISTER_POLICY = RateLimitPolicy(window_seconds=3600, soft_limit=5, hard_limit=12)
+
+
+def is_reserved_username(normalized_username: str) -> bool:
+    return normalized_username in RESERVED_USERNAMES or normalized_username.startswith(
+        RESERVED_USERNAME_PREFIXES
+    )
 
 
 class ChallengeCreateRequest(BaseModel):
@@ -326,6 +365,7 @@ async def register(
     db: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> AuthResponse:
     settings = settings_from_request(request)
+    normalized_username = payload.username.casefold()
     if not USERNAME_PATTERN.fullmatch(payload.username):
         raise AppError(
             ErrorCode.INVALID_REQUEST,
@@ -333,7 +373,13 @@ async def register(
             status_code=422,
             details={"field": "username"},
         )
-    normalized_username = payload.username.casefold()
+    if is_reserved_username(normalized_username):
+        raise AppError(
+            ErrorCode.INVALID_REQUEST,
+            "该用户名为保留名称，请更换一个。",
+            status_code=422,
+            details={"field": "username"},
+        )
     await AntiAbuseGate(settings).check(
         db,
         request,

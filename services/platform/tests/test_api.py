@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from base64 import b64encode
 from collections.abc import AsyncIterator
+from uuid import uuid4
 
 import httpx
 import pytest
@@ -72,6 +73,23 @@ async def test_health_tools_and_error_contract(api_client: httpx.AsyncClient) ->
     assert invalid.status_code == 422
     assert invalid.json()["error"]["code"] == "INVALID_REQUEST"
     assert invalid.json()["error"]["request_id"]
+
+
+@pytest.mark.asyncio
+async def test_registration_rejects_reserved_usernames(
+    api_client: httpx.AsyncClient,
+) -> None:
+    for name in ("admin", "Administrator", "root_01", "nanyee", "support"):
+        rejected = await api_client.post(
+            "/api/v1/registration",
+            json={
+                "challenge_id": str(uuid4()),
+                "username": name,
+                "password": "一段好记的密码 2026",
+            },
+        )
+        assert rejected.status_code == 422, (name, rejected.text)
+        assert rejected.json()["error"]["details"]["field"] == "username"
 
 
 @pytest.mark.asyncio
