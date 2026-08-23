@@ -1,7 +1,7 @@
 // Canvas design runtime editable source marker: about
 import React from "react";
 import { motion } from "motion/react";
-import { Gift, Info, ArrowUpRight } from "lucide-react";
+import { Info } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui.jsx";
 
 const EASE = [0.22, 1, 0.36, 1];
@@ -14,23 +14,6 @@ const stagger = {
   hidden: {},
   show: { transition: { staggerChildren: 0.07, delayChildren: 0.05 } },
 };
-
-const GOODIES = [
-  {
-    title: "看看我的主页！",
-    note: "你也可以在这里找到我的联系方式并一直视奸我。（本站支持iframe设置为主页~）",
-    site: "apograss.cn",
-    url: "https://apograss.cn/",
-    icon: "/link-icons/apograss.png",
-  },
-  {
-    title: "看看我的博客！",
-    note: "你也可以从主页那边跳转的。",
-    site: "blog.apograss.cn",
-    url: "https://blog.apograss.cn/",
-    icon: "/link-icons/blog-apograss.svg",
-  },
-];
 
 export default function About() {
   return (
@@ -67,49 +50,10 @@ export default function About() {
           <div className="flex flex-col gap-1 min-w-0">
             <h1 className="display-lede">南医工具台</h1>
             <div className="text-[12px] tracking-[0.14em] text-[var(--muted)] uppercase">Nanyee Toolkit · nanyee.de</div>
-            <p className="text-[var(--muted)] text-sm prose-body mt-1">关于这个站点，以及站主的一点私货。</p>
+            <p className="text-[var(--muted)] text-sm prose-body mt-1">关于这个站点，以及一些说明。</p>
           </div>
         </div>
       </motion.header>
-
-      {/* ---------- 私货 ---------- */}
-      <motion.div variants={fadeUp}>
-        <Card>
-          <CardHeader>
-            <div className="kicker">Personal</div>
-            <CardTitle className="flex items-center gap-2"><Gift className="w-4 h-4 text-[var(--seed-primary-strong)]" /> 一些私货</CardTitle>
-            <CardDescription>站主的个人站点，点击直达（新标签页打开）。</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col">
-              {GOODIES.map((l) => (
-                <a
-                  key={l.url}
-                  href={l.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="index-row group grid grid-cols-[auto_1fr_auto] items-center gap-4 sm:gap-6 py-4 px-2 sm:px-3 border-b border-border last:border-b-0 no-underline"
-                >
-                  <img
-                    src={l.icon}
-                    alt=""
-                    loading="lazy"
-                    className="w-8 h-8 rounded-[8px] border border-border bg-white object-contain p-[3px]"
-                  />
-                  <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1 min-w-0">
-                    <span className="font-display text-[1.125rem] font-semibold tracking-[-0.02em] text-foreground">{l.title}</span>
-                    <span className="text-[13px] text-[var(--muted)]">{l.note}</span>
-                  </span>
-                  <span className="flex items-center gap-2 text-[12px] text-[var(--muted)]">
-                    <span className="hidden md:inline truncate max-w-[220px]">{l.site}</span>
-                    <ArrowUpRight className="index-arrow w-[18px] h-[18px]" />
-                  </span>
-                </a>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
 
       {/* ---------- 说明 ---------- */}
       <motion.div variants={fadeUp}>

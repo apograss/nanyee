@@ -1,7 +1,7 @@
 // Canvas design runtime editable source marker: recommendations
 import React from "react";
 import { motion } from "motion/react";
-import { Compass, ArrowUpRight } from "lucide-react";
+import { Compass, Newspaper, Gift, ArrowUpRight } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui.jsx";
 
 const EASE = [0.22, 1, 0.36, 1];
@@ -46,6 +46,89 @@ const LINKS = [
   },
 ];
 
+// 同好站点 —— 南医人做的站点与博客（新标签页打开）
+const COMMUNITY = [
+  {
+    title: "SMU 生祠",
+    note: "收录 140 个南医学生公众号与资料的索引站",
+    site: "smuer.cn",
+    url: "https://smuer.cn/",
+    icon: "/link-icons/smuer.png",
+  },
+  {
+    title: "david03 的博客",
+    note: "生祠站长的个人博客，医学、代码与碎碎念",
+    site: "david03.top",
+    url: "https://david03.top/",
+    icon: "/link-icons/david03.png",
+  },
+];
+
+// 一些私货 —— 站主的个人站点（原关于页私货，新标签页打开）
+const GOODIES = [
+  {
+    title: "看看我的主页！",
+    note: "你也可以在这里找到我的联系方式并一直视奸我。（本站支持iframe设置为主页~）",
+    site: "apograss.cn",
+    url: "https://apograss.cn/",
+    icon: "/link-icons/apograss.png",
+  },
+  {
+    title: "看看我的博客！",
+    note: "你也可以从主页那边跳转的。",
+    site: "blog.apograss.cn",
+    url: "https://blog.apograss.cn/",
+    icon: "/link-icons/blog-apograss.svg",
+  },
+];
+
+function LinkRow({ l }) {
+  return (
+    <a
+      href={l.url}
+      target="_blank"
+      rel="noreferrer"
+      className="index-row group grid grid-cols-[auto_1fr_auto] items-center gap-4 sm:gap-6 py-4 px-2 sm:px-3 border-b border-border last:border-b-0 no-underline"
+    >
+      <img
+        src={l.icon}
+        alt=""
+        loading="lazy"
+        className="w-8 h-8 rounded-[8px] border border-border bg-white object-contain p-[3px]"
+      />
+      <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1 min-w-0">
+        <span className="font-display text-[1.125rem] font-semibold tracking-[-0.02em] text-foreground">{l.title}</span>
+        {l.note && <span className="text-[13px] text-[var(--muted)]">{l.note}</span>}
+      </span>
+      <span className="flex items-center gap-2 text-[12px] text-[var(--muted)]">
+        <span className="hidden md:inline truncate max-w-[220px]">{l.site}</span>
+        <ArrowUpRight className="index-arrow w-[18px] h-[18px]" />
+      </span>
+    </a>
+  );
+}
+
+function LinkCard({ kicker, icon: Icon, title, description, items }) {
+  return (
+    <motion.div variants={fadeUp}>
+      <Card>
+        <CardHeader>
+          <div className="kicker">{kicker}</div>
+          <CardTitle className="flex items-center gap-2"><Icon className="w-4 h-4 text-[var(--seed-primary-strong)]" /> {title}</CardTitle>
+          <CardDescription>{description}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col">
+            {items.map((l) => (
+              <LinkRow key={l.url} l={l} />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+}
+
 export default function Recommendations() {
   return (
     <motion.div
@@ -62,47 +145,35 @@ export default function Recommendations() {
           <span className="rule-line flex-1" />
         </div>
         <h1 className="display-lede">其它推荐</h1>
-        <p className="text-[var(--muted)] text-sm prose-body">其它值得推荐的工具与内容。</p>
+        <p className="text-[var(--muted)] text-sm prose-body">其它值得推荐的站点与内容。</p>
       </motion.header>
 
       {/* ---------- 仙人指路 ---------- */}
-      <motion.div variants={fadeUp}>
-        <Card>
-          <CardHeader>
-            <div className="kicker">Curated</div>
-            <CardTitle className="flex items-center gap-2"><Compass className="w-4 h-4 text-[var(--seed-primary-strong)]" /> 仙人指路</CardTitle>
-            <CardDescription>外部工具与脚本，点击直达（新标签页打开）。</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col">
-              {LINKS.map((l) => (
-                <a
-                  key={l.url}
-                  href={l.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="index-row group grid grid-cols-[auto_1fr_auto] items-center gap-4 sm:gap-6 py-4 px-2 sm:px-3 border-b border-border last:border-b-0 no-underline"
-                >
-                  <img
-                    src={l.icon}
-                    alt=""
-                    loading="lazy"
-                    className="w-8 h-8 rounded-[8px] border border-border bg-white object-contain p-[3px]"
-                  />
-                  <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1 min-w-0">
-                    <span className="font-display text-[1.125rem] font-semibold tracking-[-0.02em] text-foreground">{l.title}</span>
-                    {l.note && <span className="text-[13px] text-[var(--muted)]">{l.note}</span>}
-                  </span>
-                  <span className="flex items-center gap-2 text-[12px] text-[var(--muted)]">
-                    <span className="hidden md:inline truncate max-w-[220px]">{l.site}</span>
-                    <ArrowUpRight className="index-arrow w-[18px] h-[18px]" />
-                  </span>
-                </a>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+      <LinkCard
+        kicker="Curated"
+        icon={Compass}
+        title="仙人指路"
+        description="外部工具与脚本，点击直达（新标签页打开）。"
+        items={LINKS}
+      />
+
+      {/* ---------- 同好站点 ---------- */}
+      <LinkCard
+        kicker="Community"
+        icon={Newspaper}
+        title="同好站点"
+        description="南医人做的站点与博客，点击直达（新标签页打开）。"
+        items={COMMUNITY}
+      />
+
+      {/* ---------- 一些私货（从关于页挪来） ---------- */}
+      <LinkCard
+        kicker="Personal"
+        icon={Gift}
+        title="一些私货"
+        description="站主的个人站点，点击直达（新标签页打开）。"
+        items={GOODIES}
+      />
     </motion.div>
   );
 }
