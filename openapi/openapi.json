@@ -1697,10 +1697,29 @@
             ],
             "title": "Anti Abuse Pass"
           },
+          "semester_code": {
+            "anyOf": [
+              {
+                "pattern": "^\\d{6}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Semester Code"
+          },
           "semester_monday": {
-            "format": "date",
-            "title": "Semester Monday",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Semester Monday"
           },
           "total_weeks": {
             "default": 20,
@@ -1723,8 +1742,7 @@
           }
         },
         "required": [
-          "academic_session_id",
-          "semester_monday"
+          "academic_session_id"
         ],
         "title": "IcsRequest",
         "type": "object"
@@ -2559,6 +2577,48 @@
         "title": "RiskLevel",
         "type": "string"
       },
+      "SemesterOption": {
+        "properties": {
+          "code": {
+            "pattern": "^\\d{6}$",
+            "title": "Code",
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "label"
+        ],
+        "title": "SemesterOption",
+        "type": "object"
+      },
+      "SemestersResponse": {
+        "properties": {
+          "default_code": {
+            "title": "Default Code",
+            "type": "string"
+          },
+          "semesters": {
+            "items": {
+              "$ref": "#/components/schemas/SemesterOption"
+            },
+            "title": "Semesters",
+            "type": "array"
+          }
+        },
+        "required": [
+          "default_code",
+          "semesters"
+        ],
+        "title": "SemestersResponse",
+        "type": "object"
+      },
       "SmuCookieSessionRequest": {
         "properties": {
           "anti_abuse_pass": {
@@ -2740,6 +2800,18 @@
               }
             ],
             "title": "Anti Abuse Pass"
+          },
+          "semester_code": {
+            "anyOf": [
+              {
+                "pattern": "^\\d{6}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Semester Code"
           },
           "total_weeks": {
             "default": 20,
@@ -3034,10 +3106,29 @@
             "title": "Campus",
             "type": "string"
           },
+          "semester_code": {
+            "anyOf": [
+              {
+                "pattern": "^\\d{6}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Semester Code"
+          },
           "semester_monday": {
-            "format": "date",
-            "title": "Semester Monday",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Semester Monday"
           },
           "total_weeks": {
             "default": 20,
@@ -3061,7 +3152,6 @@
         },
         "required": [
           "academic_session_id",
-          "semester_monday",
           "campus"
         ],
         "title": "WakeUpRequest",
@@ -3099,10 +3189,29 @@
             "title": "Confirmation Version",
             "type": "string"
           },
+          "semester_code": {
+            "anyOf": [
+              {
+                "pattern": "^\\d{6}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Semester Code"
+          },
           "semester_monday": {
-            "format": "date",
-            "title": "Semester Monday",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Semester Monday"
           },
           "total_weeks": {
             "default": 20,
@@ -3126,7 +3235,6 @@
         },
         "required": [
           "academic_session_id",
-          "semester_monday",
           "campus",
           "confirmation_version"
         ],
@@ -4986,6 +5094,47 @@
           }
         },
         "summary": "Timetable Ics",
+        "tags": [
+          "smu"
+        ]
+      }
+    },
+    "/api/v1/smu/timetable.semesters": {
+      "post": {
+        "operationId": "smu_timetable_semesters",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcademicSessionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SemestersResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Timetable Semesters",
         "tags": [
           "smu"
         ]

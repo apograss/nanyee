@@ -76,7 +76,14 @@ export default function Timetable() {
 
   const [week, setWeek] = useState(8);
   const [campus, setCampus] = useState("shunde");
-  const [semesterMonday, setSemesterMonday] = useState("2026-09-07");
+  // 学期代码（xnxqdm）：登录后从教务系统拉取下拉列表，空串 = 后端按当前学期
+  const [semesters, setSemesters] = useState([]);
+  const [semesterCode, setSemesterCode] = useState("");
+  // 学期周数不固定 20：输入草稿在 blur/Enter 时才提交为 totalWeeks
+  const [totalWeeks, setTotalWeeks] = useState(20);
+  const [weeksDraft, setWeeksDraft] = useState("20");
+  // 学期第一周周一：留空则由后端按学校校历自动确定
+  const [semesterMonday, setSemesterMonday] = useState("");
   const [exporting, setExporting] = useState(null); // "ics" | "wakeup" | null
   const [exportError, setExportError] = useState(null);
   // 课表事件：仅内存，会话过期/手动刷新时清空
@@ -143,12 +150,16 @@ export default function Timetable() {
     }
   }, [captchaDataUrl, autoOcr, runOcr]);
 
-  // 拉取课表：POST /smu/timetable { academic_session_id, total_weeks } → events 仅内存
-  const loadTimetable = useCallback(async (academicSessionId) => {
+  // 拉取课表：POST /smu/timetable { academic_session_id, total_weeks, semester_code? } → events 仅内存
+  const loadTimetable = useCallback(async (academicSessionId, code, weeks) => {
     setGridLoading(true);
     setGridError(null);
     try {
-      const data = await apiPost("/smu/timetable", { academic_session_id: academicSessionId, total_weeks: 20 }, { action: "smu_timetable" });
+      const data = await apiPost(
+        "/smu/timetable",
+        { academic_session_id: academicSessionId, total_weeks: weeks, ...(code ? { semester_code: code } : {}) },
+        { action: "smu_timetable" }
+      );
       setEvents(data.events || []);
     } catch (err) {
       setEvents(null);
@@ -182,7 +193,15 @@ export default function Timetable() {
       setOcrResult(null);
       setFlowId(null);
       setCaptchaDataUrl("");
-      loadTimetable(data.academic_session_id);
+      // 学期列表（供切换学年学期）；拉取失败不阻塞，后端按教务系统当前学期处理
+      let code = "";
+      try {
+        const sem = await apiPost("/smu/timetable.semesters", { academic_session_id: data.academic_session_id }, { action: "smu_timetable" });
+        setSemesters(Array.isArray(sem.semesters) ? sem.semesters : []);
+        code = sem.default_code || "";
+        setSemesterCode(code);
+      } catch { /* 忽略，导出时仍可手动留空 */ }
+      loadTimetable(data.academic_session_id, code, totalWeeks);
     } catch (err) {
       setLoginError(err.message || "登录失败，请重新取验证码后重试");
       // 登录失败需重新取验证码
@@ -198,13 +217,48 @@ export default function Timetable() {
     fetchCaptcha();
   };
 
-  // 导出 ICS：POST /smu/timetable.ics { academic_session_id, total_weeks, semester_monday } → 浏览器下载 .ics
+  // 切换学期：重新拉取该学期课表
+  const changeSemester = (code) => {
+    setSemesterCode(code);
+    if (session) loadTimetable(session.academic_session_id, code, totalWeeks);
+  };
+
+  // 周数草稿提交（blur/Enter）：钳到 1-30，变更才重新拉取
+  const commitWeeks = () => {
+    const n = Math.max(1, Math.min(30, Number.parseInt(weeksDraft, 10) || 20));
+    setWeeksDraft(String(n));
+    if (n === totalWeeks) return;
+    setTotalWeeks(n);
+    if (week > n) setWeek(n);
+    if (session) loadTimetable(session.academic_session_id, semesterCode, n);
+  };
+
+  // 导出/分享共用的请求体；学期周一留空（后端按校历确定）或必须是周一
+  const buildExportPayload = () => {
+    if (semesterMonday) {
+      const day = new Date(`${semesterMonday}T00:00:00`).getDay();
+      if (day !== 1) {
+        setExportError("学期周一必须是周一；留空则按学校校历自动确定。");
+        return null;
+      }
+    }
+    return {
+      academic_session_id: session.academic_session_id,
+      total_weeks: totalWeeks,
+      ...(semesterCode ? { semester_code: semesterCode } : {}),
+      ...(semesterMonday ? { semester_monday: semesterMonday } : {}),
+    };
+  };
+
+  // 导出 ICS：POST /smu/timetable.ics → 浏览器下载 .ics；semester_monday 留空由后端按校历确定
   const exportIcs = async () => {
     if (!session) return;
+    const body = buildExportPayload();
+    if (!body) return;
     setExporting("ics");
     setExportError(null);
     try {
-      await apiDownload("/smu/timetable.ics", { academic_session_id: session.academic_session_id, total_weeks: 20, semester_monday: semesterMonday }, "nanyee-timetable.ics", { action: "smu_timetable" });
+      await apiDownload("/smu/timetable.ics", body, "nanyee-timetable.ics", { action: "smu_timetable" });
     } catch (err) {
       if (err.status === 410) {
         // 学校会话已在服务端失效：清空会话，回到学校登录卡
@@ -220,13 +274,15 @@ export default function Timetable() {
     }
   };
 
-  // 导出 WakeUp 文件：POST /smu/timetable.wakeup { academic_session_id, total_weeks, semester_monday, campus } → 浏览器下载 .wakeup_schedule
+  // 导出 WakeUp 文件：POST /smu/timetable.wakeup → 浏览器下载 .wakeup_schedule
   const exportWakeup = async () => {
     if (!session) return;
+    const body = buildExportPayload();
+    if (!body) return;
     setExporting("wakeup");
     setExportError(null);
     try {
-      await apiDownload("/smu/timetable.wakeup", { academic_session_id: session.academic_session_id, total_weeks: 20, semester_monday: semesterMonday, campus }, "nanyee.wakeup_schedule", { action: "smu_timetable" });
+      await apiDownload("/smu/timetable.wakeup", { ...body, campus }, "nanyee.wakeup_schedule", { action: "smu_timetable" });
     } catch (err) {
       if (err.status === 410) {
         // 学校会话已在服务端失效：清空会话，回到学校登录卡
@@ -242,19 +298,22 @@ export default function Timetable() {
     }
   };
 
-  // 分享到 WakeUp：POST /smu/timetable.wakeup.share { academic_session_id, semester_monday, campus, total_weeks, confirmation_version } → { share_code }
+  // 分享到 WakeUp：POST /smu/timetable.wakeup.share → { share_code }
   // 额外提交 confirmation_version: "timetable:wakeup_share:v1"；该路径会把生成的课表上传到 WakeUp，需用户明确同意
   const shareToWakeup = async () => {
     if (!session || !shareConsent) return;
+    const body = buildExportPayload();
+    if (!body) {
+      setShareError("学期周一必须是周一；留空则按学校校历自动确定。");
+      return;
+    }
     setShareError(null);
     setSharing(true);
     setShareCode(null);
     try {
       const data = await shareWakeup({
-        academic_session_id: session.academic_session_id,
-        semester_monday: semesterMonday,
+        ...body,
         campus,
-        total_weeks: 20,
         confirmation_version: CONFIRMATION_VERSIONS.wakeupShare,
       });
       setShareCode(data.share_code);
@@ -294,7 +353,7 @@ export default function Timetable() {
         <motion.div variants={fadeUp} className="flex items-center gap-4">
           <span className="kicker"><strong>Timetable</strong> — 学校查询</span>
           <span className="rule-line flex-1" />
-          <span className="kicker hidden sm:block">共 20 教学周</span>
+          <span className="kicker hidden sm:block">共 {totalWeeks} 教学周</span>
         </motion.div>
         <motion.h1 variants={fadeUp} className="display-lede">课表查询</motion.h1>
         <motion.p variants={fadeUp} className="text-[var(--muted)] text-sm prose-body">用学校账号登录后即可查看课表，验证码可以自动识别，密码仅用于本次登录。</motion.p>
@@ -375,11 +434,16 @@ export default function Timetable() {
                 <CalendarDays className="w-4 h-4 text-[var(--seed-primary-strong)]" />
                 第 {week} 周课表
               </CardTitle>
-              <CardDescription>共 20 教学周；当前周次可切换。</CardDescription>
+              <CardDescription>共 {totalWeeks} 教学周；学期与周次可切换。</CardDescription>
             </div>
             <div className="flex items-center gap-2">
+              {semesters.length > 0 && (
+                <Select value={semesterCode} onChange={(e) => changeSemester(e.target.value)} className="w-[150px]" aria-label="学期">
+                  {semesters.map((s) => <option key={s.code} value={s.code}>{s.label}</option>)}
+                </Select>
+              )}
               <Select value={String(week)} onChange={(e) => setWeek(Number(e.target.value))} className="w-[110px]">
-                {Array.from({ length: 20 }, (_, i) => <option key={i} value={i + 1}>第 {i + 1} 周</option>)}
+                {Array.from({ length: totalWeeks }, (_, i) => <option key={i} value={i + 1}>第 {i + 1} 周</option>)}
               </Select>
               <Button variant="outline" size="icon" onClick={() => { setSession(null); setEvents(null); setGridError(null); fetchCaptcha(); }} aria-label="刷新会话" disabled={!session}><RefreshCw className="w-4 h-4" /></Button>
             </div>
@@ -393,7 +457,7 @@ export default function Timetable() {
               <Alert variant="warning" title="课表加载失败">
                 <div className="flex flex-wrap items-center gap-3">
                   <span>{gridError}</span>
-                  <Button variant="outline" size="sm" onClick={() => loadTimetable(session.academic_session_id)}>重试</Button>
+                  <Button variant="outline" size="sm" onClick={() => loadTimetable(session.academic_session_id, semesterCode, totalWeeks)}>重试</Button>
                 </div>
               </Alert>
             ) : (
@@ -435,13 +499,26 @@ export default function Timetable() {
           <CardHeader>
             <div className="kicker"><strong>Export</strong></div>
             <CardTitle>导出课表</CardTitle>
-            <CardDescription>ICS 可导入系统日历；WakeUp 文件可导入 WakeUp 应用，不会上传到任何第三方。</CardDescription>
+            <CardDescription>ICS 可导入系统日历；WakeUp 文件可导入 WakeUp 应用，不会上传到任何第三方。学期周一留空则按学校校历自动确定。</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <div className="flex flex-col sm:flex-row sm:items-end gap-3">
               <div className="flex flex-col gap-1.5 flex-1">
-                <Label htmlFor="sm">学期周一</Label>
+                <Label htmlFor="sm">学期周一（可留空）</Label>
                 <Input id="sm" type="date" value={semesterMonday} onChange={(e) => setSemesterMonday(e.target.value)} />
+              </div>
+              <div className="flex flex-col gap-1.5 flex-1">
+                <Label htmlFor="weeks">学期周数</Label>
+                <Input
+                  id="weeks"
+                  type="number"
+                  min={1}
+                  max={30}
+                  value={weeksDraft}
+                  onChange={(e) => setWeeksDraft(e.target.value)}
+                  onBlur={commitWeeks}
+                  onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+                />
               </div>
               <div className="flex flex-col gap-1.5 flex-1">
                 <Label htmlFor="campus">校区</Label>

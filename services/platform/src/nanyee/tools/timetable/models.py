@@ -27,13 +27,15 @@ class CourseEvent(BaseModel):
 
     @classmethod
     def from_upstream(cls, value: dict[str, object]) -> CourseEvent:
+        # 上游 xs 时而返回字符串时而返回数字（如 "xs": 2），统一转成字符串
+        credit_hours = value.get("xs", "")
         return cls(
             name=value.get("kcmc", ""),
             location=value.get("jxcdmc", ""),
             activity=value.get("jxhjmc", ""),
             teachers=value.get("teaxms", ""),
             weekday=value.get("xq", 0),
-            credit_hours=value.get("xs", ""),
+            credit_hours=str(credit_hours) if credit_hours is not None else "",
             start_time=str(value.get("qssj", ""))[:5],
             end_time=str(value.get("jssj", ""))[:5],
             start_node=value.get("ps", 0),
@@ -55,6 +57,13 @@ class AggregatedCourse(BaseModel):
     start_node: int
     end_node: int
     weeks: tuple[int, ...]
+
+
+class SemesterOption(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    code: str = Field(pattern=r"^\d{6}$")
+    label: str = Field(min_length=1, max_length=32)
 
 
 def aggregate_events(events: list[CourseEvent]) -> list[AggregatedCourse]:

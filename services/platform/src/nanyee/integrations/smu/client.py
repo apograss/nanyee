@@ -7,7 +7,7 @@ import logging
 import re
 import time
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from email.utils import parsedate_to_datetime
 from typing import Any
 from urllib.parse import urlencode, urljoin, urlparse
@@ -29,7 +29,7 @@ from nanyee.tools.evaluation import (
     PendingEvaluation,
 )
 from nanyee.tools.grades import GradeDistribution, GradeRecord, RankingInfo, parse_grades
-from nanyee.tools.timetable import CourseEvent
+from nanyee.tools.timetable import CourseEvent, SemesterOption
 
 COMMON_HEADERS = {
     "User-Agent": (
@@ -175,23 +175,19 @@ class SmuAcademicClient:
         raise self._cookie_rejected()
 
     async def fetch_timetable(
-        self, *, academic_cookies: dict[str, str], total_weeks: int
+        self,
+        *,
+        academic_cookies: dict[str, str],
+        total_weeks: int,
+        semester_code: str | None = None,
     ) -> tuple[str, list[CourseEvent]]:
         if total_weeks < 1 or total_weeks > 30:
             raise ValueError("total_weeks must be between 1 and 30")
+        if semester_code is not None and not re.fullmatch(r"\d{6}", semester_code):
+            raise ValueError("semester_code must be a 6-digit code")
         async with self._client(cookies=academic_cookies) as client:
-            try:
-                page = await self._get_following_redirects(
-                    client,
-                    f"{self._settings.smu_academic_base_url}/new/student/xsgrkb/main.page",
-                )
-            except httpx.HTTPError as exc:
-                raise self._unavailable() from exc
-            self._ensure_success(page)
-            match = re.search(r"xnxqdm=(\d+)", page.text)
-            if match is None:
-                raise self._rejected()
-            semester_code = match.group(1)
+            if semester_code is None:
+                semester_code = await self._default_semester_code(client)
             events: list[CourseEvent] = []
             for start in range(1, total_weeks + 1, 5):
                 weeks = range(start, min(start + 5, total_weeks + 1))
@@ -201,6 +197,80 @@ class SmuAcademicClient:
                 for batch in batches:
                     events.extend(batch)
         return semester_code, events
+
+    async def list_semesters(
+        self, *, academic_cookies: dict[str, str]
+    ) -> tuple[str, list[SemesterOption]]:
+        """返回（当前学期代码, 全部学期选项）；选项来自 week.page 的 xnxqdm 下拉框。"""
+        base = self._settings.smu_academic_base_url
+        async with self._client(cookies=academic_cookies) as client:
+            default_code = await self._default_semester_code(client)
+            try:
+                page = await self._get_following_redirects(
+                    client,
+                    f"{base}/new/student/xsgrkb/week.page?xnxqdm={default_code}",
+                )
+            except httpx.HTTPError as exc:
+                raise self._unavailable() from exc
+            self._ensure_success(page)
+        semesters = _parse_semester_options(page.text)
+        if not semesters:
+            raise self._unavailable()
+        return default_code, semesters
+
+    async def fetch_semester_start(
+        self, *, academic_cookies: dict[str, str], semester_code: str
+    ) -> date:
+        """学期第一周周一：校历接口 getDatesOfWeek 返回该周每天日期，取 xqmc=1（周一）。"""
+        if not re.fullmatch(r"\d{6}", semester_code):
+            raise ValueError("semester_code must be a 6-digit code")
+        base = self._settings.smu_academic_base_url
+        async with self._client(cookies=academic_cookies) as client:
+            try:
+                response = await client.post(
+                    f"{base}/new/xlxx/getDatesOfWeek",
+                    data={"xnxqdm": semester_code, "zc": "1"},
+                    headers={
+                        **COMMON_HEADERS,
+                        "Content-Type": "application/x-www-form-urlencoded",
+                        "Referer": f"{base}/new/student/xsgrkb/week.page?xnxqdm={semester_code}",
+                    },
+                )
+            except httpx.HTTPError as exc:
+                raise self._unavailable() from exc
+            self._ensure_success(response)
+            try:
+                payload = response.json()
+            except ValueError as exc:
+                raise self._unavailable() from exc
+        if not isinstance(payload, list):
+            raise self._unavailable()
+        mondays = [
+            item.get("rq") for item in payload if isinstance(item, dict) and item.get("xqmc") == 1
+        ]
+        if not mondays or not isinstance(mondays[0], str):
+            raise self._unavailable()
+        try:
+            monday = date.fromisoformat(mondays[0])
+        except ValueError as exc:
+            raise self._unavailable() from exc
+        if monday.weekday() != 0:
+            raise self._unavailable()
+        return monday
+
+    async def _default_semester_code(self, client: httpx.AsyncClient) -> str:
+        try:
+            page = await self._get_following_redirects(
+                client,
+                f"{self._settings.smu_academic_base_url}/new/student/xsgrkb/main.page",
+            )
+        except httpx.HTTPError as exc:
+            raise self._unavailable() from exc
+        self._ensure_success(page)
+        match = re.search(r"xnxqdm=(\d+)", page.text)
+        if match is None:
+            raise self._rejected()
+        return match.group(1)
 
     async def fetch_grades(self, *, academic_cookies: dict[str, str]) -> list[GradeRecord]:
         base = self._settings.smu_academic_base_url
@@ -805,6 +875,29 @@ class SmuAcademicClient:
 
 def _is_academic_login_page(html: str) -> bool:
     return all(keyword in html for keyword in ("统一认证登录", "扫码登录", "密码登录"))
+
+
+def _parse_semester_options(html: str) -> list[SemesterOption]:
+    match = re.search(
+        r"<select[^>]*id=['\"]xnxqdm['\"][^>]*>(.*?)</select>",
+        html,
+        re.IGNORECASE | re.DOTALL,
+    )
+    if match is None:
+        return []
+    options: list[SemesterOption] = []
+    seen: set[str] = set()
+    for code, label in re.findall(
+        r"<option[^>]*value=['\"]?(\d{6})['\"]?[^>]*>([^<]*)</option>",
+        match.group(1),
+        re.IGNORECASE,
+    ):
+        if code in seen:
+            continue
+        seen.add(code)
+        label = re.sub(r"\s+", " ", label).strip() or code
+        options.append(SemesterOption(code=code, label=label[:32]))
+    return options
 
 
 def _parse_enrollment_categories(html: str) -> list[CourseCategory]:

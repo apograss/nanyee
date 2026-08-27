@@ -6,7 +6,7 @@ from datetime import date, datetime
 from typing import Annotated, Literal, cast
 
 from fastapi import APIRouter, Depends, Header, Query, Request, Response
-from pydantic import BaseModel, Field, SecretStr, ValidationError, model_validator
+from pydantic import BaseModel, Field, SecretStr, ValidationError, field_validator, model_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nanyee.anti_abuse.gate import AntiAbuseGate
@@ -36,6 +36,7 @@ from nanyee.tools.grades import GradeRecord, GradeSummary, calculate_summary
 from nanyee.tools.timetable import (
     AggregatedCourse,
     CourseEvent,
+    SemesterOption,
     aggregate_events,
     export_ics,
     export_wakeup_schedule,
@@ -88,6 +89,8 @@ class AcademicSessionRequest(BaseModel):
 
 class TimetableRequest(AcademicSessionRequest):
     total_weeks: int = Field(default=20, ge=1, le=30)
+    # 留空则用教务系统当前学期；否则为 6 位学年学期代码（如 202601）
+    semester_code: str | None = Field(default=None, pattern=r"^\d{6}$")
 
 
 class TimetableResponse(BaseModel):
@@ -96,12 +99,28 @@ class TimetableResponse(BaseModel):
     courses: list[AggregatedCourse]
 
 
-class IcsRequest(TimetableRequest):
-    semester_monday: date
+class SemestersResponse(BaseModel):
+    default_code: str
+    semesters: list[SemesterOption]
 
 
-class WakeUpRequest(TimetableRequest):
-    semester_monday: date
+class _SemesterMondayRequest(TimetableRequest):
+    # 留空则按学校校历自动确定该学期第一周的周一
+    semester_monday: date | None = None
+
+    @field_validator("semester_monday")
+    @classmethod
+    def semester_monday_must_be_monday(cls, value: date | None) -> date | None:
+        if value is not None and value.weekday() != 0:
+            raise ValueError("semester_monday must be a Monday")
+        return value
+
+
+class IcsRequest(_SemesterMondayRequest):
+    pass
+
+
+class WakeUpRequest(_SemesterMondayRequest):
     campus: Literal["main", "shunde"]
 
 
@@ -361,6 +380,18 @@ async def check_read_gate(
     )
 
 
+async def _resolve_semester_monday(
+    client: SmuAcademicClient,
+    cookies: dict[str, str],
+    payload: _SemesterMondayRequest,
+    semester_code: str,
+) -> date:
+    """用户未指定学期周一时，按学校校历取该学期第一周的周一。"""
+    if payload.semester_monday is not None:
+        return payload.semester_monday
+    return await client.fetch_semester_start(academic_cookies=cookies, semester_code=semester_code)
+
+
 @router.post("/timetable", response_model=TimetableResponse, operation_id="smu_timetable")
 async def timetable(
     payload: TimetableRequest,
@@ -372,13 +403,33 @@ async def timetable(
     await check_read_gate(db, request, payload, action="smu_timetable")
     cookies = await load_academic_cookies(store, payload.academic_session_id)
     semester_code, events = await client.fetch_timetable(
-        academic_cookies=cookies, total_weeks=payload.total_weeks
+        academic_cookies=cookies,
+        total_weeks=payload.total_weeks,
+        semester_code=payload.semester_code,
     )
     return TimetableResponse(
         semester_code=semester_code,
         events=events,
         courses=aggregate_events(events),
     )
+
+
+@router.post(
+    "/timetable.semesters",
+    response_model=SemestersResponse,
+    operation_id="smu_timetable_semesters",
+)
+async def timetable_semesters(
+    payload: AcademicSessionRequest,
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    store: Annotated[TransientSecretStore, Depends(get_transient_store)],
+    client: Annotated[SmuAcademicClient, Depends(get_smu_client)],
+) -> SemestersResponse:
+    await check_read_gate(db, request, payload, action="smu_timetable")
+    cookies = await load_academic_cookies(store, payload.academic_session_id)
+    default_code, semesters = await client.list_semesters(academic_cookies=cookies)
+    return SemestersResponse(default_code=default_code, semesters=semesters)
 
 
 @router.post("/timetable.ics", response_class=Response, operation_id="smu_timetable_ics")
@@ -391,10 +442,13 @@ async def timetable_ics(
 ) -> Response:
     await check_read_gate(db, request, payload, action="smu_timetable")
     cookies = await load_academic_cookies(store, payload.academic_session_id)
-    _, events = await client.fetch_timetable(
-        academic_cookies=cookies, total_weeks=payload.total_weeks
+    semester_code, events = await client.fetch_timetable(
+        academic_cookies=cookies,
+        total_weeks=payload.total_weeks,
+        semester_code=payload.semester_code,
     )
-    calendar = export_ics(events, semester_monday=payload.semester_monday)
+    monday = await _resolve_semester_monday(client, cookies, payload, semester_code)
+    calendar = export_ics(events, semester_monday=monday)
     return Response(
         content=calendar,
         media_type="text/calendar; charset=utf-8",
@@ -416,12 +470,15 @@ async def timetable_wakeup(
 ) -> Response:
     await check_read_gate(db, request, payload, action="smu_timetable")
     cookies = await load_academic_cookies(store, payload.academic_session_id)
-    _, events = await client.fetch_timetable(
-        academic_cookies=cookies, total_weeks=payload.total_weeks
+    semester_code, events = await client.fetch_timetable(
+        academic_cookies=cookies,
+        total_weeks=payload.total_weeks,
+        semester_code=payload.semester_code,
     )
+    monday = await _resolve_semester_monday(client, cookies, payload, semester_code)
     schedule = export_wakeup_schedule(
         aggregate_events(events),
-        semester_monday=payload.semester_monday,
+        semester_monday=monday,
         total_weeks=payload.total_weeks,
         campus=payload.campus,
     )
@@ -456,12 +513,15 @@ async def timetable_wakeup_share(
         )
     await check_read_gate(db, request, payload, action="smu_timetable")
     cookies = await load_academic_cookies(store, payload.academic_session_id)
-    _, events = await client.fetch_timetable(
-        academic_cookies=cookies, total_weeks=payload.total_weeks
+    semester_code, events = await client.fetch_timetable(
+        academic_cookies=cookies,
+        total_weeks=payload.total_weeks,
+        semester_code=payload.semester_code,
     )
+    monday = await _resolve_semester_monday(client, cookies, payload, semester_code)
     schedule = export_wakeup_schedule(
         aggregate_events(events),
-        semester_monday=payload.semester_monday,
+        semester_monday=monday,
         total_weeks=payload.total_weeks,
         campus=payload.campus,
     )

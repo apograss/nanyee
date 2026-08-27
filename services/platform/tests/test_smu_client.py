@@ -132,6 +132,60 @@ async def test_smu_login_keeps_cookies_server_side_and_restricts_redirects() -> 
 
 
 @pytest.mark.asyncio
+async def test_fetch_timetable_supports_semester_selection_and_numeric_credit_hours() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/new/student/xsgrkb/main.page":
+            return httpx.Response(200, text='<a href="?xnxqdm=202501">semester</a>')
+        if request.url.path == "/new/student/xsgrkb/week.page":
+            return httpx.Response(
+                200,
+                text=(
+                    "<select id='xnxqdm' name='xnxqdm'>"
+                    "<option value=202601>2026-2027-1</option>"
+                    "<option value=202502 selected>2025-2026-2</option>"
+                    "<option value=202501>2025-2026-1</option>"
+                    "</select>"
+                ),
+            )
+        if request.url.path == "/new/student/xsgrkb/getCalendarWeekDatas":
+            form = httpx.QueryParams(request.content.decode())
+            assert form["xnxqdm"] == "202502"
+            return httpx.Response(
+                200,
+                json={
+                    "data": [
+                        {
+                            "kcmc": "课程甲",
+                            "jxcdmc": "教室101",
+                            "jxhjmc": "理论",
+                            "teaxms": "张老师",
+                            "xq": 1,
+                            # 上游实际返回数字而非字符串（2026-08 实测）
+                            "xs": 2,
+                            "qssj": "08:00:00",
+                            "jssj": "09:25:00",
+                            "ps": "01",
+                            "pe": "02",
+                            "zc": int(form["zc"]),
+                        }
+                    ]
+                },
+            )
+        raise AssertionError(f"unexpected request: {request.url}")
+
+    client = SmuAcademicClient(Settings(app_env="test"), transport=httpx.MockTransport(handler))
+    semester, events = await client.fetch_timetable(
+        academic_cookies={"JSESSIONID": "x"}, total_weeks=2, semester_code="202502"
+    )
+    assert semester == "202502"
+    assert [item.credit_hours for item in events] == ["2", "2"]
+    default, semesters = await client.list_semesters(academic_cookies={"JSESSIONID": "x"})
+    assert default == "202501"
+    assert [item.code for item in semesters] == ["202601", "202502", "202501"]
+    assert semesters[0].label == "2026-2027-1"
+
+
+@pytest.mark.asyncio
 async def test_smu_sso_rejects_external_redirect() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/login/login.do":

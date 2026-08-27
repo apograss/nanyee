@@ -70,6 +70,27 @@ def test_ics_requires_semester_monday() -> None:
         export_ics([event()], semester_monday=date(2026, 9, 8))
 
 
+def test_from_upstream_accepts_numeric_credit_hours() -> None:
+    # 上游 getCalendarWeekDatas 的 xs 实际返回数字而非字符串（2026-08 实测）
+    row = {
+        "kcmc": "大学英语三",
+        "jxcdmc": "2301教室",
+        "jxhjmc": "理论",
+        "teaxms": "张老师",
+        "xq": 3,
+        "xs": 2,
+        "qssj": "08:30:00",
+        "jssj": "09:55:00",
+        "ps": "01",
+        "pe": "02",
+        "zc": 1,
+    }
+    parsed = CourseEvent.from_upstream(row)
+    assert parsed.credit_hours == "2"
+    assert parsed.start_node == 1
+    assert parsed.end_node == 2
+
+
 def test_grade_parsing_and_weighted_summary() -> None:
     grades = parse_grades(
         {

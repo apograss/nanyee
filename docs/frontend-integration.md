@@ -103,6 +103,7 @@ Turnstile Secret 永远不进入前端配置。所需脚本与 CSP 域名以 Clo
 5. 成功后只得到 `academic_session_id` 和过期时间；服务器不会返回 UIS/教务 Cookie。会话固定有效 24 小时，不做滑动续期。
 6. 在有效期内调用：
    - `POST /smu/timetable`；
+   - `POST /smu/timetable.semesters`；
    - `POST /smu/timetable.ics`；
    - `POST /smu/timetable.wakeup`；
    - `POST /smu/grades`。
@@ -111,7 +112,9 @@ Turnstile Secret 永远不进入前端配置。所需脚本与 CSP 域名以 Clo
 
 选课页还可以使用 `POST /smu/enrollment/session/cookie`：请求体提交 `cookie`，支持完整 `Cookie` 字符串、带 `Cookie:` 前缀的字符串或单独的 `JSESSIONID` 值。该接口要求平台登录与 CSRF，会先向教务系统校验会话，再把规范化 Cookie 放进与账号密码登录相同的 24 小时固定内存会话；原 Cookie 和规范化 Cookie 都不写数据库、不返回前端。账号密码登录会使同时登录教务系统的另一台设备下线，前端必须明确提示。选课成功后后端立即擦除该 `academic_session_id` 和运行中的 Cookie 副本，不调用上游全局注销。
 
-`/smu/timetable.ics` 返回 `text/calendar` 文件。`/smu/timetable.wakeup` 还需提交 `semester_monday` 和 `campus: "main" | "shunde"`，返回 `.wakeup_schedule` 文件；两者都按普通 Blob 下载处理。
+课表相关接口都可选提交 `semester_code`（6 位学年学期代码，如 `202601`），留空则按教务系统当前学期；`POST /smu/timetable.semesters` 返回 `default_code` 和全部 `semesters`（`code` + `label`，如 `2026-2027-1`），供前端渲染学期下拉。`total_weeks` 为 1-30，默认 20，学期周数不固定，前端应允许用户修改。
+
+`/smu/timetable.ics` 返回 `text/calendar` 文件。`/smu/timetable.wakeup` 还需提交 `campus: "main" | "shunde"`，返回 `.wakeup_schedule` 文件；两者都按普通 Blob 下载处理。两者的 `semester_monday` 均可留空：后端会按学校校历接口自动确定该学期第一周的周一；手动提交时必须是周一，否则 422。
 
 如果用户明确选择“导入 WakeUp”，可在登录平台并确认第三方上传后调用 `POST /smu/timetable.wakeup.share`，额外提交 `confirmation_version: "timetable:wakeup_share:v1"`，后端返回 `share_code`。该路径会把生成的课表上传到 WakeUp；拒绝上传时仍可下载本地文件。成绩结果默认不在服务器保存，返回的 `ranking` 包含课程和教学班范围的排名与分布。
 
