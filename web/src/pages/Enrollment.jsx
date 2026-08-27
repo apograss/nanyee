@@ -9,6 +9,7 @@ import {
   ENROLLMENT_TERMINAL_STATES, CONFIRMATION_VERSIONS,
 } from "@/lib/api.jsx";
 import { recognizeCaptcha } from "@/lib/captcha-ocr.jsx";
+import { loadSchoolCreds, saveSchoolCreds, clearSchoolCreds } from "@/lib/school-creds.jsx";
 
 /* ---------- 入场动效（与首页同一组曲线，克制使用） ---------- */
 const EASE = [0.22, 1, 0.36, 1];
@@ -37,6 +38,18 @@ function AcademicSessionCard({ onSession }) {
   const [cookie, setCookie] = useState("");
   const [error, setError] = useState("");
   const [captchaError, setCaptchaError] = useState("");
+  // 本机记住学号密码（localStorage 明文，用户显式勾选才保存）
+  const [rememberCreds, setRememberCreds] = useState(false);
+
+  // 已保存则自动填入
+  useEffect(() => {
+    const saved = loadSchoolCreds();
+    if (saved) {
+      setAccount(saved.account);
+      setPassword(saved.password);
+      setRememberCreds(true);
+    }
+  }, []);
 
   const fetchCaptcha = useCallback(async () => {
     setCaptchaError("");
@@ -77,6 +90,8 @@ function AcademicSessionCard({ onSession }) {
       const data = loginMode === "cookie"
         ? await createEnrollmentCookieSession(cookie)
         : await apiPost("/smu/session", { flow_id: captcha.flow_id, account, password, captcha: captchaCode }, { action: "smu_login" });
+      // 登录成功才保存；Cookie 模式或取消勾选时确保本地无残留
+      if (loginMode === "password" && rememberCreds) saveSchoolCreds(account, password); else if (loginMode === "password") clearSchoolCreds();
       setSession(data); onSession(data); setPassword(""); setCaptchaCode("");
       setCookie("");
     } catch (err) {
@@ -140,6 +155,10 @@ function AcademicSessionCard({ onSession }) {
               <div><Label>学号</Label><Input value={account} onChange={(e) => setAccount(e.target.value)} placeholder="20260001" /></div>
               <div><Label>学校密码</Label><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
             </div>
+            <label className="flex items-center gap-1.5 text-[12px] text-[var(--muted)] cursor-pointer select-none self-start">
+              <input type="checkbox" checked={rememberCreds} onChange={(e) => { setRememberCreds(e.target.checked); if (!e.target.checked) clearSchoolCreds(); }} className="accent-[var(--seed-primary)]" />
+              记住学号和密码（仅保存在本浏览器，公共电脑勿勾选）
+            </label>
             <Button onClick={login} loading={loading} disabled={!captcha || !account || !password || !captchaCode}>使用账号密码登录</Button>
             </> : <>
               <div className="flex flex-col gap-1.5">

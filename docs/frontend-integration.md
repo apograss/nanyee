@@ -108,7 +108,7 @@ Turnstile Secret 永远不进入前端配置。所需脚本与 CSP 域名以 Clo
    - `POST /smu/timetable.wakeup`；
    - `POST /smu/grades`。
 
-学校密码只用于第 4 步，不保存、不复用、不进入前端日志。`flow_id` 为一次性；登录失败后重新取验证码。`academic_session_id` 只放内存，页面刷新后允许用户重新登录学校系统。
+学校密码只用于第 4 步，服务器不保存、不复用、不进入前端日志；若用户在学校登录表单勾选“记住学号和密码”，则以明文保存在本机 localStorage（`nanyee:school-creds`），取消勾选或取消勾选后登录成功即删除。`flow_id` 为一次性；登录失败后重新取验证码。`academic_session_id` 只放内存，页面刷新后允许用户重新登录学校系统。
 
 选课页还可以使用 `POST /smu/enrollment/session/cookie`：请求体提交 `cookie`，支持完整 `Cookie` 字符串、带 `Cookie:` 前缀的字符串或单独的 `JSESSIONID` 值。该接口要求平台登录与 CSRF，会先向教务系统校验会话，再把规范化 Cookie 放进与账号密码登录相同的 24 小时固定内存会话；原 Cookie 和规范化 Cookie 都不写数据库、不返回前端。账号密码登录会使同时登录教务系统的另一台设备下线，前端必须明确提示。选课成功后后端立即擦除该 `academic_session_id` 和运行中的 Cookie 副本，不调用上游全局注销。
 

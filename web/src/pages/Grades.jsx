@@ -4,6 +4,7 @@ import { GraduationCap, ShieldCheck, TrendingUp, BarChart3, RefreshCw, ScanLine,
 import { motion } from "motion/react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Label, Table, Alert, Badge, Checkbox, Spinner, cn } from "@/components/ui.jsx";
 import { apiGet, apiPost } from "@/lib/api.jsx";
+import { loadSchoolCreds, saveSchoolCreds, clearSchoolCreds } from "@/lib/school-creds.jsx";
 import { recognizeCaptcha, terminateOCR } from "@/lib/captcha-ocr.jsx";
 
 const EASE = [0.22, 1, 0.36, 1];
@@ -55,6 +56,18 @@ export default function Grades(qoderProps) {
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrResult, setOcrResult] = useState(null); // { text, confidence } | { error } | null
   const [loading, setLoading] = useState(false);
+  // 本机记住学号密码（localStorage 明文，用户显式勾选才保存）
+  const [rememberCreds, setRememberCreds] = useState(false);
+
+  // 已保存则自动填入
+  useEffect(() => {
+    const saved = loadSchoolCreds();
+    if (saved) {
+      setAccount(saved.account);
+      setPassword(saved.password);
+      setRememberCreds(true);
+    }
+  }, []);
   const [grades, setGrades] = useState(null);
   const [error, setError] = useState("");
   const [captchaError, setCaptchaError] = useState("");
@@ -125,6 +138,8 @@ export default function Grades(qoderProps) {
     setError("");
     try {
       const sess = await apiPost("/smu/session", { flow_id: captcha?.flow_id, account, password, captcha: captchaCode }, { action: "smu_login" });
+      // 登录成功才保存；未勾选时确保本地无残留
+      if (rememberCreds) saveSchoolCreds(account, password); else clearSchoolCreds();
       setSession(sess);
       setPassword(""); setCaptchaCode("");
       setLoading(false);
@@ -154,7 +169,7 @@ export default function Grades(qoderProps) {
         <Card data-qoder-id="qel-card-3cdc14c7" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-card-3cdc14c7&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;card&quot;,&quot;loc&quot;:{&quot;line&quot;:69,&quot;column&quot;:9}}">
           <CardHeader data-qoder-id="qel-cardheader-a05c13d8" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-cardheader-a05c13d8&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;cardheader&quot;,&quot;loc&quot;:{&quot;line&quot;:70,&quot;column&quot;:11}}">
             <CardTitle className="flex items-center gap-2" data-qoder-id="qel-cardtitle-8a28de39" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-cardtitle-8a28de39&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;cardtitle&quot;,&quot;loc&quot;:{&quot;line&quot;:71,&quot;column&quot;:13}}"><ShieldCheck className="w-4 h-4 text-[var(--seed-primary-strong)]" />学校系统登录</CardTitle>
-            <CardDescription data-qoder-id="qel-carddescription-88c73238" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-carddescription-88c73238&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;carddescription&quot;,&quot;loc&quot;:{&quot;line&quot;:72,&quot;column&quot;:13}}">验证码仅用一次，学校密码只用于本次登录。</CardDescription>
+            <CardDescription data-qoder-id="qel-carddescription-88c73238" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-carddescription-88c73238&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;carddescription&quot;,&quot;loc&quot;:{&quot;line&quot;:72,&quot;column&quot;:13}}">学校密码只用于登录请求，勾选“记住”才会保存在本机浏览器。</CardDescription>
           </CardHeader>
           <CardContent data-qoder-id="qel-cardcontent-854a04a3" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-cardcontent-854a04a3&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;cardcontent&quot;,&quot;loc&quot;:{&quot;line&quot;:74,&quot;column&quot;:11}}">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:items-end" data-qoder-id="qel-grid-24412f27" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-grid-24412f27&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/Grades.jsx&quot;,&quot;componentName&quot;:&quot;Grades&quot;,&quot;elementRole&quot;:&quot;grid&quot;,&quot;loc&quot;:{&quot;line&quot;:75,&quot;column&quot;:13}}">
@@ -205,6 +220,10 @@ export default function Grades(qoderProps) {
                 )}
               </div>
             </div>
+            <label className="mt-3 inline-flex items-center gap-1.5 text-[13px] text-[var(--muted)] cursor-pointer select-none">
+              <Checkbox checked={rememberCreds} onChange={(on) => { setRememberCreds(on); if (!on) clearSchoolCreds(); }} />
+              记住学号和密码（仅保存在本浏览器，公共电脑勿勾选）
+            </label>
             <div className="mt-3"><Button onClick={login} loading={loading} disabled={!captcha || !account || !password || !captchaCode}>登录并查询</Button></div>
             {error && <Alert variant="danger" title="登录失败"><span>{error}</span></Alert>}
           </CardContent>

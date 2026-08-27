@@ -4,6 +4,7 @@ import { motion } from "motion/react";
 import { CalendarDays, Download, Image as ImageIcon, Clock, RefreshCw, ScanLine, Copy, Check, Share2 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Label, Select, Alert, Checkbox, Spinner, Textarea, cn } from "@/components/ui.jsx";
 import { apiGet, apiPost, apiDownload, shareWakeup, CONFIRMATION_VERSIONS } from "@/lib/api.jsx";
+import { loadSchoolCreds, saveSchoolCreds, clearSchoolCreds } from "@/lib/school-creds.jsx";
 import { recognizeCaptcha, terminateOCR } from "@/lib/captcha-ocr.jsx";
 
 // 瞬时学校会话状态：idle | captcha(取验证码) | session(已登录 24h) | expired
@@ -73,6 +74,23 @@ export default function Timetable() {
   const [ocrResult, setOcrResult] = useState(null); // { text, confidence } | { error } | null
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState(null);
+  // 本机记住学号密码（localStorage 明文，用户显式勾选才保存）
+  const [rememberCreds, setRememberCreds] = useState(false);
+
+  // 已保存则自动填入，实现一键登录
+  useEffect(() => {
+    const saved = loadSchoolCreds();
+    if (saved) {
+      setAccount(saved.account);
+      setPassword(saved.password);
+      setRememberCreds(true);
+    }
+  }, []);
+
+  const toggleRememberCreds = (on) => {
+    setRememberCreds(on);
+    if (!on) clearSchoolCreds();
+  };
 
   const [week, setWeek] = useState(8);
   const [campus, setCampus] = useState("shunde");
@@ -187,6 +205,8 @@ export default function Timetable() {
     setLoginLoading(true);
     try {
       const data = await apiPost("/smu/session", { flow_id: flowId, account, password, captcha }, { action: "smu_login" });
+      // 登录成功才保存；未勾选时确保本地无残留
+      if (rememberCreds) saveSchoolCreds(account, password); else clearSchoolCreds();
       setSession({ academic_session_id: data.academic_session_id, expires_at: data.expires_at });
       setPassword(""); // 学校密码只用于本次登录请求，立即清空
       setCaptcha("");
@@ -371,7 +391,7 @@ export default function Timetable() {
             <CardHeader>
               <div className="kicker"><strong>School Login</strong></div>
               <CardTitle>学校登录</CardTitle>
-              <CardDescription>登录失败需重新输入验证码；学校密码只用于本次登录，不会保存。</CardDescription>
+              <CardDescription>登录失败需重新输入验证码；学校密码只用于登录请求，勾选“记住”才会保存在本机浏览器。</CardDescription>
             </CardHeader>
             <CardContent>
               <form className="flex flex-col gap-4" onSubmit={login}>
@@ -382,9 +402,13 @@ export default function Timetable() {
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <Label htmlFor="pw">学校密码</Label>
-                    <Input id="pw" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="仅本次请求使用" required />
+                    <Input id="pw" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="提交后即清空输入框" required />
                   </div>
                 </div>
+                <label className="inline-flex items-center gap-1.5 text-[13px] text-[var(--muted)] cursor-pointer select-none self-start">
+                  <Checkbox checked={rememberCreds} onChange={toggleRememberCreds} />
+                  记住学号和密码（仅保存在本浏览器，公共电脑勿勾选）
+                </label>
                 <div className="flex flex-col gap-1.5">
                   <Label>验证码</Label>
                   <div className="flex items-center gap-3 flex-wrap">
