@@ -370,17 +370,24 @@ class SmuAcademicClient:
         base = self._settings.smu_academic_base_url
         async with self._client(cookies=academic_cookies) as client:
             try:
-                await client.get(
+                await self._get_following_redirects(
+                    client,
                     f"{base}/new/welcome.page?ui=new",
-                    headers={**COMMON_HEADERS, "Accept": "text/html,*/*"},
                 )
-                response = await client.get(
+                response = await self._get_following_redirects(
+                    client,
                     f"{base}/new/student/xsxk/",
-                    headers={**COMMON_HEADERS, "Accept": "text/html,*/*"},
                 )
             except httpx.HTTPError as exc:
                 raise self._unavailable() from exc
         self._ensure_success(response)
+        # 选课未开放时正方会把 xsxk 302 回首页/欢迎页，这是业务状态而非系统故障
+        if not response.url.path.startswith("/new/student/xsxk"):
+            raise AppError(
+                ErrorCode.NOT_FOUND,
+                "学校选课当前未开放，请在选课开放期间再试。",
+                status_code=404,
+            )
         if "统一认证登录" in response.text or "扫码登录" in response.text:
             raise self._rejected()
         return _parse_enrollment_categories(response.text)

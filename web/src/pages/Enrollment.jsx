@@ -270,6 +270,8 @@ function RunStatusView({ run, onCancel }) {
 export default function Enrollment() {
   const [academicSession, setAcademicSession] = useState(null);
   const [categories, setCategories] = useState([]);
+  const [categoriesLoaded, setCategoriesLoaded] = useState(false);
+  const [categoriesError, setCategoriesError] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [courses, setCourses] = useState([]);
   const [preferences, setPreferences] = useState([]);
@@ -283,15 +285,21 @@ export default function Enrollment() {
 
   const loadCategories = async () => {
     if (!academicSession) return;
+    setCategoriesError(null);
+    setCategoriesLoaded(false);
     try {
       const data = await fetchEnrollmentCategories(academicSession.academic_session_id);
       setCategories(data);
+      setCategoriesLoaded(true);
     } catch (err) {
       setCategories([]);
       if (err?.status === 410) {
         // 学校会话已在服务端失效：回到学校登录卡
         setAcademicSession(null);
+        return;
       }
+      setCategoriesLoaded(true);
+      setCategoriesError(err?.message || "选课类型加载失败，请稍后重试。");
     }
   };
   useEffect(() => { if (academicSession) loadCategories(); }, [academicSession]);
@@ -411,8 +419,15 @@ export default function Enrollment() {
                 <Button variant="outline" size="sm" onClick={loadCategories}><RefreshCw className="w-4 h-4" /> 刷新</Button>
               </CardHeader>
               <CardContent>
-                {categories.length === 0 ? (
-                  <div className="text-[13px] text-[var(--muted)]">加载中…</div>
+                {categoriesError ? (
+                  <Alert variant="warning" title="选课类型加载失败">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span>{categoriesError}</span>
+                      <Button variant="outline" size="sm" onClick={loadCategories}>重试</Button>
+                    </div>
+                  </Alert>
+                ) : categories.length === 0 ? (
+                  <div className="text-[13px] text-[var(--muted)]">{categoriesLoaded ? "当前没有开放的选课类型，请在选课开放期间再试。" : "加载中…"}</div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {categories.map((c) => (

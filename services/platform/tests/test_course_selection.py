@@ -112,3 +112,30 @@ async def test_enrollment_conflict_confirmation_uses_hlct_one() -> None:
     assert confirmed.success is True
     assert httpx.QueryParams(route.calls[0].request.content.decode())["hlct"] == "0"
     assert httpx.QueryParams(route.calls[1].request.content.decode())["hlct"] == "1"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_enrollment_categories_reports_closed_instead_of_unavailable() -> None:
+    # 选课未开放时正方会把 /new/student/xsxk/ 302 回首页，再跳欢迎页（2026-08 实测）
+    respx.get("https://zhjw.smu.edu.cn/new/welcome.page?ui=new").mock(
+        return_value=httpx.Response(200, text="welcome")
+    )
+    respx.get("https://zhjw.smu.edu.cn/new/student/xsxk/").mock(
+        return_value=httpx.Response(302, headers={"location": "https://zhjw.smu.edu.cn/"})
+    )
+    respx.get("https://zhjw.smu.edu.cn/").mock(
+        return_value=httpx.Response(
+            302, headers={"location": "https://zhjw.smu.edu.cn/new/welcome.page"}
+        )
+    )
+    respx.get("https://zhjw.smu.edu.cn/new/welcome.page").mock(
+        return_value=httpx.Response(200, text="welcome")
+    )
+    client = SmuAcademicClient(Settings(app_env="test"))
+
+    with pytest.raises(AppError) as raised:
+        await client.fetch_enrollment_categories(academic_cookies={"sid": "value"})
+
+    assert raised.value.code == ErrorCode.NOT_FOUND
+    assert "未开放" in raised.value.message
