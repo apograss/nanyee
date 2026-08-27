@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { motion } from "motion/react";
 import { CalendarDays, Download, Image as ImageIcon, Clock, RefreshCw, ScanLine, Copy, Check, Share2 } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Label, Select, Alert, Checkbox, Spinner, cn } from "@/components/ui.jsx";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Label, Select, Alert, Checkbox, Spinner, Textarea, cn } from "@/components/ui.jsx";
 import { apiGet, apiPost, apiDownload, shareWakeup, CONFIRMATION_VERSIONS } from "@/lib/api.jsx";
 import { recognizeCaptcha, terminateOCR } from "@/lib/captcha-ocr.jsx";
 
@@ -332,10 +332,15 @@ export default function Timetable() {
     }
   };
 
-  const copyShareCode = async () => {
-    if (!shareCode) return;
+  // WakeUp 的“从分享口令导入”识别的是整段口令消息（「」内才是分享码），只粘裸码无法导入
+  const shareMessage = shareCode
+    ? `这是来自「WakeUp课程表」的课表分享，30分钟内有效哦，如果失效请朋友再分享一遍叭。为了保护隐私我们选择不监听你的剪贴板，请复制这条消息后，打开App的主界面，右上角第二个按钮 -> 从分享口令导入，按操作提示即可完成导入~分享口令为「${shareCode}」`
+    : "";
+
+  const copyShareMessage = async () => {
+    if (!shareMessage) return;
     try {
-      await navigator.clipboard.writeText(shareCode);
+      await navigator.clipboard.writeText(shareMessage);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
@@ -548,7 +553,7 @@ export default function Timetable() {
           <CardHeader>
             <div className="kicker"><strong>Wakeup Share</strong></div>
             <CardTitle>分享到 WakeUp</CardTitle>
-            <CardDescription>直接把课表上传到 WakeUp 应用，生成分享码后即可在 App 中导入。</CardDescription>
+            <CardDescription>直接把课表上传到 WakeUp 应用，生成分享口令后即可在 App 中导入。</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <Alert variant="info" title="需要你确认">
@@ -568,13 +573,12 @@ export default function Timetable() {
             {shareCode && (
               <Alert variant="success" title="分享成功">
                 <div className="flex flex-col gap-2">
-                  <span>分享码已生成，在 WakeUp 应用中导入即可。请尽快使用，码会过期。</span>
-                  <div className="flex items-center gap-2">
-                    <Input ref={shareInputRef} value={shareCode} readOnly className="font-mono text-[13px]" />
-                    <Button variant="outline" size="icon" onClick={copyShareCode} aria-label="复制分享码">
-                      {copied ? <Check className="w-4 h-4 text-[var(--success)]" /> : <Copy className="w-4 h-4" />}
-                    </Button>
-                  </div>
+                  <span>复制下面整段分享口令（30 分钟内有效），打开 WakeUp 主界面右上角第二个按钮 → 从分享口令导入。</span>
+                  <Textarea ref={shareInputRef} value={shareMessage} readOnly rows={4} className="text-[13px]" />
+                  <Button variant="outline" size="sm" onClick={copyShareMessage} className="self-start">
+                    {copied ? <Check className="w-4 h-4 text-[var(--success)]" /> : <Copy className="w-4 h-4" />}
+                    {copied ? "已复制" : "复制完整分享口令"}
+                  </Button>
                 </div>
               </Alert>
             )}

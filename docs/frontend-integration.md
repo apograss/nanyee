@@ -116,7 +116,7 @@ Turnstile Secret 永远不进入前端配置。所需脚本与 CSP 域名以 Clo
 
 `/smu/timetable.ics` 返回 `text/calendar` 文件。`/smu/timetable.wakeup` 还需提交 `campus: "main" | "shunde"`，返回 `.wakeup_schedule` 文件；两者都按普通 Blob 下载处理。两者的 `semester_monday` 均可留空：后端会按学校校历接口自动确定该学期第一周的周一；手动提交时必须是周一，否则 422。
 
-如果用户明确选择“导入 WakeUp”，可在登录平台并确认第三方上传后调用 `POST /smu/timetable.wakeup.share`，额外提交 `confirmation_version: "timetable:wakeup_share:v1"`，后端返回 `share_code`。该路径会把生成的课表上传到 WakeUp；拒绝上传时仍可下载本地文件。成绩结果默认不在服务器保存，返回的 `ranking` 包含课程和教学班范围的排名与分布。
+如果用户明确选择“导入 WakeUp”，可在登录平台并确认第三方上传后调用 `POST /smu/timetable.wakeup.share`，额外提交 `confirmation_version: "timetable:wakeup_share:v1"`，后端返回 `share_code`。注意 WakeUp 的“从分享口令导入”识别的是整段分享消息而不是裸 `share_code`，前端应包装为 `这是来自「WakeUp课程表」的课表分享，30分钟内有效哦……分享口令为「<share_code>」` 再让用户复制。该路径会把生成的课表上传到 WakeUp；拒绝上传时仍可下载本地文件。成绩结果默认不在服务器保存，返回的 `ranking` 包含课程和教学班范围的排名与分布。
 
 ## 5. 托管凭据
 
