@@ -61,6 +61,47 @@ function AcademicSessionCard({ session, onExpire }) {
   );
 }
 
+const SECTION_TIMES = new Map(SECTIONS.map((s) => [s.n, s.time]));
+
+// 周视图网格：每个格子显式指定 gridRow/gridColumn，不依赖 grid auto-placement；
+// 被跨节课程覆盖的格子不渲染，否则跨行课程会把后续单元格挤错位。
+function TimetableGrid({ events, week }) {
+  const weekEvents = (events || []).filter((c) => c.week === week);
+  // 超出预置 9 节的节次（如晚间课）也要给出行，否则这些课无处渲染
+  const maxNode = Math.max(SECTIONS.length, ...weekEvents.map((c) => c.end_node || 0));
+  const rows = Array.from({ length: maxNode }, (_, i) => i + 1);
+  return (
+    <div className="timetable-grid" data-component="TimetableGrid" data-od-id="timetable-grid">
+      <div className="timetable-cell timetable-head">节次</div>
+      {DAYS.map((d) => <div key={d} className="timetable-cell timetable-head">{d}</div>)}
+      {rows.map((n) => (
+        <React.Fragment key={n}>
+          <div className="timetable-cell timetable-head" style={{ gridRow: n + 1, gridColumn: 1 }} data-component="SectionCell">
+            <div className="font-medium">{n}</div>
+            {SECTION_TIMES.get(n) && <div className="text-[11px] text-[var(--muted)]">{SECTION_TIMES.get(n)}</div>}
+          </div>
+          {DAYS.map((_, di) => {
+            const course = weekEvents.find((c) => c.weekday - 1 === di && c.start_node === n);
+            if (!course && weekEvents.some((c) => c.weekday - 1 === di && c.start_node < n && n <= c.end_node)) return null;
+            const span = course ? course.end_node - course.start_node + 1 : 1;
+            return (
+              <div key={di} className="timetable-cell" style={{ gridRow: `${n + 1} / span ${span}`, gridColumn: di + 2 }}>
+                {course && (
+                  <div className={cn("rounded-[var(--radius-sm)] p-2 h-full", COLORS[di % 2])} data-component="CourseCell">
+                    <div className="text-[12px] font-medium leading-tight">{course.name}</div>
+                    <div className="text-[10px] mt-0.5 opacity-80">{course.location}</div>
+                    <div className="text-[10px] opacity-70">{course.teachers}</div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}
+
 export default function Timetable() {
   const [session, setSession] = useState(null); // { academic_session_id, expires_at }
   const [flowId, setFlowId] = useState(null); // 敏感态：仅内存
@@ -490,33 +531,7 @@ export default function Timetable() {
                 </div>
               </Alert>
             ) : (
-              <div className="timetable-grid" data-component="TimetableGrid" data-od-id="timetable-grid">
-                <div className="timetable-cell timetable-head">节次</div>
-                {DAYS.map((d) => <div key={d} className="timetable-cell timetable-head">{d}</div>)}
-                {SECTIONS.map((s) => (
-                  <React.Fragment key={s.n}>
-                    <div className="timetable-cell timetable-head" data-component="SectionCell">
-                      <div className="font-medium">{s.n}</div>
-                      <div className="text-[11px] text-[var(--muted)]">{s.time}</div>
-                    </div>
-                    {DAYS.map((_, di) => {
-                      const course = (events || []).find((c) => c.week === week && c.weekday - 1 === di && c.start_node === s.n);
-                      const span = course ? course.end_node - course.start_node + 1 : 1;
-                      return (
-                        <div key={di} className="timetable-cell" style={span > 1 ? { gridRow: `span ${span}` } : undefined}>
-                          {course && (
-                            <div className={cn("rounded-[var(--radius-sm)] p-2 h-full", COLORS[di % 2])} data-component="CourseCell">
-                              <div className="text-[12px] font-medium leading-tight">{course.name}</div>
-                              <div className="text-[10px] mt-0.5 opacity-80">{course.location}</div>
-                              <div className="text-[10px] opacity-70">{course.teachers}</div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </React.Fragment>
-                ))}
-              </div>
+              <TimetableGrid events={events} week={week} />
             )}
           </CardContent>
         </Card>
