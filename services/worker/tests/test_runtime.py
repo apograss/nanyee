@@ -10,7 +10,7 @@ from nanyee.identity.models import RegistrationTrustLevel, User
 from nanyee.identity.passwords import hash_password
 from nanyee.jobs.models import Job, JobState
 from nanyee.jobs.service import JobService
-from nanyee.security import utc_now
+from nanyee.security import as_utc, utc_now
 from nanyee_worker.runtime import ExecutionFailure, ExecutionReceipt, WorkerRuntime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import (
@@ -195,6 +195,39 @@ async def test_runtime_drives_durable_job_to_terminal_state(
             assert record.receipt == {"reference": "success"}
         else:
             assert record.next_action == "verify_upstream"
+    await engine.dispose()
+
+
+class ReschedulingHandler:
+    next_run_at = utc_now() + timedelta(days=1)
+
+    async def execute(self, _db: AsyncSession, _job: Job) -> ExecutionReceipt:
+        return ExecutionReceipt({"reference": "daily"}, next_run_at=self.next_run_at)
+
+
+@pytest.mark.asyncio
+async def test_runtime_reschedules_recurring_job_instead_of_completing() -> None:
+    engine = _build_engine()
+    async with engine.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    job_id = await _create_queued_job(factory, idempotency_key="runtime-reschedule")
+
+    runtime = WorkerRuntime(
+        factory,
+        worker_id="test-worker",
+        lease_seconds=60,
+        retry_interval_seconds=5,
+        handlers={"study_cabin": ReschedulingHandler()},
+    )
+    assert await runtime.run_once() is True
+    async with factory() as db:
+        record = (await db.execute(select(Job).where(Job.id == job_id))).scalar_one()
+        assert record.state == JobState.QUEUED
+        assert as_utc(record.scheduled_for) == ReschedulingHandler.next_run_at
+        assert record.receipt == {"reference": "daily"}
+        assert record.finished_at is None
+        assert record.lease_owner is None
     await engine.dispose()
 
 

@@ -5,8 +5,9 @@ import json
 import logging
 import time
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from nanyee.config import Settings
 from nanyee.credentials.service import CredentialVaultService
@@ -14,6 +15,7 @@ from nanyee.errors import AppError
 from nanyee.integrations.smu.client import SmuAcademicClient
 from nanyee.integrations.smu.evaluation_automation import build_legacy_positive_answers
 from nanyee.jobs.models import Job
+from nanyee.security import as_utc
 from nanyee.tools.evaluation import EvaluationAutomationRequest
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,6 +23,20 @@ from nanyee_worker.runtime import ExecutionFailure, ExecutionReceipt, ensure_exe
 from nanyee_worker.study_cabin import DdddOcrSolver
 
 logger = logging.getLogger(__name__)
+
+_BEIJING = ZoneInfo("Asia/Shanghai")
+# 未显式设置 retry_until 时的默认截止：创建后 30 天，避免常驻任务无限期空跑
+_DEFAULT_RETRY_WINDOW = timedelta(days=30)
+
+
+def _next_daily_run(run_time: str, *, now: datetime | None = None) -> datetime:
+    """按北京时间计算 HH:MM 的下一个未来运行时刻（与宿主机时区无关）。"""
+    hour, minute = (int(part) for part in run_time.split(":"))
+    current = (now or datetime.now(UTC)).astimezone(_BEIJING)
+    candidate = current.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if candidate <= current:
+        candidate += timedelta(days=1)
+    return candidate
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,6 +52,7 @@ class EvaluationHandler:
         vault: CredentialVaultService,
         solver: DdddOcrSolver,
     ) -> None:
+        self._settings = settings
         self._client = SmuAcademicClient(settings)
         self._vault = vault
         self._solver = solver
@@ -122,6 +139,19 @@ class EvaluationHandler:
             f"自动评课完成，成功提交 {len(submitted)} 门。",
             submitted_count=len(submitted),
         )
+        deadline = (
+            request.retry_until
+            or as_utc(job.created_at or datetime.now(UTC)) + _DEFAULT_RETRY_WINDOW
+        )
+        next_run = _next_daily_run(self._settings.evaluation_daily_run_time)
+        next_run_at = next_run if next_run <= deadline.astimezone(UTC) else None
+        if next_run_at is not None:
+            self._log(
+                job,
+                logs,
+                "evaluation_next_scheduled",
+                f"已安排下次运行：{next_run_at.astimezone(_BEIJING):%Y-%m-%d %H:%M}（北京时间）。",
+            )
         return ExecutionReceipt(
             {
                 "strategy": request.strategy,
@@ -129,7 +159,8 @@ class EvaluationHandler:
                 "submitted_count": len(submitted),
                 "submissions": submitted,
                 "logs": logs,
-            }
+            },
+            next_run_at=next_run_at,
         )
 
     async def _academic_session(self, db: AsyncSession, job: Job) -> dict[str, str]:

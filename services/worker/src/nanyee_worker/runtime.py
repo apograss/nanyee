@@ -6,6 +6,7 @@ import time
 from collections.abc import Mapping
 from contextlib import suppress
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Protocol
 from uuid import UUID
@@ -25,6 +26,8 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True, slots=True)
 class ExecutionReceipt:
     values: dict[str, object]
+    # 常驻任务（如每日评课）执行完毕后，把任务重新排队到下一运行时刻而非终结
+    next_run_at: datetime | None = None
 
 
 class ExecutionFailure(RuntimeError):
@@ -189,6 +192,24 @@ class WorkerRuntime:
             return True
 
         async with self._session_factory() as db:
+            if receipt.next_run_at is not None:
+                await self._service.reschedule(
+                    db,
+                    job_id=job.id,
+                    worker_id=self._worker_id,
+                    receipt=receipt.values,
+                    scheduled_for=receipt.next_run_at,
+                )
+                logger.info(
+                    "job_rescheduled",
+                    extra={
+                        "event": "job_rescheduled",
+                        "job_id": str(job.id),
+                        "tool_id": job.tool_id,
+                        "next_run_at": receipt.next_run_at.isoformat(),
+                    },
+                )
+                return True
             await self._service.complete(
                 db,
                 job_id=job.id,

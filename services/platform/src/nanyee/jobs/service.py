@@ -212,6 +212,34 @@ class JobService:
         await db.refresh(record)
         return record
 
+    async def reschedule(
+        self,
+        db: AsyncSession,
+        *,
+        job_id: UUID,
+        worker_id: str,
+        receipt: dict[str, object],
+        scheduled_for: datetime,
+    ) -> Job:
+        """把执行完毕的常驻任务重新排队到下一运行时刻（如评课每日运行）。"""
+        record = await self._owned_running_job(db, job_id, worker_id)
+        now = utc_now()
+        if record.cancel_requested_at is not None:
+            record.state = JobState.CANCELLED
+            record.receipt = None
+            record.finished_at = now
+        else:
+            record.state = JobState.QUEUED
+            record.scheduled_for = scheduled_for
+            record.receipt = receipt
+        record.error_code = None
+        record.next_action = None
+        record.lease_owner = None
+        record.lease_expires_at = None
+        await db.commit()
+        await db.refresh(record)
+        return record
+
     async def fail(
         self,
         db: AsyncSession,

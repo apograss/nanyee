@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 from uuid import uuid4
 
@@ -188,6 +188,92 @@ async def test_evaluation_login_stops_on_bad_credentials() -> None:
     assert excinfo.value.next_action == "replace_credential"
 
 
+def test_next_daily_run_uses_beijing_time() -> None:
+    from nanyee_worker.evaluation import _next_daily_run
+
+    # 北京 2026-09-01 06:00（UTC 2026-08-31 22:00）→ 当天 07:00（UTC 23:00）
+    now = datetime(2026, 8, 31, 22, 0, tzinfo=UTC)
+    assert _next_daily_run("07:00", now=now) == datetime(2026, 8, 31, 23, 0, tzinfo=UTC)
+    # 北京 2026-09-01 08:30（UTC 00:30）→ 次日 07:00
+    now = datetime(2026, 9, 1, 0, 30, tzinfo=UTC)
+    assert _next_daily_run("07:00", now=now) == datetime(2026, 9, 1, 23, 0, tzinfo=UTC)
+    # 恰好 07:00:00 已过点（候选 <= 当前），也进次日
+    now = datetime(2026, 8, 31, 23, 0, tzinfo=UTC)
+    assert _next_daily_run("07:00", now=now) == datetime(2026, 9, 1, 23, 0, tzinfo=UTC)
+
+
+class QuietAcademicClient:
+    """评教未开放：登录正常但没有待评课程。"""
+
+    async def fetch_captcha(self) -> CaptchaData:
+        return CaptchaData(image=b"captcha", content_type="image/png", cookies={"sid": "v"})
+
+    async def authenticate(self, **_kwargs: object) -> dict[str, str]:
+        return {"academic": "session"}
+
+    async def fetch_pending_evaluations(self, **_kwargs: object) -> list[PendingEvaluation]:
+        return []
+
+
+def build_handler(client: object) -> EvaluationHandler:
+    handler = EvaluationHandler(
+        Settings(app_env="test"),
+        cast(CredentialVaultService, FakeVault()),
+        cast(DdddOcrSolver, FakeSolver()),
+    )
+    handler._client = cast(Any, client)
+    return handler
+
+
+@pytest.mark.asyncio
+async def test_evaluation_zero_pending_still_schedules_next_daily_run(monkeypatch: Any) -> None:
+    import nanyee_worker.evaluation as module
+
+    async def active_job(_db: object, _job: Job) -> None:
+        return None
+
+    monkeypatch.setattr(module, "ensure_execution_active", active_job)
+    next_run = datetime.now(UTC) + timedelta(days=1)
+    monkeypatch.setattr(module, "_next_daily_run", lambda _run_time: next_run)
+    handler = build_handler(QuietAcademicClient())
+    job = build_job()
+
+    receipt = await handler.execute(cast(Any, object()), job)
+
+    assert receipt.values["submitted_count"] == 0
+    assert receipt.next_run_at == next_run
+    assert [entry["event"] for entry in receipt.values["logs"]] == [
+        "evaluation_started",
+        "evaluation_pending_loaded",
+        "evaluation_completed",
+        "evaluation_next_scheduled",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_evaluation_past_retry_until_completes_terminally(monkeypatch: Any) -> None:
+    import nanyee_worker.evaluation as module
+
+    async def active_job(_db: object, _job: Job) -> None:
+        return None
+
+    monkeypatch.setattr(module, "ensure_execution_active", active_job)
+    # 下一轮运行晚于截止时刻：本轮执行完即终结，不再排队
+    next_run = datetime.now(UTC) + timedelta(days=1)
+    monkeypatch.setattr(module, "_next_daily_run", lambda _run_time: next_run)
+    handler = build_handler(QuietAcademicClient())
+    job = build_job()
+    job.payload = {
+        **job.payload,
+        "retry_until": (datetime.now(UTC) + timedelta(hours=1)).isoformat(),
+    }
+
+    receipt = await handler.execute(cast(Any, object()), job)
+
+    assert receipt.next_run_at is None
+    assert "evaluation_next_scheduled" not in [entry["event"] for entry in receipt.values["logs"]]
+
+
 @pytest.mark.asyncio
 async def test_evaluation_handler_submits_all_pending_courses(monkeypatch: Any) -> None:
     import nanyee_worker.evaluation as module
@@ -215,5 +301,6 @@ async def test_evaluation_handler_submits_all_pending_courses(monkeypatch: Any) 
         "evaluation_course_started",
         "evaluation_course_succeeded",
         "evaluation_completed",
+        "evaluation_next_scheduled",
     ]
     assert "password" not in str(receipt.values)

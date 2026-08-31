@@ -112,6 +112,8 @@ class Settings(BaseSettings):
     worker_heartbeat_file: str = ""
     # 生产容器内 Chromium 需要 ["--no-sandbox", "--disable-dev-shm-usage"]（非 root + cap_drop ALL）
     playwright_launch_args: list[str] = []
+    # 自动评课每日运行时间，按北京时间（Asia/Shanghai）解释，与宿主机/容器时区无关
+    evaluation_daily_run_time: str = Field(default="07:00", pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
 
     @model_validator(mode="after")
     def validate_cross_field_security(self) -> Settings:

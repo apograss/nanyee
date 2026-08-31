@@ -190,7 +190,7 @@ export default function JobDetail() {
           <CardHeader>
             <div className="kicker"><strong>Pipeline</strong></div>
             <CardTitle>状态进度</CardTitle>
-            <CardDescription>任务会自动重试几次，完成后就不能再重新执行。</CardDescription>
+            <CardDescription>评课任务每天定时自动执行；其他任务失败会自动重试几次。</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2" data-component="JobPipeline" data-od-id="pipeline">
