@@ -1031,9 +1031,13 @@ def _evaluation_options(node: Tag, type_code: int) -> list[EvaluationOption]:
                 values = json.loads(raw)
             except (TypeError, ValueError):
                 values = []
-            if isinstance(values, list):
+            if isinstance(values, list) and values:
+                # 星星题分值 = 题目满分(data-fz) / 选项数 × 星级(从 1 计)，
+                # 与学校页面 static/js/pj.js 的 calcuteWjpf/savePj 口径一致
+                full_score = _safe_float(raty.get("data-fz"))
+                count = len(values)
                 options: list[EvaluationOption] = []
-                for value in values[:20]:
+                for index, value in enumerate(values[:20]):
                     if not isinstance(value, dict):
                         continue
                     code = _bounded_text(value.get("zbxmdm"), 128)
@@ -1042,10 +1046,9 @@ def _evaluation_options(node: Tag, type_code: int) -> list[EvaluationOption]:
                     options.append(
                         EvaluationOption(
                             code=code,
-                            score=max(0, min(100, _safe_int(value.get("fz")))),
+                            score=max(0, min(100, round(full_score * (index + 1) / count))),
                             label=_bounded_text(
-                                value.get("dtjg") or value.get("zbxmmc") or value.get("mc") or code,
-                                100,
+                                value.get("zbxmmc") or value.get("mc") or code, 100
                             ),
                         )
                     )
@@ -1059,9 +1062,17 @@ def _evaluation_options(node: Tag, type_code: int) -> list[EvaluationOption]:
         code = _bounded_text(input_node.get("value"), 128)
         if not code or any(item.code == code for item in options):
             continue
-        label_node = input_node.find_parent("label")
-        label = _bounded_text(label_node.get_text(" ", strip=True) if label_node else code, 100)
-        options.append(EvaluationOption(code=code, label=label or code))
+        label = _bounded_text(input_node.get("data-mc"), 100)
+        if not label:
+            label_node = input_node.find_parent("label")
+            label = _bounded_text(label_node.get_text(" ", strip=True) if label_node else "", 100)
+        options.append(
+            EvaluationOption(
+                code=code,
+                score=max(0, min(100, round(_safe_float(input_node.get("data-fz"))))),
+                label=label or code,
+            )
+        )
     return options
 
 
