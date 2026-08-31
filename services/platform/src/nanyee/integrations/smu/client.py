@@ -586,7 +586,12 @@ class SmuAcademicClient:
                         "dgksdm": reference.class_hour_code,
                         "wjdm": reference.questionnaire_code,
                     },
-                    headers={**COMMON_HEADERS, "Accept": "text/html,*/*"},
+                    # 正方对该页做 Referer 防深链校验，缺失会 302 回首页
+                    headers={
+                        **COMMON_HEADERS,
+                        "Accept": "text/html,*/*",
+                        "Referer": f"{base}/new/student/ktpj",
+                    },
                 )
         except httpx.HTTPError as exc:
             raise self._unavailable() from exc

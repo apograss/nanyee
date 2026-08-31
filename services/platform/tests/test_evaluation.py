@@ -167,3 +167,26 @@ async def test_evaluation_rejects_incomplete_or_unknown_choices() -> None:
             selections={"quality": "invalid", "attendance": "yes"},
         )
     assert unknown.value.code == ErrorCode.INVALID_REQUEST
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_evaluation_draft_request_sends_referer_for_anti_deeplink() -> None:
+    reference = EvaluationReference(
+        teacher_code="teacher-1",
+        class_hour_code="hour-1",
+        questionnaire_code="questionnaire-1",
+    )
+    route = respx.get("https://zhjw.smu.edu.cn/new/student/ktpj/showXsktpjwj.page").mock(
+        return_value=httpx.Response(200, text=EVALUATION_HTML)
+    )
+    client = SmuAcademicClient(Settings(app_env="test"))
+    await client.fetch_evaluation_draft(academic_cookies={"sid": "value"}, reference=reference)
+
+    # 正方对该页做 Referer 防深链校验，缺失会 302 回首页导致 UPSTREAM_UNAVAILABLE
+    assert route.calls[0].request.headers["referer"] == "https://zhjw.smu.edu.cn/new/student/ktpj"
+
+    route.mock(return_value=httpx.Response(302, headers={"location": "https://zhjw.smu.edu.cn/"}))
+    with pytest.raises(AppError) as raised:
+        await client.fetch_evaluation_draft(academic_cookies={"sid": "value"}, reference=reference)
+    assert raised.value.code == ErrorCode.UPSTREAM_UNAVAILABLE
