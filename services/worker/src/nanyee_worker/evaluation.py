@@ -166,9 +166,17 @@ class EvaluationHandler:
                 )
             except Exception as exc:
                 last_error = exc
+                if isinstance(exc, AppError) and exc.details.get("smu_reason") == "bad_credentials":
+                    raise ExecutionFailure(
+                        "CREDENTIAL_INVALID", retryable=False, next_action="replace_credential"
+                    ) from exc
                 logger.warning(
                     "教务登录或验证码识别失败，将放缓后重试。",
-                    extra={"event": "evaluation_login_retry", "attempt": attempt + 1},
+                    extra={
+                        "event": "evaluation_login_retry",
+                        "attempt": attempt + 1,
+                        "error": str(exc),
+                    },
                 )
             if attempt < 4:
                 await asyncio.sleep(2**attempt)

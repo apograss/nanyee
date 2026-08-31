@@ -158,6 +158,37 @@ async def test_evaluation_login_keeps_retrying_ocr_failures(monkeypatch: Any) ->
 
 
 @pytest.mark.asyncio
+async def test_evaluation_login_stops_on_bad_credentials() -> None:
+    class BadCredentialsClient:
+        async def fetch_captcha(self) -> CaptchaData:
+            return CaptchaData(image=b"captcha", content_type="image/png", cookies={"sid": "v"})
+
+        async def authenticate(self, **_kwargs: object) -> dict[str, str]:
+            raise AppError(
+                ErrorCode.UPSTREAM_REJECTED,
+                "学校账号或密码不匹配，请更新保存的凭据。",
+                status_code=401,
+                details={"smu_reason": "bad_credentials"},
+            )
+
+    handler = EvaluationHandler(
+        Settings(app_env="test"),
+        cast(CredentialVaultService, FakeVault()),
+        cast(DdddOcrSolver, FakeSolver()),
+    )
+    handler._client = cast(Any, BadCredentialsClient())
+
+    from nanyee_worker.runtime import ExecutionFailure
+
+    with pytest.raises(ExecutionFailure) as excinfo:
+        await handler._login_with_backoff("student", "password")
+
+    assert excinfo.value.error_code == "CREDENTIAL_INVALID"
+    assert excinfo.value.retryable is False
+    assert excinfo.value.next_action == "replace_credential"
+
+
+@pytest.mark.asyncio
 async def test_evaluation_handler_submits_all_pending_courses(monkeypatch: Any) -> None:
     import nanyee_worker.evaluation as module
 

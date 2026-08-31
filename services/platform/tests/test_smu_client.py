@@ -251,3 +251,37 @@ async def test_transient_store_is_typed_and_one_time_capable() -> None:
     assert await store.take(key, kind="captcha") == b"secret"
     assert await store.get(key, kind="captcha") is None
     await store.close()
+
+
+@pytest.mark.asyncio
+async def test_smu_login_rejection_distinguishes_bad_credentials() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/login/login.do"
+        return httpx.Response(
+            200,
+            json={"message": "用户名或密码不匹配，您还可以重新输入4次", "status": False},
+        )
+
+    client = SmuAcademicClient(Settings(app_env="test"), transport=httpx.MockTransport(handler))
+    with pytest.raises(AppError) as excinfo:
+        await client._login_for_ticket(account="a", password="p", captcha="1234", cookies={})
+
+    assert excinfo.value.code == ErrorCode.UPSTREAM_REJECTED
+    assert excinfo.value.details["smu_reason"] == "bad_credentials"
+
+
+@pytest.mark.asyncio
+async def test_smu_login_rejection_distinguishes_bad_captcha() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/login/login.do"
+        return httpx.Response(
+            200,
+            json={"message": "验证码不正确，请重新输入", "status": False, "msg": "badRandcodekey"},
+        )
+
+    client = SmuAcademicClient(Settings(app_env="test"), transport=httpx.MockTransport(handler))
+    with pytest.raises(AppError) as excinfo:
+        await client._login_for_ticket(account="a", password="p", captcha="1234", cookies={})
+
+    assert excinfo.value.code == ErrorCode.UPSTREAM_REJECTED
+    assert excinfo.value.details["smu_reason"] == "bad_captcha"

@@ -774,9 +774,9 @@ class SmuAcademicClient:
         if not isinstance(data, dict):
             raise self._rejected()
         ticket = data.get("ticket")
-        if not isinstance(ticket, str) or not ticket or len(ticket) > 2048:
-            raise self._rejected()
-        return ticket
+        if isinstance(ticket, str) and ticket and len(ticket) <= 2048:
+            return ticket
+        raise self._login_rejected(data)
 
     def _allowed_page_hosts(self) -> set[str | None]:
         return {
@@ -862,6 +862,33 @@ class SmuAcademicClient:
             status_code=503,
             retryable=True,
         )
+
+    @staticmethod
+    def _login_rejected(data: dict[str, Any]) -> AppError:
+        """按学校返回的报错区分登录失败原因。
+
+        学校对验证码错误返回 msg=badRandcodekey，对密码错误返回
+        "用户名或密码不匹配" 文案；两类错误的处理方式完全不同（前者值得重试，
+        后者重试一万次也不会成功），通过 details.smu_reason 传给调用方。
+        """
+        msg = data.get("msg")
+        message = data.get("message")
+        text = message if isinstance(message, str) else ""
+        if msg == "badRandcodekey" or "验证码" in text:
+            return AppError(
+                ErrorCode.UPSTREAM_REJECTED,
+                "学校验证码校验失败。",
+                status_code=401,
+                details={"smu_reason": "bad_captcha"},
+            )
+        if "密码" in text:
+            return AppError(
+                ErrorCode.UPSTREAM_REJECTED,
+                "学校账号或密码不匹配，请更新保存的凭据。",
+                status_code=401,
+                details={"smu_reason": "bad_credentials"},
+            )
+        return SmuAcademicClient._rejected()
 
     @staticmethod
     def _rejected() -> AppError:
