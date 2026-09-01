@@ -143,8 +143,9 @@ async def test_evaluation_draft_is_typed_and_submit_is_single_attempt() -> None:
     assert form["wtpf"] == "25"
     answers = json.loads(form["dt"])
     assert [answer["zbxmdm"] for answer in answers] == ["excellent", "no"]
+    # 星星题的 dtjg 与学校页面（pj.js）一致：星级串 ★×N，而非文字
     assert [(answer["fz"], answer["dtjg"]) for answer in answers] == [
-        (25, "非常满意"),
+        (25, "★★★★★"),
         (0, "否"),
     ]
 

@@ -624,6 +624,21 @@ class SmuAcademicClient:
                     status_code=422,
                 )
             total_score += option.score
+            dtjg = option.label
+            if question.type_code == 5:
+                # 学校页面（pj.js）星星题提交的是星级串 ★×N，回显时保持一致
+                star = (
+                    next(
+                        (
+                            index
+                            for index, item in enumerate(question.options)
+                            if item.code == selected_code
+                        ),
+                        -1,
+                    )
+                    + 1
+                )
+                dtjg = "★" * star
             answers.append(
                 {
                     "txdm": question.type_code,
@@ -631,7 +646,7 @@ class SmuAcademicClient:
                     "zbmc": question.title,
                     "zbxmdm": option.code,
                     "fz": option.score,
-                    "dtjg": option.label,
+                    "dtjg": dtjg,
                 }
             )
         body = {
