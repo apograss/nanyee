@@ -665,6 +665,21 @@
         "title": "CredentialMode",
         "type": "string"
       },
+      "CredentialRenewRequest": {
+        "properties": {
+          "ttl_seconds": {
+            "maximum": 31536000.0,
+            "minimum": 300.0,
+            "title": "Ttl Seconds",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ttl_seconds"
+        ],
+        "title": "CredentialRenewRequest",
+        "type": "object"
+      },
       "CredentialResponse": {
         "properties": {
           "consent_version": {
@@ -3512,6 +3527,75 @@
           }
         },
         "summary": "Revoke Credential",
+        "tags": [
+          "credentials"
+        ]
+      }
+    },
+    "/api/v1/credentials/{credential_id}/renew": {
+      "post": {
+        "operationId": "renew_credential",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "credential_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Credential Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CredentialRenewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredentialResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Renew Credential",
         "tags": [
           "credentials"
         ]

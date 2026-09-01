@@ -190,6 +190,44 @@ class CredentialVaultService:
             await db.commit()
         return record
 
+    async def renew(
+        self,
+        db: AsyncSession,
+        *,
+        credential_id: UUID,
+        user_id: UUID,
+        ttl_seconds: int,
+    ) -> HostedCredential:
+        """延长凭据有效期（含已过期但未删除的凭据），不需要重新输入明文。"""
+        record = (
+            await db.execute(
+                select(HostedCredential)
+                .where(
+                    HostedCredential.id == credential_id,
+                    HostedCredential.user_id == user_id,
+                )
+                .with_for_update()
+            )
+        ).scalar_one_or_none()
+        if record is None or record.status == CredentialStatus.DELETED:
+            raise AppError(ErrorCode.NOT_FOUND, "凭据不存在。", status_code=404)
+        if record.status != CredentialStatus.ACTIVE:
+            raise AppError(
+                ErrorCode.INVALID_REQUEST,
+                "已禁用的凭据不能延期，请重新添加授权。",
+                status_code=422,
+            )
+        if ttl_seconds < 300 or ttl_seconds > 365 * 24 * 60 * 60:
+            raise AppError(
+                ErrorCode.INVALID_REQUEST,
+                "凭据保存期限无效。",
+                status_code=422,
+                details={"field": "ttl_seconds"},
+            )
+        record.expires_at = utc_now() + timedelta(seconds=ttl_seconds)
+        await db.commit()
+        return record
+
 
 async def _cancel_pending_jobs(db: AsyncSession, *, credential_id: UUID, user_id: UUID) -> None:
     now = utc_now()

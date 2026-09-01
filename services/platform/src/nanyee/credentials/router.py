@@ -28,6 +28,7 @@ router = APIRouter(prefix="/credentials", tags=["credentials"])
 HOSTING_CONSENT_VERSION = "credential-hosting-v1"
 CREDENTIAL_CREATE_POLICY = RateLimitPolicy(window_seconds=10 * 60, soft_limit=5, hard_limit=15)
 CREDENTIAL_REVEAL_POLICY = RateLimitPolicy(window_seconds=10 * 60, soft_limit=10, hard_limit=30)
+CREDENTIAL_RENEW_POLICY = RateLimitPolicy(window_seconds=10 * 60, soft_limit=10, hard_limit=30)
 
 
 class CredentialCreateRequest(BaseModel):
@@ -249,6 +250,46 @@ async def reveal_credential(
         extra={"user_id": str(auth.user.id), "credential_id": str(credential_id)},
     )
     return CredentialRevealResponse(secret=secret)
+
+
+class CredentialRenewRequest(BaseModel):
+    ttl_seconds: int = Field(ge=300, le=365 * 24 * 60 * 60)
+
+
+@router.post(
+    "/{credential_id}/renew",
+    response_model=CredentialResponse,
+    operation_id="renew_credential",
+)
+async def renew_credential(
+    credential_id: UUID,
+    payload: CredentialRenewRequest,
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    auth: Annotated[AuthContext, Depends(current_auth)],
+    cipher: Annotated[EnvelopeCipher, Depends(get_cipher)],
+    csrf_header: Annotated[str | None, Header(alias="X-CSRF-Token")] = None,
+) -> CredentialResponse:
+    require_csrf(request, auth, csrf_header)
+    await AntiAbuseGate(settings_from_request(request)).check(
+        db,
+        request,
+        action="credential_renew",
+        identity=str(auth.user.id),
+        policy=CREDENTIAL_RENEW_POLICY,
+    )
+    service = CredentialVaultService(cipher, settings_from_request(request))
+    record = await service.renew(
+        db,
+        credential_id=credential_id,
+        user_id=auth.user.id,
+        ttl_seconds=payload.ttl_seconds,
+    )
+    logger.info(
+        "credential_renewed",
+        extra={"user_id": str(auth.user.id), "credential_id": str(credential_id)},
+    )
+    return CredentialResponse.from_record(record)
 
 
 @router.delete(

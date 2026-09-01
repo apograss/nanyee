@@ -268,3 +268,51 @@ async def test_deleting_credential_detaches_jobs_and_removes_row() -> None:
         ).scalar_one_or_none()
         assert remaining is None
     await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_renew_extends_expired_credential_without_plaintext() -> None:
+    engine, factory, vault = await _make_vault()
+    async with factory() as db:
+        owner = await _make_user(db, "renew_owner")
+        other = await _make_user(db, "renew_other")
+        credential = await vault.create(
+            db,
+            user_id=owner.id,
+            upstream="school",
+            purpose="school",
+            plaintext='{"account":"20260001","password":"secret"}',
+            public_metadata={},
+            consent_version="credential-hosting-v1",
+            ttl_seconds=300,
+        )
+        # 模拟已过期：过期后 worker 解密会被拒绝
+        credential.expires_at = utc_now() - timedelta(seconds=1)
+        await db.commit()
+        with pytest.raises(AppError) as raised:
+            await vault.decrypt_for_worker(
+                db, credential_id=credential.id, user_id=owner.id, purpose="evaluation"
+            )
+        assert raised.value.status_code == 403
+
+        renewed = await vault.renew(
+            db, credential_id=credential.id, user_id=owner.id, ttl_seconds=180 * 86400
+        )
+        assert renewed.expires_at > utc_now() + timedelta(days=179)
+        plaintext = await vault.decrypt_for_worker(
+            db, credential_id=credential.id, user_id=owner.id, purpose="evaluation"
+        )
+        assert plaintext.decode("utf-8") == '{"account":"20260001","password":"secret"}'
+
+        # 他人不能延期；已禁用凭据不能延期；期限越界拒绝
+        with pytest.raises(AppError) as raised:
+            await vault.renew(db, credential_id=credential.id, user_id=other.id, ttl_seconds=300)
+        assert raised.value.status_code == 404
+        with pytest.raises(AppError) as raised:
+            await vault.renew(db, credential_id=credential.id, user_id=owner.id, ttl_seconds=60)
+        assert raised.value.status_code == 422
+        await vault.revoke(db, credential_id=credential.id, user_id=owner.id)
+        with pytest.raises(AppError) as raised:
+            await vault.renew(db, credential_id=credential.id, user_id=owner.id, ttl_seconds=300)
+        assert raised.value.status_code == 422
+    await engine.dispose()

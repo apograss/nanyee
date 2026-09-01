@@ -291,6 +291,11 @@ export const CONFIRMATION_VERSIONS = {
   credentialHosting: "credential-hosting-v1",
 };
 
+// 列表接口不会把已过期的凭据标记为失效，需自行判断 expires_at
+export function isCredentialUsable(c) {
+  return !!c && c.status === "active" && !!c.expires_at && new Date(c.expires_at).getTime() > Date.now();
+}
+
 /* ---------- API 端点封装 ---------- */
 // action 写死在后端 gate 名上，用于 anti_abuse_pass 缓存与 Turnstile 挑战
 // 选课
@@ -338,6 +343,9 @@ export function listCredentials(opts) {
 }
 export function revokeCredential(id, opts) {
   return apiDelete(`/credentials/${id}`, opts);
+}
+export function renewCredential(id, body, opts) {
+  return apiPost(`/credentials/${id}/renew`, body, { ...opts, action: "credential_renew" });
 }
 export function revealCredential(id, opts) {
   return apiPost(`/credentials/${id}/reveal`, undefined, { ...opts, action: "credential_reveal" });

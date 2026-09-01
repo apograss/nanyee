@@ -5,7 +5,7 @@ import { motion } from "motion/react";
 import { Armchair, ArrowRight, ChevronDown, ChevronUp, GripVertical, Clock, ShieldCheck, AlertTriangle, CheckCircle2, RefreshCw } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Label, Badge, Alert, StatusBadge, Spinner, cn } from "@/components/ui.jsx";
 import {
-  fetchStudyCabins, listCredentials, createCredential, createJob,
+  fetchStudyCabins, listCredentials, createCredential, createJob, isCredentialUsable,
   CONFIRMATION_VERSIONS, CREDENTIAL_PURPOSES, useAuth,
 } from "@/lib/api.jsx";
 
@@ -46,7 +46,7 @@ export default function StudyCabin(qoderProps) {
   const [account, setAccount] = useState("");
   const [password, setPassword] = useState(""); // 敏感态：仅内存，提交后清空
   const [accountHint, setAccountHint] = useState("");
-  const [ttl, setTtl] = useState(604800); // 默认 7 天
+  const [ttl, setTtl] = useState(180 * 86400); // 默认 180 天
   const [creatingCred, setCreatingCred] = useState(false);
   const [credError, setCredError] = useState(null);
 
@@ -82,9 +82,9 @@ export default function StudyCabin(qoderProps) {
     try {
       const list = await listCredentials();
       const arr = Array.isArray(list) ? list : (list?.items || []);
-      // 学校统一认证（school）与旧版学习舱专用凭据都可用，优先统一认证
-      const school = arr.find((c) => c.purpose === "school" && c.status === "active");
-      const legacy = arr.find((c) => c.purpose === "study_cabin" && c.status === "active");
+      // 学校统一认证（school）与旧版学习舱专用凭据都可用，优先统一认证；已过期的视为无效
+      const school = arr.find((c) => c.purpose === "school" && isCredentialUsable(c));
+      const legacy = arr.find((c) => c.purpose === "study_cabin" && isCredentialUsable(c));
       setCredential(school || legacy || null);
     } catch {
       setCredential(null);
@@ -237,9 +237,9 @@ export default function StudyCabin(qoderProps) {
                   <Input value={accountHint} onChange={(e) => setAccountHint(e.target.value)} placeholder="尾号 0001"  data-qoder-id="qel-input-9544b19e" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-input-9544b19e&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;input&quot;,&quot;loc&quot;:{&quot;line&quot;:201,&quot;column&quot;:19}}"/>
                 </div>
                 <div data-qoder-id="qel-div-bbd33925" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-div-bbd33925&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;div&quot;,&quot;loc&quot;:{&quot;line&quot;:203,&quot;column&quot;:17}}">
-                  <Label data-qoder-id="qel-label-27cd81cc" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-label-27cd81cc&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;label&quot;,&quot;loc&quot;:{&quot;line&quot;:204,&quot;column&quot;:19}}">凭据有效期（秒）</Label>
-                  <Input type="number" min="300" max="2592000" value={ttl} onChange={(e) => setTtl(Number(e.target.value))}  data-qoder-id="qel-input-9844b657" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-input-9844b657&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;input&quot;,&quot;loc&quot;:{&quot;line&quot;:205,&quot;column&quot;:19}}"/>
-                  <div className="text-[11px] text-[var(--muted)] mt-1" data-qoder-id="qel-text-11px-acdef32b" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-text-11px-acdef32b&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;text-11px&quot;,&quot;loc&quot;:{&quot;line&quot;:206,&quot;column&quot;:19}}">默认 7 天（604800 秒）</div>
+                  <Label data-qoder-id="qel-label-27cd81cc" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-label-27cd81cc&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;label&quot;,&quot;loc&quot;:{&quot;line&quot;:204,&quot;column&quot;:19}}">凭据有效期（天）</Label>
+                  <Input type="number" min="1" max="365" value={Math.round(ttl / 86400)} onChange={(e) => setTtl(Math.min(365, Math.max(1, Number(e.target.value) || 1)) * 86400)}  data-qoder-id="qel-input-9844b657" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-input-9844b657&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;input&quot;,&quot;loc&quot;:{&quot;line&quot;:205,&quot;column&quot;:19}}"/>
+                  <div className="text-[11px] text-[var(--muted)] mt-1" data-qoder-id="qel-text-11px-acdef32b" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-text-11px-acdef32b&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;text-11px&quot;,&quot;loc&quot;:{&quot;line&quot;:206,&quot;column&quot;:19}}">默认 180 天，最长 365 天</div>
                 </div>
               </div>
               {credError && <Alert variant="warning" title="凭据创建失败" data-qoder-id="qel-alert-7be2357d" data-qoder-source="{&quot;qoderId&quot;:&quot;qel-alert-7be2357d&quot;,&quot;filePath&quot;:&quot;react-vite/src/pages/StudyCabin.jsx&quot;,&quot;componentName&quot;:&quot;StudyCabin&quot;,&quot;elementRole&quot;:&quot;alert&quot;,&quot;loc&quot;:{&quot;line&quot;:209,&quot;column&quot;:29}}">{credError}</Alert>}

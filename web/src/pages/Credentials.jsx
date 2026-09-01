@@ -1,12 +1,15 @@
 // Canvas design runtime editable source marker: credentials
 import React, { useState, useEffect } from "react";
 import { motion } from "motion/react";
-import { KeyRound, Plus, Trash2, Armchair, Users, GraduationCap, ShieldCheck, Eye, EyeOff, Ban } from "lucide-react";
+import { KeyRound, Plus, Trash2, Armchair, Users, GraduationCap, ShieldCheck, Eye, EyeOff, Ban, RefreshCw } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Label, Badge, Alert, Dialog, Table, cn } from "@/components/ui.jsx";
 import {
-  createCredential, listCredentials, revokeCredential, revealCredential, deleteCredential,
-  CREDENTIAL_PURPOSES, CONFIRMATION_VERSIONS,
+  createCredential, listCredentials, revokeCredential, revealCredential, deleteCredential, renewCredential,
+  isCredentialUsable, CREDENTIAL_PURPOSES, CONFIRMATION_VERSIONS,
 } from "@/lib/api.jsx";
+
+// 延期时长：180 天，一键续期无需重新输入密码
+const RENEW_TTL_SECONDS = 180 * 86400;
 
 const PURPOSE_META = {
   school: { label: "学校统一认证", upstream: "school", icon: GraduationCap, secretHint: "学号 + 学校密码，评课与学习舱共用" },
@@ -36,7 +39,7 @@ export default function Credentials() {
   const [password, setPassword] = useState("");
   const [token, setToken] = useState("");
   const [hint, setHint] = useState("");
-  const [ttl, setTtl] = useState(2592000);
+  const [ttl, setTtl] = useState(RENEW_TTL_SECONDS); // 默认 180 天
   const [loading, setLoading] = useState(false);
   const [revealFor, setRevealFor] = useState(null);
   const [revealData, setRevealData] = useState(null);
@@ -77,6 +80,13 @@ export default function Credentials() {
     try {
       await revokeCredential(id);
       setList(list.map((c) => c.id === id ? { ...c, status: "revoked" } : c));
+    } catch {}
+  };
+
+  const doRenew = async (id) => {
+    try {
+      await renewCredential(id, { ttl_seconds: RENEW_TTL_SECONDS });
+      listCredentials().then(setList).catch(() => {});
     } catch {}
   };
 
@@ -151,10 +161,13 @@ export default function Credentials() {
                 <Badge variant={c.purpose === "school" ? "default" : c.purpose === "study_cabin" ? "outline" : "muted"}>
                   {PURPOSE_META[c.purpose]?.label || c.purpose}
                 </Badge>,
-                c.status === "active" ? <Badge variant="success">有效</Badge> : <Badge variant="muted">已取消</Badge>,
+                c.status !== "active" ? <Badge variant="muted">已取消</Badge>
+                  : isCredentialUsable(c) ? <Badge variant="success">有效</Badge>
+                    : <Badge variant="warning">已过期</Badge>,
                 <span className="text-[13px]">{c.metadata?.account_hint || "—"}</span>,
                 <span className="text-[13px] text-[var(--muted)]">{new Date(c.expires_at).toLocaleDateString("zh-CN")}</span>,
                 <div className="flex items-center gap-1">
+                  <Button size="sm" variant="ghost" disabled={c.status !== "active"} onClick={() => doRenew(c.id)} title="延长 180 天，无需重新输入密码"><RefreshCw className="w-3.5 h-3.5" /> 延期</Button>
                   <Button size="sm" variant="ghost" onClick={() => openReveal(c)}><Eye className="w-3.5 h-3.5" /> 查看</Button>
                   <Button size="sm" variant="ghost" disabled={c.status !== "active"} onClick={() => doRevoke(c.id)}><Ban className="w-3.5 h-3.5" /> 禁用</Button>
                   <Button size="sm" variant="ghost" onClick={() => setDeleteFor(c)}><Trash2 className="w-3.5 h-3.5" /> 删除</Button>
@@ -225,8 +238,8 @@ export default function Credentials() {
           )}
 
           <div className="flex flex-col gap-1.5">
-            <Label>有效期</Label>
-            <Input type="number" min="300" max="31536000" value={ttl} onChange={(e) => setTtl(Number(e.target.value))} />
+            <Label>有效期（天）</Label>
+            <Input type="number" min="1" max="365" value={Math.round(ttl / 86400)} onChange={(e) => setTtl(Math.min(365, Math.max(1, Number(e.target.value) || 1)) * 86400)} />
             <div className="text-[11px] text-[var(--muted)]">默认 30 天，最长 365 天</div>
           </div>
 

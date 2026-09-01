@@ -4,7 +4,7 @@ import { motion } from "motion/react";
 import { Image as ImageIcon, CheckCircle2, ArrowRight, KeyRound, MapPin, Send, Download, ExternalLink, Link2, CalendarClock } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Label, Badge, Alert, Table, EmptyState } from "@/components/ui.jsx";
 import AmapLocationPicker from "@/components/AmapLocationPicker.jsx";
-import { apiFetch, apiPost, listCredentials, createCredential, revealCredential, deleteCredential, createJob, CONFIRMATION_VERSIONS } from "@/lib/api.jsx";
+import { apiFetch, apiPost, listCredentials, createCredential, revealCredential, deleteCredential, createJob, isCredentialUsable, CONFIRMATION_VERSIONS } from "@/lib/api.jsx";
 
 const EMPTY_LOCATION = { lat: "", lng: "", address: "" };
 
@@ -145,7 +145,7 @@ export default function Qun() {
   // 预约打卡：Token 必须托管为凭据（worker 到点自取），与页面里粘贴的 Token 保持一致
   const ensureHostedCredential = async () => {
     const list = await listCredentials();
-    const existing = (Array.isArray(list) ? list : []).find((c) => c.purpose === "qun_checkin" && c.status === "active");
+    const existing = (Array.isArray(list) ? list : []).find((c) => c.purpose === "qun_checkin" && isCredentialUsable(c));
     if (existing) {
       const { secret } = await revealCredential(existing.id);
       if (secret === token.trim()) return { credential: existing, created: false };
