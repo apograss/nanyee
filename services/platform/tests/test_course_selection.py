@@ -116,6 +116,31 @@ async def test_enrollment_conflict_confirmation_uses_hlct_one() -> None:
 
 @pytest.mark.asyncio
 @respx.mock
+async def test_enrollment_categories_parses_xklxdm_layout_before_opening() -> None:
+    # 2026-09 实测：未开放时 xsxk 首页 200 直出，入口为 xsxk.html?xklxdm=01 格式
+    respx.get("https://zhjw.smu.edu.cn/new/welcome.page?ui=new").mock(
+        return_value=httpx.Response(200, text="welcome")
+    )
+    respx.get("https://zhjw.smu.edu.cn/new/student/xsxk/").mock(
+        return_value=httpx.Response(
+            200,
+            text=(
+                '<div id="bb1" class="disabled" lay-tips="选课学期:2026-2027-1" '
+                'lay-iframe="公共选修课" data-jzyl="0" '
+                'data-href="/xsxk.html?xklxdm=01&mode=list&bp=/">'
+                '<span class="title">公共选修课</span></div>'
+            ),
+        )
+    )
+    client = SmuAcademicClient(Settings(app_env="test"))
+
+    categories = await client.fetch_enrollment_categories(academic_cookies={"sid": "value"})
+
+    assert [item.model_dump() for item in categories] == [{"code": "01", "title": "公共选修课"}]
+
+
+@pytest.mark.asyncio
+@respx.mock
 async def test_enrollment_categories_reports_closed_instead_of_unavailable() -> None:
     # 选课未开放时正方会把 /new/student/xsxk/ 302 回首页，再跳欢迎页（2026-08 实测）
     respx.get("https://zhjw.smu.edu.cn/new/welcome.page?ui=new").mock(

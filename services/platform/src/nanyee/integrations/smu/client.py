@@ -955,31 +955,54 @@ def _parse_semester_options(html: str) -> list[SemesterOption]:
 
 
 def _parse_enrollment_categories(html: str) -> list[CourseCategory]:
-    patterns = (
-        re.compile(
-            r'data-href\s*=\s*["\'][^"\']*xklx/(\d+)[^"\']*["\'][^>]*'
-            r'lay-iframe\s*=\s*["\']([^"\']+)["\']',
-            re.IGNORECASE,
+    # (pattern, code 分组号, title 分组号)；正方新版首页用 xsxk.html?xklxdm=01 而非 /xklx/01
+    patterns: tuple[tuple[re.Pattern[str], int, int], ...] = (
+        (
+            re.compile(
+                r'data-href\s*=\s*["\'][^"\']*xklx/(\d+)[^"\']*["\'][^>]*'
+                r'lay-iframe\s*=\s*["\']([^"\']+)["\']',
+                re.IGNORECASE,
+            ),
+            1,
+            2,
         ),
-        re.compile(
-            r'lay-iframe\s*=\s*["\']([^"\']+)["\'][^>]*data-href\s*=\s*'
-            r'["\'][^"\']*xklx/(\d+)[^"\']*["\']',
-            re.IGNORECASE,
+        (
+            re.compile(
+                r'lay-iframe\s*=\s*["\']([^"\']+)["\'][^>]*data-href\s*=\s*'
+                r'["\'][^"\']*xklx/(\d+)[^"\']*["\']',
+                re.IGNORECASE,
+            ),
+            2,
+            1,
+        ),
+        (
+            re.compile(
+                r'data-href\s*=\s*["\'][^"\']*xklxdm=(\d+)[^"\']*["\'][^>]*'
+                r'lay-iframe\s*=\s*["\']([^"\']+)["\']',
+                re.IGNORECASE,
+            ),
+            1,
+            2,
+        ),
+        (
+            re.compile(
+                r'lay-iframe\s*=\s*["\']([^"\']+)["\'][^>]*data-href\s*=\s*'
+                r'["\'][^"\']*xklxdm=(\d+)',
+                re.IGNORECASE,
+            ),
+            2,
+            1,
         ),
     )
     values: dict[str, str] = {}
-    for index, pattern in enumerate(patterns):
+    for pattern, code_group, title_group in patterns:
         for match in pattern.finditer(html):
-            code, title = (
-                (match.group(1), match.group(2))
-                if index == 0
-                else (
-                    match.group(2),
-                    match.group(1),
-                )
-            )
-            values.setdefault(code, re.sub(r"\s+", " ", title).strip()[:100])
+            code = match.group(code_group)
+            title = re.sub(r"\s+", " ", match.group(title_group)).strip()[:100]
+            values.setdefault(code, title)
     for code in re.findall(r"/xklx/(\d{1,8})", html, flags=re.IGNORECASE):
+        values.setdefault(code, f"类型{code}")
+    for code in re.findall(r"xklxdm=(\d{1,8})", html, flags=re.IGNORECASE):
         values.setdefault(code, f"类型{code}")
     return [CourseCategory(code=code, title=title) for code, title in values.items()]
 
