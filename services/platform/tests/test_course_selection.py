@@ -37,8 +37,8 @@ async def test_categories_and_courses_are_parsed_without_exposing_raw_html() -> 
                         "kcrwdm": "task-1",
                         "kcmc": "医学伦理",
                         "teaxm": "教师",
-                        "pkrs": 20,
-                        "xkrs": 30,
+                        "jxbrs": 20,
+                        "pkrs": 30,
                         "xf": 1.5,
                         "sksj": "周一",
                     }
@@ -52,6 +52,7 @@ async def test_categories_and_courses_are_parsed_without_exposing_raw_html() -> 
 
     assert courses[0].task_code == "task-1"
     assert courses[0].selected_count == 20
+    assert courses[0].capacity == 30
     assert courses[0].credits == 1.5
 
 
@@ -112,6 +113,24 @@ async def test_enrollment_conflict_confirmation_uses_hlct_one() -> None:
     assert confirmed.success is True
     assert httpx.QueryParams(route.calls[0].request.content.decode())["hlct"] == "0"
     assert httpx.QueryParams(route.calls[1].request.content.decode())["hlct"] == "1"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_enrollment_not_open_message_is_classified() -> None:
+    # 2026-09 关闭期实测：提交返回 {"code":-1,"message":"当前不是选课时间"}
+    course = CourseItem(task_code="task-1", name="医学伦理")
+    respx.post("https://zhjw.smu.edu.cn/new/student/xsxk/xklx/12/add").mock(
+        return_value=httpx.Response(200, json={"code": -1, "message": "当前不是选课时间"})
+    )
+    client = SmuAcademicClient(Settings(app_env="test"))
+
+    result = await client.enroll_course(
+        academic_cookies={"sid": "value"}, category_code="12", course=course
+    )
+
+    assert result.success is False
+    assert result.outcome == "not_open"
 
 
 @pytest.mark.asyncio

@@ -61,12 +61,18 @@ class EnrollmentRunManager:
         event_limit: int = 500,
         delay_min_seconds: float = 0.1,
         delay_max_seconds: float = 0.3,
+        not_open_delay_min_seconds: float = 0.5,
+        not_open_delay_max_seconds: float = 1.0,
+        not_open_poll_limit: int = 600,
     ) -> None:
         self._client = client
         self._max_runs = max_runs
         self._event_limit = event_limit
         self._delay_min_seconds = delay_min_seconds
         self._delay_max_seconds = delay_max_seconds
+        self._not_open_delay_min_seconds = not_open_delay_min_seconds
+        self._not_open_delay_max_seconds = not_open_delay_max_seconds
+        self._not_open_poll_limit = not_open_poll_limit
         self._records: dict[str, _RunRecord] = {}
         self._lock = asyncio.Lock()
         self._random = random.SystemRandom()
@@ -181,23 +187,27 @@ class EnrollmentRunManager:
 
     async def _attempt_courses(self, record: _RunRecord) -> None:
         last_message = "未收到教务系统结果"
-        for index in range(record.max_attempts):
+        attempt = 0
+        not_open_polls = 0
+        while attempt < record.max_attempts:
             if record.cancel_event.is_set():
                 return
             preference_index = (
                 0
-                if index < record.primary_burst_attempts
-                else (index - record.primary_burst_attempts) % len(record.preferences)
+                if attempt < record.primary_burst_attempts
+                else (attempt - record.primary_burst_attempts) % len(record.preferences)
             )
             course = record.preferences[preference_index]
-            record.attempt_count = index + 1
+            attempt += 1
+            record.attempt_count = attempt
             self._log(
                 record,
                 "attempt",
-                f"[{index + 1}/{record.max_attempts}] 正在尝试 {course.name}。",
-                attempt=index + 1,
+                f"[{attempt}/{record.max_attempts}] 正在尝试 {course.name}。",
+                attempt=attempt,
                 course_name=course.name,
             )
+            not_open = False
             try:
                 result = await self._client.enroll_course(
                     academic_cookies=record.cookies,
@@ -212,7 +222,9 @@ class EnrollmentRunManager:
                     self._log(record, "success", _success_message(result))
                     self._finish(record, EnrollmentRunState.SUCCEEDED)
                     return
-                if result.outcome == "conflict" and record.confirm_conflicts:
+                if result.outcome == "not_open":
+                    not_open = True
+                elif result.outcome == "conflict" and record.confirm_conflicts:
                     self._log(record, "info", f"检测到冲突，正在确认选择 {course.name}。")
                     confirmed = await self._client.enroll_course(
                         academic_cookies=record.cookies,
@@ -228,19 +240,42 @@ class EnrollmentRunManager:
                         self._log(record, "success", _success_message(confirmed, conflict=True))
                         self._finish(record, EnrollmentRunState.SUCCEEDED)
                         return
-                if index % 5 == 0:
+                if attempt % 5 == 0:
                     self._log(record, "info", f"教务系统返回：{last_message[:200]}")
             except AppError as exc:
                 last_message = exc.message
-                if index % 5 == 0:
+                if attempt % 5 == 0:
                     self._log(record, "error", f"本次请求异常：{exc.message}")
-            if index + 1 < record.max_attempts:
-                delay = self._random.uniform(self._delay_min_seconds, self._delay_max_seconds)
-                try:
-                    await asyncio.wait_for(record.cancel_event.wait(), timeout=delay)
+            if not_open:
+                # 学校尚未开放不消耗尝试预算：放慢节奏持续等开放，避免到点前几秒把次数打光
+                attempt -= 1
+                record.attempt_count = attempt
+                not_open_polls += 1
+                if not_open_polls == 1 or not_open_polls % 20 == 0:
+                    self._log(record, "info", "学校尚未开放选课，持续等待开放中。")
+                if not_open_polls >= self._not_open_poll_limit:
+                    record.result = EnrollmentResult(
+                        success=False,
+                        course_name="",
+                        outcome="not_open",
+                        message="等待开放超时，学校长时间未开放选课。",
+                    )
+                    self._log(record, "fail", "等待开放超时，学校长时间未开放选课。")
+                    self._finish(record, EnrollmentRunState.FAILED)
                     return
-                except TimeoutError:
-                    pass
+                delay = self._random.uniform(
+                    self._not_open_delay_min_seconds, self._not_open_delay_max_seconds
+                )
+            else:
+                not_open_polls = 0
+                if attempt >= record.max_attempts:
+                    break
+                delay = self._random.uniform(self._delay_min_seconds, self._delay_max_seconds)
+            try:
+                await asyncio.wait_for(record.cancel_event.wait(), timeout=delay)
+                return
+            except TimeoutError:
+                pass
         record.result = EnrollmentResult(
             success=False,
             course_name="",

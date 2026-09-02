@@ -500,6 +500,10 @@ class SmuAcademicClient:
         elif "冲突" in message:
             outcome = "conflict"
             success = False
+        elif "不是选课时间" in message or "不在选课时间" in message:
+            # 学校尚未到点开放（实测 2026-09 关闭期提交返回"当前不是选课时间"）
+            outcome = "not_open"
+            success = False
         else:
             outcome = "rejected"
             success = False
@@ -1174,12 +1178,13 @@ def _safe_float(value: object) -> float:
 
 
 def _course_item(row: dict[str, Any]) -> CourseItem:
+    # 正方字段语义（以学校 xsxktablelist.html 列表头为准）：pkrs=限选容量，jxbrs=已选人数
     return CourseItem(
         task_code=str(row.get("kcrwdm") or ""),
         name=str(row.get("kcmc") or ""),
         teacher=str(row.get("teaxm") or ""),
-        selected_count=max(0, _safe_int(row.get("pkrs"))),
-        capacity=max(0, _safe_int(row.get("xkrs"))),
+        selected_count=max(0, _safe_int(row.get("jxbrs") or row.get("xkrs"))),
+        capacity=max(0, _safe_int(row.get("pkrs"))),
         credits=max(0, _safe_float(row.get("xf"))),
         hours=max(0, _safe_float(row.get("zxs"))),
         schedule=str(row.get("sksj") or "")[:500],
