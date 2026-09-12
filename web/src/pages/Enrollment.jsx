@@ -400,6 +400,15 @@ export default function Enrollment() {
         </Alert>
       </motion.div>
 
+      <motion.div variants={fadeUp}>
+        <div className="flex items-center justify-between gap-3 rounded-[var(--radius)] border border-dashed border-border p-3.5">
+          <span className="text-[13px] text-[var(--muted)]">选课前先翻翻大家的历史评价：考勤、给分、避雷，全在选课宝典。</span>
+          <a href="https://www.notion.so/3d9e9fe4a81e8143af82e776e48bff16" target="_blank" rel="noopener" className="inline-flex items-center gap-1.5 rounded-[var(--radius)] border border-border px-3 h-8 text-[13px] font-medium text-[var(--seed-primary-strong)] hover:bg-[var(--seed-surface-2)] transition-colors shrink-0">
+            <ExternalLink className="w-3.5 h-3.5" /> 选课宝典
+          </a>
+        </div>
+      </motion.div>
+
       {!academicSession && (
         <motion.div variants={fadeUp}>
           <AcademicSessionCard onSession={setAcademicSession} />
