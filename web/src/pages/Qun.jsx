@@ -6,7 +6,22 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Inpu
 import AmapLocationPicker from "@/components/AmapLocationPicker.jsx";
 import { apiFetch, apiPost, listCredentials, createCredential, revealCredential, deleteCredential, createJob, isCredentialUsable, CONFIRMATION_VERSIONS } from "@/lib/api.jsx";
 
-const EMPTY_LOCATION = { lat: "", lng: "", address: "" };
+// 默认打卡点：学校正中心。新表单首次打卡没有历史记录可复用，必须给出真实坐标，
+// 不能依赖输入框占位符（占位符不会进入提交数据）。
+const DEFAULT_LOCATION = { lat: 22.805618, lng: 113.28735, address: "南方医科大学顺德校区" };
+
+function isEmptyLocationValue(value) {
+  if (value === null || value === undefined || value === "") return true;
+  if (typeof value === "object" && !Array.isArray(value)) {
+    const coordinates = value.location?.coordinates;
+    return !Array.isArray(coordinates) || coordinates.length < 2;
+  }
+  return false;
+}
+
+function findEmptyLocationCatalog(catalogs) {
+  return (catalogs || []).find((catalog) => catalog.type === "LOCATION" && isEmptyLocationValue(catalog.value));
+}
 
 // datetime-local → ISO 8601 带本地时区（后端要求 +08:00 格式）
 function toISOWithTimezone(datetimeLocal) {
@@ -44,7 +59,7 @@ export default function Qun() {
   const [selectedForm, setSelectedForm] = useState(null);
   const [linkInput, setLinkInput] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [location, setLocation] = useState(EMPTY_LOCATION);
+  const [location, setLocation] = useState(DEFAULT_LOCATION);
   const [preview, setPreview] = useState(null);
   const [uploadedUrl, setUploadedUrl] = useState("");
   const [scheduledFor, setScheduledFor] = useState("");
@@ -106,6 +121,9 @@ export default function Qun() {
       ));
     }
     setPreview(data);
+    if (findEmptyLocationCatalog(data.catalogs)) {
+      setMessage({ variant: "danger", title: "定位为空", text: "这个表单含定位字段，但本次没有可用坐标（首次打卡没有历史记录可复用）。请先在第二步填好经纬度再生成预览。" });
+    }
   });
 
   const onFile = (file) => {
@@ -132,6 +150,10 @@ export default function Qun() {
   };
 
   const submit = () => run(async () => {
+    if (findEmptyLocationCatalog(preview.catalogs)) {
+      setMessage({ variant: "danger", title: "无法提交", text: "定位字段为空，直接提交会被群报数拒绝（请求参数不合法）。请回到第二步填好经纬度后重新生成预览。" });
+      return;
+    }
     const result = await apiPost(`/qun/forms/${preview.form_id}/submit`, {
       auth_token: token,
       form_version: preview.version,
@@ -161,6 +183,10 @@ export default function Qun() {
   };
 
   const schedule = () => run(async () => {
+    if (findEmptyLocationCatalog(preview.catalogs)) {
+      setMessage({ variant: "danger", title: "无法预约", text: "定位字段为空，预约提交会被群报数拒绝。请回到第二步填好经纬度后重新生成预览。" });
+      return;
+    }
     const when = new Date(scheduledFor);
     if (isNaN(when.getTime()) || when.getTime() <= Date.now()) {
       setMessage({ variant: "danger", title: "时间无效", text: "请选择将来的打卡时间。" });

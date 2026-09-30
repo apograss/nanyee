@@ -166,8 +166,8 @@ export default function AmapLocationPicker({ value, onChange }) {
       <div ref={canvasRef} className="h-72 w-full overflow-hidden rounded-[var(--radius)] border border-border bg-[var(--seed-surface-2)]" aria-label="点击地图选择打卡位置" />
       <div className="text-[12px] text-[var(--muted)] flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" /> {status}</div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div><Label>纬度</Label><Input type="number" step="any" value={value.lat} onChange={(event) => updateManual("lat", event.target.value)} placeholder="22.805618" /></div>
-        <div><Label>经度</Label><Input type="number" step="any" value={value.lng} onChange={(event) => updateManual("lng", event.target.value)} placeholder="113.287350" /></div>
+        <div><Label>纬度</Label><Input type="number" step="any" value={value.lat} onChange={(event) => updateManual("lat", event.target.value)} placeholder="例如 22.805618" /></div>
+        <div><Label>经度</Label><Input type="number" step="any" value={value.lng} onChange={(event) => updateManual("lng", event.target.value)} placeholder="例如 113.287350" /></div>
       </div>
       <div><Label>地点名称</Label><Input value={value.address} onChange={(event) => updateManual("address", event.target.value)} placeholder="教学楼、宿舍或其他地点说明" /></div>
     </div>
