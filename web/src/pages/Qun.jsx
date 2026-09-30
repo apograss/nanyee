@@ -9,6 +9,24 @@ import { apiFetch, apiPost, listCredentials, createCredential, revealCredential,
 // 默认打卡点：学校正中心。新表单首次打卡没有历史记录可复用，必须给出真实坐标，
 // 不能依赖输入框占位符（占位符不会进入提交数据）。
 const DEFAULT_LOCATION = { lat: 22.805618, lng: 113.28735, address: "南方医科大学顺德校区" };
+const TOKEN_STORAGE_KEY = "nanyee.qun.authToken";
+
+function readStoredToken() {
+  try {
+    return localStorage.getItem(TOKEN_STORAGE_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+function storeToken(value) {
+  try {
+    if (value.trim()) localStorage.setItem(TOKEN_STORAGE_KEY, value);
+    else localStorage.removeItem(TOKEN_STORAGE_KEY);
+  } catch {
+    // localStorage 不可用时静默降级为页面内存
+  }
+}
 
 function isEmptyLocationValue(value) {
   if (value === null || value === undefined || value === "") return true;
@@ -53,7 +71,11 @@ function displayValue(value) {
 }
 
 export default function Qun() {
-  const [token, setToken] = useState("");
+  const [token, setTokenState] = useState(readStoredToken);
+  const setToken = (value) => {
+    setTokenState(value);
+    storeToken(value);
+  };
   const [verified, setVerified] = useState(false);
   const [forms, setForms] = useState([]);
   const [selectedForm, setSelectedForm] = useState(null);
@@ -223,7 +245,7 @@ export default function Qun() {
         </motion.div>
         <motion.h1 variants={fadeUp} className="display-lede">群报数</motion.h1>
         <motion.p variants={fadeUp} className="text-[var(--muted)] text-sm prose-body">
-          凭证、坐标和预览内容只保留在当前页面内存中，服务器不保存本次凭证明文。
+          Token 只保存在你自己浏览器的 localStorage 里（清空输入框即删除），服务器不保存明文凭据；坐标和预览内容仍只留在页面内存中。
         </motion.p>
       </motion.div>
 
@@ -232,7 +254,7 @@ export default function Qun() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-baseline gap-3">第一步 · 登录校验 <span className="accent-en text-[13px] font-normal">step 01</span></CardTitle>
-              <CardDescription>粘贴完整 Authorization Token。</CardDescription>
+              <CardDescription>粘贴完整 Authorization Token，会记住在本浏览器，下次打开直接点校验即可。</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
               <div className="flex flex-col gap-1.5">
