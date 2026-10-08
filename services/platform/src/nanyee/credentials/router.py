@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from nanyee.anti_abuse.gate import AntiAbuseGate
 from nanyee.anti_abuse.rate_limit import RateLimitPolicy
 from nanyee.credentials.envelope import EnvelopeCipher
-from nanyee.credentials.models import CredentialStatus, HostedCredential
+from nanyee.credentials.models import SCHOOL_ACCOUNT_PURPOSES, CredentialStatus, HostedCredential
 from nanyee.credentials.service import CredentialVaultService
 from nanyee.db import get_db_session
 from nanyee.errors import AppError, ErrorCode
@@ -29,6 +29,7 @@ HOSTING_CONSENT_VERSION = "credential-hosting-v1"
 CREDENTIAL_CREATE_POLICY = RateLimitPolicy(window_seconds=10 * 60, soft_limit=5, hard_limit=15)
 CREDENTIAL_REVEAL_POLICY = RateLimitPolicy(window_seconds=10 * 60, soft_limit=10, hard_limit=30)
 CREDENTIAL_RENEW_POLICY = RateLimitPolicy(window_seconds=10 * 60, soft_limit=10, hard_limit=30)
+CREDENTIAL_UPDATE_POLICY = RateLimitPolicy(window_seconds=10 * 60, soft_limit=5, hard_limit=15)
 
 
 class CredentialCreateRequest(BaseModel):
@@ -63,7 +64,7 @@ class CredentialResponse(BaseModel):
     upstream: str
     purpose: str
     status: CredentialStatus
-    expires_at: datetime
+    expires_at: datetime | None
     created_at: datetime
     last_used_at: datetime | None
     metadata: dict[str, str | int | bool | None]
@@ -105,9 +106,8 @@ def require_csrf(request: Request, auth: AuthContext, csrf_header: str | None) -
     )
 
 
-def _canonical_secret(payload: CredentialCreateRequest) -> str:
-    value = payload.secret.get_secret_value()
-    if payload.purpose == "qun_checkin":
+def _canonical_secret(purpose: str, value: str) -> str:
+    if purpose == "qun_checkin":
         try:
             return validate_auth_token(value)
         except ValueError as exc:
@@ -117,7 +117,7 @@ def _canonical_secret(payload: CredentialCreateRequest) -> str:
                 status_code=422,
                 details={"field": "secret"},
             ) from exc
-    if payload.purpose not in {"evaluation", "study_cabin", "school"}:
+    if purpose not in SCHOOL_ACCOUNT_PURPOSES:
         return value
     try:
         parsed = json.loads(value)
@@ -192,7 +192,7 @@ async def create_credential(
         user_id=auth.user.id,
         upstream=payload.upstream,
         purpose=payload.purpose,
-        plaintext=_canonical_secret(payload),
+        plaintext=_canonical_secret(payload.purpose, payload.secret.get_secret_value()),
         public_metadata=payload.metadata,
         consent_version=payload.consent_version,
         ttl_seconds=payload.ttl_seconds,
@@ -287,6 +287,69 @@ async def renew_credential(
     )
     logger.info(
         "credential_renewed",
+        extra={"user_id": str(auth.user.id), "credential_id": str(credential_id)},
+    )
+    return CredentialResponse.from_record(record)
+
+
+class CredentialUpdateRequest(BaseModel):
+    secret: SecretStr
+    metadata: dict[str, Any] | None = None
+
+    @model_validator(mode="after")
+    def validate_metadata(self) -> CredentialUpdateRequest:
+        if self.metadata is not None:
+            if len(self.metadata) > 10:
+                raise ValueError("credential metadata has too many fields")
+            encoded = json.dumps(self.metadata, ensure_ascii=False, default=str).encode("utf-8")
+            if len(encoded) > 4096:
+                raise ValueError("credential metadata is too large")
+        return self
+
+
+@router.put(
+    "/{credential_id}/secret",
+    response_model=CredentialResponse,
+    operation_id="update_credential_secret",
+)
+async def update_credential_secret(
+    credential_id: UUID,
+    payload: CredentialUpdateRequest,
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    auth: Annotated[AuthContext, Depends(current_auth)],
+    cipher: Annotated[EnvelopeCipher, Depends(get_cipher)],
+    csrf_header: Annotated[str | None, Header(alias="X-CSRF-Token")] = None,
+) -> CredentialResponse:
+    require_csrf(request, auth, csrf_header)
+    await AntiAbuseGate(settings_from_request(request)).check(
+        db,
+        request,
+        action="credential_update",
+        identity=str(auth.user.id),
+        policy=CREDENTIAL_UPDATE_POLICY,
+    )
+    purpose = (
+        await db.execute(
+            select(HostedCredential.purpose).where(
+                HostedCredential.id == credential_id,
+                HostedCredential.user_id == auth.user.id,
+                HostedCredential.status != CredentialStatus.DELETED,
+            )
+        )
+    ).scalar_one_or_none()
+    if purpose is None:
+        raise AppError(ErrorCode.NOT_FOUND, "凭据不存在。", status_code=404)
+    service = CredentialVaultService(cipher, settings_from_request(request))
+    record = await service.update_secret(
+        db,
+        credential_id=credential_id,
+        user_id=auth.user.id,
+        plaintext=_canonical_secret(purpose, payload.secret.get_secret_value()),
+        public_metadata=payload.metadata,
+    )
+    logger.info(
+        "credential_secret_updated",
         extra={"user_id": str(auth.user.id), "credential_id": str(credential_id)},
     )
     return CredentialResponse.from_record(record)

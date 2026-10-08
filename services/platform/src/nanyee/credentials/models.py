@@ -8,6 +8,7 @@ from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Index, Integer, LargeBi
 from sqlalchemy.orm import Mapped, mapped_column
 
 from nanyee.db.base import Base, TimestampMixin
+from nanyee.security import as_utc
 
 
 class CredentialStatus(StrEnum):
@@ -18,6 +19,13 @@ class CredentialStatus(StrEnum):
 
 SHARED_SCHOOL_PURPOSE = "school"
 SCHOOL_SHARED_TOOL_IDS = frozenset({"evaluation", "study_cabin"})
+# 学校账号密码类凭据：永久保存，改密码时原地更新
+SCHOOL_ACCOUNT_PURPOSES = frozenset({SHARED_SCHOOL_PURPOSE, *SCHOOL_SHARED_TOOL_IDS})
+
+
+def credential_expired(expires_at: datetime | None, now: datetime) -> bool:
+    """expires_at 为空表示永久有效。"""
+    return expires_at is not None and as_utc(expires_at) <= now
 
 
 def purpose_satisfies(credential_purpose: str, required: str) -> bool:
@@ -54,9 +62,7 @@ class HostedCredential(TimestampMixin, Base):
         default=CredentialStatus.ACTIVE,
         nullable=False,
     )
-    expires_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, index=True
-    )
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

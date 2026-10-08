@@ -285,7 +285,28 @@ async def test_school_credential_shared_reveal_and_hard_delete(
         },
     )
     assert created.status_code == 201, created.text
+    assert created.json()["expires_at"] is None
     credential_id = created.json()["id"]
+
+    rejected_update = await api_client.put(
+        f"/api/v1/credentials/{credential_id}/secret",
+        json={"secret": '{"account":"20260001","password":"changed"}'},
+    )
+    assert rejected_update.status_code == 403
+    invalid_update = await api_client.put(
+        f"/api/v1/credentials/{credential_id}/secret",
+        headers={"X-CSRF-Token": csrf},
+        json={"secret": "not-json"},
+    )
+    assert invalid_update.status_code == 422
+    updated = await api_client.put(
+        f"/api/v1/credentials/{credential_id}/secret",
+        headers={"X-CSRF-Token": csrf},
+        json={"secret": '{"account":"20260001","password":"school-password"}'},
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["id"] == credential_id
+    assert updated.json()["metadata"] == {"account_hint": "尾号 0001"}
 
     evaluation_job = await api_client.post(
         "/api/v1/jobs",

@@ -125,6 +125,9 @@ Turnstile Secret 永远不进入前端配置。所需脚本与 CSP 域名以 Clo
 - 创建：`POST /credentials`，必须登录、带 CSRF，并提交 `consent_version: "credential-hosting-v1"`。
 - 列表：`GET /credentials`，只返回用途、上游、状态、期限和允许公开的提示字段。
 - 撤销：`DELETE /credentials/{id}`，必须带 CSRF。
+- 修改：`PUT /credentials/{id}/secret`，必须带 CSRF，请求体 `{"secret": "...", "metadata": {...}}`（`metadata` 可省略，省略时保留原值）。凭据 ID 不变，引用它的任务下一轮直接使用新内容；已撤销的凭据不能修改。
+
+学校账号类凭据（`purpose` 为 `school`、`evaluation`、`study_cabin`）永久保存，`expires_at` 为 `null`，创建时传入的 `ttl_seconds` 会被忽略，也不能延期；学校改密码后用上面的修改接口更新。其他凭据（如群报数）仍按 `ttl_seconds` 设置期限，可通过 `POST /credentials/{id}/renew` 延期。
 
 创建响应和列表永远不会返回明文、密文、nonce、包裹密钥或 Azure Key ID。前端提交成功后立即清空密码/Token 输入值及其组件状态。
 

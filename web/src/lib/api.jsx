@@ -291,9 +291,9 @@ export const CONFIRMATION_VERSIONS = {
   credentialHosting: "credential-hosting-v1",
 };
 
-// 列表接口不会把已过期的凭据标记为失效，需自行判断 expires_at
+// 列表接口不会把已过期的凭据标记为失效，需自行判断 expires_at；expires_at 为空表示永久有效（学校账号）
 export function isCredentialUsable(c) {
-  return !!c && c.status === "active" && !!c.expires_at && new Date(c.expires_at).getTime() > Date.now();
+  return !!c && c.status === "active" && (!c.expires_at || new Date(c.expires_at).getTime() > Date.now());
 }
 
 /* ---------- API 端点封装 ---------- */
@@ -346,6 +346,10 @@ export function revokeCredential(id, opts) {
 }
 export function renewCredential(id, body, opts) {
   return apiPost(`/credentials/${id}/renew`, body, { ...opts, action: "credential_renew" });
+}
+// 原地替换凭据内容（如学校改密码），凭据 ID 不变，关联任务下一轮直接使用新值
+export function updateCredentialSecret(id, body, opts) {
+  return apiFetch(`/credentials/${id}/secret`, { ...opts, method: "PUT", body, action: "credential_update" });
 }
 export function revealCredential(id, opts) {
   return apiPost(`/credentials/${id}/reveal`, undefined, { ...opts, action: "credential_reveal" });

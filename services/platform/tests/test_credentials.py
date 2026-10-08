@@ -279,9 +279,9 @@ async def test_renew_extends_expired_credential_without_plaintext() -> None:
         credential = await vault.create(
             db,
             user_id=owner.id,
-            upstream="school",
-            purpose="school",
-            plaintext='{"account":"20260001","password":"secret"}',
+            upstream="qun100",
+            purpose="qun_checkin",
+            plaintext="qun-token",
             public_metadata={},
             consent_version="credential-hosting-v1",
             ttl_seconds=300,
@@ -291,7 +291,7 @@ async def test_renew_extends_expired_credential_without_plaintext() -> None:
         await db.commit()
         with pytest.raises(AppError) as raised:
             await vault.decrypt_for_worker(
-                db, credential_id=credential.id, user_id=owner.id, purpose="evaluation"
+                db, credential_id=credential.id, user_id=owner.id, purpose="qun_checkin"
             )
         assert raised.value.status_code == 403
 
@@ -300,9 +300,9 @@ async def test_renew_extends_expired_credential_without_plaintext() -> None:
         )
         assert renewed.expires_at > utc_now() + timedelta(days=179)
         plaintext = await vault.decrypt_for_worker(
-            db, credential_id=credential.id, user_id=owner.id, purpose="evaluation"
+            db, credential_id=credential.id, user_id=owner.id, purpose="qun_checkin"
         )
-        assert plaintext.decode("utf-8") == '{"account":"20260001","password":"secret"}'
+        assert plaintext.decode("utf-8") == "qun-token"
 
         # 他人不能延期；已禁用凭据不能延期；期限越界拒绝
         with pytest.raises(AppError) as raised:
@@ -314,5 +314,54 @@ async def test_renew_extends_expired_credential_without_plaintext() -> None:
         await vault.revoke(db, credential_id=credential.id, user_id=owner.id)
         with pytest.raises(AppError) as raised:
             await vault.renew(db, credential_id=credential.id, user_id=owner.id, ttl_seconds=300)
+        assert raised.value.status_code == 422
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_school_credential_is_permanent_and_secret_updates_in_place() -> None:
+    engine, factory, vault = await _make_vault()
+    async with factory() as db:
+        owner = await _make_user(db, "permanent_owner")
+        other = await _make_user(db, "permanent_other")
+        credential = await vault.create(
+            db,
+            user_id=owner.id,
+            upstream="school",
+            purpose="school",
+            plaintext='{"account":"20260001","password":"old"}',
+            public_metadata={"account_hint": "尾号 0001"},
+            consent_version="credential-hosting-v1",
+            ttl_seconds=300,
+        )
+        # 学校账号忽略 TTL，永久有效，也不能延期
+        assert credential.expires_at is None
+        with pytest.raises(AppError) as raised:
+            await vault.renew(db, credential_id=credential.id, user_id=owner.id, ttl_seconds=300)
+        assert raised.value.status_code == 422
+
+        updated = await vault.update_secret(
+            db,
+            credential_id=credential.id,
+            user_id=owner.id,
+            plaintext='{"account":"20260001","password":"new"}',
+            public_metadata={"account_hint": "尾号 0001"},
+        )
+        assert updated.id == credential.id
+        plaintext = await vault.decrypt_for_worker(
+            db, credential_id=credential.id, user_id=owner.id, purpose="evaluation"
+        )
+        assert plaintext.decode("utf-8") == '{"account":"20260001","password":"new"}'
+
+        with pytest.raises(AppError) as raised:
+            await vault.update_secret(
+                db, credential_id=credential.id, user_id=other.id, plaintext="x"
+            )
+        assert raised.value.status_code == 404
+        await vault.revoke(db, credential_id=credential.id, user_id=owner.id)
+        with pytest.raises(AppError) as raised:
+            await vault.update_secret(
+                db, credential_id=credential.id, user_id=owner.id, plaintext="x"
+            )
         assert raised.value.status_code == 422
     await engine.dispose()

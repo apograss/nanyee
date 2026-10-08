@@ -116,7 +116,6 @@ X-CSRF-Token: value-from-csrf-cookie
   "upstream":"academic",
   "purpose":"evaluation",
   "secret":"{\"account\":\"20260001\",\"password\":\"仅在此请求发送\"}",
-  "ttl_seconds":2592000,
   "consent_version":"credential-hosting-v1",
   "metadata":{"account_hint":"尾号 0001"}
 }
@@ -151,7 +150,6 @@ X-CSRF-Token: value-from-csrf-cookie
   "upstream":"infospace",
   "purpose":"study_cabin",
   "secret":"{\"account\":\"20260001\",\"password\":\"仅在此请求发送\"}",
-  "ttl_seconds":604800,
   "consent_version":"credential-hosting-v1",
   "metadata":{"account_hint":"尾号 0001"}
 }

@@ -13,10 +13,16 @@ from nanyee.credentials.envelope import (
     EnvelopeCipher,
     redact_credential_metadata,
 )
-from nanyee.credentials.models import CredentialStatus, HostedCredential, purpose_satisfies
+from nanyee.credentials.models import (
+    SCHOOL_ACCOUNT_PURPOSES,
+    CredentialStatus,
+    HostedCredential,
+    credential_expired,
+    purpose_satisfies,
+)
 from nanyee.errors import AppError, ErrorCode
 from nanyee.jobs.models import TERMINAL_JOB_STATES, Job, JobState
-from nanyee.security import as_utc, utc_now
+from nanyee.security import utc_now
 
 
 class CredentialVaultService:
@@ -36,22 +42,18 @@ class CredentialVaultService:
         consent_version: str,
         ttl_seconds: int | None = None,
     ) -> HostedCredential:
-        encoded = plaintext.encode("utf-8")
-        if not encoded or len(encoded) > 16_384:
-            raise AppError(
-                ErrorCode.INVALID_REQUEST,
-                "凭据长度无效。",
-                status_code=422,
-                details={"field": "secret"},
-            )
-        ttl = ttl_seconds or self._settings.credential_default_ttl_seconds
-        if ttl < 300 or ttl > 365 * 24 * 60 * 60:
-            raise AppError(
-                ErrorCode.INVALID_REQUEST,
-                "凭据保存期限无效。",
-                status_code=422,
-                details={"field": "ttl_seconds"},
-            )
+        encoded = _encode_plaintext(plaintext)
+        expires_at = None
+        if purpose not in SCHOOL_ACCOUNT_PURPOSES:
+            ttl = ttl_seconds or self._settings.credential_default_ttl_seconds
+            if ttl < 300 or ttl > 365 * 24 * 60 * 60:
+                raise AppError(
+                    ErrorCode.INVALID_REQUEST,
+                    "凭据保存期限无效。",
+                    status_code=422,
+                    details={"field": "ttl_seconds"},
+                )
+            expires_at = utc_now() + timedelta(seconds=ttl)
         credential_id = uuid4()
         context = CredentialContext(
             credential_id=credential_id,
@@ -72,7 +74,7 @@ class CredentialVaultService:
             key_wrap_algorithm=envelope.key_wrap_algorithm,
             envelope_version=envelope.envelope_version,
             public_metadata=redact_credential_metadata(public_metadata),
-            expires_at=utc_now() + timedelta(seconds=ttl),
+            expires_at=expires_at,
             consent_version=consent_version,
         )
         db.add(record)
@@ -100,7 +102,7 @@ class CredentialVaultService:
         if (
             record is None
             or record.status != CredentialStatus.ACTIVE
-            or as_utc(record.expires_at) <= utc_now()
+            or credential_expired(record.expires_at, utc_now())
             or not purpose_satisfies(record.purpose, purpose)
         ):
             raise AppError(
@@ -217,6 +219,12 @@ class CredentialVaultService:
                 "已禁用的凭据不能延期，请重新添加授权。",
                 status_code=422,
             )
+        if record.expires_at is None:
+            raise AppError(
+                ErrorCode.INVALID_REQUEST,
+                "该凭据永久有效，无需延期。",
+                status_code=422,
+            )
         if ttl_seconds < 300 or ttl_seconds > 365 * 24 * 60 * 60:
             raise AppError(
                 ErrorCode.INVALID_REQUEST,
@@ -227,6 +235,65 @@ class CredentialVaultService:
         record.expires_at = utc_now() + timedelta(seconds=ttl_seconds)
         await db.commit()
         return record
+
+    async def update_secret(
+        self,
+        db: AsyncSession,
+        *,
+        credential_id: UUID,
+        user_id: UUID,
+        plaintext: str,
+        public_metadata: dict[str, object] | None = None,
+    ) -> HostedCredential:
+        """原地替换凭据明文（如学校账号改密码），凭据 ID 不变，关联任务下一轮直接使用新值。"""
+        encoded = _encode_plaintext(plaintext)
+        record = (
+            await db.execute(
+                select(HostedCredential)
+                .where(
+                    HostedCredential.id == credential_id,
+                    HostedCredential.user_id == user_id,
+                )
+                .with_for_update()
+            )
+        ).scalar_one_or_none()
+        if record is None or record.status == CredentialStatus.DELETED:
+            raise AppError(ErrorCode.NOT_FOUND, "凭据不存在。", status_code=404)
+        if record.status != CredentialStatus.ACTIVE:
+            raise AppError(
+                ErrorCode.INVALID_REQUEST,
+                "已禁用的凭据不能修改，请重新添加授权。",
+                status_code=422,
+            )
+        context = CredentialContext(
+            credential_id=record.id,
+            user_id=record.user_id,
+            upstream=record.upstream,
+            purpose=record.purpose,
+        )
+        envelope = await self._cipher.encrypt(encoded, context)
+        record.ciphertext = envelope.ciphertext
+        record.nonce = envelope.nonce
+        record.wrapped_data_key = envelope.wrapped_data_key
+        record.key_reference = envelope.key_reference
+        record.key_wrap_algorithm = envelope.key_wrap_algorithm
+        record.envelope_version = envelope.envelope_version
+        if public_metadata is not None:
+            record.public_metadata = redact_credential_metadata(public_metadata)
+        await db.commit()
+        return record
+
+
+def _encode_plaintext(plaintext: str) -> bytes:
+    encoded = plaintext.encode("utf-8")
+    if not encoded or len(encoded) > 16_384:
+        raise AppError(
+            ErrorCode.INVALID_REQUEST,
+            "凭据长度无效。",
+            status_code=422,
+            details={"field": "secret"},
+        )
+    return encoded
 
 
 async def _cancel_pending_jobs(db: AsyncSession, *, credential_id: UUID, user_id: UUID) -> None:

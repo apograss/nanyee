@@ -4,7 +4,7 @@ import { motion } from "motion/react";
 import { ClipboardCheck, ArrowRight, Zap, ShieldCheck } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Label, Alert, StatusBadge } from "@/components/ui.jsx";
 import {
-  createCredential, createJob, listCredentials, renewCredential, isCredentialUsable,
+  createCredential, createJob, listCredentials, isCredentialUsable,
   CONFIRMATION_VERSIONS, CREDENTIAL_PURPOSES, useAuth,
 } from "@/lib/api.jsx";
 
@@ -18,15 +18,11 @@ const stagger = {
   show: { transition: { staggerChildren: 0.07, delayChildren: 0.05 } },
 };
 
-// 凭据长期保存：180 天，期间任务可重复使用该授权；到期可一键延期，也可随时在「我的凭据」删除
-const CREDENTIAL_TTL_SECONDS = 180 * 24 * 60 * 60;
-
 export default function Evaluations() {
   const { user } = useAuth();
   const [account, setAccount] = useState("");
   const [password, setPassword] = useState("");
   const [credential, setCredential] = useState(null);
-  const [expiredCredential, setExpiredCredential] = useState(null);
   const [credLoading, setCredLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null); // { credential_id, job_id, state } | { error }
@@ -36,7 +32,6 @@ export default function Evaluations() {
   const refreshCredentials = () => {
     if (!user) {
       setCredential(null);
-      setExpiredCredential(null);
       setCredLoading(false);
       return;
     }
@@ -47,33 +42,12 @@ export default function Evaluations() {
         const school = arr.find((c) => c.purpose === "school" && isCredentialUsable(c));
         const legacy = arr.find((c) => c.purpose === "evaluation" && isCredentialUsable(c));
         setCredential(school || legacy || null);
-        setExpiredCredential(
-          arr.find(
-            (c) =>
-              (c.purpose === "school" || c.purpose === "evaluation") &&
-              c.status === "active" &&
-              !isCredentialUsable(c),
-          ) || null,
-        );
       })
       .catch(() => setCredential(null))
       .finally(() => setCredLoading(false));
   };
 
   useEffect(refreshCredentials, [user]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // 过期凭据可直接延期，无需重新输入学校密码
-  const renewExpired = async () => {
-    if (!expiredCredential) return;
-    try {
-      await renewCredential(expiredCredential.id, { ttl_seconds: CREDENTIAL_TTL_SECONDS });
-      setExpiredCredential(null);
-      setCredLoading(true);
-      refreshCredentials();
-    } catch (err) {
-      setResult({ error: err?.message || "延期失败" });
-    }
-  };
 
   const submit = async () => {
     setLoading(true);
@@ -87,7 +61,6 @@ export default function Evaluations() {
           purpose: purpose.purpose,
           secret,
           consent_version: CONFIRMATION_VERSIONS.credentialHosting,
-          ttl_seconds: CREDENTIAL_TTL_SECONDS,
           metadata: { account_hint: `尾号 ${account.slice(-4)}` },
         });
         setCredential(cred);
@@ -143,7 +116,7 @@ export default function Evaluations() {
             <div className="kicker"><strong>School Account</strong></div>
             <CardTitle>学校账号授权</CardTitle>
             <CardDescription>
-              授权后后台自动完成全部评课：立即先评一次，之后每天北京时间 07:00 自动执行，直到你取消。凭据以 AES-256-GCM 信封加密保存 180 天，到期可一键延期，也可随时在「我的凭据」中删除。
+              授权后后台自动完成全部评课：立即先评一次，之后每天北京时间 07:00 自动执行，持续 180 天或直到你取消。学号密码以 AES-256-GCM 信封加密长期保存，改了学校密码后在「授权管理」中修改即可，任务不用重建；也可随时删除。
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
@@ -152,21 +125,11 @@ export default function Evaluations() {
                 <span className="inline-flex flex-wrap items-center gap-2 text-[13px]">
                   {credential.metadata?.account_hint && <span>（{credential.metadata.account_hint}）</span>}
                   {credential.expires_at && <span className="opacity-70">· 有效期至 {new Date(credential.expires_at).toLocaleDateString("zh-CN")}</span>}
-                  <span className="opacity-70">· 可在「授权管理」中查看、禁用或删除</span>
+                  <span className="opacity-70">· 可在「授权管理」中查看、修改密码、禁用或删除</span>
                 </span>
               </Alert>
             ) : (
               <>
-                {expiredCredential && (
-                  <Alert variant="warning" title="原凭据已过期">
-                    <span className="text-[13px]">
-                      有效期至 {new Date(expiredCredential.expires_at).toLocaleDateString("zh-CN")}，可一键延期（无需重新输入密码），或重新输入学号密码授权。
-                    </span>
-                    <Button size="sm" variant="outline" className="mt-2" onClick={renewExpired}>
-                      <Zap className="w-3.5 h-3.5" /> 延期 180 天
-                    </Button>
-                  </Alert>
-                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <Label>学号</Label>

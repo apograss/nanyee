@@ -11,12 +11,12 @@ from pathlib import Path
 from typing import Protocol
 from uuid import UUID
 
-from nanyee.credentials.models import CredentialStatus, HostedCredential
+from nanyee.credentials.models import CredentialStatus, HostedCredential, credential_expired
 from nanyee.errors import AppError, ErrorCode
 from nanyee.identity.models import User, UserStatus
 from nanyee.jobs.models import Job
 from nanyee.jobs.service import JobService
-from nanyee.security import as_utc, utc_now
+from nanyee.security import utc_now
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -72,8 +72,7 @@ async def ensure_execution_active(db: AsyncSession, job: Job) -> None:
         raise ExecutionFailure("USER_INACTIVE", retryable=False)
     if job.credential_id is not None and (
         credential_status != CredentialStatus.ACTIVE
-        or credential_expires_at is None
-        or as_utc(credential_expires_at) <= utc_now()
+        or credential_expired(credential_expires_at, utc_now())
     ):
         raise ExecutionFailure(
             "CREDENTIAL_UNAVAILABLE", retryable=False, next_action="replace_credential"

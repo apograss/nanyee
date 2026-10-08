@@ -1,15 +1,18 @@
 // Canvas design runtime editable source marker: credentials
 import React, { useState, useEffect } from "react";
 import { motion } from "motion/react";
-import { KeyRound, Plus, Trash2, Armchair, Users, GraduationCap, ShieldCheck, Eye, EyeOff, Ban, RefreshCw } from "lucide-react";
+import { KeyRound, Plus, Trash2, Armchair, Users, GraduationCap, ShieldCheck, Eye, EyeOff, Ban, RefreshCw, Pencil } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Label, Badge, Alert, Dialog, Table, cn } from "@/components/ui.jsx";
 import {
-  createCredential, listCredentials, revokeCredential, revealCredential, deleteCredential, renewCredential,
+  createCredential, listCredentials, revokeCredential, revealCredential, deleteCredential, renewCredential, updateCredentialSecret,
   isCredentialUsable, CREDENTIAL_PURPOSES, CONFIRMATION_VERSIONS,
 } from "@/lib/api.jsx";
 
-// 延期时长：180 天，一键续期无需重新输入密码
+// 延期时长：180 天，一键续期无需重新输入密码（仅群报数等有期限的凭据）
 const RENEW_TTL_SECONDS = 180 * 86400;
+
+// 学校账号密码类凭据永久保存，改密码时原地修改
+const SCHOOL_ACCOUNT_PURPOSES = ["school", "evaluation", "study_cabin"];
 
 const PURPOSE_META = {
   school: { label: "学校统一认证", upstream: "school", icon: GraduationCap, secretHint: "学号 + 学校密码，评课与学习舱共用" },
@@ -47,6 +50,11 @@ export default function Credentials() {
   const [revealError, setRevealError] = useState("");
   const [deleteFor, setDeleteFor] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [editFor, setEditFor] = useState(null);
+  const [editAccount, setEditAccount] = useState("");
+  const [editSecret, setEditSecret] = useState(""); // 敏感态：仅内存，提交后清空
+  const [editError, setEditError] = useState("");
+  const [editing, setEditing] = useState(false);
   const meta = PURPOSE_META[purpose];
   const isSchoolAccount = purpose !== "qun_checkin";
 
@@ -65,7 +73,7 @@ export default function Credentials() {
         purpose,
         secret,
         consent_version: CONFIRMATION_VERSIONS.credentialHosting,
-        ttl_seconds: ttl,
+        ...(isSchoolAccount ? {} : { ttl_seconds: ttl }),
         metadata: { account_hint: hint || (isSchoolAccount ? `尾号 ${account.slice(-4)}` : `尾号 ${token.slice(-4)}`) },
       });
       // 提交即清空
@@ -88,6 +96,35 @@ export default function Credentials() {
       await renewCredential(id, { ttl_seconds: RENEW_TTL_SECONDS });
       listCredentials().then(setList).catch(() => {});
     } catch {}
+  };
+
+  const openEdit = (cred) => {
+    setEditFor(cred);
+    setEditAccount("");
+    setEditSecret("");
+    setEditError("");
+  };
+
+  const closeEdit = () => {
+    setEditFor(null);
+    setEditSecret("");
+  };
+
+  const doEdit = async () => {
+    if (!editFor) return;
+    const isSchool = SCHOOL_ACCOUNT_PURPOSES.includes(editFor.purpose);
+    setEditing(true);
+    setEditError("");
+    try {
+      await updateCredentialSecret(editFor.id, isSchool
+        ? { secret: JSON.stringify({ account: editAccount, password: editSecret }), metadata: { ...editFor.metadata, account_hint: `尾号 ${editAccount.slice(-4)}` } }
+        : { secret: editSecret });
+      closeEdit();
+      listCredentials().then(setList).catch(() => {});
+    } catch (err) {
+      setEditError(err?.message || "修改失败，请稍后重试。");
+    }
+    setEditing(false);
   };
 
   const openReveal = async (cred) => {
@@ -150,7 +187,7 @@ export default function Credentials() {
             <div className="flex flex-col gap-1.5">
               <div className="kicker"><strong>Authorizations</strong> — 授权列表</div>
               <CardTitle className="mt-1">我的授权</CardTitle>
-              <CardDescription>学校统一认证凭据一条即可覆盖评课与学习舱。</CardDescription>
+              <CardDescription>学校统一认证凭据一条即可覆盖评课与学习舱，永久保存；改了学校密码点「修改」即可。</CardDescription>
             </div>
             <Button onClick={() => setCreateOpen(true)}><Plus className="w-4 h-4" /> 添加授权</Button>
           </CardHeader>
@@ -165,9 +202,10 @@ export default function Credentials() {
                   : isCredentialUsable(c) ? <Badge variant="success">有效</Badge>
                     : <Badge variant="warning">已过期</Badge>,
                 <span className="text-[13px]">{c.metadata?.account_hint || "—"}</span>,
-                <span className="text-[13px] text-[var(--muted)]">{new Date(c.expires_at).toLocaleDateString("zh-CN")}</span>,
+                <span className="text-[13px] text-[var(--muted)]">{c.expires_at ? new Date(c.expires_at).toLocaleDateString("zh-CN") : "永久"}</span>,
                 <div className="flex items-center gap-1">
-                  <Button size="sm" variant="ghost" disabled={c.status !== "active"} onClick={() => doRenew(c.id)} title="延长 180 天，无需重新输入密码"><RefreshCw className="w-3.5 h-3.5" /> 延期</Button>
+                  <Button size="sm" variant="ghost" disabled={c.status !== "active"} onClick={() => openEdit(c)} title="改了密码后在这里更新，任务无需重建"><Pencil className="w-3.5 h-3.5" /> 修改</Button>
+                  {c.expires_at && <Button size="sm" variant="ghost" disabled={c.status !== "active"} onClick={() => doRenew(c.id)} title="延长 180 天，无需重新输入密码"><RefreshCw className="w-3.5 h-3.5" /> 延期</Button>}
                   <Button size="sm" variant="ghost" onClick={() => openReveal(c)}><Eye className="w-3.5 h-3.5" /> 查看</Button>
                   <Button size="sm" variant="ghost" disabled={c.status !== "active"} onClick={() => doRevoke(c.id)}><Ban className="w-3.5 h-3.5" /> 禁用</Button>
                   <Button size="sm" variant="ghost" onClick={() => setDeleteFor(c)}><Trash2 className="w-3.5 h-3.5" /> 删除</Button>
@@ -237,11 +275,11 @@ export default function Credentials() {
             </div>
           )}
 
-          <div className="flex flex-col gap-1.5">
+          {!isSchoolAccount && <div className="flex flex-col gap-1.5">
             <Label>有效期（天）</Label>
             <Input type="number" min="1" max="365" value={Math.round(ttl / 86400)} onChange={(e) => setTtl(Math.min(365, Math.max(1, Number(e.target.value) || 1)) * 86400)} />
-            <div className="text-[11px] text-[var(--muted)]">默认 30 天，最长 365 天</div>
-          </div>
+            <div className="text-[11px] text-[var(--muted)]">默认 180 天，最长 365 天</div>
+          </div>}
 
           <div className="flex flex-col gap-1.5">
             <Label>备注（仅自己可见）</Label>
@@ -252,6 +290,40 @@ export default function Credentials() {
             <span>添加成功后输入框会立即清空，密码不会被保存到本地。</span>
           </Alert>
         </div>
+      </Dialog>
+
+      <Dialog
+        open={!!editFor}
+        onClose={closeEdit}
+        title="修改凭据"
+        description={editFor ? `${PURPOSE_META[editFor.purpose]?.label || editFor.purpose} · ${editFor.metadata?.account_hint || "无备注"}` : ""}
+        footer={<><Button variant="ghost" onClick={closeEdit}>取消</Button><Button onClick={doEdit} loading={editing} disabled={!editSecret || (SCHOOL_ACCOUNT_PURPOSES.includes(editFor?.purpose) && !editAccount)}>保存修改</Button></>}
+      >
+        {editFor && (
+          <div className="flex flex-col gap-4">
+            {SCHOOL_ACCOUNT_PURPOSES.includes(editFor.purpose) ? (
+              <>
+                <div className="flex flex-col gap-1.5">
+                  <Label>学号</Label>
+                  <Input value={editAccount} onChange={(e) => setEditAccount(e.target.value)} placeholder="20260001" />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label>新的学校密码</Label>
+                  <Input type="password" value={editSecret} onChange={(e) => setEditSecret(e.target.value)} placeholder="仅本次提交使用，不保存" />
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                <Label>新的群报数登录凭证</Label>
+                <Input type="password" value={editSecret} onChange={(e) => setEditSecret(e.target.value)} placeholder="请粘贴完整的登录凭证" />
+              </div>
+            )}
+            {editError && <Alert variant="danger" title="修改失败"><span>{editError}</span></Alert>}
+            <Alert variant="info" title="任务不用重建">
+              <span>保存后，使用这条授权的任务从下一轮起直接用新的内容。</span>
+            </Alert>
+          </div>
+        )}
       </Dialog>
 
       <Dialog
