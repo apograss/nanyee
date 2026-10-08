@@ -74,7 +74,8 @@ export default function Evaluations() {
         payload: { strategy: "legacy_positive_random", max_courses: 60 },
       });
 
-      setResult({ credential_id: cred.id, job_id: job.id, state: job.state });
+      // 已有在跑的评课任务时后端直接沿用，不会再建一个
+      setResult({ credential_id: cred.id, job_id: job.id, state: job.state, reused: (job.attempt_count || 0) > 0 });
       setPassword(""); // 提交即清空
     } catch (err) {
       setResult({ error: err?.message || "创建失败" });
@@ -163,7 +164,7 @@ export default function Evaluations() {
 
       {result && !result.error && (
         <motion.div variants={fadeUp}>
-          <Alert variant="success" title="评课任务已创建">
+          <Alert variant="success" title={result.reused ? "你已有进行中的评课任务" : "评课任务已创建"}>
             <div className="flex flex-col gap-1.5 mt-1">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-3.5 h-3.5 text-[var(--success)]" />
@@ -172,7 +173,7 @@ export default function Evaluations() {
               <div className="flex items-center gap-2">
                 <ArrowRight className="w-3.5 h-3.5 text-[var(--success)]" />
                 <StatusBadge status={result.state} />
-                <span className="text-[13px]">任务已在后台开始执行，之后每天 07:00（北京时间）自动运行</span>
+                <span className="text-[13px]">{result.reused ? "已沿用原来的任务，不会重复创建；它会继续每天 07:00（北京时间）自动运行" : "任务已在后台开始执行，之后每天 07:00（北京时间）自动运行"}</span>
               </div>
               <div className="text-[12px] text-[var(--muted)] mt-1">可在「任务」页面查看运行状态。学校密码已清空。</div>
             </div>

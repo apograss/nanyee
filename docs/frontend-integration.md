@@ -118,6 +118,16 @@ Turnstile Secret 永远不进入前端配置。所需脚本与 CSP 域名以 Clo
 
 如果用户明确选择“导入 WakeUp”，可在登录平台并确认第三方上传后调用 `POST /smu/timetable.wakeup.share`，额外提交 `confirmation_version: "timetable:wakeup_share:v1"`，后端返回 `share_code`。注意 WakeUp 的“从分享口令导入”识别的是整段分享消息而不是裸 `share_code`，前端应包装为 `这是来自「WakeUp课程表」的课表分享，30分钟内有效哦……分享口令为「<share_code>」` 再让用户复制。该路径会把生成的课表上传到 WakeUp；拒绝上传时仍可下载本地文件。成绩结果默认不在服务器保存，返回的 `ranking` 包含课程和教学班范围的排名与分布。
 
+## 4.5 站内通知
+
+`GET /notices` 返回当前用户需要关注的通知，按任务状态实时计算，不单独存储。每条包含 `id`、`kind`、`level`（`danger`/`info`）、`title`、`message`、`dismissible`，以及可选的 `job_id`、`credential_id`：
+
+- `credential_invalid`：最近的评课任务因学校密码错误终止，且没有在跑的评课任务。不可关闭；`credential_id` 非空时引导用户修改该凭据，修改后后端会自动恢复任务（`PUT /credentials/{id}/secret` 响应中的 `resumed_job_id`）；为空时引导重新创建。
+- `evaluation_recovered`：在跑的评课任务日志里有系统恢复说明（30 天内）。可关闭。
+- `duplicates_merged`：重复的评课任务已被合并（30 天内）。可关闭。
+
+可关闭通知的已读状态由前端按 `id` 保存在本地。
+
 ## 5. 托管凭据
 
 托管凭据只用于浏览器关闭后仍需继续执行的评课、学习舱和群报数任务。拒绝托管不影响课表、成绩和在线选课。
@@ -208,6 +218,8 @@ Turnstile Secret 永远不进入前端配置。所需脚本与 CSP 域名以 Clo
   }
 }
 ```
+
+每个用户只保留一个常驻评课任务：已有排队、运行或等待重试的评课任务时，再次创建会直接返回原任务（HTTP 200，响应头 `X-Job-Deduplicated: true`），不会新建。
 
 `retry_until` 可省略；填写时表示用户主动设置的停止时间，缺省为任务创建后 180 天。任务是常驻的：创建后立即执行一次，之后每天按 `NANYEE_EVALUATION_DAILY_RUN_TIME`（默认 07:00，始终按北京时间 Asia/Shanghai 解释，与宿主机时区无关）自动运行——每轮执行完毕任务回到 `queued` 并排队到下一运行时刻，`receipt` 保留最近一轮的结果与日志。Worker 每轮会查找全部待评课程，按旧工具的偏高随机档位生成合法答案并依次提交；评教未开放或当日无待评课程时该轮空跑。服务端验证码仅用于这个无人值守任务：单次登录按 1、2、4、8 秒退避识别，仍未成功时任务重新进入 `retry_wait`（30 秒后再试），浏览器关闭不影响后续执行；学校明确返回账号密码不匹配时任务直接终止并要求更新凭据，不再无限重试。只有用户取消、凭据撤销或过期、截止时间到达等确定条件才终止。
 

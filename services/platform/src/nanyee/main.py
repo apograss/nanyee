@@ -24,6 +24,7 @@ from nanyee.integrations.qun100.router import router as qun100_router
 from nanyee.integrations.smu.client import SmuAcademicClient
 from nanyee.integrations.smu.enrollment_runs import EnrollmentRunManager
 from nanyee.integrations.smu.router import router as smu_router
+from nanyee.jobs.notices import router as notices_router
 from nanyee.jobs.router import router as jobs_router
 from nanyee.logging import configure_logging
 from nanyee.middleware import RequestContextMiddleware
@@ -100,6 +101,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(registration_router, prefix="/api/v1")
     app.include_router(credentials_router, prefix="/api/v1")
     app.include_router(jobs_router, prefix="/api/v1")
+    app.include_router(notices_router, prefix="/api/v1")
     app.include_router(smu_router, prefix="/api/v1")
     app.include_router(qun100_router, prefix="/api/v1")
     app.include_router(infospace_router, prefix="/api/v1")

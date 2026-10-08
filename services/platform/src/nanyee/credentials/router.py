@@ -20,6 +20,7 @@ from nanyee.db import get_db_session
 from nanyee.errors import AppError, ErrorCode
 from nanyee.identity.router import current_auth
 from nanyee.identity.sessions import AuthContext, settings_from_request, validate_csrf
+from nanyee.jobs.service import JobService
 from nanyee.tools.qun_checkin import validate_auth_token
 
 logger = logging.getLogger(__name__)
@@ -307,9 +308,13 @@ class CredentialUpdateRequest(BaseModel):
         return self
 
 
+class CredentialUpdateResponse(CredentialResponse):
+    resumed_job_id: UUID | None = None
+
+
 @router.put(
     "/{credential_id}/secret",
-    response_model=CredentialResponse,
+    response_model=CredentialUpdateResponse,
     operation_id="update_credential_secret",
 )
 async def update_credential_secret(
@@ -320,7 +325,7 @@ async def update_credential_secret(
     auth: Annotated[AuthContext, Depends(current_auth)],
     cipher: Annotated[EnvelopeCipher, Depends(get_cipher)],
     csrf_header: Annotated[str | None, Header(alias="X-CSRF-Token")] = None,
-) -> CredentialResponse:
+) -> CredentialUpdateResponse:
     require_csrf(request, auth, csrf_header)
     await AntiAbuseGate(settings_from_request(request)).check(
         db,
@@ -348,11 +353,21 @@ async def update_credential_secret(
         plaintext=_canonical_secret(purpose, payload.secret.get_secret_value()),
         public_metadata=payload.metadata,
     )
+    resumed = await JobService().resume_after_credential_update(
+        db, credential_id=credential_id, user_id=auth.user.id
+    )
     logger.info(
         "credential_secret_updated",
-        extra={"user_id": str(auth.user.id), "credential_id": str(credential_id)},
+        extra={
+            "user_id": str(auth.user.id),
+            "credential_id": str(credential_id),
+            "resumed_job_id": str(resumed.id) if resumed else None,
+        },
     )
-    return CredentialResponse.from_record(record)
+    return CredentialUpdateResponse(
+        **CredentialResponse.from_record(record).model_dump(),
+        resumed_job_id=resumed.id if resumed else None,
+    )
 
 
 @router.delete(

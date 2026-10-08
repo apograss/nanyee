@@ -14,7 +14,7 @@ from nanyee.credentials.service import CredentialVaultService
 from nanyee.errors import AppError
 from nanyee.integrations.smu.client import SmuAcademicClient
 from nanyee.integrations.smu.evaluation_automation import build_legacy_positive_answers
-from nanyee.jobs.models import Job
+from nanyee.jobs.models import EVALUATION_DEFAULT_WINDOW, SYSTEM_NOTICE_EVENT, Job
 from nanyee.security import as_utc
 from nanyee.tools.evaluation import EvaluationAutomationRequest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,10 +25,7 @@ from nanyee_worker.study_cabin import DdddOcrSolver
 logger = logging.getLogger(__name__)
 
 _BEIJING = ZoneInfo("Asia/Shanghai")
-_SYSTEM_NOTICE_EVENT = "system_notice"
 _MAX_CARRIED_NOTICES = 3
-# 未显式设置 retry_until 时的默认截止：任务创建后 180 天
-_DEFAULT_RETRY_WINDOW = timedelta(days=180)
 
 
 def _next_daily_run(run_time: str, *, now: datetime | None = None) -> datetime:
@@ -49,7 +46,7 @@ def _carried_notices(receipt: dict[str, object] | None) -> list[dict[str, object
     notices = [
         entry
         for entry in previous
-        if isinstance(entry, dict) and entry.get("event") == _SYSTEM_NOTICE_EVENT
+        if isinstance(entry, dict) and entry.get("event") == SYSTEM_NOTICE_EVENT
     ]
     return notices[-_MAX_CARRIED_NOTICES:]
 
@@ -156,7 +153,7 @@ class EvaluationHandler:
         )
         deadline = (
             request.retry_until
-            or as_utc(job.created_at or datetime.now(UTC)) + _DEFAULT_RETRY_WINDOW
+            or as_utc(job.created_at or datetime.now(UTC)) + EVALUATION_DEFAULT_WINDOW
         )
         next_run = _next_daily_run(self._settings.evaluation_daily_run_time)
         next_run_at = next_run if next_run <= deadline.astimezone(UTC) else None

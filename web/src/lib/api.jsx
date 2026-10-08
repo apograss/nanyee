@@ -358,6 +358,11 @@ export function deleteCredential(id, opts) {
   return apiDelete(`/credentials/${id}?hard=true`, opts);
 }
 
+// 站内通知（按任务状态实时计算）
+export function listNotices(opts) {
+  return apiGet("/notices", opts);
+}
+
 // 任务
 export function createJob(body, opts) {
   return apiFetch("/jobs", { ...opts, method: "POST", body, action: "job_create", headers: { ...(opts?.headers || {}), "Idempotency-Key": opts?.idempotencyKey || crypto.randomUUID() } });

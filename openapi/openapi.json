@@ -692,9 +692,16 @@
             "type": "string"
           },
           "expires_at": {
-            "format": "date-time",
-            "title": "Expires At",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
           },
           "id": {
             "format": "uuid",
@@ -780,6 +787,131 @@
         ],
         "title": "CredentialStatus",
         "type": "string"
+      },
+      "CredentialUpdateRequest": {
+        "properties": {
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
+          },
+          "secret": {
+            "format": "password",
+            "title": "Secret",
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "secret"
+        ],
+        "title": "CredentialUpdateRequest",
+        "type": "object"
+      },
+      "CredentialUpdateResponse": {
+        "properties": {
+          "consent_version": {
+            "title": "Consent Version",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "metadata": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Metadata",
+            "type": "object"
+          },
+          "purpose": {
+            "title": "Purpose",
+            "type": "string"
+          },
+          "resumed_job_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resumed Job Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CredentialStatus"
+          },
+          "upstream": {
+            "title": "Upstream",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "upstream",
+          "purpose",
+          "status",
+          "expires_at",
+          "created_at",
+          "last_used_at",
+          "metadata",
+          "consent_version"
+        ],
+        "title": "CredentialUpdateResponse",
+        "type": "object"
       },
       "EnrollmentCategoryRequest": {
         "properties": {
@@ -2031,6 +2163,77 @@
           "password"
         ],
         "title": "LoginRequest",
+        "type": "object"
+      },
+      "NoticeResponse": {
+        "properties": {
+          "credential_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential Id"
+          },
+          "dismissible": {
+            "title": "Dismissible",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "kind": {
+            "enum": [
+              "credential_invalid",
+              "evaluation_recovered",
+              "duplicates_merged"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "level": {
+            "enum": [
+              "danger",
+              "info"
+            ],
+            "title": "Level",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "level",
+          "title",
+          "message",
+          "dismissible"
+        ],
+        "title": "NoticeResponse",
         "type": "object"
       },
       "PendingEvaluation": {
@@ -3660,6 +3863,75 @@
         ]
       }
     },
+    "/api/v1/credentials/{credential_id}/secret": {
+      "put": {
+        "operationId": "update_credential_secret",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "credential_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Credential Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CredentialUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredentialUpdateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Credential Secret",
+        "tags": [
+          "credentials"
+        ]
+      }
+    },
     "/api/v1/jobs": {
       "get": {
         "operationId": "list_jobs",
@@ -3857,6 +4129,31 @@
         "summary": "Cancel Job",
         "tags": [
           "jobs"
+        ]
+      }
+    },
+    "/api/v1/notices": {
+      "get": {
+        "operationId": "list_notices",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/NoticeResponse"
+                  },
+                  "title": "Response List Notices",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Notices",
+        "tags": [
+          "notices"
         ]
       }
     },

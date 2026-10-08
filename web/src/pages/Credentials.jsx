@@ -1,5 +1,6 @@
 // Canvas design runtime editable source marker: credentials
 import React, { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { motion } from "motion/react";
 import { KeyRound, Plus, Trash2, Armchair, Users, GraduationCap, ShieldCheck, Eye, EyeOff, Ban, RefreshCw, Pencil } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Label, Badge, Alert, Dialog, Table, cn } from "@/components/ui.jsx";
@@ -7,6 +8,7 @@ import {
   createCredential, listCredentials, revokeCredential, revealCredential, deleteCredential, renewCredential, updateCredentialSecret,
   isCredentialUsable, CREDENTIAL_PURPOSES, CONFIRMATION_VERSIONS,
 } from "@/lib/api.jsx";
+import { NOTICES_REFRESH_EVENT } from "@/components/NoticeBanner.jsx";
 
 // 延期时长：180 天，一键续期无需重新输入密码（仅群报数等有期限的凭据）
 const RENEW_TTL_SECONDS = 180 * 86400;
@@ -55,12 +57,23 @@ export default function Credentials() {
   const [editSecret, setEditSecret] = useState(""); // 敏感态：仅内存，提交后清空
   const [editError, setEditError] = useState("");
   const [editing, setEditing] = useState(false);
+  const [editResult, setEditResult] = useState(null); // { resumed: boolean }
+  const [searchParams, setSearchParams] = useSearchParams();
   const meta = PURPOSE_META[purpose];
   const isSchoolAccount = purpose !== "qun_checkin";
 
   useEffect(() => {
     listCredentials().then(setList).catch(() => setList([]));
   }, []);
+
+  // 通知横幅「去修改学校密码」跳转过来时带 ?edit=<id>，直接打开修改对话框
+  const editParam = searchParams.get("edit");
+  useEffect(() => {
+    if (!editParam || !list.length) return;
+    const target = list.find((c) => c.id === editParam && c.status === "active");
+    if (target) openEdit(target);
+    setSearchParams({}, { replace: true });
+  }, [editParam, list]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const create = async () => {
     setLoading(true);
@@ -116,11 +129,13 @@ export default function Credentials() {
     setEditing(true);
     setEditError("");
     try {
-      await updateCredentialSecret(editFor.id, isSchool
+      const updated = await updateCredentialSecret(editFor.id, isSchool
         ? { secret: JSON.stringify({ account: editAccount, password: editSecret }), metadata: { ...editFor.metadata, account_hint: `尾号 ${editAccount.slice(-4)}` } }
         : { secret: editSecret });
       closeEdit();
+      setEditResult({ resumed: !!updated?.resumed_job_id });
       listCredentials().then(setList).catch(() => {});
+      window.dispatchEvent(new Event(NOTICES_REFRESH_EVENT));
     } catch (err) {
       setEditError(err?.message || "修改失败，请稍后重试。");
     }
@@ -180,6 +195,14 @@ export default function Credentials() {
           <span>凭据以 AES-256-GCM 信封加密保存；查看明文需本人登录态二次确认；删除会立即清除密文，不可恢复。</span>
         </Alert>
       </motion.div>
+
+      {editResult && (
+        <motion.div variants={fadeUp} initial="hidden" animate="show">
+          <Alert variant="success" title="凭据已更新">
+            <span>{editResult.resumed ? "因密码错误停止的自动评课已经恢复，马上会用新密码重新运行。" : "使用这条授权的任务下一轮会直接用新的内容。"}</span>
+          </Alert>
+        </motion.div>
+      )}
 
       <motion.div variants={fadeUp}>
         <Card>

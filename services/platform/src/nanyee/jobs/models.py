@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import StrEnum
 from uuid import UUID, uuid4
 
@@ -38,6 +38,16 @@ TERMINAL_JOB_STATES = frozenset(
         JobState.VERIFICATION_REQUIRED,
     }
 )
+
+ACTIVE_JOB_STATES = frozenset({JobState.QUEUED, JobState.RUNNING, JobState.RETRY_WAIT})
+
+# 评课任务策略（platform 与 worker 共用）
+EVALUATION_TOOL_ID = "evaluation"
+# 未设置 retry_until 时的默认运行期限：任务创建后 180 天
+EVALUATION_DEFAULT_WINDOW = timedelta(days=180)
+# 合并重复评课任务时，被取消的那些任务的 error_code
+DUPLICATE_MERGED_ERROR = "DUPLICATE_MERGED"
+SYSTEM_NOTICE_EVENT = "system_notice"
 
 
 class Job(TimestampMixin, Base):

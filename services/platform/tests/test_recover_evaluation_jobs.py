@@ -14,16 +14,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 NOW = datetime(2026, 10, 8, 4, 0, tzinfo=UTC)
-MIGRATION = (
-    Path(__file__).resolve().parents[1]
-    / "migrations"
-    / "versions"
-    / "20261008_0005_recover_evaluation_jobs.py"
-)
+VERSIONS = Path(__file__).resolve().parents[1] / "migrations" / "versions"
 
 
-def _load_migration() -> ModuleType:
-    spec = importlib.util.spec_from_file_location("recover_evaluation_jobs", MIGRATION)
+def _load_migration(name: str = "20261008_0005_recover_evaluation_jobs") -> ModuleType:
+    spec = importlib.util.spec_from_file_location(name, VERSIONS / f"{name}.py")
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -210,3 +205,43 @@ def test_recover_requeues_only_eligible_evaluation_jobs() -> None:
             assert job is not None
             assert job.state == state
             assert job.finished_at is not None
+
+
+def test_merge_keeps_latest_active_evaluation_job_per_user() -> None:
+    migration = _load_migration("20261008_0006_merge_duplicate_evaluation_jobs")
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        dup_user = _user(db, "dup_user")
+        dup_cred = _credential(db, dup_user)
+        oldest = _job(db, dup_user, dup_cred, state=JobState.QUEUED, created_days_ago=20)
+        middle = _job(db, dup_user, dup_cred, state=JobState.RETRY_WAIT, created_days_ago=10)
+        newest = _job(db, dup_user, dup_cred, state=JobState.QUEUED, created_days_ago=2)
+        finished = _job(db, dup_user, dup_cred, state=JobState.SUCCEEDED, created_days_ago=1)
+
+        single_user = _user(db, "single_user")
+        single_cred = _credential(db, single_user)
+        single = _job(db, single_user, single_cred, state=JobState.QUEUED)
+        db.commit()
+        ids = {
+            "oldest": oldest.id,
+            "middle": middle.id,
+            "newest": newest.id,
+            "finished": finished.id,
+            "single": single.id,
+        }
+
+    with engine.begin() as connection:
+        assert migration.merge(connection, NOW) == 2
+
+    with Session(engine) as db:
+        states = {name: db.get(Job, job_id) for name, job_id in ids.items()}
+        for name in ("oldest", "middle"):
+            job = states[name]
+            assert job is not None
+            assert job.state == JobState.CANCELLED
+            assert job.error_code == "DUPLICATE_MERGED"
+            assert job.finished_at is not None
+        assert states["newest"] is not None and states["newest"].state == JobState.QUEUED
+        assert states["finished"] is not None and states["finished"].state == JobState.SUCCEEDED
+        assert states["single"] is not None and states["single"].state == JobState.QUEUED

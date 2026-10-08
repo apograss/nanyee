@@ -9,6 +9,7 @@ import { AuthProvider, useAuth, apiPost, listJobs } from "@/lib/api.jsx";
 import { ThemeProvider, ThemeToggle } from "@/lib/theme.jsx";
 import { MotionConfig, motion } from "motion/react";
 import { Button, Badge, cn } from "@/components/ui.jsx";
+import NoticeBanner from "@/components/NoticeBanner.jsx";
 
 import AuthPages from "@/pages/AuthPages.jsx";
 import HomePage from "@/pages/Home.jsx";
@@ -209,6 +210,7 @@ function Shell() {
           </div>
         </header>
         <main className="flex-1 p-4 sm:p-6 lg:p-8 warm-grain" data-component="PageMain">
+          <NoticeBanner user={user} />
           <Outlet />
         </main>
       </div>

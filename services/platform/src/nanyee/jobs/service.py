@@ -11,7 +11,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from nanyee.errors import AppError, ErrorCode
 from nanyee.identity.models import User, UserStatus
-from nanyee.jobs.models import TERMINAL_JOB_STATES, Job, JobState
+from nanyee.jobs.models import (
+    ACTIVE_JOB_STATES,
+    EVALUATION_DEFAULT_WINDOW,
+    EVALUATION_TOOL_ID,
+    SYSTEM_NOTICE_EVENT,
+    TERMINAL_JOB_STATES,
+    Job,
+    JobState,
+)
 from nanyee.security import as_utc, utc_now
 
 
@@ -270,6 +278,70 @@ class JobService:
         else:
             record.state = JobState.FAILED
             record.finished_at = now
+        await db.commit()
+        await db.refresh(record)
+        return record
+
+    async def active_evaluation_job(self, db: AsyncSession, *, user_id: UUID) -> Job | None:
+        """用户当前在跑的评课任务（最新创建的一条）；每人只保留一个常驻评课任务。"""
+        return (
+            await db.execute(
+                select(Job)
+                .where(
+                    Job.user_id == user_id,
+                    Job.tool_id == EVALUATION_TOOL_ID,
+                    Job.state.in_(ACTIVE_JOB_STATES),
+                    Job.cancel_requested_at.is_(None),
+                )
+                .order_by(Job.created_at.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+
+    async def resume_after_credential_update(
+        self, db: AsyncSession, *, credential_id: UUID, user_id: UUID
+    ) -> Job | None:
+        """凭据改密后，把因密码错误终止的评课任务重新排队；用户已有在跑的评课任务时不处理。"""
+        if await self.active_evaluation_job(db, user_id=user_id) is not None:
+            return None
+        record = (
+            await db.execute(
+                select(Job)
+                .where(
+                    Job.user_id == user_id,
+                    Job.tool_id == EVALUATION_TOOL_ID,
+                    Job.credential_id == credential_id,
+                )
+                .order_by(Job.created_at.desc())
+                .limit(1)
+                .with_for_update()
+            )
+        ).scalar_one_or_none()
+        now = utc_now()
+        if (
+            record is None
+            or record.state != JobState.FAILED
+            or record.error_code != "CREDENTIAL_INVALID"
+            or record.attempt_count >= record.max_attempts
+            or as_utc(record.created_at) + EVALUATION_DEFAULT_WINDOW <= now
+        ):
+            return None
+        receipt = dict(record.receipt or {})
+        logs = receipt.get("logs")
+        receipt["logs"] = [
+            *(logs if isinstance(logs, list) else []),
+            {
+                "time": now.isoformat(),
+                "event": SYSTEM_NOTICE_EVENT,
+                "message": "学校密码已更新，评课任务已自动恢复，马上会重新运行。",
+            },
+        ]
+        record.state = JobState.QUEUED
+        record.scheduled_for = now
+        record.finished_at = None
+        record.error_code = None
+        record.next_action = None
+        record.receipt = receipt
         await db.commit()
         await db.refresh(record)
         return record

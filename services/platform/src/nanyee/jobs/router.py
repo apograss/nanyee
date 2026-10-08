@@ -24,7 +24,7 @@ from nanyee.db import get_db_session
 from nanyee.errors import AppError, ErrorCode
 from nanyee.identity.router import current_auth
 from nanyee.identity.sessions import AuthContext, settings_from_request
-from nanyee.jobs.models import Job, JobState
+from nanyee.jobs.models import EVALUATION_TOOL_ID, Job, JobState
 from nanyee.jobs.service import JobService
 from nanyee.security import as_utc, utc_now
 from nanyee.tool_registry import RiskLevel, get_tool
@@ -192,7 +192,16 @@ async def create_job(
             status_code=422,
             details={"field": "scheduled_for"},
         )
-    record, created = await JobService().create(
+    service = JobService()
+    if payload.tool_id == EVALUATION_TOOL_ID:
+        # 每人只保留一个常驻评课任务，已有在跑的就直接沿用，避免每天重复登录学校
+        active = await service.active_evaluation_job(db, user_id=auth.user.id)
+        if active is not None:
+            response.status_code = 200
+            response.headers["Idempotency-Replayed"] = "false"
+            response.headers["X-Job-Deduplicated"] = "true"
+            return JobResponse.from_record(active)
+    record, created = await service.create(
         db,
         user_id=auth.user.id,
         tool_id=payload.tool_id,
