@@ -251,6 +251,28 @@ async def test_evaluation_zero_pending_still_schedules_next_daily_run(monkeypatc
 
 
 @pytest.mark.asyncio
+async def test_evaluation_without_retry_until_keeps_scheduling_after_30_days(
+    monkeypatch: Any,
+) -> None:
+    import nanyee_worker.evaluation as module
+
+    async def active_job(_db: object, _job: Job) -> None:
+        return None
+
+    monkeypatch.setattr(module, "ensure_execution_active", active_job)
+    # 未设置 retry_until 的常驻任务不应因创建时间久远而终结
+    next_run = datetime.now(UTC) + timedelta(days=1)
+    monkeypatch.setattr(module, "_next_daily_run", lambda _run_time: next_run)
+    handler = build_handler(QuietAcademicClient())
+    job = build_job()
+    job.created_at = datetime.now(UTC) - timedelta(days=60)
+
+    receipt = await handler.execute(cast(Any, object()), job)
+
+    assert receipt.next_run_at == next_run
+
+
+@pytest.mark.asyncio
 async def test_evaluation_past_retry_until_completes_terminally(monkeypatch: Any) -> None:
     import nanyee_worker.evaluation as module
 

@@ -15,7 +15,6 @@ from nanyee.errors import AppError
 from nanyee.integrations.smu.client import SmuAcademicClient
 from nanyee.integrations.smu.evaluation_automation import build_legacy_positive_answers
 from nanyee.jobs.models import Job
-from nanyee.security import as_utc
 from nanyee.tools.evaluation import EvaluationAutomationRequest
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,8 +24,6 @@ from nanyee_worker.study_cabin import DdddOcrSolver
 logger = logging.getLogger(__name__)
 
 _BEIJING = ZoneInfo("Asia/Shanghai")
-# 未显式设置 retry_until 时的默认截止：创建后 30 天，避免常驻任务无限期空跑
-_DEFAULT_RETRY_WINDOW = timedelta(days=30)
 
 
 def _next_daily_run(run_time: str, *, now: datetime | None = None) -> datetime:
@@ -139,12 +136,11 @@ class EvaluationHandler:
             f"自动评课完成，成功提交 {len(submitted)} 门。",
             submitted_count=len(submitted),
         )
-        deadline = (
-            request.retry_until
-            or as_utc(job.created_at or datetime.now(UTC)) + _DEFAULT_RETRY_WINDOW
-        )
+        # 未设置 retry_until 时常驻运行，由凭据过期或用户取消来终止
         next_run = _next_daily_run(self._settings.evaluation_daily_run_time)
-        next_run_at = next_run if next_run <= deadline.astimezone(UTC) else None
+        next_run_at: datetime | None = next_run
+        if request.retry_until is not None and next_run > request.retry_until.astimezone(UTC):
+            next_run_at = None
         if next_run_at is not None:
             self._log(
                 job,
