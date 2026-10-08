@@ -276,6 +276,28 @@ async def test_evaluation_default_window_is_180_days(monkeypatch: Any) -> None:
 
 
 @pytest.mark.asyncio
+async def test_evaluation_keeps_system_notices_from_previous_receipt(monkeypatch: Any) -> None:
+    import nanyee_worker.evaluation as module
+
+    async def active_job(_db: object, _job: Job) -> None:
+        return None
+
+    monkeypatch.setattr(module, "ensure_execution_active", active_job)
+    handler = build_handler(QuietAcademicClient())
+    job = build_job()
+    notice = {"time": "2026-10-08T00:00:00+00:00", "event": "system_notice", "message": "已恢复"}
+    job.receipt = {
+        "logs": [notice, {"event": "evaluation_completed", "message": "旧日志"}],
+    }
+
+    receipt = await handler.execute(cast(Any, object()), job)
+
+    logs = receipt.values["logs"]
+    assert logs[0] == notice
+    assert all(entry.get("message") != "旧日志" for entry in logs)
+
+
+@pytest.mark.asyncio
 async def test_evaluation_past_retry_until_completes_terminally(monkeypatch: Any) -> None:
     import nanyee_worker.evaluation as module
 

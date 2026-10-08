@@ -167,7 +167,7 @@ export default function JobDetail() {
             </CardHeader>
             <CardContent className="flex flex-col gap-2">
               {job.receipt.logs.map((entry, index) => (
-                <div key={`${entry.time || "log"}-${index}`} className="flex items-start gap-3 rounded-[var(--radius)] border border-border px-3 py-2 text-[12px]">
+                <div key={`${entry.time || "log"}-${index}`} className={cn("flex items-start gap-3 rounded-[var(--radius)] border px-3 py-2 text-[12px]", entry.event === "system_notice" ? "border-[var(--seed-primary)] bg-[var(--primary-muted)]" : "border-border")}>
                   <span className="shrink-0 font-mono text-[var(--muted)]">{entry.time ? new Date(entry.time).toLocaleTimeString("zh-CN", { hour12: false }) : "--:--:--"}</span>
                   <span className="flex-1">{entry.message || entry.event}</span>
                 </div>

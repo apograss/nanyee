@@ -25,6 +25,8 @@ from nanyee_worker.study_cabin import DdddOcrSolver
 logger = logging.getLogger(__name__)
 
 _BEIJING = ZoneInfo("Asia/Shanghai")
+_SYSTEM_NOTICE_EVENT = "system_notice"
+_MAX_CARRIED_NOTICES = 3
 # 未显式设置 retry_until 时的默认截止：任务创建后 180 天
 _DEFAULT_RETRY_WINDOW = timedelta(days=180)
 
@@ -37,6 +39,19 @@ def _next_daily_run(run_time: str, *, now: datetime | None = None) -> datetime:
     if candidate <= current:
         candidate += timedelta(days=1)
     return candidate
+
+
+def _carried_notices(receipt: dict[str, object] | None) -> list[dict[str, object]]:
+    """保留上一轮日志中的系统说明（如自动恢复通知），避免被新一轮结果覆盖。"""
+    previous = receipt.get("logs") if isinstance(receipt, dict) else None
+    if not isinstance(previous, list):
+        return []
+    notices = [
+        entry
+        for entry in previous
+        if isinstance(entry, dict) and entry.get("event") == _SYSTEM_NOTICE_EVENT
+    ]
+    return notices[-_MAX_CARRIED_NOTICES:]
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,7 +79,7 @@ class EvaluationHandler:
                 "CREDENTIAL_REQUIRED", retryable=False, next_action="replace_credential"
             )
         request = EvaluationAutomationRequest.model_validate(job.payload)
-        logs: list[dict[str, object]] = []
+        logs = _carried_notices(job.receipt)
         self._log(job, logs, "evaluation_started", "自动评课任务开始。")
         if request.retry_until is not None and datetime.now(UTC) >= request.retry_until.astimezone(
             UTC

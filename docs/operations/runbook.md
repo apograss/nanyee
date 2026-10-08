@@ -16,6 +16,8 @@ docker compose --env-file .env.production -f infra/compose/compose.prod.yaml run
 docker compose --env-file .env.production -f infra/compose/compose.prod.yaml up -d api worker gateway
 ```
 
+迁移若与旧代码不兼容（如 `20261008_0004` 让 `hosted_credentials.expires_at` 可为空，旧 worker 会把空值当作凭据失效），先 `docker compose ... stop api worker` 再跑 `migrate`，最后 `up -d` 启动新版本。
+
 ## 切换现状（执行前必读）
 
 以下为当前生产事实，切换 `nanyee.de` 前必须逐项确认：
