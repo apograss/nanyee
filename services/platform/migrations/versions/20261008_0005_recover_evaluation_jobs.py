@@ -29,6 +29,8 @@ logger = logging.getLogger("alembic.runtime.migration")
 
 _BEIJING = ZoneInfo("Asia/Shanghai")
 _JOB_WINDOW = timedelta(days=180)
+# 旧窗口为 30 天；跨度不足的"已完成"是每日运行上线前的一次性任务，不恢复
+_OLD_WINDOW_MIN_SPAN = timedelta(days=29)
 # 留出新版 worker 启动的时间，避免旧 worker 按旧逻辑领走后再次结束任务
 _START_DELAY = timedelta(minutes=10)
 _ACTIVE_JOB_STATES = {"QUEUED", "RUNNING", "RETRY_WAIT"}
@@ -71,7 +73,12 @@ def _utc(value: datetime) -> datetime:
 def _recovery_reason(row: Any) -> str | None:
     state = str(row.state).upper()
     payload = row.payload if isinstance(row.payload, dict) else {}
-    if state == "SUCCEEDED" and payload.get("retry_until") is None:
+    if (
+        state == "SUCCEEDED"
+        and payload.get("retry_until") is None
+        and row.finished_at is not None
+        and _utc(row.finished_at) - _utc(row.created_at) >= _OLD_WINDOW_MIN_SPAN
+    ):
         return "window"
     if state == "FAILED" and row.error_code == "CREDENTIAL_UNAVAILABLE":
         return "credential"

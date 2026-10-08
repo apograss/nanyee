@@ -159,6 +159,13 @@ def test_recover_requeues_only_eligible_evaluation_jobs() -> None:
             error_code="CREDENTIAL_INVALID",
         )
 
+        # 每日运行上线前的一次性任务：创建当天就完成，不恢复
+        one_shot_user = _user(db, "one_shot_user")
+        one_shot_cred = _credential(db, one_shot_user)
+        one_shot_job = _job(
+            db, one_shot_user, one_shot_cred, state=JobState.SUCCEEDED, created_days_ago=9
+        )
+
         old_user = _user(db, "old_user")
         old_cred = _credential(db, old_user)
         old_job = _job(db, old_user, old_cred, state=JobState.SUCCEEDED, created_days_ago=181)
@@ -171,6 +178,7 @@ def test_recover_requeues_only_eligible_evaluation_jobs() -> None:
                 suspended_job,
                 deadline_job,
                 other_failure_job,
+                one_shot_job,
                 old_job,
             )
         }
