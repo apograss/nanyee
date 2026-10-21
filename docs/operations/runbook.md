@@ -14,6 +14,7 @@ docker compose --env-file .env.production -f infra/compose/compose.prod.yaml con
 docker compose --env-file .env.production -f infra/compose/compose.prod.yaml pull
 docker compose --env-file .env.production -f infra/compose/compose.prod.yaml run --rm migrate
 docker compose --env-file .env.production -f infra/compose/compose.prod.yaml up -d api worker gateway
+docker compose --env-file .env.production -f infra/compose/compose.prod.yaml restart gateway   # api 重建后必须，见「镜像构建与分发」节
 ```
 
 迁移若与旧代码不兼容（如 `20261008_0004` 让 `hosted_credentials.expires_at` 可为空，旧 worker 会把空值当作凭据失效），先 `docker compose ... stop api worker` 再跑 `migrate`，最后 `up -d` 启动新版本。
@@ -54,7 +55,12 @@ VPS 部署/更新：
 docker compose --env-file .env.production -f infra/compose/compose.prod.yaml config
 docker compose --env-file .env.production -f infra/compose/compose.prod.yaml run --rm migrate   # 首次或迁移有更新时
 docker compose --env-file .env.production -f infra/compose/compose.prod.yaml up -d api worker gateway
+docker compose --env-file .env.production -f infra/compose/compose.prod.yaml restart gateway
 ```
+
+**api 重建后必须重启 gateway。** gateway 的 nginx 用 `proxy_pass http://api:8000` 静态反代，只在启动时解析一次 `api` 的容器 IP；api 容器被重建（新镜像、`up -d api`、`--force-recreate` 等）后内网 IP 会变，gateway 仍连旧地址，表现为前端页面正常、所有 `/api` 请求 502，gateway 日志里是 `connect() failed (111: Connection refused)`。因此部署时 `up -d` 之后总是补一次 `restart gateway`，单独动 api 时也一样。验证：`curl -s -o /dev/null -w "%{http_code}" -H "Host: nanyee.de" http://127.0.0.1:8080/api/v1/auth/me` 应为 401 而不是 502（`/health/ready` 不经过 api，不能用来判断）。
+
+注意 compose 服务名是 `api`、`worker`、`gateway`、`postgres`，前端镜像 `nanyee-web` 挂在 `gateway` 服务下，没有 `web` 服务；`pull web` 这类写错服务名的命令会整条失败，什么都不拉。
 
 备选：离线构建（Apple Silicon Mac）时必须 `docker buildx build --platform linux/amd64 ... --load`，再 `docker save | ssh docker load`；镜像 1GB+，仅当 GHCR 不可用时走这条路。
 
