@@ -2,7 +2,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
-import { AlertOctagon, CheckCircle2, Layers, X, KeyRound, ArrowRight } from "lucide-react";
+import { AlertOctagon, CheckCircle2, Layers, Megaphone, X, KeyRound, ArrowRight } from "lucide-react";
 import { Button, cn } from "@/components/ui.jsx";
 import { listNotices } from "@/lib/api.jsx";
 
@@ -18,7 +18,25 @@ function loadDismissed() {
   }
 }
 
+// 站点公告：前端静态配置，所有访客可见；改内容时换个 id，已关闭过的人才会重新看到
+const ANNOUNCEMENTS = [
+  {
+    id: "announcement:evaluation-schedule-20261021",
+    kind: "announcement",
+    level: "info",
+    title: "公告",
+    message: "调整了下自动评课时间，目前还能正常运行，如遇任何问题请在关于页面反馈",
+    dismissible: true,
+  },
+];
+
 const KIND_META = {
+  announcement: {
+    icon: Megaphone,
+    cls: "border-[color-mix(in_srgb,var(--seed-primary)_55%,transparent)] bg-[var(--primary-muted)]",
+    bar: "bg-[var(--seed-primary)]",
+    iconCls: "text-[var(--seed-primary-strong)]",
+  },
   credential_invalid: {
     icon: AlertOctagon,
     cls: "border-[var(--danger)] bg-[var(--danger-muted)]",
@@ -65,7 +83,7 @@ export default function NoticeBanner({ user }) {
     try { localStorage.setItem(DISMISSED_KEY, JSON.stringify(next)); } catch { /* 隐私模式下忽略 */ }
   };
 
-  const visible = notices.filter((n) => !n.dismissible || !dismissed.includes(n.id));
+  const visible = [...ANNOUNCEMENTS, ...notices].filter((n) => !n.dismissible || !dismissed.includes(n.id));
   if (!visible.length) return null;
 
   return (
@@ -102,6 +120,9 @@ export default function NoticeBanner({ user }) {
                           <ArrowRight className="w-3.5 h-3.5" /> 重新开始自动评课
                         </Button>
                       )
+                    )}
+                    {notice.kind === "announcement" && location.pathname !== "/about" && (
+                      <Button size="sm" variant="outline" onClick={() => navigate("/about")}>去反馈</Button>
                     )}
                     {notice.job_id && (
                       <Button size="sm" variant="outline" onClick={() => navigate(`/jobs/${notice.job_id}`)}>
