@@ -71,16 +71,20 @@ def test_cloudmail_gateway_pair_is_accepted_in_production() -> None:
     assert settings.cloudmail_gateway_url == "https://cloudmail.apograss.workers.dev"
 
 
-def test_evaluation_daily_run_time_default_and_format() -> None:
-    assert Settings(app_env="test").evaluation_daily_run_time == "07:00"
-    assert (
-        Settings(app_env="test", evaluation_daily_run_time="23:59").evaluation_daily_run_time
-        == "23:59"
-    )
+def test_evaluation_daily_window_default_and_format() -> None:
+    settings = Settings(app_env="test")
+    assert settings.evaluation_daily_window_start == "21:10"
+    assert settings.evaluation_daily_window_end == "23:30"
     with pytest.raises(ValidationError):
-        Settings(app_env="test", evaluation_daily_run_time="25:00")
+        Settings(app_env="test", evaluation_daily_window_start="25:00")
     with pytest.raises(ValidationError):
-        Settings(app_env="test", evaluation_daily_run_time="7点")
+        Settings(app_env="test", evaluation_daily_window_end="7点")
+    with pytest.raises(ValidationError):
+        Settings(
+            app_env="test",
+            evaluation_daily_window_start="23:00",
+            evaluation_daily_window_end="22:00",
+        )
 
 
 @pytest.mark.parametrize(

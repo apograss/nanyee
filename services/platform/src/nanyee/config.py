@@ -112,13 +112,19 @@ class Settings(BaseSettings):
     worker_heartbeat_file: str = ""
     # 生产容器内 Chromium 需要 ["--no-sandbox", "--disable-dev-shm-usage"]（非 root + cap_drop ALL）
     playwright_launch_args: list[str] = []
-    # 自动评课每日运行时间，按北京时间（Asia/Shanghai）解释，与宿主机/容器时区无关
-    evaluation_daily_run_time: str = Field(default="07:00", pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    # 自动评课每日运行时间窗口，每次在 [start, end] 内随机取一个时刻；
+    # 按北京时间（Asia/Shanghai）解释，与宿主机/容器时区无关
+    evaluation_daily_window_start: str = Field(
+        default="21:10", pattern=r"^([01]\d|2[0-3]):[0-5]\d$"
+    )
+    evaluation_daily_window_end: str = Field(default="23:30", pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
 
     @model_validator(mode="after")
     def validate_cross_field_security(self) -> Settings:
         if self.quiz_pass_score > self.quiz_question_count:
             raise ValueError("quiz_pass_score cannot exceed quiz_question_count")
+        if self.evaluation_daily_window_start > self.evaluation_daily_window_end:
+            raise ValueError("evaluation_daily_window_start cannot be later than window end")
 
         if self.turnstile_enabled:
             if not self.turnstile_site_key or not self.turnstile_secret_key:

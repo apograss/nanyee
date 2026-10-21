@@ -117,7 +117,7 @@ export default function Evaluations() {
             <div className="kicker"><strong>School Account</strong></div>
             <CardTitle>学校账号授权</CardTitle>
             <CardDescription>
-              授权后后台自动完成全部评课：立即先评一次，之后每天北京时间 07:00 自动执行，持续 180 天或直到你取消。学号密码以 AES-256-GCM 信封加密长期保存，改了学校密码后在「授权管理」中修改即可，任务不用重建；也可随时删除。
+              授权后后台自动完成全部评课：立即先评一次，之后每天北京时间 21:10–23:30 之间随机挑个时间自动执行，持续 180 天或直到你取消。学号密码以 AES-256-GCM 信封加密长期保存，改了学校密码后在「授权管理」中修改即可，任务不用重建；也可随时删除。
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
@@ -146,7 +146,7 @@ export default function Evaluations() {
 
             <div className="rounded-[var(--radius)] border border-border p-4 bg-[var(--seed-surface-2)] text-[13px] flex flex-col gap-1.5">
               <div className="flex justify-between"><span className="text-[var(--muted)]">评课方式</span><span>自动查找待评课程，生成正面评价</span></div>
-              <div className="flex justify-between"><span className="text-[var(--muted)]">运行频率</span><span>每天 07:00（北京时间）自动执行</span></div>
+              <div className="flex justify-between"><span className="text-[var(--muted)]">运行频率</span><span>每天 21:10–23:30 随机执行（北京时间）</span></div>
               <div className="flex justify-between"><span className="text-[var(--muted)]">验证码</span><span>识别失败自动重试</span></div>
               <div className="flex justify-between"><span className="text-[var(--muted)]">授权有效期</span><span>180 天，到期可延期，可随时删除</span></div>
             </div>
@@ -173,7 +173,7 @@ export default function Evaluations() {
               <div className="flex items-center gap-2">
                 <ArrowRight className="w-3.5 h-3.5 text-[var(--success)]" />
                 <StatusBadge status={result.state} />
-                <span className="text-[13px]">{result.reused ? "已沿用原来的任务，不会重复创建；它会继续每天 07:00（北京时间）自动运行" : "任务已在后台开始执行，之后每天 07:00（北京时间）自动运行"}</span>
+                <span className="text-[13px]">{result.reused ? "已沿用原来的任务，不会重复创建；它会继续每天 21:10–23:30（北京时间）自动运行" : "任务已在后台开始执行，之后每天 21:10–23:30（北京时间）自动运行"}</span>
               </div>
               <div className="text-[12px] text-[var(--muted)] mt-1">可在「任务」页面查看运行状态。学校密码已清空。</div>
             </div>

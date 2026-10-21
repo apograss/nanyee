@@ -188,18 +188,24 @@ async def test_evaluation_login_stops_on_bad_credentials() -> None:
     assert excinfo.value.next_action == "replace_credential"
 
 
-def test_next_daily_run_uses_beijing_time() -> None:
+def test_next_daily_run_picks_random_time_in_beijing_window() -> None:
     from nanyee_worker.evaluation import _next_daily_run
 
-    # 北京 2026-09-01 06:00（UTC 2026-08-31 22:00）→ 当天 07:00（UTC 23:00）
+    # 北京 2026-09-01 06:00（UTC 2026-08-31 22:00）→ 当天 21:10–23:30（UTC 13:10–15:30）
     now = datetime(2026, 8, 31, 22, 0, tzinfo=UTC)
-    assert _next_daily_run("07:00", now=now) == datetime(2026, 8, 31, 23, 0, tzinfo=UTC)
-    # 北京 2026-09-01 08:30（UTC 00:30）→ 次日 07:00
-    now = datetime(2026, 9, 1, 0, 30, tzinfo=UTC)
-    assert _next_daily_run("07:00", now=now) == datetime(2026, 9, 1, 23, 0, tzinfo=UTC)
-    # 恰好 07:00:00 已过点（候选 <= 当前），也进次日
-    now = datetime(2026, 8, 31, 23, 0, tzinfo=UTC)
-    assert _next_daily_run("07:00", now=now) == datetime(2026, 9, 1, 23, 0, tzinfo=UTC)
+    for _ in range(50):
+        run = _next_daily_run("21:10", "23:30", now=now)
+        window_start = datetime(2026, 9, 1, 13, 10, tzinfo=UTC)
+        assert window_start <= run <= window_start + timedelta(hours=2, minutes=20)
+    # 北京 2026-09-01 22:00 窗口已开始（比如刚跑完一轮）→ 排到次日窗口，一天只跑一次
+    now = datetime(2026, 9, 1, 14, 0, tzinfo=UTC)
+    for _ in range(50):
+        run = _next_daily_run("21:10", "23:30", now=now)
+        window_start = datetime(2026, 9, 2, 13, 10, tzinfo=UTC)
+        assert window_start <= run <= window_start + timedelta(hours=2, minutes=20)
+    # 恰好 21:10:00 也算窗口已开始
+    now = datetime(2026, 9, 1, 13, 10, tzinfo=UTC)
+    assert _next_daily_run("21:10", "21:10", now=now) == datetime(2026, 9, 2, 13, 10, tzinfo=UTC)
 
 
 class QuietAcademicClient:
@@ -234,7 +240,7 @@ async def test_evaluation_zero_pending_still_schedules_next_daily_run(monkeypatc
 
     monkeypatch.setattr(module, "ensure_execution_active", active_job)
     next_run = datetime.now(UTC) + timedelta(days=1)
-    monkeypatch.setattr(module, "_next_daily_run", lambda _run_time: next_run)
+    monkeypatch.setattr(module, "_next_daily_run", lambda *_args: next_run)
     handler = build_handler(QuietAcademicClient())
     job = build_job()
 
@@ -259,7 +265,7 @@ async def test_evaluation_default_window_is_180_days(monkeypatch: Any) -> None:
 
     monkeypatch.setattr(module, "ensure_execution_active", active_job)
     next_run = datetime.now(UTC) + timedelta(days=1)
-    monkeypatch.setattr(module, "_next_daily_run", lambda _run_time: next_run)
+    monkeypatch.setattr(module, "_next_daily_run", lambda *_args: next_run)
     handler = build_handler(QuietAcademicClient())
 
     # 创建 60 天：仍在 180 天窗口内，继续排队
@@ -307,7 +313,7 @@ async def test_evaluation_past_retry_until_completes_terminally(monkeypatch: Any
     monkeypatch.setattr(module, "ensure_execution_active", active_job)
     # 下一轮运行晚于截止时刻：本轮执行完即终结，不再排队
     next_run = datetime.now(UTC) + timedelta(days=1)
-    monkeypatch.setattr(module, "_next_daily_run", lambda _run_time: next_run)
+    monkeypatch.setattr(module, "_next_daily_run", lambda *_args: next_run)
     handler = build_handler(QuietAcademicClient())
     job = build_job()
     job.payload = {

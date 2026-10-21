@@ -50,7 +50,7 @@ export default function About() {
           <div className="flex flex-col gap-1 min-w-0">
             <h1 className="display-lede">南医工具台</h1>
             <div className="text-[12px] tracking-[0.14em] text-[var(--muted)] uppercase">Nanyee Toolkit · nanyee.de</div>
-            <p className="text-[var(--muted)] text-sm prose-body mt-1">关于这个站点，以及一些说明。</p>
+            <p className="text-[var(--muted)] text-sm prose-body mt-1">站点的一些说明。</p>
           </div>
         </div>
       </motion.header>
@@ -61,33 +61,31 @@ export default function About() {
           <CardHeader>
             <div className="kicker">Notes</div>
             <CardTitle className="flex items-center gap-2"><Info className="w-4 h-4 text-[var(--seed-primary-strong)]" /> 一些说明</CardTitle>
-            <CardDescription>联系、协议与使用提示。</CardDescription>
+            <CardDescription>联系方式、源码和访问相关。</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex flex-col">
               {[
                 <>
-                  有问题、有想法，或者哪里用不顺手，都欢迎写信到{" "}
+                  如有任何问题或者建议，欢迎发邮件到
                   <a href="mailto:contact@nanyee.de">contact@nanyee.de</a>
-                  。这个站需要你的反馈才能继续变好。
+                  ，期待大家的反馈qwq
                 </>,
                 <>
-                  本站代码以 MIT 协议全部开源，仓库在{" "}
+                  代码用 MIT 协议开源，全都放在
                   <a href="https://github.com/apograss/nanyee" target="_blank" rel="noreferrer">
-                    github.com/apograss/nanyee
+                    GitHub
                   </a>
-                  ，欢迎围观、捉虫、添砖加瓦。
+                  ，欢迎直接提 issue 乃至 pull request。
                 </>,
                 <>
-                  站点架在 Cloudflare 边缘节点上，没有针对大陆优化线路；觉得慢的话，开个加速器会顺畅不少。
-                </>,
-                <>
-                  遇到不会的操作或者打不开的内容，先问问 AI（比如
-                  <a href="https://www.doubao.com/" target="_blank" rel="noreferrer">
-                    豆包
+                  网站部署在 Cloudflare 上，国内访问会比较慢，可以的话尽量开加速器，或是访问优选域名
+                  <a href="https://www.nanyee.de" target="_blank" rel="noreferrer">
+                    www.nanyee.de
                   </a>
-                  ）——99% 的问题都能这样解决。
+                  （非联通可显著提升速度）。
                 </>,
+                <>遇到任何问题，先问问你的 AI 或者自己认真想想 :)</>,
               ].map((item, i) => (
                 <div
                   key={i}

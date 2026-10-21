@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import random
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -28,14 +29,19 @@ _BEIJING = ZoneInfo("Asia/Shanghai")
 _MAX_CARRIED_NOTICES = 3
 
 
-def _next_daily_run(run_time: str, *, now: datetime | None = None) -> datetime:
-    """按北京时间计算 HH:MM 的下一个未来运行时刻（与宿主机时区无关）。"""
-    hour, minute = (int(part) for part in run_time.split(":"))
+def _next_daily_run(window_start: str, window_end: str, *, now: datetime | None = None) -> datetime:
+    """在北京时间 [window_start, window_end] 内随机取下一次运行时刻（与宿主机时区无关）。
+
+    当天窗口尚未开始时排在当天，否则排到次日，保证一天最多跑一次。
+    """
     current = (now or datetime.now(UTC)).astimezone(_BEIJING)
-    candidate = current.replace(hour=hour, minute=minute, second=0, microsecond=0)
-    if candidate <= current:
-        candidate += timedelta(days=1)
-    return candidate
+    start_hour, start_minute = (int(part) for part in window_start.split(":"))
+    end_hour, end_minute = (int(part) for part in window_end.split(":"))
+    start = current.replace(hour=start_hour, minute=start_minute, second=0, microsecond=0)
+    if start <= current:
+        start += timedelta(days=1)
+    span = (end_hour * 60 + end_minute) - (start_hour * 60 + start_minute)
+    return start + timedelta(seconds=random.randint(0, span * 60))  # noqa: S311 - 排程抖动，非安全用途
 
 
 def _carried_notices(receipt: dict[str, object] | None) -> list[dict[str, object]]:
@@ -155,7 +161,10 @@ class EvaluationHandler:
             request.retry_until
             or as_utc(job.created_at or datetime.now(UTC)) + EVALUATION_DEFAULT_WINDOW
         )
-        next_run = _next_daily_run(self._settings.evaluation_daily_run_time)
+        next_run = _next_daily_run(
+            self._settings.evaluation_daily_window_start,
+            self._settings.evaluation_daily_window_end,
+        )
         next_run_at = next_run if next_run <= deadline.astimezone(UTC) else None
         if next_run_at is not None:
             self._log(
