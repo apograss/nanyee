@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import logging
 from email.message import EmailMessage
 from typing import Literal, Protocol
@@ -130,21 +131,54 @@ class SmtpVerificationMailer:
 
 
 class NoticeMailer:
-    """不带验证码的通知邮件（换绑提醒等），只走 SMTP。
+    """不带验证码的通知邮件（换绑提醒等）。
 
-    Cloudmail 网关只支持验证码模板，SMTP 未配置时跳过并记日志；通知是尽力而为，
-    发送失败不影响主流程。
+    Cloudmail 网关只支持验证码模板，所以通知走 Sender.net 事务邮件 API，未配置时退回 SMTP，
+    两者都没有就跳过并记日志。通知是尽力而为，发送失败不影响主流程。
     """
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, client: httpx.AsyncClient | None = None) -> None:
+        self._settings = settings
+        self._client = client
         self._smtp = SmtpVerificationMailer(settings)
-        self._enabled = bool(settings.smtp_host and settings.mail_from)
 
     async def send_notice(self, *, recipient: str, subject: str, text: str) -> None:
-        if not self._enabled:
-            logger.info("通知邮件未发送：SMTP 未配置。", extra={"event": "notice_mail_skipped"})
-            return
+        settings = self._settings
+        token = settings.sender_api_token.get_secret_value() if settings.sender_api_token else ""
         try:
-            await self._smtp.send_text(recipient=recipient, subject=subject, text=text)
-        except AppError:
+            if token:
+                await self._send_via_sender(token, recipient=recipient, subject=subject, text=text)
+            elif settings.smtp_host and settings.mail_from:
+                await self._smtp.send_text(recipient=recipient, subject=subject, text=text)
+            else:
+                logger.info(
+                    "通知邮件未发送：未配置发信通道。", extra={"event": "notice_mail_skipped"}
+                )
+        except (AppError, httpx.HTTPError):
             logger.warning("通知邮件发送失败。", extra={"event": "notice_mail_failed"})
+
+    async def _send_via_sender(
+        self, token: str, *, recipient: str, subject: str, text: str
+    ) -> None:
+        settings = self._settings
+        payload = {
+            "from": {"email": settings.notice_mail_from, "name": settings.notice_mail_from_name},
+            "to": {"email": recipient},
+            "subject": subject,
+            "text": text,
+            "html": "<br>".join(html.escape(line) for line in text.splitlines()),
+        }
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+        }
+        if self._client is not None:
+            response = await self._client.post(
+                settings.sender_api_url, json=payload, headers=headers, timeout=10
+            )
+        else:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    settings.sender_api_url, json=payload, headers=headers, timeout=10
+                )
+        response.raise_for_status()

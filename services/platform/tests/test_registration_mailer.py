@@ -114,3 +114,51 @@ def test_get_mailer_respects_app_state_override() -> None:
     request = request_with_settings(cloudmail_settings())
     request.app.state.verification_mailer = override
     assert get_mailer(request) is override
+
+
+@pytest.mark.asyncio
+async def test_notice_mailer_posts_to_sender_api() -> None:
+    from nanyee.registration.mailer import NoticeMailer
+
+    captured: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        captured["authorization"] = request.headers["Authorization"]
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(200, json={"success": True})
+
+    settings = Settings(
+        app_env="test",
+        database_url="sqlite+aiosqlite://",
+        sender_api_token=SecretStr("sender-token"),
+    )
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        await NoticeMailer(settings, client).send_notice(
+            recipient="old@qq.com", subject="主题", text="第一行 <b>\n第二行"
+        )
+    assert captured["url"] == "https://api.sender.net/v2/message/send"
+    assert captured["authorization"] == "Bearer sender-token"
+    assert captured["body"] == {
+        "from": {"email": "noreply@nanyee.de", "name": "南医工具台"},
+        "to": {"email": "old@qq.com"},
+        "subject": "主题",
+        "text": "第一行 <b>\n第二行",
+        "html": "第一行 &lt;b&gt;<br>第二行",
+    }
+
+
+@pytest.mark.asyncio
+async def test_notice_mailer_swallows_sender_errors() -> None:
+    from nanyee.registration.mailer import NoticeMailer
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(422, json={"errors": {"from": ["not verified"]}})
+
+    settings = Settings(
+        app_env="test", database_url="sqlite+aiosqlite://", sender_api_token=SecretStr("t")
+    )
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        await NoticeMailer(settings, client).send_notice(
+            recipient="a@qq.com", subject="s", text="t"
+        )

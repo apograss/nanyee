@@ -79,6 +79,12 @@ class Settings(BaseSettings):
     mail_from: str | None = None
 
     cloudmail_gateway_url: str = ""
+    # 通知类邮件（换绑提醒等，不带验证码）：优先 Sender.net 事务邮件 API，未配置时退回 SMTP。
+    # 发件地址的域名必须在 Sender 中验证过。
+    sender_api_token: SecretStr | None = None
+    sender_api_url: str = "https://api.sender.net/v2/message/send"
+    notice_mail_from: str = "noreply@nanyee.de"
+    notice_mail_from_name: str = "南医工具台"
     cloudmail_gateway_token: SecretStr = SecretStr("")
 
     # 学校侧出口代理（Cloudflare Worker 多 IP 池，见 infra/cloudflare/egress-proxy/）
