@@ -27,7 +27,11 @@ from nanyee.registration.mailer import (
     SmtpVerificationMailer,
     VerificationMailer,
 )
-from nanyee.registration.models import RegistrationChallenge, RegistrationMethod
+from nanyee.registration.models import (
+    REGISTRATION_METHODS,
+    RegistrationChallenge,
+    RegistrationMethod,
+)
 from nanyee.registration.quiz import grade_answers, load_quiz_bank, pick_question_ids
 from nanyee.security import as_utc, keyed_digest, secure_compare, utc_now
 
@@ -293,7 +297,7 @@ async def verify_challenge(
         )
     ).scalar_one_or_none()
     now = utc_now()
-    if challenge is None:
+    if challenge is None or challenge.method not in REGISTRATION_METHODS:
         raise AppError(ErrorCode.NOT_FOUND, "注册验证不存在。", status_code=404)
     if challenge.consumed_at is not None:
         raise AppError(ErrorCode.CONFLICT, "注册验证已被使用。", status_code=409)
@@ -398,7 +402,7 @@ async def register(
         )
     ).scalar_one_or_none()
     now = utc_now()
-    if challenge is None:
+    if challenge is None or challenge.method not in REGISTRATION_METHODS:
         raise AppError(ErrorCode.NOT_FOUND, "注册验证不存在。", status_code=404)
     if challenge.consumed_at is not None:
         raise AppError(ErrorCode.CONFLICT, "注册验证已被使用。", status_code=409)

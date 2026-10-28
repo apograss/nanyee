@@ -45,6 +45,7 @@ class UserResponse(BaseModel):
     username: str
     nickname: str
     email: str | None
+    email_verified: bool
     role: UserRole
     status: UserStatus
     registration_trust_level: RegistrationTrustLevel
@@ -57,6 +58,7 @@ class UserResponse(BaseModel):
                 "username": user.username,
                 "nickname": user.nickname,
                 "email": user.email,
+                "email_verified": user.email is not None and user.email_verified_at is not None,
                 "role": user.role,
                 "status": user.status,
                 "registration_trust_level": user.registration_trust_level,

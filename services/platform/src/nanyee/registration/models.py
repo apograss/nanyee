@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import StrEnum
 from uuid import UUID, uuid4
 
-from sqlalchemy import JSON, DateTime, Enum, Integer, String, Uuid
+from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Integer, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from nanyee.db.base import Base, TimestampMixin
@@ -13,6 +13,12 @@ from nanyee.db.base import Base, TimestampMixin
 class RegistrationMethod(StrEnum):
     EMAIL = "email"
     QUIZ = "quiz"
+    # 以下两种不用于注册：登录后绑定/换绑邮箱、凭邮箱找回密码
+    EMAIL_BIND = "email_bind"
+    PASSWORD_RESET = "password_reset"  # noqa: S105 - 枚举值，不是密码
+
+
+REGISTRATION_METHODS = frozenset({RegistrationMethod.EMAIL, RegistrationMethod.QUIZ})
 
 
 class RegistrationChallenge(TimestampMixin, Base):
@@ -23,6 +29,10 @@ class RegistrationChallenge(TimestampMixin, Base):
         Enum(RegistrationMethod, native_enum=False, length=16), nullable=False, index=True
     )
     email: Mapped[str | None] = mapped_column(String(254), index=True)
+    # 绑定邮箱：发起的用户；找回密码：邮箱对应的用户（邮箱未绑定时为空）
+    user_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
     code_digest: Mapped[str | None] = mapped_column(String(64))
     question_ids: Mapped[list[int] | None] = mapped_column(JSON)
     attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

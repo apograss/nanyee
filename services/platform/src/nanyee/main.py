@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from nanyee.account.router import router as account_router
 from nanyee.config import Settings, get_settings
 from nanyee.context import request_id_context
 from nanyee.credentials.factory import build_envelope_cipher
@@ -99,6 +100,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(tools_router, prefix="/api/v1")
     app.include_router(identity_router, prefix="/api/v1")
     app.include_router(registration_router, prefix="/api/v1")
+    app.include_router(account_router, prefix="/api/v1")
     app.include_router(credentials_router, prefix="/api/v1")
     app.include_router(jobs_router, prefix="/api/v1")
     app.include_router(notices_router, prefix="/api/v1")
