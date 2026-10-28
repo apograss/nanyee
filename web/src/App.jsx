@@ -3,7 +3,7 @@ import React, { useEffect } from "react";
 import { Routes, Route, Navigate, Outlet, useLocation, useNavigate, Link } from "react-router-dom";
 import {
   Home, CalendarDays, GraduationCap, BookOpen, ClipboardCheck, Armchair,
-  Users, KeyRound, ListTodo, LogOut, LogIn, Bell, ShieldCheck, Compass, Info,
+  Users, KeyRound, ListTodo, LogOut, LogIn, Bell, ShieldCheck, Compass, Info, UserCog,
 } from "lucide-react";
 import { AuthProvider, useAuth, apiPost, listJobs } from "@/lib/api.jsx";
 import { ThemeProvider, ThemeToggle } from "@/lib/theme.jsx";
@@ -24,6 +24,7 @@ import Jobs from "@/pages/Jobs.jsx";
 import JobDetail from "@/pages/JobDetail.jsx";
 import Recommendations from "@/pages/Recommendations.jsx";
 import About from "@/pages/About.jsx";
+import Account from "@/pages/Account.jsx";
 
 const NAV = [
   { to: "/", label: "首页", icon: Home, end: true },
@@ -35,6 +36,7 @@ const NAV = [
   { to: "/tools/qun", label: "群报数", icon: Users },
   { to: "/credentials", label: "我的凭据", icon: KeyRound },
   { to: "/jobs", label: "任务列表", icon: ListTodo },
+  { to: "/account", label: "账号设置", icon: UserCog },
   { to: "/recommendations", label: "其它推荐", icon: Compass, group: "更多" },
   { to: "/about", label: "关于", icon: Info },
 ];
@@ -146,10 +148,18 @@ function Shell() {
             <div className="w-8 h-8 rounded-[var(--radius-full)] bg-[var(--primary-muted)] flex items-center justify-center text-[13px] font-semibold text-[var(--seed-primary-strong)]">
               {user?.nickname?.[0] || "·"}
             </div>
-            <div className="flex-1 min-w-0 leading-tight">
+            <Link
+              to={user ? "/account" : "/auth/login"}
+              onClick={() => setMobileNavOpen(false)}
+              className="flex-1 min-w-0 leading-tight no-underline text-foreground"
+              data-component="AccountLink"
+            >
               <div className="text-[13px] font-medium truncate">{user?.nickname || "未登录"}</div>
-              <div className="text-[11px] text-[var(--muted)] truncate">{user?.username ? `@${user.username}` : "平台账号"}</div>
-            </div>
+              <div className="text-[11px] text-[var(--muted)] truncate">
+                {user?.username ? `@${user.username}` : "平台账号"}
+                {user && !user.email_verified && <span className="text-[var(--warning)]"> · 未绑邮箱</span>}
+              </div>
+            </Link>
             {user ? (
               <Button
                 variant="ghost"
@@ -270,6 +280,7 @@ export default function App() {
           <Routes>
             <Route path="/auth/login" element={<AuthPages mode="login" />} />
             <Route path="/auth/register" element={<AuthPages mode="register" />} />
+            <Route path="/auth/forgot" element={<AuthPages mode="forgot" />} />
             <Route element={<Shell />}>
               {/* 公开页面：无需平台登录，学校查询走学校账号会话 */}
               <Route path="/" element={<HomePage />} />
@@ -286,6 +297,7 @@ export default function App() {
                 <Route path="/credentials" element={<Credentials />} />
                 <Route path="/jobs" element={<Jobs />} />
                 <Route path="/jobs/:id" element={<JobDetail />} />
+                <Route path="/account" element={<Account />} />
               </Route>
             </Route>
             <Route path="*" element={<NotFound />} />

@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion } from "motion/react";
 import { KeyRound, Plus, Trash2, Armchair, Users, GraduationCap, ShieldCheck, Eye, EyeOff, Ban, RefreshCw, Pencil } from "lucide-react";
+import EmailBindHint from "@/components/EmailBindHint.jsx";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Label, Badge, Alert, Dialog, Table, cn } from "@/components/ui.jsx";
 import {
   createCredential, listCredentials, revokeCredential, revealCredential, deleteCredential, renewCredential, updateCredentialSecret,
@@ -195,6 +196,7 @@ export default function Credentials() {
           <span>凭据以 AES-256-GCM 信封加密保存；查看明文需本人登录态二次确认；删除会立即清除密文，不可恢复。</span>
         </Alert>
       </motion.div>
+      <EmailBindHint />
 
       {editResult && (
         <motion.div variants={fadeUp} initial="hidden" animate="show">

@@ -4,7 +4,7 @@ import { useNavigate, useLocation, Link } from "react-router-dom";
 import { motion } from "motion/react";
 import { ArrowRight, ArrowUpRight, CheckCircle2 } from "lucide-react";
 import { Button, Input, Label, Alert, Badge, Spinner, cn } from "@/components/ui.jsx";
-import { useTurnstile, useAuth, apiPost } from "@/lib/api.jsx";
+import { useTurnstile, useAuth, apiPost, startPasswordReset, confirmPasswordReset } from "@/lib/api.jsx";
 import { ThemeToggle } from "@/lib/theme.jsx";
 
 const EASE = [0.22, 1, 0.36, 1];
@@ -100,11 +100,119 @@ function LoginForm() {
       </form>
       {widget && <div className="mt-4">{widget}</div>}
       {error && <div className="mt-4"><Alert variant="danger" title="登录失败"><span>{error}</span></Alert></div>}
-      <div className="text-[13px] text-[var(--muted)] mt-6 flex items-center gap-2">
+      <div className="text-[13px] text-[var(--muted)] mt-6 flex flex-wrap items-center gap-2">
+        <Link to="/auth/forgot" className="text-[var(--seed-primary-strong)] no-underline hover:underline underline-offset-4">
+          忘记密码？
+        </Link>
+        <span className="text-[var(--border)] select-none">/</span>
         没有账号？
         <Link to="/auth/register" className="inline-flex items-center gap-1 text-[var(--seed-primary-strong)] no-underline hover:underline underline-offset-4">
           注册一个 <ArrowUpRight className="w-3.5 h-3.5" />
         </Link>
+      </div>
+    </AuthPanel>
+  );
+}
+
+/* ---------- 找回密码 ---------- */
+function ForgotPassword() {
+  const [email, setEmail] = useState("");
+  const [challenge, setChallenge] = useState(null);
+  const [code, setCode] = useState("");
+  const [password, setPassword] = useState("");
+  const [phase, setPhase] = useState("email"); // email → reset → done
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const { replayWithChallenge, widget } = useTurnstile();
+
+  const sendCode = async (e) => {
+    e?.preventDefault();
+    setLoading(true);
+    setError("");
+    try {
+      let data;
+      try {
+        data = await startPasswordReset({ email });
+      } catch (err) {
+        if (err.code !== "RATE_LIMIT_CHALLENGE_REQUIRED" || !err.turnstileChallenge) throw err;
+        const { action, sitekey } = err.turnstileChallenge;
+        data = await replayWithChallenge((t) => startPasswordReset({ email }, { turnstileToken: t }), action, sitekey);
+      }
+      setChallenge(data);
+      setPhase("reset");
+    } catch (err) {
+      setError(err?.code === "HUMAN_VERIFICATION_FAILED" ? "人机验证失败，请重试" : err?.message || "发送失败，请稍后重试。");
+    }
+    setLoading(false);
+  };
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+    try {
+      await confirmPasswordReset({ challenge_id: challenge.challenge_id, code, new_password: password });
+      setPassword("");
+      setPhase("done");
+    } catch (err) {
+      setError(err?.message || "验证码错误或已过期。");
+    }
+    setLoading(false);
+  };
+
+  if (phase === "done") {
+    return (
+      <AuthPanel kicker="Done — 已重置" title="密码已重置" description="所有设备上的登录都已退出，请用新密码重新登录。" data-component="ForgotPassword">
+        <Link to="/auth/login" className="no-underline"><Button className="w-full h-11">去登录 <ArrowRight className="w-4 h-4" /></Button></Link>
+      </AuthPanel>
+    );
+  }
+
+  if (phase === "reset") {
+    return (
+      <AuthPanel
+        kicker="Step 02 — 设置新密码"
+        title="输入验证码"
+        description={`如果 ${challenge?.masked_email || email} 绑定了平台账号，验证码已经发过去了，邮件标题里有你的用户名。没收到的话看看垃圾箱。`}
+        data-component="ForgotPassword"
+      >
+        <form className="flex flex-col gap-4" onSubmit={submit}>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="fc">验证码</Label>
+            <Input id="fc" value={code} onChange={(e) => setCode(e.target.value.trim())} inputMode="numeric" placeholder="6 位数字" />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="fp">新密码</Label>
+            <Input id="fp" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" placeholder="8–128 字符" />
+          </div>
+          {error && <Alert variant="danger" title="重置失败"><span>{error}</span></Alert>}
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" onClick={() => { setPhase("email"); setCode(""); setError(""); }} className="h-11">返回</Button>
+            <Button type="submit" loading={loading} disabled={!/^\d{6}$/.test(code) || password.length < 8} className="h-11 flex-1">重置密码</Button>
+          </div>
+        </form>
+      </AuthPanel>
+    );
+  }
+
+  return (
+    <AuthPanel
+      kicker="Forgot — 找回密码"
+      title="找回平台密码"
+      description="输入账号绑定的邮箱，我们会发一个验证码。没有绑定过邮箱的账号无法自助找回，可以发邮件到 contact@nanyee.de。"
+      data-component="ForgotPassword"
+    >
+      <form className="flex flex-col gap-4" onSubmit={sendCode}>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="fe">绑定的邮箱</Label>
+          <Input id="fe" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder="例如 123456@qq.com" />
+        </div>
+        <Button type="submit" loading={loading} disabled={!email} className="w-full h-11">发送验证码 <ArrowRight className="w-4 h-4" /></Button>
+      </form>
+      {widget && <div className="mt-4">{widget}</div>}
+      {error && <div className="mt-4"><Alert variant="danger" title="发送失败"><span>{error}</span></Alert></div>}
+      <div className="text-[13px] text-[var(--muted)] mt-6">
+        <Link to="/auth/login" className="text-[var(--seed-primary-strong)] no-underline hover:underline underline-offset-4">返回登录</Link>
       </div>
     </AuthPanel>
   );
@@ -174,7 +282,8 @@ function QuizRegister() {
       await apiPost("/registration", { challenge_id: challengeId, username, password }, { action: "register" });
       await refresh();
       setPassword("");
-      navigate("/", { replace: true });
+      // 答题注册的账号没有邮箱：先去账号设置引导绑定（可跳过）
+      navigate("/account", { replace: true, state: { welcome: true } });
     } catch (err) {
       setError(err?.message || "注册失败，请更换用户名重试。");
     }
@@ -540,13 +649,13 @@ export default function AuthPages({ mode }) {
             </div>
             <span className="font-display text-[15px] font-semibold">南医工具台</span>
           </Link>
-          <span className="kicker hidden lg:block">{mode === "login" ? "Welcome back" : "Join us"}</span>
+          <span className="kicker hidden lg:block">{mode === "login" ? "Welcome back" : mode === "forgot" ? "Reset password" : "Join us"}</span>
           <ThemeToggle />
         </header>
 
         <main className="flex-1 flex items-start sm:items-center justify-center px-5 sm:px-8 py-8 sm:py-10">
           <div className="w-full max-w-2xl flex flex-col gap-7">
-            {mode === "login" ? <LoginForm /> : (
+            {mode === "login" ? <LoginForm /> : mode === "forgot" ? <ForgotPassword /> : (
               <>
                 <Tabs value={tab} onValueChange={setTab} options={[
                   { value: "quiz", label: "校内答题" },

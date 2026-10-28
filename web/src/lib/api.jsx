@@ -358,6 +358,25 @@ export function deleteCredential(id, opts) {
   return apiDelete(`/credentials/${id}?hard=true`, opts);
 }
 
+// 平台账号：绑定邮箱 / 找回密码
+// 已绑定邮箱时（换绑）body 需带 password
+export function startEmailBind(body, opts) {
+  return apiPost("/account/email/challenges", body, { ...opts, action: "email_bind" });
+}
+export function confirmEmailBind(body, opts) {
+  return apiPost("/account/email/confirm", body, opts);
+}
+export function unbindEmail(body, opts) {
+  return apiPost("/account/email/unbind", body, { ...opts, action: "email_unbind" });
+}
+// 无论邮箱是否绑定都返回同样结构，不暴露账号是否存在
+export function startPasswordReset(body, opts) {
+  return apiPost("/account/password-reset", body, { ...opts, action: "password_reset" });
+}
+export function confirmPasswordReset(body, opts) {
+  return apiPost("/account/password-reset/confirm", body, opts);
+}
+
 // 站内通知（按任务状态实时计算）
 export function listNotices(opts) {
   return apiGet("/notices", opts);

@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { ClipboardCheck, ArrowRight, Zap, ShieldCheck } from "lucide-react";
+import EmailBindHint from "@/components/EmailBindHint.jsx";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Label, Alert, StatusBadge } from "@/components/ui.jsx";
 import {
   createCredential, createJob, listCredentials, isCredentialUsable,
@@ -109,6 +110,7 @@ export default function Evaluations() {
           <span>任务在后台持续运行，自动查找全部待评课程并依次提交。遇到验证码会自动识别重试，关闭页面也不会中断。</span>
         </Alert>
       </motion.div>
+      {user && !user.email_verified && (<motion.div variants={fadeUp}><EmailBindHint /></motion.div>)}
 
       {/* ---------- 学校账号授权 ---------- */}
       <motion.div variants={fadeUp}>
