@@ -401,6 +401,35 @@
         "title": "ChallengeVerifyResponse",
         "type": "object"
       },
+      "CodeChallengeResponse": {
+        "properties": {
+          "challenge_id": {
+            "format": "uuid",
+            "title": "Challenge Id",
+            "type": "string"
+          },
+          "expires_at": {
+            "title": "Expires At",
+            "type": "string"
+          },
+          "masked_email": {
+            "title": "Masked Email",
+            "type": "string"
+          },
+          "resend_at": {
+            "title": "Resend At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "challenge_id",
+          "expires_at",
+          "resend_at",
+          "masked_email"
+        ],
+        "title": "CodeChallengeResponse",
+        "type": "object"
+      },
       "CourseCategory": {
         "properties": {
           "code": {
@@ -911,6 +940,115 @@
           "consent_version"
         ],
         "title": "CredentialUpdateResponse",
+        "type": "object"
+      },
+      "EmailBindRequest": {
+        "properties": {
+          "anti_abuse_pass": {
+            "anyOf": [
+              {
+                "maxLength": 4096,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anti Abuse Pass"
+          },
+          "email": {
+            "maxLength": 254,
+            "title": "Email",
+            "type": "string"
+          },
+          "password": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password"
+          },
+          "turnstile_token": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turnstile Token"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "title": "EmailBindRequest",
+        "type": "object"
+      },
+      "EmailConfirmRequest": {
+        "properties": {
+          "challenge_id": {
+            "format": "uuid",
+            "title": "Challenge Id",
+            "type": "string"
+          },
+          "code": {
+            "pattern": "^\\d{6}$",
+            "title": "Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "challenge_id",
+          "code"
+        ],
+        "title": "EmailConfirmRequest",
+        "type": "object"
+      },
+      "EmailUnbindRequest": {
+        "properties": {
+          "anti_abuse_pass": {
+            "anyOf": [
+              {
+                "maxLength": 4096,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anti Abuse Pass"
+          },
+          "password": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          },
+          "turnstile_token": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turnstile Token"
+          }
+        },
+        "required": [
+          "password"
+        ],
+        "title": "EmailUnbindRequest",
         "type": "object"
       },
       "EnrollmentCategoryRequest": {
@@ -2203,7 +2341,8 @@
             "enum": [
               "credential_invalid",
               "evaluation_recovered",
-              "duplicates_merged"
+              "duplicates_merged",
+              "evaluation_claimed"
             ],
             "title": "Kind",
             "type": "string"
@@ -2234,6 +2373,71 @@
           "dismissible"
         ],
         "title": "NoticeResponse",
+        "type": "object"
+      },
+      "PasswordResetConfirmRequest": {
+        "properties": {
+          "challenge_id": {
+            "format": "uuid",
+            "title": "Challenge Id",
+            "type": "string"
+          },
+          "code": {
+            "pattern": "^\\d{6}$",
+            "title": "Code",
+            "type": "string"
+          },
+          "new_password": {
+            "maxLength": 128,
+            "minLength": 8,
+            "title": "New Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "challenge_id",
+          "code",
+          "new_password"
+        ],
+        "title": "PasswordResetConfirmRequest",
+        "type": "object"
+      },
+      "PasswordResetRequest": {
+        "properties": {
+          "anti_abuse_pass": {
+            "anyOf": [
+              {
+                "maxLength": 4096,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anti Abuse Pass"
+          },
+          "email": {
+            "maxLength": 254,
+            "title": "Email",
+            "type": "string"
+          },
+          "turnstile_token": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turnstile Token"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "title": "PasswordResetRequest",
         "type": "object"
       },
       "PendingEvaluation": {
@@ -2773,7 +2977,9 @@
       "RegistrationMethod": {
         "enum": [
           "email",
-          "quiz"
+          "quiz",
+          "email_bind",
+          "password_reset"
         ],
         "title": "RegistrationMethod",
         "type": "string"
@@ -2956,6 +3162,71 @@
           "expires_at"
         ],
         "title": "SmuSessionResponse",
+        "type": "object"
+      },
+      "StopOtherEvaluationsRequest": {
+        "properties": {
+          "anti_abuse_pass": {
+            "anyOf": [
+              {
+                "maxLength": 4096,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anti Abuse Pass"
+          },
+          "captcha": {
+            "maxLength": 16,
+            "minLength": 1,
+            "title": "Captcha",
+            "type": "string"
+          },
+          "credential_id": {
+            "format": "uuid",
+            "title": "Credential Id",
+            "type": "string"
+          },
+          "flow_id": {
+            "maxLength": 128,
+            "minLength": 20,
+            "title": "Flow Id",
+            "type": "string"
+          },
+          "turnstile_token": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turnstile Token"
+          }
+        },
+        "required": [
+          "credential_id",
+          "flow_id",
+          "captcha"
+        ],
+        "title": "StopOtherEvaluationsRequest",
+        "type": "object"
+      },
+      "StopOtherEvaluationsResponse": {
+        "properties": {
+          "stopped_jobs": {
+            "title": "Stopped Jobs",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "stopped_jobs"
+        ],
+        "title": "StopOtherEvaluationsResponse",
         "type": "object"
       },
       "StudyCabinResponse": {
@@ -3204,6 +3475,10 @@
             ],
             "title": "Email"
           },
+          "email_verified": {
+            "title": "Email Verified",
+            "type": "boolean"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -3232,6 +3507,7 @@
           "username",
           "nickname",
           "email",
+          "email_verified",
           "role",
           "status",
           "registration_trust_level"
@@ -3480,6 +3756,259 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/account/email/challenges": {
+      "post": {
+        "operationId": "create_email_bind_challenge",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailBindRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeChallengeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Email Bind Challenge",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/v1/account/email/confirm": {
+      "post": {
+        "operationId": "confirm_email_bind",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailConfirmRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirm Email Bind",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/v1/account/email/unbind": {
+      "post": {
+        "operationId": "unbind_email",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailUnbindRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unbind Email",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/v1/account/password-reset": {
+      "post": {
+        "description": "无论邮箱是否绑定了账号，都返回同样的结果，不暴露账号是否存在。",
+        "operationId": "create_password_reset_challenge",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordResetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeChallengeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Password Reset Challenge",
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/api/v1/account/password-reset/confirm": {
+      "post": {
+        "operationId": "confirm_password_reset",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordResetConfirmRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirm Password Reset",
+        "tags": [
+          "account"
+        ]
+      }
+    },
     "/api/v1/auth/login": {
       "post": {
         "operationId": "auth_login",
@@ -5359,6 +5888,66 @@
           }
         },
         "summary": "Grades",
+        "tags": [
+          "smu"
+        ]
+      }
+    },
+    "/api/v1/smu/school-account/stop-other-evaluations": {
+      "post": {
+        "description": "用自己的学校凭据实时登录学校，成功后停止其他平台账号上同一学号的自动评课。\n\n见 docs/adr/0002：登录失败时不透露是否存在其他账号；成功时只返回停止的数量。",
+        "operationId": "smu_stop_other_evaluations",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-CSRF-Token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StopOtherEvaluationsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StopOtherEvaluationsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stop Other Evaluations",
         "tags": [
           "smu"
         ]
