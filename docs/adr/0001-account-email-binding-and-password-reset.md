@@ -16,13 +16,20 @@
 4. **绑定 / 换绑 / 解绑**：
    - 新邮箱需通过 6 位验证码验证。
    - 换绑和解绑需要输入当前平台密码。
-   - 换绑或解绑成功后，向旧邮箱发送通知。
+   - 换绑或解绑成功后，向旧邮箱发送通知（见下方“实现说明”，依赖 SMTP）。
 5. **找回密码只需输入邮箱**：
    - 邮件发送 6 位验证码（不用链接，QQ 邮箱常拦截或折叠链接），15 分钟有效，限制尝试次数；邮件中附带该邮箱对应的用户名，便于忘记用户名的人。
    - 不论邮箱是否已绑定，接口返回同样的提示，不暴露账号是否存在。
    - 复用现有的 Turnstile 与限流（按 IP、按邮箱分桶）。
    - 重置成功后吊销该用户所有会话，要求重新登录；更新 `password_changed_at`。
 6. 验证码流程复用现有 challenge 机制与 mailer，新增用途（绑定邮箱、重置密码），不另起一套。
+
+## 实现说明（2026-10-28）
+
+- 接口：`POST /api/v1/account/email/challenges`、`/account/email/confirm`、`/account/email/unbind`、`/account/password-reset`、`/account/password-reset/confirm`；前端 `/account`、`/auth/forgot`。
+- 生产环境只配置了 Cloudmail 网关，它只有验证码模板（`purpose` = register / reset / bind），正文不可定制，只能定制标题。因此：
+  - 找回密码邮件的用户名写在**标题**里。
+  - 不带验证码的通知邮件走 `NoticeMailer`，**只用 SMTP**；SMTP 未配置时跳过并记日志。要启用，在 `.env.production` 配 `NANYEE_SMTP_*`（例如 Resend 的 SMTP：`smtp.resend.com:465`，用户名 `resend`，密码为 API key）。
 
 ## 后果
 

@@ -23,7 +23,13 @@
    - 登录成功：按 `account_digest` 查找**其他账号**下的同学号凭据，取消其上的活跃评课任务（`QUEUED` / `RUNNING` / `RETRY_WAIT`），撤销这些凭据；告诉用户停止了几个任务，**不透露旧账号用户名**。
    - 需要 CSRF、Turnstile 与限流（同步学校登录成本高，且可被用来试探密码）。
 5. **范围只限自动评课**。学习舱是用户主动发起的短任务，不在此列。
-6. **通知旧账号**：在被停止的任务上记录 `system_notice`（"该任务已被使用同一学号登录验证的另一账号停止"）；旧账号绑定了邮箱时同时发邮件。
+6. **通知旧账号**：被停止的任务记 `error_code = CLAIMED_BY_OTHER_ACCOUNT`，旧账号看到 `evaluation_claimed` 站内通知（30 天）。运行中被停止的任务收尾时保留这个原因。旧账号邮件提醒暂未实现（同 ADR 0001 的通知邮件限制）。
+
+## 实现说明（2026-10-28）
+
+- 接口：`POST /api/v1/smu/school-account/stop-other-evaluations`（`credential_id` + 验证码 `flow_id` / `captcha`）。验证码沿用 `/smu/captcha`，由浏览器端 OCR 自动识别，识别错时前端自动换图重试。
+- 前端入口：授权管理页“忘了旧账号，停不掉之前的自动评课？”卡片。
+- 未配置 `NANYEE_SCHOOL_ACCOUNT_DIGEST_KEY` 时接口返回 503，其余功能不受影响。
 
 ## 后果
 

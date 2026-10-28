@@ -27,6 +27,15 @@ docker compose --env-file .env.production -f infra/compose/compose.prod.yaml res
 - ~~Cloudflare Turnstile 密钥尚未创建~~（2026-08 已完成）：已为 hostname `nanyee.de` 创建站点，真实 site/secret key 已填入 `.env.production`，`NANYEE_TURNSTILE_ENABLED=true`，生产配置校验已通过。
 - 后端镜像已内置 Chromium + 系统依赖（学习舱 Infospace 登录的真实浏览器需求），worker 服务在 compose 里以 `--no-sandbox --disable-dev-shm-usage` 启动参数运行；首次构建镜像会多下载约 200MB。
 
+## 学号摘要密钥与补算（ADR 0002）
+
+`NANYEE_SCHOOL_ACCOUNT_DIGEST_KEY` 是学校凭据学号盲索引的 HMAC 密钥，独立随机生成（如 `openssl rand -base64 32`），不得复用其他密钥，并与主密钥一样做离线备份。首次配置或轮换后，在 worker 容器内补算存量凭据（只输出计数）：
+
+```bash
+docker compose --env-file .env.production -f infra/compose/compose.prod.yaml exec worker python -m nanyee.credentials.backfill_account_digest        # 首次：只补空值
+docker compose --env-file .env.production -f infra/compose/compose.prod.yaml exec worker python -m nanyee.credentials.backfill_account_digest --all  # 轮换密钥后
+```
+
 ## 验收
 
 - `GET /health/live` 与 `/health/ready` 返回 200。
