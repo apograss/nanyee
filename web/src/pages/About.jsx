@@ -61,7 +61,7 @@ export default function About() {
           <CardHeader>
             <div className="kicker">Notes</div>
             <CardTitle className="flex items-center gap-2"><Info className="w-4 h-4 text-[var(--seed-primary-strong)]" /> 一些说明</CardTitle>
-            <CardDescription>联系方式、源码和访问相关。</CardDescription>
+            <CardDescription>联系方式、源码、访问和自动评课相关。</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex flex-col">
@@ -84,6 +84,13 @@ export default function About() {
                     www.nanyee.de
                   </a>
                   （非联通可显著提升速度）。
+                </>,
+                <>
+                  自动评课任务只挂在创建它的那个账号下。如果忘了旧账号密码又重新注册，新账号里是看不到旧任务的。想停掉旧任务，可以去改
+                  <a href="https://uis.smu.edu.cn" target="_blank" rel="noreferrer">
+                    统一身份认证
+                  </a>
+                  的密码（改教务系统的密码没用），旧任务下次运行时登录失败就会自动停止；也可以带上用户名发邮件给我们，帮你取消。
                 </>,
                 <>遇到任何问题，先问问你的 AI 或者自己认真想想 :)</>,
               ].map((item, i) => (
