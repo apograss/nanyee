@@ -17,6 +17,7 @@ from nanyee.identity.router import current_auth
 from nanyee.identity.sessions import AuthContext
 from nanyee.jobs.models import (
     ACTIVE_JOB_STATES,
+    CLAIMED_BY_OTHER_ACCOUNT_ERROR,
     DUPLICATE_MERGED_ERROR,
     EVALUATION_TOOL_ID,
     SYSTEM_NOTICE_EVENT,
@@ -33,7 +34,9 @@ _EVENT_NOTICE_TTL = timedelta(days=30)
 
 class NoticeResponse(BaseModel):
     id: str
-    kind: Literal["credential_invalid", "evaluation_recovered", "duplicates_merged"]
+    kind: Literal[
+        "credential_invalid", "evaluation_recovered", "duplicates_merged", "evaluation_claimed"
+    ]
     level: Literal["danger", "info"]
     title: str
     message: str
@@ -133,6 +136,32 @@ async def list_notices(
             )
         )
         break
+
+    claimed = next(
+        (
+            job
+            for job in jobs
+            if job.error_code == CLAIMED_BY_OTHER_ACCOUNT_ERROR
+            and job.finished_at is not None
+            and as_utc(job.finished_at) + _EVENT_NOTICE_TTL > now
+        ),
+        None,
+    )
+    if claimed is not None and claimed.finished_at is not None:
+        notices.append(
+            NoticeResponse(
+                id=f"evaluation_claimed:{claimed.id}",
+                kind="evaluation_claimed",
+                level="info",
+                title="自动评课已被另一个账号停止",
+                message=(
+                    "有人用同一个学号登录学校验证成功后，停止了这个账号上的自动评课，"
+                    "这里保存的学校凭据也已撤销。如果不是你本人操作，请尽快修改学校统一认证密码。"
+                ),
+                dismissible=True,
+                job_id=claimed.id,
+            )
+        )
 
     merged = [
         job

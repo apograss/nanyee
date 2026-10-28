@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nanyee.config import Settings
+from nanyee.credentials.account_digest import digest_for_plaintext
 from nanyee.credentials.envelope import (
     CredentialContext,
     CredentialEnvelope,
@@ -21,7 +22,15 @@ from nanyee.credentials.models import (
     purpose_satisfies,
 )
 from nanyee.errors import AppError, ErrorCode
-from nanyee.jobs.models import TERMINAL_JOB_STATES, Job, JobState
+from nanyee.jobs.models import (
+    ACTIVE_JOB_STATES,
+    CLAIMED_BY_OTHER_ACCOUNT_ERROR,
+    EVALUATION_TOOL_ID,
+    SYSTEM_NOTICE_EVENT,
+    TERMINAL_JOB_STATES,
+    Job,
+    JobState,
+)
 from nanyee.security import utc_now
 
 
@@ -76,6 +85,7 @@ class CredentialVaultService:
             public_metadata=redact_credential_metadata(public_metadata),
             expires_at=expires_at,
             consent_version=consent_version,
+            account_digest=digest_for_plaintext(self._settings, purpose, plaintext),
         )
         db.add(record)
         await db.commit()
@@ -278,10 +288,76 @@ class CredentialVaultService:
         record.key_reference = envelope.key_reference
         record.key_wrap_algorithm = envelope.key_wrap_algorithm
         record.envelope_version = envelope.envelope_version
+        record.account_digest = digest_for_plaintext(self._settings, record.purpose, plaintext)
         if public_metadata is not None:
             record.public_metadata = redact_credential_metadata(public_metadata)
         await db.commit()
         return record
+
+
+async def stop_other_accounts_evaluations(
+    db: AsyncSession, *, user_id: UUID, account_digest: str
+) -> int:
+    """停止其他平台账号上同一学号的自动评课，并撤销那些账号上该学号的凭据。
+
+    调用方必须已用该学号实时登录学校成功（见 ADR 0002）。返回停止的评课任务数。
+    被停止的任务记 error_code=CLAIMED_BY_OTHER_ACCOUNT，旧账号据此看到站内通知。
+    """
+    now = utc_now()
+    credentials = list(
+        (
+            await db.execute(
+                select(HostedCredential)
+                .where(
+                    HostedCredential.account_digest == account_digest,
+                    HostedCredential.user_id != user_id,
+                    HostedCredential.status == CredentialStatus.ACTIVE,
+                )
+                .with_for_update()
+            )
+        ).scalars()
+    )
+    if not credentials:
+        return 0
+    jobs = list(
+        (
+            await db.execute(
+                select(Job)
+                .where(
+                    Job.credential_id.in_([record.id for record in credentials]),
+                    Job.tool_id == EVALUATION_TOOL_ID,
+                    Job.state.in_(ACTIVE_JOB_STATES),
+                )
+                .with_for_update()
+            )
+        ).scalars()
+    )
+    for job in jobs:
+        job.cancel_requested_at = now
+        job.error_code = CLAIMED_BY_OTHER_ACCOUNT_ERROR
+        receipt = dict(job.receipt or {})
+        previous = receipt.get("logs")
+        logs = list(previous) if isinstance(previous, list) else []
+        logs.append(
+            {
+                "time": now.isoformat(),
+                "event": SYSTEM_NOTICE_EVENT,
+                "message": "该任务已被使用同一学号登录验证的另一个平台账号停止。",
+            }
+        )
+        receipt["logs"] = logs
+        job.receipt = receipt
+        if job.state in (JobState.QUEUED, JobState.RETRY_WAIT):
+            job.state = JobState.CANCELLED
+            job.finished_at = now
+            job.lease_owner = None
+            job.lease_expires_at = None
+    for record in credentials:
+        record.status = CredentialStatus.REVOKED
+        record.revoked_at = now
+        await _cancel_pending_jobs(db, credential_id=record.id, user_id=record.user_id)
+    await db.commit()
+    return len(jobs)
 
 
 def _encode_plaintext(plaintext: str) -> bytes:

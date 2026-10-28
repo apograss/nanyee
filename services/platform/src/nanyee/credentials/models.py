@@ -57,6 +57,8 @@ class HostedCredential(TimestampMixin, Base):
     public_metadata: Mapped[dict[str, str | int | bool | None]] = mapped_column(
         JSON, default=dict, nullable=False
     )
+    # 学校账号类凭据的学号 HMAC 盲索引，用于判断两条凭据是否同一学号（不解密）
+    account_digest: Mapped[str | None] = mapped_column(String(64), index=True)
     status: Mapped[CredentialStatus] = mapped_column(
         Enum(CredentialStatus, native_enum=False, length=16),
         default=CredentialStatus.ACTIVE,

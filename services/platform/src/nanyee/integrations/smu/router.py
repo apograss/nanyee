@@ -2,16 +2,23 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 from datetime import date, datetime
 from typing import Annotated, Literal, cast
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Query, Request, Response
 from pydantic import BaseModel, Field, SecretStr, ValidationError, field_validator, model_validator
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nanyee.anti_abuse.gate import AntiAbuseGate
 from nanyee.anti_abuse.rate_limit import RateLimitPolicy
-from nanyee.credentials.router import require_csrf
+from nanyee.credentials.account_digest import school_account_digest
+from nanyee.credentials.envelope import EnvelopeCipher
+from nanyee.credentials.models import SCHOOL_ACCOUNT_PURPOSES, CredentialStatus, HostedCredential
+from nanyee.credentials.router import get_cipher, require_csrf
+from nanyee.credentials.service import CredentialVaultService, stop_other_accounts_evaluations
 from nanyee.db import get_db_session
 from nanyee.errors import AppError, ErrorCode
 from nanyee.identity.router import current_auth
@@ -42,6 +49,8 @@ from nanyee.tools.timetable import (
     export_wakeup_schedule,
 )
 from nanyee.transient import TransientSecretStore
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/smu", tags=["smu"])
 # 正常使用一节课表会话只需 1-2 个验证码；限流主要用于挡脚本，保留量级但放宽到不误伤真人
@@ -234,6 +243,29 @@ async def load_academic_cookies(
     return parsed
 
 
+async def _take_captcha_cookies(store: TransientSecretStore, flow_id: str) -> dict[str, str]:
+    raw_cookies = await store.take(flow_id, kind="smu_captcha")
+    if raw_cookies is None:
+        raise AppError(
+            ErrorCode.INVALID_REQUEST,
+            "验证码流程已失效，请重新获取。",
+            status_code=410,
+        )
+    try:
+        parsed = json.loads(raw_cookies)
+        if not isinstance(parsed, dict) or not all(
+            isinstance(key, str) and isinstance(value, str) for key, value in parsed.items()
+        ):
+            raise ValueError
+        return cast(dict[str, str], parsed)
+    except (ValueError, TypeError, json.JSONDecodeError) as exc:
+        raise AppError(
+            ErrorCode.INTERNAL_ERROR,
+            "验证码流程状态无效。",
+            status_code=500,
+        ) from exc
+
+
 @router.get("/captcha", response_model=CaptchaResponse, operation_id="smu_captcha")
 async def captcha(
     request: Request,
@@ -284,26 +316,7 @@ async def create_smu_session(
         turnstile_token=payload.turnstile_token,
         anti_abuse_pass=payload.anti_abuse_pass,
     )
-    raw_cookies = await store.take(payload.flow_id, kind="smu_captcha")
-    if raw_cookies is None:
-        raise AppError(
-            ErrorCode.INVALID_REQUEST,
-            "验证码流程已失效，请重新获取。",
-            status_code=410,
-        )
-    try:
-        parsed = json.loads(raw_cookies)
-        if not isinstance(parsed, dict) or not all(
-            isinstance(key, str) and isinstance(value, str) for key, value in parsed.items()
-        ):
-            raise ValueError
-        uis_cookies: dict[str, str] = parsed
-    except (ValueError, TypeError, json.JSONDecodeError) as exc:
-        raise AppError(
-            ErrorCode.INTERNAL_ERROR,
-            "验证码流程状态无效。",
-            status_code=500,
-        ) from exc
+    uis_cookies = await _take_captcha_cookies(store, payload.flow_id)
     academic_cookies = await client.authenticate(
         account=payload.account,
         password=payload.password.get_secret_value(),
@@ -882,3 +895,104 @@ async def submit_evaluation(
         draft=stored.draft,
         selections=payload.selections,
     )
+
+
+CLAIM_POLICY = RateLimitPolicy(window_seconds=3600, soft_limit=5, hard_limit=10)
+
+
+class StopOtherEvaluationsRequest(BaseModel):
+    credential_id: UUID
+    flow_id: str = Field(min_length=20, max_length=128)
+    captcha: str = Field(min_length=1, max_length=16)
+    turnstile_token: str | None = Field(default=None, max_length=2048)
+    anti_abuse_pass: str | None = Field(default=None, max_length=4096)
+
+
+class StopOtherEvaluationsResponse(BaseModel):
+    stopped_jobs: int
+
+
+@router.post(
+    "/school-account/stop-other-evaluations",
+    response_model=StopOtherEvaluationsResponse,
+    operation_id="smu_stop_other_evaluations",
+)
+async def stop_other_evaluations(
+    payload: StopOtherEvaluationsRequest,
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    store: Annotated[TransientSecretStore, Depends(get_transient_store)],
+    client: Annotated[SmuAcademicClient, Depends(get_smu_client)],
+    cipher: Annotated[EnvelopeCipher, Depends(get_cipher)],
+    auth: Annotated[AuthContext, Depends(current_auth)],
+    csrf_header: Annotated[str | None, Header(alias="X-CSRF-Token")] = None,
+) -> StopOtherEvaluationsResponse:
+    """用自己的学校凭据实时登录学校，成功后停止其他平台账号上同一学号的自动评课。
+
+    见 docs/adr/0002：登录失败时不透露是否存在其他账号；成功时只返回停止的数量。
+    """
+    require_csrf(request, auth, csrf_header)
+    settings = settings_from_request(request)
+    await AntiAbuseGate(settings).check(
+        db,
+        request,
+        action="school_account_claim",
+        identity=str(auth.user.id),
+        policy=CLAIM_POLICY,
+        turnstile_token=payload.turnstile_token,
+        anti_abuse_pass=payload.anti_abuse_pass,
+    )
+    record = (
+        await db.execute(
+            select(HostedCredential).where(
+                HostedCredential.id == payload.credential_id,
+                HostedCredential.user_id == auth.user.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if (
+        record is None
+        or record.status != CredentialStatus.ACTIVE
+        or record.purpose not in SCHOOL_ACCOUNT_PURPOSES
+    ):
+        raise AppError(ErrorCode.NOT_FOUND, "学校凭据不存在或已停用。", status_code=404)
+    plaintext = await CredentialVaultService(cipher, settings).reveal_for_owner(
+        db, credential_id=record.id, user_id=auth.user.id
+    )
+    secret = json.loads(plaintext)
+    account = str(secret.get("account") or "").strip()
+    digest = school_account_digest(settings, account)
+    if digest is None:
+        raise AppError(
+            ErrorCode.UPSTREAM_UNAVAILABLE,
+            "这个功能暂时不可用，请发邮件到 contact@nanyee.de 处理。",
+            status_code=503,
+        )
+    uis_cookies = await _take_captcha_cookies(store, payload.flow_id)
+    try:
+        await client.authenticate(
+            account=account,
+            password=str(secret.get("password") or ""),
+            captcha=payload.captcha,
+            uis_cookies=uis_cookies,
+        )
+    except AppError as exc:
+        if exc.details.get("smu_reason") == "bad_credentials":
+            raise AppError(
+                ErrorCode.UPSTREAM_REJECTED,
+                "学校提示这条凭据的账号或密码不正确，请先在授权管理里更新密码。",
+                status_code=422,
+                details={"smu_reason": "bad_credentials"},
+            ) from exc
+        raise
+    finally:
+        secret = {}
+    if record.account_digest != digest:
+        record.account_digest = digest
+    stopped = await stop_other_accounts_evaluations(db, user_id=auth.user.id, account_digest=digest)
+    await db.commit()
+    logger.info(
+        "已按学号停止其他账号的评课任务。",
+        extra={"event": "school_account_claimed", "stopped_jobs": stopped},
+    )
+    return StopOtherEvaluationsResponse(stopped_jobs=stopped)

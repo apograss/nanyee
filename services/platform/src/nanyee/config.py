@@ -93,6 +93,9 @@ class Settings(BaseSettings):
     credential_local_key_version: str = "local-v1"
     azure_key_vault_key_id: str | None = None
     credential_default_ttl_seconds: int = Field(default=24 * 60 * 60, ge=300, le=30 * 24 * 60 * 60)
+    # 学校凭据学号盲索引（HMAC）的密钥，见 docs/adr/0002；未配置时“检查并停止”功能不可用。
+    # 轮换后需要重新补算全部存量凭据。
+    school_account_digest_key: SecretStr | None = None
 
     transient_secret_ttl_seconds: int = Field(default=300, ge=60, le=300)
     transient_secret_max_entries: int = Field(default=1000, ge=10, le=10_000)

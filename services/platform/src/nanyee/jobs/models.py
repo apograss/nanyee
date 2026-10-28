@@ -47,6 +47,8 @@ EVALUATION_TOOL_ID = "evaluation"
 EVALUATION_DEFAULT_WINDOW = timedelta(days=180)
 # 合并重复评课任务时，被取消的那些任务的 error_code
 DUPLICATE_MERGED_ERROR = "DUPLICATE_MERGED"
+# 评课任务被同一学号、已通过学校登录验证的另一个平台账号停止（ADR 0002）
+CLAIMED_BY_OTHER_ACCOUNT_ERROR = "CLAIMED_BY_OTHER_ACCOUNT"
 SYSTEM_NOTICE_EVENT = "system_notice"
 
 

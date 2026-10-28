@@ -13,6 +13,7 @@ from nanyee.errors import AppError, ErrorCode
 from nanyee.identity.models import User, UserStatus
 from nanyee.jobs.models import (
     ACTIVE_JOB_STATES,
+    CLAIMED_BY_OTHER_ACCOUNT_ERROR,
     EVALUATION_DEFAULT_WINDOW,
     EVALUATION_TOOL_ID,
     SYSTEM_NOTICE_EVENT,
@@ -240,7 +241,8 @@ class JobService:
             record.state = JobState.QUEUED
             record.scheduled_for = scheduled_for
             record.receipt = receipt
-        record.error_code = None
+        if not _claimed(record):
+            record.error_code = None
         record.next_action = None
         record.lease_owner = None
         record.lease_expires_at = None
@@ -262,7 +264,8 @@ class JobService:
     ) -> Job:
         record = await self._owned_running_job(db, job_id, worker_id)
         now = utc_now()
-        record.error_code = error_code
+        if not _claimed(record):
+            record.error_code = error_code
         record.next_action = next_action
         record.lease_owner = None
         record.lease_expires_at = None
@@ -360,3 +363,11 @@ class JobService:
                 status_code=409,
             )
         return record
+
+
+def _claimed(record: Job) -> bool:
+    """运行中被另一账号停止（ADR 0002）的任务：收尾时保留这个原因，供旧账号的站内通知使用。"""
+    return (
+        record.cancel_requested_at is not None
+        and record.error_code == CLAIMED_BY_OTHER_ACCOUNT_ERROR
+    )
