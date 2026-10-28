@@ -377,6 +377,11 @@ export function confirmPasswordReset(body, opts) {
   return apiPost("/account/password-reset/confirm", body, opts);
 }
 
+// 用自己的学校凭据登录学校验证后，停止其他平台账号上同一学号的自动评课（ADR 0002）
+export function stopOtherEvaluations(body, opts) {
+  return apiPost("/smu/school-account/stop-other-evaluations", body, { ...opts, action: "school_account_claim" });
+}
+
 // 站内通知（按任务状态实时计算）
 export function listNotices(opts) {
   return apiGet("/notices", opts);

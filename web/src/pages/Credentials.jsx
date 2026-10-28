@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { motion } from "motion/react";
 import { KeyRound, Plus, Trash2, Armchair, Users, GraduationCap, ShieldCheck, Eye, EyeOff, Ban, RefreshCw, Pencil } from "lucide-react";
 import EmailBindHint from "@/components/EmailBindHint.jsx";
+import StopOtherEvaluations from "@/components/StopOtherEvaluations.jsx";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Label, Badge, Alert, Dialog, Table, cn } from "@/components/ui.jsx";
 import {
   createCredential, listCredentials, revokeCredential, revealCredential, deleteCredential, renewCredential, updateCredentialSecret,
@@ -239,6 +240,10 @@ export default function Credentials() {
             />
           </CardContent>
         </Card>
+      </motion.div>
+
+      <motion.div variants={fadeUp}>
+        <StopOtherEvaluations credentials={list} />
       </motion.div>
 
       {/* ---------- 页脚签条 ---------- */}
