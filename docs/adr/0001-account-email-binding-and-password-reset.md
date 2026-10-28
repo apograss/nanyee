@@ -29,7 +29,7 @@
 - 接口：`POST /api/v1/account/email/challenges`、`/account/email/confirm`、`/account/email/unbind`、`/account/password-reset`、`/account/password-reset/confirm`；前端 `/account`、`/auth/forgot`。
 - 生产环境只配置了 Cloudmail 网关，它只有验证码模板（`purpose` = register / reset / bind），正文不可定制，只能定制标题。因此：
   - 找回密码邮件的用户名写在**标题**里。
-  - 不带验证码的通知邮件走 `NoticeMailer`：优先 Sender.net 事务邮件 API（`NANYEE_SENDER_API_TOKEN`，发件人 `NANYEE_NOTICE_MAIL_FROM`，默认 `noreply@nanyee.de`，域名需在 Sender 验证），否则 SMTP，都没有则跳过并记日志。发送失败不影响主流程。
+  - 不带验证码的通知邮件走 `NoticeMailer`：优先 Sender.net 事务邮件 API（`NANYEE_SENDER_API_TOKEN`，发件人 `NANYEE_NOTICE_MAIL_FROM`，默认 `contact@nanyee.de`（Sender 免费版只能验证一个发件人，与联系邮箱共用）），否则 SMTP，都没有则跳过并记日志。发送失败不影响主流程。
 
 ## 后果
 

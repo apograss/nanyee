@@ -140,7 +140,7 @@ async def test_notice_mailer_posts_to_sender_api() -> None:
     assert captured["url"] == "https://api.sender.net/v2/message/send"
     assert captured["authorization"] == "Bearer sender-token"
     assert captured["body"] == {
-        "from": {"email": "noreply@nanyee.de", "name": "南医工具台"},
+        "from": {"email": "contact@nanyee.de", "name": "南医工具台"},
         "to": {"email": "old@qq.com"},
         "subject": "主题",
         "text": "第一行 <b>\n第二行",

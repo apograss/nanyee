@@ -83,7 +83,7 @@ class Settings(BaseSettings):
     # 发件地址的域名必须在 Sender 中验证过。
     sender_api_token: SecretStr | None = None
     sender_api_url: str = "https://api.sender.net/v2/message/send"
-    notice_mail_from: str = "noreply@nanyee.de"
+    notice_mail_from: str = "contact@nanyee.de"
     notice_mail_from_name: str = "南医工具台"
     cloudmail_gateway_token: SecretStr = SecretStr("")
 
