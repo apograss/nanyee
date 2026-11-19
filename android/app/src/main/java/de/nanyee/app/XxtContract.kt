@@ -18,7 +18,7 @@ internal const val XXT_MOBILE = "https://mobilelearn.chaoxing.com"
 internal class XxtFailure(val kind: String, message: String) : Exception(message)
 @Serializable internal data class XxtUser(val uid: String, val name: String, val cid: String = "", val sc: String = "")
 @Serializable internal data class XxtCourse(val id: String, val classId: String, val cpi: String, val name: String, val teacher: String)
-@Serializable internal data class XxtActivity(val id: String, val name: String, val description: String, val type: Int, val ongoing: Boolean, val start: Long, val end: Long = 0, val signType: Int = -1)
+@Serializable internal data class XxtActivity(val id: String, val name: String, val description: String, val type: Int, val ongoing: Boolean, val start: Long, val end: Long = 0, val signType: Int = -1, val topicId: String = "")
 @Serializable internal data class XxtSignDetail(val type: Int, val photo: Boolean = false, val face: Boolean = false, val captcha: Boolean = false, val address: String = "", val latitude: Double? = null, val longitude: Double? = null, val range: String = "", val codeLength: Int = 0, val signed: Boolean = false)
 @Serializable internal data class XxtPosition(val latitude: Double, val longitude: Double, val obtainedAt: Long, val accuracy: Float)
 @Serializable internal data class XxtSignPlan(val course: XxtCourse, val activity: XxtActivity, val detail: XxtSignDetail, val code: String = "", val qr: String = "", val photoPath: String = "", val position: XxtPosition? = null)
@@ -66,7 +66,7 @@ internal fun xxtActivities(app: JsonObject, web: JsonObject): List<XxtActivity> 
     val other = (web["data"] as? JsonObject)?.get("activeList") as? JsonArray ?: throw XxtFailure("FORMAT", "学习通活动格式有变。")
     val types = other.associate { it.jsonObject.text("id") to it.jsonObject }
     return rows.map { item -> val row = item.jsonObject; val extra = types[row.text("id")]
-        XxtActivity(row.text("id"), row.text("nameOne"), row.text("nameTwo").ifBlank { extra?.text("nameFour").orEmpty() }, row.number("activeType"), row.number("status") == 1, row.text("startTime").toLongOrNull() ?: 0, row.text("endTime").toLongOrNull() ?: 0, extra?.text("otherId")?.toIntOrNull() ?: -1)
+        XxtActivity(row.text("id"), row.text("nameOne"), row.text("nameTwo").ifBlank { extra?.text("nameFour").orEmpty() }, row.number("activeType"), row.number("status") == 1, row.text("startTime").toLongOrNull() ?: 0, row.text("endTime").toLongOrNull() ?: 0, extra?.text("otherId")?.toIntOrNull() ?: -1, (row["extraInfo"] as? JsonObject)?.text("topicId").orEmpty())
     }.sortedWith(compareByDescending<XxtActivity> { it.ongoing }.thenByDescending { it.start })
 }
 internal fun xxtDetail(data: JsonObject, attend: JsonObject): XxtSignDetail {
@@ -119,7 +119,7 @@ internal interface XxtListing {
     suspend fun courses(): List<XxtCourse>
     suspend fun activities(course: XxtCourse): List<XxtActivity>
 }
-internal interface XxtBackend : XxtListing {
+internal interface XxtBackend : XxtListing, XxtClassroomBackend {
     suspend fun qrLogin(): XxtQrLogin
     suspend fun pollQr(qr: XxtQrLogin): XxtUser?
     suspend fun detail(activity: XxtActivity): XxtSignDetail

@@ -1,4 +1,4 @@
-// Portions derived from AneryCoft/course_helper (GPL-3.0), lib/api/{login,course,sign_in,image,captcha}.dart.
+// Portions derived from AneryCoft/course_helper (GPL-3.0), lib/api/{login,course,sign_in,image,captcha,quiz,topic_discuss,evaluate,pick}.dart.
 package de.nanyee.app
 
 import android.content.Context
@@ -114,6 +114,47 @@ internal class XxtApi(private val storage: XxtStorage, private val transport: Ca
         val attend = json(xxtRequest("$XXT_MOBILE/v2/apis/sign/getAttendInfo", mapOf("activeId" to activity.id, "moreClassAttendEnc" to "")))
         if (info.number("result") != 1 || attend.number("result") != 1) throw XxtFailure("UPSTREAM", "无法读取当前账号的签到详情。")
         return xxtDetail(info["data"]!!.jsonObject, attend["data"]!!.jsonObject)
+    }
+    override suspend fun classroom(course: XxtCourse, activity: XxtActivity, user: XxtUser): XxtClassPage {
+        fun data(value: JsonObject): JsonObject {
+            if (value.number("result") != 1) throw XxtFailure("UPSTREAM", "无法读取课堂活动，请刷新或使用官方学习通。")
+            return value["data"] as? JsonObject ?: throw XxtFailure("FORMAT", "课堂活动格式有变。")
+        }
+        return when (activity.type) {
+            43, 14, 42 -> {
+                val open = activity.type != 42 || json(xxtRequest("$XXT_MOBILE/pptTestPaperStu/checkActiveStatus", mapOf("classId" to course.classId, "activePrimaryId" to activity.id, "appType" to "15"), true)).number("status") == 1
+                val page = xxtParseQuestions(activity, data(json(xxtQuizRequest(activity))))
+                if (open) page else page.copy(writable = false, notice = "随堂练习已关闭，仅供只读查看。")
+            }
+            5 -> {
+                if (activity.topicId.isBlank()) return XxtClassPage(activity.name, activity.description, notice = "活动未提供讨论编号，仅供只读查看。")
+                val topic = json(xxtTopicRequest(false, user.uid, activity.topicId, device, System.currentTimeMillis()))
+                val uuid = data(topic).text("uuid").also { require(it.isNotBlank()) }
+                val replies = json(xxtTopicRequest(true, user.uid, uuid, device, System.currentTimeMillis()))
+                data(replies)
+                xxtParseTopic(activity, topic, replies)
+            }
+            11 -> XxtClassPage(activity.name, activity.description, notice = "仅在本页面打开且应用处于前台时监测，只提示当前本人账号。")
+            else -> {
+                val info = data(json(xxtRequest("$XXT_MOBILE/v2/apis/active/getPPTActiveInfo", mapOf("activeId" to activity.id))))
+                if (activity.type == 23) {
+                    json(xxtRatingRequest(course, activity))
+                    xxtParseRating(activity, info)
+                } else XxtClassPage(activity.name, xxtPlain(info.text("content")).ifBlank { activity.description }, notice = "此活动类型暂不支持操作，仅供只读查看。")
+            }
+        }
+    }
+    override suspend fun submitClassroom(submission: XxtClassSubmission): XxtClassResult {
+        xxtValidateClassroom(submission, System.currentTimeMillis())
+        val current = user()
+        if (current.uid != submission.user.uid) throw XxtFailure("SESSION", "学习通账号已变更，请重新加载并确认。")
+        val latest = classroom(submission.course, submission.activity, current)
+        if (latest.copy(replies = emptyList()) != submission.page.copy(replies = emptyList())) throw XxtFailure("CHANGED", "活动要求或提交状态已变更，请重新加载并确认。")
+        return xxtClassResult(json(xxtClassroomRequest(submission, System.currentTimeMillis(), UUID.randomUUID().toString())))
+    }
+    override suspend fun picked(activity: XxtActivity, uid: String): XxtPickStatus {
+        require(activity.type == 11)
+        return xxtParsePicked(json(xxtPickRequest(activity, System.currentTimeMillis())), uid)
     }
     private suspend fun upload(path: String, user: XxtUser): String = withContext(Dispatchers.IO) {
         val file = File(path); require(file.isFile && file.length() in 1..6 * 1024 * 1024)

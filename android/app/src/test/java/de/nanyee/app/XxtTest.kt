@@ -197,7 +197,7 @@ class XxtTest {
     }
     @Test fun demoIncludesAllTypesAndSuccessFailureUnknownWithoutTransport() = runBlocking {
         val demo = DemoXxtBackend(); val user = demo.user(); val c = demo.courses().single(); val rows = demo.activities(c)
-        val details = rows.filter { it.ongoing }.map { demo.detail(it) }
+        val details = rows.filter { it.ongoing && it.type in setOf(2, 74) }.map { demo.detail(it) }
         assertEquals(setOf(0, 2, 3, 4, 5), details.map { it.type }.toSet()); assertTrue(details.any { it.face }); assertTrue(details.any { it.photo }); assertTrue(details.any { it.captcha })
         assertEquals(XxtSignResult.Success, demo.sign(user, XxtSignPlan(c, rows[0], details[0])))
         assertEquals(XxtSignResult.Rejected, demo.sign(user, XxtSignPlan(c, rows[7], details[7])))
