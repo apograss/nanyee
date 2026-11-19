@@ -8,6 +8,26 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class AccountModelTest {
+    @Test fun changingHostedSchoolAccountRefreshesHintWithoutDiscardingMetadata() = runBlocking {
+        val f = Fixture(); f.login(); val model = f.model
+        model.editCredential("demo-school"); model.schoolAccount = "202612345678"; model.secret = "fixture-password"
+        model.review(AccountWrite.UPDATE, "demo-school")
+        val body = model.pending!!.body!!
+        assertEquals("202612345678", Json.parseToJsonElement(body.text("secret")).jsonObject.text("account"))
+        assertEquals("尾号 5678", body.getValue("metadata").jsonObject.text("account_hint"))
+        assertEquals("password", body.getValue("metadata").jsonObject.text("credential_kind"))
+        assertFalse(body.getValue("metadata").toString().contains("fixture-password"))
+        model.confirm()
+        val hint = model.credentials.first { it.text("id") == "demo-school" }.getValue("metadata").jsonObject.text("account_hint")
+        assertTrue(cabinAccountMatchesHint("202612345678", hint))
+        assertFalse(cabinAccountMatchesHint("202612341234", hint))
+        model.editCredential("demo-school"); model.secret = "fixture-password"
+        model.review(AccountWrite.UPDATE, "demo-school"); assertNull(model.pending)
+        model.editCredential("demo-token"); model.secret = "fixture-token"
+        model.review(AccountWrite.UPDATE, "demo-token")
+        assertEquals(setOf("secret"), model.pending!!.body!!.keys)
+    }
+
     @Test fun initialDemoShowsSignedInSuccessWithoutLoginOrVerification() = runBlocking {
         val backend = DemoAccountBackend(initiallySignedIn = true)
         val model = AccountModel(backend, AccountRecovery({ null }, { _, _ -> }))

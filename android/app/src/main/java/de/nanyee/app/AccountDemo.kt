@@ -13,7 +13,7 @@ internal class DemoAccountBackend(initiallySignedIn: Boolean = false) : Platform
     private var email: String? = "demo@example.invalid"
     private var requestedEmail = ""
     private var credentialRows = listOf(
-        accountPayload("id" to "demo-school", "purpose" to "school", "upstream" to "school", "status" to "active", "expires_at" to JsonNull),
+        accountPayload("id" to "demo-school", "purpose" to "school", "upstream" to "school", "status" to "active", "expires_at" to JsonNull, "metadata" to accountPayload("account_hint" to "尾号 1234", "credential_kind" to "password")),
         accountPayload("id" to "demo-token", "purpose" to "qun_checkin", "upstream" to "qun100", "status" to "active", "expires_at" to "2030-12-01T00:00:00Z"),
         accountPayload("id" to "demo-revoked", "purpose" to "evaluation", "upstream" to "academic", "status" to "revoked", "expires_at" to JsonNull)
     )
@@ -53,6 +53,7 @@ internal class DemoAccountBackend(initiallySignedIn: Boolean = false) : Platform
                         val updated = JsonObject(row + when {
                             path.endsWith("/renew") -> mapOf("expires_at" to JsonPrimitive(Instant.now().plusSeconds(body?.get("ttl_seconds")?.jsonPrimitive?.long ?: 0).toString()))
                             method == "DELETE" -> mapOf("status" to JsonPrimitive("revoked"))
+                            path.endsWith("/secret") && body?.get("metadata") != null -> mapOf("metadata" to body.getValue("metadata"))
                             else -> emptyMap()
                         })
                         credentialRows = credentialRows.map { if (it.text("id") == id) updated else it }; updated

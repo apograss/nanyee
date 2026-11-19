@@ -120,11 +120,12 @@ internal class AccountModel(private val backend: PlatformBackend, private val re
                             val purpose = row.text("purpose")
                             valid(purpose in setOf("school", "evaluation", "study_cabin", "qun_checkin"), "此凭据类型请在网页修改。")
                             valid(secret.isNotBlank() && secret.length <= 4096, "请填写新的托管秘密。")
-                            val value = if (purpose == "qun_checkin") secret else {
+                            if (purpose == "qun_checkin") accountPayload("secret" to secret) else {
                                 valid(schoolAccount.isNotBlank() && schoolAccount.length <= 64 && secret.length <= 256, "请填写原学校账号及新密码。")
-                                accountPayload("account" to schoolAccount, "password" to secret).toString()
+                                val update = cabinSecret(schoolAccount, secret, false)
+                                val metadata = JsonObject((row["metadata"] as? JsonObject).orEmpty() + update.getValue("metadata").jsonObject)
+                                accountPayload("secret" to update.getValue("secret"), "metadata" to metadata)
                             }
-                            accountPayload("secret" to value)
                         }
                         AccountWrite.RENEW -> {
                             valid(row["expires_at"] != null && row["expires_at"] != JsonNull, "永久凭据无需续期。")
