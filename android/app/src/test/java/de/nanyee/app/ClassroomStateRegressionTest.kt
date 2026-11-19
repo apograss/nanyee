@@ -55,6 +55,35 @@ class ClassroomStateRegressionTest {
         assertFalse(state.completed)
     }
 
+    @Test fun unknownWriteSurvivesBackReopenAndRestorationUntilAcknowledged() = runBlocking<Unit> {
+        val saved = SavedStateHandle()
+        val state = XxtState(application(), saved)
+        synchronousScope(state)
+        setState(state, "demo", true)
+        val backend = DemoXxtBackend()
+        XxtState::class.java.getDeclaredField("backend").apply { isAccessible = true }.set(state, backend)
+        XxtState::class.java.getDeclaredField("pendingWrite").apply { isAccessible = true }.set(state, true)
+        val course = backend.courses().first()
+        val activity = backend.activities(course).first()
+        state.selectCourse(course)
+        state.selectActivity(activity)
+        state.back()
+        assertTrue(state.hasUnknownWrite)
+        state.selectActivity(activity)
+        assertTrue(state.completed)
+        val restored = XxtState(application(), saved)
+        synchronousScope(restored)
+        restored.initialize(true)
+        val work = XxtState::class.java.getDeclaredField("work").apply { isAccessible = true }
+        withTimeout(5000) { (work.get(restored) as Job).join() }
+        assertTrue(restored.hasUnknownWrite)
+        restored.acknowledgeUnknown()
+        withTimeout(5000) { (work.get(restored) as Job).join() }
+        assertFalse(restored.hasUnknownWrite)
+        assertFalse(restored.completed)
+        ViewModelStore().apply { put("first", state); put("restored", restored); clear() }
+    }
+
     @Test fun followingRestoresLatestPresentationAndNotTheHistoricalDeck() {
         val slides = RainLiveSlides()
         assertNull(slides.target)
