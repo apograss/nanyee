@@ -41,3 +41,14 @@ emulator -avd nanyee
 ```
 
 未使用真实学生账号验证上游学校登录，演示模式不代表真实学校响应。
+
+## 可选的真实账号只读集成测试
+
+仅在本地环境同时设置 `NANYEE_LIVE_ACCOUNT` 和 `NANYEE_LIVE_PASSWORD` 后运行；缺少任一变量时 JUnit assume 跳过，不加载模型、不联网。不要将凭据写入命令行参数、Gradle 属性或文件。测试使用同一模型及预处理、JVM ONNX Runtime 和直连数据源，依次读取学期、当前学期前 20 周课表、校历和成绩；不执行选课或评教。登录可能影响其他设备的学校会话。学期外允许当前周为空，但校历、课表和成绩必须非空。
+
+```sh
+cd android
+ANDROID_HOME=/home/ubuntu/android-sdk ./gradlew testDebugUnitTest --tests 'de.nanyee.app.DirectSchoolLiveIntegrationTest' --rerun-tasks --info --max-workers=2
+```
+
+`--rerun-tasks` 避免之前的跳过结果被当作最新结果；`--info` 显示测试的统计输出。只打印 OCR 次数、模型形状、学期/课程/成绩记录数，以及校历/当前周/汇总是否存在；失败时不附带上游内容。
