@@ -5,6 +5,14 @@ import org.junit.Test
 import java.time.LocalDate
 
 class PresentationTest {
+    @Test fun roomsDropOnlyTheGenericTeachingBuildingPrefix() {
+        assertEquals("201", compactRoom("教学楼 201"))
+        assertEquals("A-201", compactRoom("教学楼A-201"))
+        assertEquals("一号楼 201", compactRoom(" 一号楼 201 "))
+        assertEquals("第一教学楼201", compactRoom("第一教学楼201"))
+        assertEquals("教学楼", compactRoom("教学楼"))
+        assertEquals("", compactRoom("  "))
+    }
     @Test fun horizontalSwipesChangeOneWeekAndRespectBounds() {
         assertEquals(4, weekAfterSwipe(3, 20, -100f, 64f))
         assertEquals(2, weekAfterSwipe(3, 20, 100f, 64f))

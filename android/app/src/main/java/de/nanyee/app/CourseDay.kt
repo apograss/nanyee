@@ -31,8 +31,8 @@ fun CourseDay(courses: List<JsonObject>, allCourses: List<JsonObject>, colors: L
                             Text(course.text("start_time"), Modifier.weight(1f), fontSize = 8.sp, lineHeight = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             if (collapse && group.size > 1) Text("+${group.size - 1}", fontSize = 10.sp, lineHeight = 10.sp, maxLines = 1, fontWeight = FontWeight.Bold)
                         }
-                        Text(course.text("name"), fontWeight = FontWeight.Bold, fontSize = 10.sp, lineHeight = 14.sp, maxLines = if (span.first == span.last) 1 else 3, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall.copy(lineBreak = LineBreak.Heading))
-                        Text(course.text("location"), fontSize = 8.sp, lineHeight = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(course.text("name"), Modifier.weight(1f, fill = false), fontWeight = FontWeight.Bold, fontSize = 10.sp, lineHeight = 14.sp, maxLines = if (span.first == span.last) 1 else 3, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall.copy(lineBreak = LineBreak.Heading))
+                        Text(compactRoom(course.text("location")), fontSize = 8.sp, lineHeight = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
