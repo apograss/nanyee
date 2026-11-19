@@ -31,15 +31,16 @@ internal class EncryptedPlatformCookies(context: Context) : PlatformCookieStorag
 
 internal class PlatformCookies(private val storage: PlatformCookieStorage) : CookieJar {
     private val origin = "https://nanyee.de/".toHttpUrl()
-    private val values = storage.read().lineSequence().mapNotNull { Cookie.parse(origin, it) }.filter { it.name in setOf("nanyee_session", "nanyee_csrf") && it.matches(origin) }.toMutableList()
+    private val names = setOf("__Host-nanyee_session", "nanyee_session", "nanyee_csrf")
+    private val values = storage.read().lineSequence().mapNotNull { Cookie.parse(origin, it) }.filter { it.name in names && it.domain == origin.host }.toMutableList()
     @Synchronized override fun loadForRequest(url: HttpUrl): List<Cookie> = if (url.host != origin.host || !url.isHttps) emptyList() else values.filter { it.expiresAt > System.currentTimeMillis() && it.matches(url) }
     @Synchronized override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
         if (url.host != origin.host || !url.isHttps) return
-        cookies.filter { it.name in setOf("nanyee_session", "nanyee_csrf") }.forEach { next ->
+        cookies.filter { it.name in names }.forEach { next ->
             values.removeAll { it.name == next.name && it.domain == next.domain && it.path == next.path }
             if (next.expiresAt > System.currentTimeMillis()) values.add(next)
         }
-        try { storage.write(values.joinToString("\n")) }
+        try { storage.write(values.joinToString("\n") { if (it.hostOnly) it.toString().replace("; domain=${it.domain}", "") else it.toString() }) }
         catch (e: Exception) { values.clear(); throw IOException("平台登录状态无法安全保存。", e) }
     }
     @Synchronized fun csrf(): String? = loadForRequest("https://nanyee.de/api/v1/jobs".toHttpUrl()).lastOrNull { it.name == "nanyee_csrf" }?.value

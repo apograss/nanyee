@@ -110,6 +110,16 @@ class CabinContractTest {
         override fun write(value: String) { this.value = value }
     }
 
+    @Test fun productionHostCookieSurvivesRestart() {
+        val origin = "https://nanyee.de/api/v1/auth/login".toHttpUrl()
+        val storage = MemoryCookies()
+        PlatformCookies(storage).saveFromResponse(origin, listOf(Cookie.parse(origin, "__Host-nanyee_session=fixture-only; Path=/; Secure; HttpOnly; Max-Age=3600")!!))
+        val cookie = PlatformCookies(storage).loadForRequest("https://nanyee.de/api/v1/credentials".toHttpUrl()).single()
+        assertEquals("__Host-nanyee_session", cookie.name)
+        assertTrue(cookie.hostOnly); assertTrue(cookie.secure); assertTrue(cookie.httpOnly)
+        assertEquals("/", cookie.path)
+    }
+
     @Test fun platformCookiesRoundTripScopeExpiryAndLogout() {
         val storage = MemoryCookies()
         val origin = "https://nanyee.de/".toHttpUrl()
