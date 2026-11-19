@@ -262,8 +262,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
             if (savedAccount.isBlank() || savedPassword.isEmpty()) null else savedAccount to savedPassword
         }
     }
-    internal suspend fun evaluationAccess(): EvaluationSource {
-        if (demo) return DemoEvaluationSource()
+    private suspend fun ensureToolSession() {
         if (!loggedIn || session.isEmpty() || runCatching { Instant.parse(expires) <= Instant.now() }.getOrDefault(true)) {
             val credentials = hostedSchoolPrefill() ?: throw SchoolError(401, "LOGIN_REQUIRED", "请先在“我的”登录学校，或保存凭据后重试。")
             autoLoggingIn = true
@@ -278,6 +277,15 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
                 }
             } finally { autoLoggingIn = false }
         }
+    }
+    internal suspend fun courseGrabAccess(): CourseGrabSource {
+        check(!demo)
+        ensureToolSession()
+        return (api as DirectSchoolApi).courseGrab(session)
+    }
+    internal suspend fun evaluationAccess(): EvaluationSource {
+        if (demo) return DemoEvaluationSource()
+        ensureToolSession()
         val sourceSession = session
         val source = (api as DirectSchoolApi).evaluations(sourceSession)
         return object : EvaluationSource by source {

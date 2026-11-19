@@ -30,7 +30,7 @@ Debug APK 使用 Android 默认开发密钥签名，可直接安装。发布正�
 - “记住学号和密码”使用 Android Keystore 支持的 EncryptedSharedPreferences。取消勾选立即删除；不备份应用数据。
 - 仅学期总周数作为普通偏好保存（1–30，默认 20）。
 - 所有构建均可在登录页选择“演示模式”；横幅明确标注示例数据，不发送学校查询请求。
-- 不含选课、评教、Turnstile 与导出功能；学校直连只调用仓库已有的认证与只读查询端点。学习舱任务通过下述 Nanyee API 创建，不由手机直接访问学校 infospace。
+- 不含 Turnstile 与导出功能；学校直连只调用仓库已有的认证、查询与明确确认后的评课/选课端点。学习舱任务通过下述 Nanyee API 创建，不由手机直接访问学校 infospace。
 
 ## 学习舱预约（工具）
 
@@ -57,6 +57,21 @@ ANDROID_HOME=/home/ubuntu/android-sdk ./gradlew testDebugUnitTest --tests 'de.na
 ```
 
 运行前在本地环境安全设置 `NANYEE_LIVE_ACCOUNT` 和 `NANYEE_LIVE_PASSWORD`，不要放入命令行或仓库。登录可能影响其他设备的学校会话。课程评价 UI 尚未设备视觉验证。
+
+## 抢课（工具，本机）
+
+- 仅依据本仓库 `services/platform/src/nanyee/integrations/smu/client.py`、`enrollment_runs.py`、`tools/course_selection/models.py` 及测试移植；未复制 GPL GUI 仓库代码。复用内存学校 SSO 会话及静默登录，不经过 Nanyee 服务器。
+- 只读入口为 welcome 页与 `/new/student/xsxk/`；按类型分页 POST `xklx/{code}/kxkc`（每页 50，最多 20 页）。容量取 `pkrs`，已选人数取 `jxbrs`、回退 `xkrs`；可搜索、刷新、排序最多四个志愿。没有退课、已选查询或独立容量轮询端点。
+- 用户确认摘要后才 POST `xklx/{code}/add`。默认 15 次尝试，先尝试首志愿 5 次，最多 120 次；串行，100–300 ms 随机间隔。冲突确认默认关闭，仅开启后才重复 `hlct=1`。门数上限单独显示，不声称选课成功。
+- 未开放按 0.5–1 s 等候，不消耗尝试次数，最多 600 次连续轮询；429 按 Retry-After 等候（缺失或无效时 60 秒）。超时/非 JSON 记为结果未知并继续，耗尽后仅提示人工核验，不追加任何核验写入。
+- 可选北京时间 HH:mm:ss；运行前采样 welcome 的 Date 三次，取最小 RTT 的偏移，提前 50 ms；当天时间已过则顺延次日。Date 精度约一秒，不能保证精准到点。必须保持 App 在前台；运行/等待时常亮，ViewModel 保持旋转后的任务，取消会中断网络请求/等待。没有前台服务或进程重启续跑，中断后请人工核验。
+- 演示源完全不联网，可选第三次成功、未开放后开放、冲突、满员、门数上限、超时未知。UI 尚未在设备上视觉验证。
+- `CourseSelectionLiveListingTest` 仅在同时设置 `NANYEE_LIVE_ACCOUNT`、`NANYEE_LIVE_PASSWORD` 时运行；只静默登录、发现类型并读取每类第一页，输出脱敏计数，测试只持有无提交方法的 `CourseGrabListing` 接口。不要将凭据放入命令行或文件。登录可能影响其他设备会话；此测试不调用 `/add`：
+
+```sh
+cd android
+ANDROID_HOME=/home/ubuntu/android-sdk ./gradlew testDebugUnitTest --tests 'de.nanyee.app.CourseSelectionLiveListingTest' --rerun-tasks --info --max-workers=2
+```
 
 ## 模拟器
 

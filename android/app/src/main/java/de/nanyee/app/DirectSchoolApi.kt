@@ -162,6 +162,63 @@ internal class DirectSchoolApi(private val transport: Call.Factory? = null) : Sc
         if (session.isEmpty() || body?.text("academic_session_id") != session) throw SchoolError(410, "SESSION_EXPIRED", "学校会话已过期，请重新登录。")
     }
 
+    internal fun courseGrab(sessionId: String): CourseGrabSource = object : CourseGrabSource {
+        private fun check() = checkSession(payload("academic_session_id" to sessionId))
+        private suspend fun <T> read(request: Request, parse: (Response) -> T): T {
+            check()
+            try { return execute(request, singleAttempt = true, parse = parse) }
+            catch (e: SchoolError) {
+                if (e.status == 429) throw GrabThrottle(java.time.Duration.between(Instant.now(), retryAt).toMillis().coerceAtLeast(1000))
+                throw e
+            }
+        }
+        override suspend fun categories(): List<GrabCategory> = withContext(Dispatchers.IO) {
+            read(requestBuilder("$ACADEMIC/new/welcome.page?ui=new").build()) { content(it) }
+            var url = "$ACADEMIC/new/student/xsxk/".toHttpUrl()
+            repeat(5) {
+                val result = read(requestBuilder(url.toString()).build()) { response ->
+                    if (response.isRedirect) null to response.header("Location") else content(response) to null
+                }
+                if (result.first != null) {
+                    if (!url.encodedPath.startsWith("/new/student/xsxk")) throw SchoolError(404, "NOT_OPEN", "学校选课当前未开放，请在开放期间重试。")
+                    return@withContext grabCategories(result.first!!)
+                }
+                val next = result.second?.let { url.resolve(it) }
+                if (next == null || next.scheme != "https" || next.host != "zhjw.smu.edu.cn") throw SchoolError(410, "SESSION_EXPIRED", "学校会话已过期，请重新登录。")
+                url = next
+            }
+            throw SchoolError(503, "UPSTREAM_UNAVAILABLE", "学校跳转次数过多。")
+        }
+        override suspend fun courses(category: String, page: Int): GrabPage = withContext(Dispatchers.IO) {
+            read(grabRequest(category, page = page)) { grabCourses(Json.parseToJsonElement(content(it))) }
+        }
+        override suspend fun clock(): Long = withContext(Dispatchers.IO) {
+            val samples = mutableListOf<GrabClockSample>()
+            repeat(3) { index ->
+                val wall = System.currentTimeMillis(); val start = System.nanoTime()
+                val date = read(requestBuilder("$ACADEMIC/new/welcome.page?ui=new").build()) { response ->
+                    content(response)
+                    response.header("Date")?.let { runCatching { ZonedDateTime.parse(it, DateTimeFormatter.RFC_1123_DATE_TIME).toInstant().toEpochMilli() }.getOrNull() }
+                }
+                if (date != null) samples.add(GrabClockSample(wall, (System.nanoTime() - start) / 1000000, date))
+                if (index < 2) kotlinx.coroutines.delay(30)
+            }
+            grabClockOffset(samples)
+        }
+        override suspend fun select(category: String, course: GrabCourse, conflict: Boolean): GrabReply = withContext(Dispatchers.IO) {
+            check()
+            try {
+                read(grabRequest(category, course = course, conflict = conflict)) { response ->
+                    if (response.code in setOf(401, 403) || response.isRedirect) throw SchoolError(410, "SESSION_EXPIRED", "学校会话已过期，请重新登录并核验结果。")
+                    if (response.code != 200) GrabReply(GrabOutcome.UNKNOWN, "学校响应异常，结果未知") else grabReply(content(response))
+                }
+            } catch (e: SchoolError) {
+                if (e.status in setOf(401, 410)) throw e
+                GrabReply(GrabOutcome.UNKNOWN, "请求超时或响应异常，结果未知")
+            }
+        }
+    }
+
     internal fun evaluations(sessionId: String): EvaluationSource = object : EvaluationSource {
         private fun check() = checkSession(payload("academic_session_id" to sessionId))
         private fun headers(request: Request) = request.newBuilder().header("User-Agent", requestBuilder(ACADEMIC).build().header("User-Agent")!!).header("Accept-Language", "zh-CN,zh;q=0.9").build()
