@@ -179,6 +179,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
     }
     private fun sessionBody() = payload("academic_session_id" to session)
     private suspend fun loadTimetable() {
+        courses = emptyList(); semesterStart = ""
         val response = api.request("timetable.semesters", sessionBody())
         semesters = response.items("semesters")
         if (semesters.none { it.text("code") == semester }) semester = response.text("default_code")
@@ -223,7 +224,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         if (demo) courses = demoCourses(code)
         else if (cachedMode) {
             val table = cachedTimetables?.tables?.get(code)
-            if (table == null) requireSchoolLogin(0) else { courses = table.courses; totalWeeks = table.totalWeeks; semesterStart = table.semesterStart; week = week.coerceAtMost(totalWeeks); followCurrentWeek() }
+            if (table == null) { courses = emptyList(); semesterStart = ""; requireSchoolLogin(0) } else { courses = table.courses; totalWeeks = table.totalWeeks; semesterStart = table.semesterStart; week = week.coerceAtMost(totalWeeks); followCurrentWeek() }
         } else if (loggedIn) { semesterStart = ""; courses = emptyList(); launch("timetable") { queryTimetable() } }
     }
     fun setWeeks(value: Int) { totalWeeks = value.coerceIn(1, 30); week = week.coerceAtMost(totalWeeks); followCurrentWeek(); prefs.edit().putInt("weeks", totalWeeks).apply(); if (!demo && loggedIn) launch("timetable") { queryTimetable() } }
