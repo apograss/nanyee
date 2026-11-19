@@ -162,7 +162,9 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
     }
     fun cancelLogin() {
         jobs.remove("login")?.cancel(); loginInFlight = false; busy = jobs.isNotEmpty()
-        hint = "已取消登录，可继续填写"
+        captcha = null; captchaText = ""
+        hint = "已取消登录，请输入新验证码"
+        launch(silent = true) { fetchCaptcha() }
     }
     fun logout() {
         val wasDemo = demo
@@ -172,6 +174,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         if (!wasDemo) { password = ""; captcha = null; captchaText = ""; api.clear(); launch(silent = true) { fetchCaptcha() } } else if (captcha == null) launch(silent = true) { fetchCaptcha() } else checkCaptcha()
     }
     fun startDemo() {
+        if (loginInFlight) { captcha = null; captchaText = "" }
         clearRequests()
         saved["demo"] = true; saved["hadSession"] = false
         session = ""; expires = ""; demo = true; loggedIn = true; tab = 0; error = ""; week = 1
