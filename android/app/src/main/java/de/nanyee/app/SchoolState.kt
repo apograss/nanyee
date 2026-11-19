@@ -98,7 +98,7 @@ class SchoolState(app: Application) : AndroidViewModel(app) {
     }
     private suspend fun loadGrades() { grades = api.request("grades", sessionBody()) }
     fun reload() { if (!demo && loggedIn) { if (tab == 0) launch("timetable") { if (semesters.isEmpty()) loadTimetable() else queryTimetable() } else launch("grades") { loadGrades() } } }
-    fun selectSemester(code: String) { semester = code; if (!demo && loggedIn) launch("timetable") { queryTimetable() } }
+    fun selectSemester(code: String) { semester = code; if (demo) courses = demoCourses(code) else if (loggedIn) launch("timetable") { queryTimetable() } }
     fun setWeeks(value: Int) { totalWeeks = value.coerceIn(1, 30); week = week.coerceAtMost(totalWeeks); prefs.edit().putInt("weeks", totalWeeks).apply(); if (!demo && loggedIn) launch("timetable") { queryTimetable() } }
     private fun clearRequests() {
         sessionGeneration++
@@ -112,18 +112,26 @@ class SchoolState(app: Application) : AndroidViewModel(app) {
     fun startDemo() {
         clearRequests()
         session = ""; expires = ""; password = ""; captchaText = ""; captcha = null; demo = true; loggedIn = true; tab = 0; error = ""; week = 1
-        semesters = listOf(payload("code" to "202501", "label" to "2025-2026-1")); semester = "202501"
-        courses = listOf("人体解剖学", "大学英语", "医用高等数学", "基础化学", "医学导论", "体育").mapIndexed { i, name -> buildJsonObject {
-            put("name", name); put("weekday", i % 5 + 1); put("start_node", if (i % 2 == 0) 1 else 3); put("end_node", if (i % 2 == 0) 2 else 4)
+        semesters = listOf(payload("code" to "202501", "label" to "2025-2026-1"), payload("code" to "202402", "label" to "2024-2025-2")); semester = "202501"
+        courses = demoCourses(semester)
+        grades = demoGrades()
+    }
+}
+
+internal fun demoCourses(semester: String): List<JsonObject> {
+    val previous = semester == "202402"
+    val names = if (previous) listOf("医学生物学", "有机化学", "医学伦理学", "大学物理") else listOf("人体解剖学", "大学英语", "医用高等数学", "基础化学", "医学导论", "体育")
+    return names.mapIndexed { i, name -> buildJsonObject {
+            put("name", name); put("weekday", (i + if (previous) 1 else 0) % 5 + 1); put("start_node", if (i % 2 == 0) 1 else 3); put("end_node", if (i % 2 == 0) 2 else 4)
             put("start_time", if (i % 2 == 0) "08:00" else "10:10"); put("end_time", if (i % 2 == 0) "09:40" else "11:50")
             put("location", "教学楼 ${201 + i}"); put("teachers", "示例教师"); put("weeks", JsonArray((1..20).map { JsonPrimitive(it) }))
         } }
-        grades = buildJsonObject {
-            put("summary", payload("weighted_gpa" to "3.82", "required_gpa" to "3.90", "average_score" to "88.6", "required_average_score" to "89.2", "total_credits" to "18", "total_courses" to "6", "failed_count" to "0"))
-            put("grades", JsonArray(courses.mapIndexed { i, c -> buildJsonObject {
-                put("name", c.text("name")); put("semester", "2025-2026-1"); put("credits", 3); put("raw_score", "${94 - i * 2}"); put("grade_point", "${4.4 - i * 0.2}")
+}
+
+internal fun demoGrades() = buildJsonObject {
+            put("summary", payload("weighted_gpa" to "3.82", "required_gpa" to "3.90", "average_score" to "88.6", "required_average_score" to "89.2", "total_credits" to "30", "total_courses" to "10", "failed_count" to "0"))
+            put("grades", JsonArray(listOf("202501" to "2025-2026-1", "202402" to "2024-2025-2").flatMap { (code, label) -> demoCourses(code).mapIndexed { i, c -> buildJsonObject {
+                put("name", c.text("name")); put("semester", label); put("credits", 3); put("raw_score", "${94 - i * 2}"); put("grade_point", "${4.4 - i * 0.2}")
                 put("ranking", buildJsonObject { put("course_rank", 12); put("course_total", 240); put("class_rank", 3); put("class_total", 40); put("distribution", buildJsonObject { put("lt60", 2); put("s60to70", 15); put("s70to80", 48); put("s80to90", 105); put("gte90", 70) }) })
-            } }))
-        }
-    }
+            } } }))
 }
