@@ -118,22 +118,23 @@ private fun XxtScreen(state: XxtState, onBack: () -> Unit, onToggleDemo: () -> U
                 Text("活动 · 进行中优先")
                 if (state.loaded && state.activities.isEmpty()) Text("本课程暂无活动。")
                 state.activities.forEach { row ->
-                    val sign = row.type in setOf(2, 74)
-                    Card(onClick = { state.selectActivity(row) }, modifier = Modifier.fillMaxWidth(), enabled = sign && row.ongoing && !state.busy) {
+                    Card(onClick = { state.selectActivity(row) }, modifier = Modifier.fillMaxWidth(), enabled = !state.busy) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(row.name, style = MaterialTheme.typography.titleMedium)
                             Text("${if (row.ongoing) "进行中" else "已结束"} · ${xxtActivityLabel(row)}")
                             Text("开始 ${xxtTime(row.start)}${if (row.end > 0) " · 结束 ${xxtTime(row.end)}" else ""}")
                             if (row.description.isNotBlank()) Text(row.description)
-                            if (!sign) Text("本期仅支持签到和签退，其余活动请使用官方学习通。")
+                            if (row.type !in xxtClassroomWrites && row.type !in setOf(2, 74, 11)) Text("只读详情")
                         }
                     }
                 }
             } else {
                 Text(activity.name, style = MaterialTheme.typography.titleLarge)
                 Text("${xxtActivityLabel(activity)} · ${xxtTime(activity.start)}")
-                if (detail != null) {
-                    if (detail.face) Text("此活动要求人脸签到，暂不支持。请使用官方学习通，不提供跳过或替代身份。", color = MaterialTheme.colorScheme.error)
+                if (activity.type !in setOf(2, 74)) XxtClassroomContent(state)
+                else if (detail != null) {
+                    if (!activity.ongoing) Text("活动已结束，仅供只读查看。")
+                    else if (detail.face) Text("此活动要求人脸签到，暂不支持。请使用官方学习通，不提供跳过或替代身份。", color = MaterialTheme.colorScheme.error)
                     else if (detail.signed) Text("当前本人账号已签到，无需再次提交。")
                     else if (detail.type !in setOf(0, 2, 3, 4, 5)) Text("暂不支持此签到类型，请使用官方学习通。")
                     else {
@@ -189,9 +190,10 @@ private fun XxtScreen(state: XxtState, onBack: () -> Unit, onToggleDemo: () -> U
         }, confirmButton = { Button(onClick = state::submit, enabled = !state.busy) { Text("确认提交") } }, dismissButton = { TextButton(onClick = state::dismissConfirmation) { Text("返回修改") } })
     }
     state.captcha?.let { XxtCaptchaDialog(it, state.busy, state.error, state::verifyCaptcha, state::reloadCaptcha, state::dismissCaptcha) }
+    XxtClassroomConfirmation(state)
 }
 
-internal fun xxtActivityLabel(activity: XxtActivity): String = when (activity.type) { 2 -> "签到 · ${xxtSignLabel(XxtSignDetail(activity.signType))}"; 74 -> "签退"; 5 -> "讨论"; 14 -> "问卷"; 23 -> "评分"; 42 -> "随堂练习"; 43 -> "投票"; 45 -> "通知"; else -> "其他活动（${activity.type}）" }
+internal fun xxtActivityLabel(activity: XxtActivity): String = when (activity.type) { 2 -> "签到 · ${xxtSignLabel(XxtSignDetail(activity.signType))}"; 74 -> "签退"; 5 -> "讨论"; 11 -> "选人监测"; 14 -> "问卷"; 23 -> "评分"; 42 -> "随堂练习"; 43 -> "投票"; 45 -> "通知"; else -> "其他活动（${activity.type}）" }
 internal fun xxtSignLabel(detail: XxtSignDetail): String = when { detail.face -> "人脸签到 · 不支持"; detail.photo -> "拍照签到"; else -> when (detail.type) { 0 -> "普通签到"; 2 -> "二维码签到"; 3 -> "手势签到"; 4 -> "位置签到"; 5 -> "签到码签到"; else -> "待加载详情" } }
 private fun xxtTime(millis: Long): String = if (millis <= 0) "时间未提供" else DateTimeFormatter.ofPattern("MM-dd HH:mm").withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(millis))
 

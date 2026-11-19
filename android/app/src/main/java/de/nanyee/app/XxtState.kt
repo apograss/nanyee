@@ -23,6 +23,17 @@ internal class XxtState(app: Application, private val savedState: SavedStateHand
     private var flow = XxtFlow()
     private var validateToken = ""
     private var pendingWrite = false
+    private var classroomFlow = XxtClassFlow()
+    private var pickWork: Job? = null
+    private var pickTracker = XxtPickTracker()
+    private var pickGeneration = 0
+    var classroomPage by mutableStateOf<XxtClassPage?>(null); private set
+    var classroomDraft by mutableStateOf(XxtClassDraft()); private set
+    var classroomConfirmation by mutableStateOf<XxtClassSubmission?>(null); private set
+    var classroomResult by mutableStateOf<XxtClassResult?>(null); private set
+    var pickMonitoring by mutableStateOf(false); private set
+    var pickMessage by mutableStateOf("等待前台监测…"); private set
+    var pickAlert by mutableStateOf(false); private set
     var demo by mutableStateOf(false); private set
     var busy by mutableStateOf(false); private set
     var user by mutableStateOf<XxtUser?>(null); private set
@@ -41,14 +52,14 @@ internal class XxtState(app: Application, private val savedState: SavedStateHand
     var error by mutableStateOf(""); private set
     var message by mutableStateOf(""); private set
     var loaded by mutableStateOf(false); private set
-    val completed get() = pendingWrite || flow.stage in setOf(XxtStage.UNKNOWN, XxtStage.SUCCESS)
+    val completed get() = pendingWrite || classroomResult == XxtClassResult.SUCCESS || flow.stage in setOf(XxtStage.UNKNOWN, XxtStage.SUCCESS)
     private suspend fun api(): XxtBackend = backend ?: withContext(Dispatchers.IO) { if (demo) DemoXxtBackend() else XxtApi(storage) }.also { backend = it }
     private fun run(action: suspend () -> Unit) {
         if (busy) return
-        busy = true; error = ""
+        busy = true; error = ""; monitorPick(false)
         val token = generation
         work = viewModelScope.launch {
-            try { action() }
+            try { draftWork?.cancelAndJoin(); action() }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) {
                 if (token == generation) {
@@ -60,7 +71,7 @@ internal class XxtState(app: Application, private val savedState: SavedStateHand
         }
     }
     private suspend fun save() {
-        val value = Json.encodeToString(XxtJournal(demo, course, activity, detail, code, photoPath, pendingWrite))
+        val value = Json.encodeToString(XxtJournal(demo, course, activity, detail, code, photoPath, pendingWrite, classroomDraft, classroomResult))
         if (demo) savedState["draft"] = value else withContext(Dispatchers.IO) { storage.write("journal", value) }
     }
     private suspend fun <T> read(action: suspend () -> T): T = if (demo) action() else xxtReadRecover(
@@ -82,11 +93,13 @@ internal class XxtState(app: Application, private val savedState: SavedStateHand
                 val restored = runCatching { Json.decodeFromString<XxtJournal>(journal) }.getOrNull()
                 course = restored?.course; activity = restored?.activity; detail = restored?.detail; code = restored?.code.orEmpty(); photoPath = restored?.photo.orEmpty()
                 pendingWrite = restored?.writePending == true
+                classroomDraft = restored?.classroom ?: XxtClassDraft(); classroomResult = restored?.classroomResult
                 if (pendingWrite) message = "上次操作被中断，结果未知，请先在官方学习通确认；不会恢复提交。"
+                else if (classroomResult == XxtClassResult.SUCCESS) message = "上次课堂活动提交成功。"
                 if (demo || withContext(Dispatchers.IO) { storage.read("active") } == "true") {
                     user = read { api().user() }; courses = read { api().courses() }; loaded = true
                     course?.let { activities = read { api().activities(it) } }
-                    activity?.let { detail = read { api().detail(it) } }
+                    loadActivity()
                 }
         }
     }
@@ -116,7 +129,7 @@ internal class XxtState(app: Application, private val savedState: SavedStateHand
     fun refresh() = run {
         user = read { api().user() }; courses = read { api().courses() }; loaded = true
         course?.let { activities = read { api().activities(it) } }
-        activity?.let { detail = read { api().detail(it) } }
+        loadActivity()
     }
     fun selectCourse(value: XxtCourse) = run {
         resetSign(); activity = null; detail = null; course = value; activities = emptyList(); loaded = false; save()
@@ -125,9 +138,18 @@ internal class XxtState(app: Application, private val savedState: SavedStateHand
     fun selectActivity(value: XxtActivity) = run {
         resetSign(); activity = value; detail = null; save()
         user = read { api().user() }
-        detail = read { api().detail(value) }; save()
+        loadActivity(); save()
     }
-    private fun resetSign() { flow = XxtFlow(); confirmation = null; captcha = null; code = ""; qr = ""; position = null; photoPath = ""; validateToken = ""; message = ""; pendingWrite = false }
+    private suspend fun loadActivity() {
+        val selected = activity ?: return
+        if (selected.type in setOf(2, 74)) detail = read { api().detail(selected) }
+        else classroomPage = read { api().classroom(requireNotNull(course), selected, requireNotNull(user)) }
+    }
+    private fun resetSign() {
+        monitorPick(false); pickTracker = XxtPickTracker(); pickAlert = false; pickMessage = "等待前台监测…"
+        classroomFlow = XxtClassFlow(); classroomPage = null; classroomDraft = XxtClassDraft(); classroomConfirmation = null; classroomResult = null
+        flow = XxtFlow(); confirmation = null; captcha = null; code = ""; qr = ""; position = null; photoPath = ""; validateToken = ""; message = ""; pendingWrite = false
+    }
     fun back() = run {
         if (activity != null) { activity = null; detail = null } else { course = null; activities = emptyList() }
         resetSign(); loaded = true; save()
@@ -168,6 +190,58 @@ internal class XxtState(app: Application, private val savedState: SavedStateHand
     fun reloadCaptcha() = run { captcha = api().captcha(requireNotNull(flow.plan)) }
     fun dismissConfirmation() { confirmation = null }
     fun dismissCaptcha() { captcha = null; flow.dismiss() }
+    fun updateClassroom(value: XxtClassDraft) {
+        if (busy || completed) return
+        classroomDraft = value; classroomFlow.dismiss(); classroomConfirmation = null; classroomResult = null
+        draftWork?.cancel()
+        draftWork = viewModelScope.launch {
+            delay(250)
+            try { save() } catch (e: CancellationException) { throw e } catch (_: Exception) { error = "无法安全保存课堂活动草稿。" }
+        }
+    }
+    fun previewClassroom() = run {
+        check(!completed)
+        user = read { api().user() }; loadActivity()
+        val value = XxtClassSubmission(requireNotNull(user), requireNotNull(course), requireNotNull(activity), requireNotNull(classroomPage), classroomDraft)
+        classroomFlow.preview(value, System.currentTimeMillis()); classroomConfirmation = value; save()
+    }
+    fun dismissClassroomConfirmation() { if (!busy) { classroomFlow.dismiss(); classroomConfirmation = null } }
+    fun submitClassroom() = run {
+        val confirmed = requireNotNull(classroomConfirmation)
+        val current = read { api().user() }
+        check(current.uid == confirmed.user.uid && activity == confirmed.activity && course == confirmed.course) { "账号或活动已变更，请重新确认。" }
+        user = current
+        val value = classroomFlow.begin(System.currentTimeMillis()); classroomConfirmation = null
+        pendingWrite = true; save()
+        val result = api().submitClassroom(value)
+        classroomFlow.finish(result); classroomResult = result; pendingWrite = result == XxtClassResult.UNKNOWN; save()
+        message = when (result) {
+            XxtClassResult.SUCCESS -> "课堂活动提交成功。再次回复讨论请返回后重新打开。"
+            XxtClassResult.REJECTED -> "提交未成功，请核对输入和活动要求；不会自动重试。"
+            XxtClassResult.UNKNOWN -> "结果未知，请在官方学习通确认；不会自动重试。"
+        }
+    }
+    fun dismissPickAlert() { pickAlert = false }
+    fun monitorPick(enabled: Boolean) {
+        if (!enabled) { pickGeneration++; pickWork?.cancel(); pickWork = null; pickMonitoring = false; return }
+        if (pickWork?.isActive == true || busy) return
+        val selected = activity?.takeIf { it.type == 11 && it.ongoing } ?: return
+        val owner = user ?: return
+        val token = pickGeneration
+        pickMonitoring = true
+        pickWork = viewModelScope.launch {
+            try {
+                xxtPollPicked(read = { read { api().picked(selected, owner.uid) } }, update = { status ->
+                    if (activity != selected || user?.uid != owner.uid) throw CancellationException()
+                    if (pickTracker.observe(status)) pickAlert = true
+                    pickMessage = if (status.count > 0) "你已被选中！" else "暂未选中本人，正在监测…"
+                    if (!status.ongoing) pickMessage += " 活动已结束。"
+                })
+            } catch (e: CancellationException) { throw e }
+            catch (_: Exception) { pickMessage = "读取选人状态失败，已停止监测。请重新打开页面或手动刷新。" }
+            finally { if (token == pickGeneration) pickMonitoring = false }
+        }
+    }
     fun submit() = run {
         val confirmedUid = requireNotNull(user).uid
         val current = read { api().user() }
@@ -187,6 +261,7 @@ internal class XxtState(app: Application, private val savedState: SavedStateHand
         }
     }
     fun logout() {
+        monitorPick(false)
         val old = work; generation++; work?.cancel(); draftWork?.cancel(); busy = true
         work = viewModelScope.launch {
             try {
