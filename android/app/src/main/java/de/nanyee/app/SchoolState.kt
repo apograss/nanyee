@@ -268,7 +268,11 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
             autoLoggingIn = true
             try {
                 when (val result = silentLogin(api, credentials.first, credentials.second, captchaOcr::recognize)) {
-                    is SilentLoginResult.Success -> completeLogin(result.session, credentials.first, credentials.second, true, 3, semester)
+                    is SilentLoginResult.Success -> {
+                        completeLogin(result.session, credentials.first, credentials.second, true, 3, semester)
+                        launch("timetable") { loadTimetable() }
+                        launch("grades") { loadGrades() }
+                    }
                     is SilentLoginResult.Manual -> throw SchoolError(401, "LOGIN_REQUIRED", result.message + " 请在“我的”手动登录后返回。")
                 }
             } finally { autoLoggingIn = false }
