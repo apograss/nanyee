@@ -146,7 +146,7 @@ fun Login(state: SchoolState) {
             OutlinedTextField(value = state.captchaText, onValueChange = { state.captchaText = it }, label = { Text("验证码") }, singleLine = true, modifier = Modifier.weight(1f))
             val bitmap = remember(state.captcha) { runCatching { val bytes = Base64.decode(state.captcha?.text("image_base64") ?: "", Base64.DEFAULT); BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap() }.getOrNull() }
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.width(104.dp).clickable(enabled = !state.busy) { state.refreshCaptcha() }) {
-                Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceContainerHighest) { Box(Modifier.fillMaxWidth().height(48.dp).padding(6.dp), contentAlignment = Alignment.Center) {
+                Surface(shape = RoundedCornerShape(12.dp), color = Color(0xFFFAFAFA), contentColor = Color(0xFF333333)) { Box(Modifier.fillMaxWidth().height(48.dp).padding(6.dp), contentAlignment = Alignment.Center) {
                     if (bitmap != null) Image(bitmap, "验证码，点击刷新", Modifier.fillMaxSize().clip(RoundedCornerShape(6.dp))) else Icon(Icons.Outlined.Refresh, "加载验证码")
                 } }
                 Text("点击刷新", fontSize = (11 / LocalDensity.current.fontScale.coerceAtLeast(1f)).sp, maxLines = 1, color = MaterialTheme.colorScheme.onSurfaceVariant)
