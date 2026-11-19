@@ -18,6 +18,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 internal fun TodayScreen(state: SchoolState, onCourse: (JsonObject) -> Unit) {
     val agenda = remember(state.courses, state.semesterStart, state.totalWeeks, state.now) {
         todaySchedule(state.courses, state.semesterStart, state.totalWeeks, state.now)
@@ -26,7 +27,10 @@ internal fun TodayScreen(state: SchoolState, onCourse: (JsonObject) -> Unit) {
     val date = state.now.format(DateTimeFormatter.ofPattern("M月d日"))
     Column(Modifier.widthIn(max = 720.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(date, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
-        Text(if (agenda.week == null) weekday else "第 ${agenda.week} 周 · $weekday", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            agenda.week?.let { Text("第 $it 周 ·", softWrap = false, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            Text(weekday, softWrap = false, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         if (agenda.message.isNotEmpty()) {
             Card(Modifier.fillMaxWidth()) { Text(agenda.message, Modifier.padding(20.dp)) }
         } else {
@@ -45,7 +49,11 @@ internal fun TodayScreen(state: SchoolState, onCourse: (JsonObject) -> Unit) {
             if (rest.isNotEmpty()) Text("今日课程", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             rest.forEach { TodayCourseCard(it, when (it.phase) { ClassPhase.PAST -> "已结束"; ClassPhase.UNKNOWN -> "时间待确认"; else -> "待上课" }, false, onCourse) }
             agenda.nextDay?.let { nextDay ->
-                Text("下次有课 · ${nextDay.format(DateTimeFormatter.ofPattern("M月d日"))} 周${"一二三四五六日"[nextDay.dayOfWeek.value - 1]}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    listOf("下次有课 ·", nextDay.format(DateTimeFormatter.ofPattern("M月d日")), "周${"一二三四五六日"[nextDay.dayOfWeek.value - 1]}").forEach { token ->
+                        Text(token, softWrap = false, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    }
+                }
                 agenda.preview.forEach { TodayCourseCard(it, "课程预览", false, onCourse) }
             }
             if (agenda.classes.isEmpty() && agenda.preview.isEmpty()) Text("本学期暂无后续课程安排。", color = MaterialTheme.colorScheme.onSurfaceVariant)
