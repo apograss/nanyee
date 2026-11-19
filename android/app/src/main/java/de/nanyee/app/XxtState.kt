@@ -53,6 +53,7 @@ internal class XxtState(app: Application, private val savedState: SavedStateHand
     var message by mutableStateOf(""); private set
     var loaded by mutableStateOf(false); private set
     val completed get() = pendingWrite || classroomResult == XxtClassResult.SUCCESS || flow.stage in setOf(XxtStage.UNKNOWN, XxtStage.SUCCESS)
+    val hasUnknownWrite get() = pendingWrite
     private suspend fun api(): XxtBackend = backend ?: withContext(Dispatchers.IO) { if (demo) DemoXxtBackend() else XxtApi(storage) }.also { backend = it }
     private fun run(action: suspend () -> Unit) {
         if (busy) return
@@ -148,7 +149,11 @@ internal class XxtState(app: Application, private val savedState: SavedStateHand
     private fun resetSign() {
         monitorPick(false); pickTracker = XxtPickTracker(); pickAlert = false; pickMessage = "等待前台监测…"
         classroomFlow = XxtClassFlow(); classroomPage = null; classroomDraft = XxtClassDraft(); classroomConfirmation = null; classroomResult = null
-        flow = XxtFlow(); confirmation = null; captcha = null; code = ""; qr = ""; position = null; photoPath = ""; validateToken = ""; message = ""; pendingWrite = false
+        flow = XxtFlow(); confirmation = null; captcha = null; code = ""; qr = ""; position = null; photoPath = ""; validateToken = ""; message = if (pendingWrite) "结果未知，请先在官方学习通核验；不会自动重试。" else ""
+    }
+    fun acknowledgeUnknown() = run {
+        pendingWrite = false; resetSign(); save()
+        message = "已解除本地未知结果标记；再次提交仍需预览确认。"
     }
     fun back() = run {
         if (activity != null) { activity = null; detail = null } else { course = null; activities = emptyList() }
@@ -207,6 +212,7 @@ internal class XxtState(app: Application, private val savedState: SavedStateHand
     }
     fun dismissClassroomConfirmation() { if (!busy) { classroomFlow.dismiss(); classroomConfirmation = null } }
     fun submitClassroom() = run {
+        check(!pendingWrite) { "请先核验上次结果。" }
         val confirmed = requireNotNull(classroomConfirmation)
         val current = read { api().user() }
         check(current.uid == confirmed.user.uid && activity == confirmed.activity && course == confirmed.course) { "账号或活动已变更，请重新确认。" }
@@ -243,6 +249,7 @@ internal class XxtState(app: Application, private val savedState: SavedStateHand
         }
     }
     fun submit() = run {
+        check(!pendingWrite) { "请先核验上次结果。" }
         val confirmedUid = requireNotNull(user).uid
         val current = read { api().user() }
         check(current.uid == confirmedUid) { "账号已变更，请重新加载并确认。" }
@@ -271,7 +278,7 @@ internal class XxtState(app: Application, private val savedState: SavedStateHand
                 else backend?.clear()
                 withContext(Dispatchers.IO) { getApplication<Application>().filesDir.listFiles()?.filter { it.name.startsWith(if (demo) "xxt_demo_photo_" else "xxt_photo_") }?.forEach { it.delete() } }
                 withContext(Dispatchers.IO) { File(getApplication<Application>().cacheDir, "xxt_camera").deleteRecursively() }
-                backend = null; user = null; courses = emptyList(); activities = emptyList(); course = null; activity = null; detail = null; loaded = false; qrLogin = null; resetSign(); error = ""
+                backend = null; user = null; courses = emptyList(); activities = emptyList(); course = null; activity = null; detail = null; loaded = false; qrLogin = null; pendingWrite = false; resetSign(); error = ""
                 savedState.remove<String>("draft")
             } catch (_: Exception) { error = "本地学习通数据未能完全清除，请重试或在系统设置清除应用数据。" }
             finally { busy = false }

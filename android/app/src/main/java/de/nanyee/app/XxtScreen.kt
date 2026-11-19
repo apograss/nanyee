@@ -78,6 +78,10 @@ private fun XxtScreen(state: XxtState, onBack: () -> Unit, onToggleDemo: () -> U
         if (state.error.isNotBlank()) Text(state.error, color = MaterialTheme.colorScheme.error)
         if (deviceError.isNotBlank()) Text(deviceError, color = MaterialTheme.colorScheme.error)
         if (state.message.isNotBlank()) Text(state.message, style = MaterialTheme.typography.titleMedium)
+        if (state.hasUnknownWrite) {
+            Text("上次提交结果未知。在官方学习通核验前，所有写入均已阻止。")
+            TextButton(onClick = state::acknowledgeUnknown, enabled = !state.busy) { Text("我已在官方学习通核验，解除写入阻止") }
+        }
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("学习通账号", style = MaterialTheme.typography.titleLarge)
