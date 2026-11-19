@@ -55,7 +55,7 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Nanyee(state: SchoolState) {
-    BackHandler(enabled = state.demo || state.loginInFlight) { if (state.demo) state.logout() else state.cancelLogin() }
+    BackHandler(enabled = state.demo || state.loginInFlight || state.canReturnToCache) { if (state.demo) state.logout() else if (state.loginInFlight) state.cancelLogin() else state.returnToCache() }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle) {
         val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) state.onResume() }
@@ -67,35 +67,35 @@ fun Nanyee(state: SchoolState) {
     var detailDataIdentity by rememberSaveable(state.sessionGeneration) { mutableStateOf("") }
     val detailItems = if (detailKind == "course") state.courses else state.grades?.items("grades") ?: emptyList()
     val dataIdentity = if (detailKind == "course") state.courseDataIdentity else state.gradeDataIdentity
-    val detail = if (!state.loggedIn) null else selectedDetail(detailDataIdentity, dataIdentity, detailIndex, detailItems)?.let { detailKind to it }
+    val detail = if (!state.homeVisible) null else selectedDetail(detailDataIdentity, dataIdentity, detailIndex, detailItems)?.let { detailKind to it }
     val landscape = LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp
     val iconSize = (24 * LocalDensity.current.fontScale.coerceIn(1f, 1.35f)).dp
     val labels = listOf("课表", "成绩", "我的")
     val icons = listOf(Icons.Outlined.CalendarMonth, Icons.Outlined.BarChart, Icons.Outlined.Person)
     Scaffold(
         contentWindowInsets = WindowInsets.safeDrawing,
-        topBar = { if (state.loggedIn) TopAppBar(expandedHeight = if (landscape) 44.dp else 64.dp, title = { Text(labels[state.tab] + if (landscape && state.demo) " · 演示模式" else "", fontWeight = FontWeight.Bold, style = if (landscape) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge, maxLines = 1) }, actions = { if (state.tab < 2 && !state.demo) IconButton(onClick = { state.reload() }, enabled = !state.busy) { Icon(Icons.Outlined.Refresh, "刷新", Modifier.size(iconSize)) } }) },
-        bottomBar = { if (state.loggedIn && !landscape) NavigationBar { labels.forEachIndexed { i, label -> NavigationBarItem(selected = state.tab == i, onClick = { state.tab = i }, icon = { Icon(icons[i], null) }, label = { Text(label) }) } } }
+        topBar = { if (state.homeVisible) TopAppBar(expandedHeight = if (landscape) 44.dp else 64.dp, title = { Text(labels[state.tab] + if (landscape && state.demo) " · 演示模式" else "", fontWeight = FontWeight.Bold, style = if (landscape) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge, maxLines = 1) }, actions = { if (state.tab < 2 && !state.demo) IconButton(onClick = { state.reload() }, enabled = !state.busy) { Icon(Icons.Outlined.Refresh, "刷新", Modifier.size(iconSize)) } }) },
+        bottomBar = { if (state.homeVisible && !landscape) NavigationBar { labels.forEachIndexed { i, label -> NavigationBarItem(selected = state.tab == i, onClick = { state.selectTab(i) }, icon = { Icon(icons[i], null) }, label = { Text(label) }) } } }
     ) { padding ->
         Row(Modifier.padding(padding).consumeWindowInsets(padding).fillMaxSize()) {
-            if (landscape && state.loggedIn) NavigationRail(windowInsets = WindowInsets(0)) { labels.forEachIndexed { i, label -> NavigationRailItem(selected = state.tab == i, onClick = { state.tab = i }, icon = { Icon(icons[i], label) }) } }
+            if (landscape && state.homeVisible) NavigationRail(windowInsets = WindowInsets(0)) { labels.forEachIndexed { i, label -> NavigationRailItem(selected = state.tab == i, onClick = { state.selectTab(i) }, icon = { Icon(icons[i], label) }) } }
         Column(Modifier.weight(1f).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
             if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
             if (state.demo && !landscape) Surface(color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.fillMaxWidth()) { Text("演示模式 · 以下为示例数据，并非真实学业记录", Modifier.padding(horizontal = 20.dp, vertical = 8.dp), style = MaterialTheme.typography.labelMedium) }
-            if (state.loggedIn && state.error.isNotEmpty()) ErrorCard(state)
+            if (state.homeVisible && state.error.isNotEmpty()) ErrorCard(state)
             when {
-                !state.loggedIn -> Login(state)
+                !state.homeVisible -> Login(state)
                 state.tab == 0 -> Timetable(state) { detailKind = "course"; detailIndex = state.courses.indexOf(it); detailDataIdentity = state.courseDataIdentity }
                 state.tab == 1 -> Grades(state) { detailKind = "grade"; detailIndex = state.grades?.items("grades")?.indexOf(it) ?: -1; detailDataIdentity = state.gradeDataIdentity }
                 else -> Column(Modifier.widthIn(max = 520.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                     Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.primaryContainer) { Icon(Icons.Outlined.School, null, Modifier.padding(20.dp).size(36.dp)) }
                     Text("学校登录", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                     Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) { Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(if (state.demo) "当前处于演示模式" else "已登录学校系统", color = MaterialTheme.colorScheme.primary)
-                    if (!state.demo) Text("会话到期：${runCatching { DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.of("Asia/Shanghai")).format(Instant.parse(state.expires)) }.getOrDefault(state.expires)}（北京时间）")
-                    Text("学校会话与学业数据仅保存在内存中。", style = MaterialTheme.typography.bodyMedium)
+                    Text(if (state.demo) "当前处于演示模式" else if (state.cachedMode) "正在查看本机课表 · 未登录" else "已登录学校系统", color = MaterialTheme.colorScheme.primary)
+                    if (!state.demo && state.loggedIn) Text("会话到期：${runCatching { DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.of("Asia/Shanghai")).format(Instant.parse(state.expires)) }.getOrDefault(state.expires)}（北京时间）")
+                    Text("课表在本机加密保存；学校会话与成绩仅保存在内存中。", style = MaterialTheme.typography.bodyMedium)
                     } }
-                    OutlinedButton(onClick = { state.logout() }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Outlined.Logout, null); Spacer(Modifier.width(8.dp)); Text(if (state.demo) "退出演示模式" else "退出登录") }
+                    OutlinedButton(onClick = { state.logout() }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Outlined.Logout, null); Spacer(Modifier.width(8.dp)); Text(if (state.demo) "退出演示模式" else "退出并清除本机课表") }
                 }
             }
         }
@@ -192,6 +192,10 @@ fun Timetable(state: SchoolState, onCourse: (JsonObject) -> Unit) {
                 Picker("选择周次", (1..state.totalWeeks).map { it.toString() to "第 $it 周" }, state.week.toString(), { state.selectWeek(it.toInt()) }, Modifier.weight(1f))
                 TextButton(onClick = { weeksInput = state.totalWeeks.toString(); weeksDialog = true }, contentPadding = PaddingValues(2.dp)) { Text("共 ${state.totalWeeks} 周", fontSize = 11.sp, maxLines = 1) }
         }
+        if (!state.demo && state.timetableUpdatedAt.isNotEmpty()) Text(
+            "${if (state.cachedMode) "本机课表 · 未登录 · " else ""}更新于 ${runCatching { DateTimeFormatter.ofPattern("MM-dd HH:mm").withZone(ZoneId.of("Asia/Shanghai")).format(Instant.parse(state.timetableUpdatedAt)) }.getOrDefault("—")}",
+            Modifier.padding(horizontal = 16.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         val active = state.courses.filter { (it["weeks"] as? JsonArray)?.any { w -> (w as? JsonPrimitive)?.intOrNull == state.week } == true }
         if (active.isEmpty()) Text(if (state.busy) "正在加载课表…" else "本周暂无课程", Modifier.padding(20.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
         val dark = isSystemInDarkTheme()
