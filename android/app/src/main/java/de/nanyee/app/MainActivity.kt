@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -54,14 +55,16 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Nanyee(state: SchoolState) {
-    BackHandler(enabled = state.demo) { state.logout() }
+    BackHandler(enabled = state.demo || state.loginInFlight) { if (state.demo) state.logout() else state.cancelLogin() }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle) {
-        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) state.checkCaptcha() }
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) state.onResume() }
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer) }
     }
-    var detail by remember(state.sessionGeneration) { mutableStateOf<Pair<String, JsonObject>?>(null) }
+    var detailKind by rememberSaveable(state.sessionGeneration) { mutableStateOf("") }
+    var detailIndex by rememberSaveable(state.sessionGeneration) { mutableIntStateOf(-1) }
+    val detail = if (!state.loggedIn) null else (if (detailKind == "course") state.courses else state.grades?.items("grades") ?: emptyList()).getOrNull(detailIndex)?.let { detailKind to it }
     val landscape = LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp
     val iconSize = (24 * LocalDensity.current.fontScale.coerceIn(1f, 1.35f)).dp
     val labels = listOf("课表", "成绩", "我的")
@@ -79,8 +82,8 @@ fun Nanyee(state: SchoolState) {
             if (state.loggedIn && state.error.isNotEmpty()) ErrorCard(state)
             when {
                 !state.loggedIn -> Login(state)
-                state.tab == 0 -> Timetable(state) { detail = "course" to it }
-                state.tab == 1 -> Grades(state) { detail = "grade" to it }
+                state.tab == 0 -> Timetable(state) { detailKind = "course"; detailIndex = state.courses.indexOf(it) }
+                state.tab == 1 -> Grades(state) { detailKind = "grade"; detailIndex = state.grades?.items("grades")?.indexOf(it) ?: -1 }
                 else -> Column(Modifier.widthIn(max = 520.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                     Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.primaryContainer) { Icon(Icons.Outlined.School, null, Modifier.padding(20.dp).size(36.dp)) }
                     Text("学校登录", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
@@ -95,7 +98,7 @@ fun Nanyee(state: SchoolState) {
         }
         }
     }
-    detail?.let { (kind, item) -> AlertDialog(onDismissRequest = { detail = null }, confirmButton = { TextButton(onClick = { detail = null }) { Text("关闭") } }, title = { Text(item.text("name")) }, text = {
+    detail?.let { (kind, item) -> AlertDialog(onDismissRequest = { detailIndex = -1 }, confirmButton = { TextButton(onClick = { detailIndex = -1 }) { Text("关闭") } }, title = { Text(item.text("name")) }, text = {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (kind == "course") {
                 Text("周${"一二三四五六日".getOrNull(item.number("weekday") - 1)} · ${item.text("start_time")}–${item.text("end_time")}")
@@ -148,7 +151,8 @@ fun Login(state: SchoolState) {
         Button(onClick = { state.login() }, enabled = !state.busy && state.captcha != null && state.account.isNotBlank() && state.password.isNotEmpty() && state.captchaText.isNotBlank(), modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("登录学校系统") }
         Text(when { state.busy -> "正在连接学校系统…"; state.account.isBlank() -> "请输入学号"; state.password.isEmpty() -> "请输入学校密码"; state.captcha == null -> "验证码未加载，请点击刷新"; state.captchaText.isBlank() -> "请输入图中的验证码"; else -> state.hint.ifEmpty { "信息已填写，可以登录" } }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (state.hint.isNotEmpty() && state.captchaText.isBlank()) Text(state.hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-        OutlinedButton(onClick = { state.startDemo() }, enabled = !state.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("演示模式") }
+        if (state.loginInFlight) TextButton(onClick = { state.cancelLogin() }) { Text("取消登录") }
+        OutlinedButton(onClick = { state.startDemo() }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("演示模式") }
         Text("学校登录可能使其他设备的教务会话下线。会话仅存于内存；勾选后，学号和密码将在本机加密保存。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
@@ -191,9 +195,9 @@ fun Timetable(state: SchoolState, onCourse: (JsonObject) -> Unit) {
         val colors = if (dark) listOf(Color(0xFF244F47), Color(0xFF394563), Color(0xFF58452E), Color(0xFF503D55)) else listOf(Color(0xFFDCEFE7), Color(0xFFE4E9F9), Color(0xFFF8EBD4), Color(0xFFF1E3EF))
         val nodeTimes = listOf("08:00", "08:55", "10:10", "11:05", "14:30", "15:25", "16:30", "19:00", "19:55")
         val nodes = maxOf(nodeTimes.size, active.maxOfOrNull { it.number("end_node") } ?: nodeTimes.size)
-        val today = java.time.LocalDate.now(ZoneId.of("Asia/Shanghai")).dayOfWeek.value
+        val today = state.today.dayOfWeek.value
         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-            Spacer(Modifier.width(30.dp))
+            Spacer(Modifier.width(36.dp))
             (1..7).forEach { day ->
                 Box(Modifier.weight(1f).height(32.dp).clip(RoundedCornerShape(10.dp)).background(if (day == today) MaterialTheme.colorScheme.primaryContainer else Color.Transparent), contentAlignment = Alignment.Center) {
                     Text("周${"一二三四五六日"[day - 1]}", fontSize = 11.sp, fontWeight = if (day == today) FontWeight.Bold else FontWeight.Normal, color = if (day == today) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
@@ -202,11 +206,11 @@ fun Timetable(state: SchoolState, onCourse: (JsonObject) -> Unit) {
         }
         Spacer(Modifier.height(4.dp))
         Row(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-            Column(Modifier.width(30.dp)) {
+            Column(Modifier.width(36.dp)) {
                 (1..nodes).forEach { node -> Column(Modifier.height(64.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("$node", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     val time = state.courses.firstOrNull { it.number("start_node") == node }?.text("start_time")
-                    Text(time ?: nodeTimes.getOrNull(node - 1) ?: "—", fontSize = 7.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(time ?: nodeTimes.getOrNull(node - 1) ?: "—", fontSize = 8.sp, maxLines = 1, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } }
             }
             (1..7).forEach { day -> CourseDay(active.filter { it.number("weekday") == day }, state.courses, colors, nodes, onCourse, { conflicts = it }, Modifier.weight(1f)) }

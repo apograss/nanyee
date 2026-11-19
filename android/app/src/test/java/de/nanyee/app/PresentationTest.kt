@@ -2,8 +2,16 @@ package de.nanyee.app
 
 import org.junit.Assert.*
 import org.junit.Test
+import java.time.LocalDate
 
 class PresentationTest {
+    @Test fun weekTracksMondayBoundariesAndStaysInsideSemester() {
+        val sunday = LocalDate.parse("2026-01-04")
+        assertEquals(3, weekAfterDateChange(3, 20, sunday, sunday))
+        assertEquals(4, weekAfterDateChange(3, 20, sunday, sunday.plusDays(1)))
+        assertEquals(20, weekAfterDateChange(20, 20, sunday, sunday.plusWeeks(1)))
+        assertEquals(1, weekAfterDateChange(1, 20, sunday, sunday.minusWeeks(1)))
+    }
     @Test fun numbersAreRoundedWithoutTrailingZeroes() {
         assertEquals("3.8", displayNumber("3.8000000000000003"))
         assertEquals("88.13", displayNumber("88.125"))

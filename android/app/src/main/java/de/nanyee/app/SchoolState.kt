@@ -3,6 +3,7 @@ package de.nanyee.app
 import android.app.Application
 import androidx.compose.runtime.*
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
@@ -12,8 +13,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.*
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 
-class SchoolState(app: Application) : AndroidViewModel(app) {
+class SchoolState(app: Application, private val saved: SavedStateHandle) : AndroidViewModel(app) {
     private val api = SchoolApi()
     private val prefs = app.getSharedPreferences("preferences", 0)
     private val secure by lazy {
@@ -33,23 +36,56 @@ class SchoolState(app: Application) : AndroidViewModel(app) {
     var loggedIn by mutableStateOf(false)
     var demo by mutableStateOf(false)
     var busy by mutableStateOf(false)
+    var loginInFlight by mutableStateOf(false)
+        private set
     var error by mutableStateOf("")
     var hint by mutableStateOf("")
     var gradesLoading by mutableStateOf(false)
         private set
-    var tab by mutableIntStateOf(0)
+    private var selectedTab by mutableIntStateOf(saved["tab"] ?: 0)
+    var tab: Int
+        get() = selectedTab
+        set(value) { selectedTab = value; saved["tab"] = value }
     var semesters by mutableStateOf(emptyList<JsonObject>())
-    var semester by mutableStateOf("")
+    private var selectedSemester by mutableStateOf(saved["semester"] ?: "")
+    var semester: String
+        get() = selectedSemester
+        set(value) { selectedSemester = value; saved["semester"] = value }
     var totalWeeks by mutableIntStateOf(prefs.getInt("weeks", 20).coerceIn(1, 30))
-    var week by mutableIntStateOf(1)
+    private var selectedWeek by mutableIntStateOf(saved["week"] ?: 1)
+    var week: Int
+        get() = selectedWeek
+        set(value) { selectedWeek = value; saved["week"] = value }
     var courses by mutableStateOf(emptyList<JsonObject>())
     var grades by mutableStateOf<JsonObject?>(null)
+    var today by mutableStateOf(runCatching { LocalDate.parse(saved.get<String>("date")) }.getOrDefault(LocalDate.now(ZoneId.of("Asia/Shanghai"))))
+        private set
 
     init {
         if (remember) runCatching { if (secure.getString("account", "") == account.trim()) password = secure.getString("password", "") ?: "" }
-        launch(silent = true) { fetchCaptcha() }
-        viewModelScope.launch { while (true) { delay(1000); checkCaptcha(); if (loggedIn && !demo && runCatching { Instant.now().isAfter(Instant.parse(expires)) }.getOrDefault(true)) { logout(); error = "学校会话已过期，请重新登录。" } } }
+        if (saved.get<Boolean>("demo") == true) {
+            val restoreTab = tab
+            val restoreSemester = semester
+            val restoreWeek = week
+            startDemo()
+            if (semesters.any { it.text("code") == restoreSemester }) selectSemester(restoreSemester)
+            tab = restoreTab.coerceIn(0, 2); week = restoreWeek.coerceIn(1, totalWeeks)
+        } else {
+            if (saved.get<Boolean>("hadSession") == true) hint = "会话已过期，请重新登录"
+            launch(silent = true) { fetchCaptcha() }
+        }
+        updateDate()
+        viewModelScope.launch { while (true) { delay(1000); updateDate(); checkCaptcha(); if (loggedIn && !demo && runCatching { Instant.now().isAfter(Instant.parse(expires)) }.getOrDefault(true)) { logout(); error = "学校会话已过期，请重新登录。" } } }
     }
+    private fun updateDate() {
+        val now = LocalDate.now(ZoneId.of("Asia/Shanghai"))
+        if (now != today) {
+            if (loggedIn) week = weekAfterDateChange(week, totalWeeks, today, now)
+            today = now
+        }
+        saved["date"] = now.toString()
+    }
+    fun onResume() { updateDate(); checkCaptcha() }
     private fun launch(key: String = "captcha", silent: Boolean = false, block: suspend () -> Unit) {
         jobs.remove(key)?.cancel()
         val generation = sessionGeneration
@@ -61,11 +97,11 @@ class SchoolState(app: Application) : AndroidViewModel(app) {
                 if (e is SchoolError && loggedIn && (e.status == 401 || e.status == 410)) logout()
                 if (!silent) error = if (e is SchoolError) e.message ?: "请求失败" else "操作失败，请稍后重试。"
             } finally {
-                if (jobs[key] == coroutineContext[Job]) jobs.remove(key)
+                if (jobs[key] == coroutineContext[Job]) { jobs.remove(key); if (key == "login") loginInFlight = false }
                 busy = jobs.isNotEmpty()
             }
         }
-        jobs[key] = job; busy = true; job.start()
+        jobs[key] = job; busy = true; if (key == "login") loginInFlight = true; job.start()
     }
     private suspend fun fetchCaptcha() { captchaAttemptAt = Instant.now(); captchaText = ""; captcha = api.request("captcha") }
     fun checkCaptcha() {
@@ -93,6 +129,7 @@ class SchoolState(app: Application) : AndroidViewModel(app) {
             if (session.isEmpty() || expires.isEmpty()) throw SchoolError(0, "INVALID_RESPONSE", "登录响应无效，请重试。")
             if (submittedRemember && remember) secure.edit().putString("account", submittedAccount).putString("password", submittedPassword).apply()
             password = ""; captchaText = ""; loggedIn = true; demo = false; tab = 0
+            saved["hadSession"] = true; saved["demo"] = false
         } catch (e: Exception) {
             if (e is CancellationException) throw e
             runCatching { fetchCaptcha() }
@@ -121,16 +158,22 @@ class SchoolState(app: Application) : AndroidViewModel(app) {
     fun setWeeks(value: Int) { totalWeeks = value.coerceIn(1, 30); week = week.coerceAtMost(totalWeeks); prefs.edit().putInt("weeks", totalWeeks).apply(); if (!demo && loggedIn) launch("timetable") { queryTimetable() } }
     private fun clearRequests() {
         sessionGeneration++
-        jobs.values.toList().forEach { it.cancel() }; jobs.clear(); busy = false
+        jobs.values.toList().forEach { it.cancel() }; jobs.clear(); busy = false; loginInFlight = false
+    }
+    fun cancelLogin() {
+        jobs.remove("login")?.cancel(); loginInFlight = false; busy = jobs.isNotEmpty()
+        hint = "已取消登录，可继续填写"
     }
     fun logout() {
         val wasDemo = demo
         clearRequests()
+        saved["demo"] = false; saved["hadSession"] = false
         session = ""; expires = ""; loggedIn = false; demo = false; courses = emptyList(); grades = null; semesters = emptyList(); semester = ""; gradesLoading = false; error = ""
-        if (!wasDemo) { password = ""; captcha = null; captchaText = ""; api.clear(); launch(silent = true) { fetchCaptcha() } } else checkCaptcha()
+        if (!wasDemo) { password = ""; captcha = null; captchaText = ""; api.clear(); launch(silent = true) { fetchCaptcha() } } else if (captcha == null) launch(silent = true) { fetchCaptcha() } else checkCaptcha()
     }
     fun startDemo() {
         clearRequests()
+        saved["demo"] = true; saved["hadSession"] = false
         session = ""; expires = ""; demo = true; loggedIn = true; tab = 0; error = ""; week = 1
         semesters = listOf(payload("code" to "202501", "label" to "2025-2026-1"), payload("code" to "202402", "label" to "2024-2025-2")); semester = "202501"
         courses = demoCourses(semester)

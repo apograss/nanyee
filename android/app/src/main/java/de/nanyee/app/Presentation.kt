@@ -2,9 +2,19 @@ package de.nanyee.app
 
 import java.math.RoundingMode
 import java.time.Instant
+import java.time.LocalDate
+import java.time.DayOfWeek
+import java.time.temporal.ChronoUnit
+import java.time.temporal.TemporalAdjusters
 import kotlinx.serialization.json.*
 
 internal fun captchaNeedsRefresh(expires: String, now: Instant): Boolean = runCatching { !now.plusSeconds(15).isBefore(Instant.parse(expires)) }.getOrDefault(false)
+
+internal fun weekAfterDateChange(week: Int, totalWeeks: Int, previous: LocalDate, current: LocalDate): Int {
+    val monday = TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)
+    val delta = ChronoUnit.WEEKS.between(previous.with(monday), current.with(monday))
+    return (week + delta).coerceIn(1, totalWeeks.toLong()).toInt()
+}
 
 internal fun gradeSummary(grades: List<JsonObject>): JsonObject {
     fun value(grade: JsonObject, key: String) = grade.text(key).toDoubleOrNull()?.takeIf { it.isFinite() } ?: 0.0
