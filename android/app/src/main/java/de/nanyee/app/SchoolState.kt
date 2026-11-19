@@ -210,7 +210,13 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         gradesLoading = true
         try { grades = api.request("grades", sessionBody()) } finally { gradesLoading = false }
     }
-    fun reload() { if (cachedMode) requireSchoolLogin(0) else if (!demo && loggedIn) { if (tab == 0) launch("timetable") { if (semesters.isEmpty()) loadTimetable() else queryTimetable() } else launch("grades") { loadGrades() } }
+    fun reload() {
+        if (cachedMode) requireSchoolLogin(0)
+        else if (!demo && loggedIn) {
+            if (tab == 0) launch("timetable") { if (semesters.isEmpty()) loadTimetable() else queryTimetable() }
+            else launch("grades") { loadGrades() }
+        }
+    }
     fun selectTab(value: Int) { if (cachedMode && value == 1) requireSchoolLogin(1) else tab = value }
     fun selectSemester(code: String) {
         semester = code
