@@ -133,6 +133,23 @@ ANDROID_HOME=/home/ubuntu/android-sdk ./gradlew testDebugUnitTest --tests 'de.na
 
 离线演示覆盖扫码授权、课程/空列表、开课检查、两步扫码加入、课堂签到、真实定位、课件/图片、直播、手动作答及重试、相册的成功、失败与未知结果；演示无网络，相册保存仍会真实写入本机且需确认。新增请求、解析、会话隔离、手写答案、防重放与可见性测试。**本期仅运行离线测试和构建，没有真实雨课堂凭据或请求**；线上兼容性、相机、定位、MediaStore、WebSocket 实际服务及设备旋转/进程重建均未验证。
 
+### 安装包与 release 验证
+
+安装包使用 `assembleRelease`：R8 压缩代码、移除未使用资源，保留 ONNX Runtime 的 JNI 类及序列化、OkHttp 公共后缀表、Tink protobuf 所需的反射入口；依赖自带的 consumer rules 也会合并。所有现有运行时依赖均有实际调用；体积最大的 Material 扩展图标库只保留用到的图标，ONNX Runtime 用于本机验证码识别，均非无用依赖。
+
+默认 release 只带 `arm64-v8a,armeabi-v7a`，debug 的 ABI、调试和测试设置不变。可用 `-PreleaseAbis=x86_64` 构建模拟器验证包，或 `-PreleaseAbis=arm64-v8a` 比较单 ABI 体积；这些覆盖项只作用于 release。release 使用本机 debug keystore 签名，方便直接安装，**不是正式商店发布签名**，不同机器的 debug key 可能不同。不要用它替代正式发布密钥。
+
+```sh
+ANDROID_HOME=/home/ubuntu/android-sdk ./gradlew assembleRelease --no-daemon --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process
+# 另行构建 x86_64 release，再安装到模拟器（同样启用 R8/resource shrinking）
+ANDROID_HOME=/home/ubuntu/android-sdk ./gradlew assembleRelease -PreleaseAbis=x86_64 --no-daemon --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process
+adb install -r app/build/outputs/apk/release/app-release.apk
+mkdir -p "$HOME/out/nanyee-release-smoke"
+ANDROID_HOME=/home/ubuntu/android-sdk bash release-smoke/run.sh "$HOME/out/nanyee-release-smoke"
+```
+
+独立 smoke instrumentation APK 使用同一个 debug key，不放入应用，也不添加测试框架依赖；通过已安装 release 应用的 ClassLoader 反射调用保留后的 ONNX API，打开其真实 `captcha_model.onnx`，执行 `[1,1,28,80]` 离线输入并验证 `[1,4,10]` 有限输出，再启动 MainActivity。不读取账号、不请求网络端点，不验证真实验证码识别准确率；应用自身已有的登录页可能按原行为刷新公开验证码。之后可卸载 `de.nanyee.smoke`。界面验证仍需单独截图，不能用此 smoke 代替。
+
 ### Android 许可与来源
 
 本 Android 应用包含移植自 [AneryCoft/course_helper](https://github.com/AneryCoft/course_helper) 的学习通加密、雨课堂协议、课堂 WebSocket 与解析逻辑，原项目许可为 **GPL-3.0**，参考版本 `5344bef2146cb701abf57220d84a79d35daeaf45`。相应源文件标明来源，完整 GPL-3.0 文本见 [`LICENSE`](LICENSE)（其中保留 Free Software Foundation 的原始版权声明）。参考的 Dart 源文件没有单独的作者版权头；其作者归属保留为 AneryCoft/course_helper。分发此 Android 应用须遵守 GPL-3.0，包括提供完整对应源码；该声明不改变仓库中独立 web/backend 等其他部分的许可。

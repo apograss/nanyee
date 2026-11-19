@@ -13,6 +13,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AutoStories
+import androidx.compose.material.icons.outlined.Slideshow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -55,6 +58,7 @@ private fun RainContent(state: RainState, onBack: () -> Unit, toggleDemo: () -> 
     val context = LocalContext.current
     var deviceError by remember { mutableStateOf("") }
     var localConfirm by remember { mutableStateOf("") }
+    var showScenarios by rememberSaveable { mutableStateOf(false) }
     val scanner = rememberLauncherForActivityResult(ScanContract()) { result -> result.contents?.let(state::previewScan) }
     val locationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
         if (permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true) state.locate() else deviceError = "需要精确定位权限；不支持手动坐标或模拟定位。"
@@ -68,10 +72,9 @@ private fun RainContent(state: RainState, onBack: () -> Unit, toggleDemo: () -> 
         }
     }
     BackHandler(onBack = back)
-    Column(Modifier.widthIn(max = 920.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        TextButton(onClick = back, enabled = !state.busy) { Text(if (state.lesson != null) "离开课堂并返回课程" else "返回课表") }
-        Text("雨课堂", style = MaterialTheme.typography.headlineMedium)
-        Text(if (state.demo) "离线演示 · 不联网，不改变课堂状态。保存图片会写入本机相册。" else "雨课堂独立加密会话 · 仅当前本人账号 · 不共享教务或学习通 Cookie")
+    Column(Modifier.widthIn(max = 920.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (state.lesson != null || state.qr != null) TextButton(onClick = back, enabled = !state.busy) { Text(if (state.lesson != null) "离开课堂并返回课程" else "取消二维码登录") }
+        SectionHeading("雨课堂", if (state.demo) "离线演示 · 保存图片仍会写入本机相册" else "独立加密会话 · 仅当前本人账号", Icons.Outlined.Slideshow)
         if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         if (state.error.isNotBlank()) Text(state.error, color = MaterialTheme.colorScheme.error)
         if (deviceError.isNotBlank()) Text(deviceError, color = MaterialTheme.colorScheme.error)
@@ -79,7 +82,7 @@ private fun RainContent(state: RainState, onBack: () -> Unit, toggleDemo: () -> 
         if (!state.ready && !state.busy) Button(onClick = { state.initialize(state.demo) }) { Text("重试打开加密存储") }
         if (state.ready) {
             if (state.unknownKey.isNotBlank()) Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("上次提交结果未知（可能已提交），已禁止后续课堂写入。请先到官方雨课堂核验；不会自动重试。")
                     TextButton(onClick = { localConfirm = "unknown" }, enabled = !state.busy) { Text("已在官方核验结果…") }
                 }
@@ -87,11 +90,11 @@ private fun RainContent(state: RainState, onBack: () -> Unit, toggleDemo: () -> 
             Text("服务器：${state.host.domain}", style = MaterialTheme.typography.titleMedium)
             TextButton(onClick = toggleDemo, enabled = !state.busy) { Text(if (state.demo) "返回真实雨课堂" else "无账号体验离线演示") }
             if (state.demo) {
-                Text("演示场景（切换后再执行对应操作）")
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) { RainDemoFailure.entries.forEach { value -> FilterChip(selected = state.scenario == value, onClick = { state.selectScenario(value) }, enabled = !state.busy, label = { Text(value.label) }) } }
+                TextButton(onClick = { showScenarios = !showScenarios }) { Text("演示场景 · ${state.scenario.label} ${if (showScenarios) "收起" else "展开"}") }
+                if (showScenarios) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) { RainDemoFailure.entries.forEach { value -> FilterChip(selected = state.scenario == value, onClick = { state.selectScenario(value) }, enabled = !state.busy, label = { Text(value.label) }) } }
             }
             Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("雨课堂账号", style = MaterialTheme.typography.titleLarge)
                     if (state.user != null) {
                         Text("${state.user?.name} · 仅本人账号")
@@ -113,12 +116,12 @@ private fun RainContent(state: RainState, onBack: () -> Unit, toggleDemo: () -> 
             if (state.user != null) {
                 if (state.lesson == null) {
                     TextButton(onClick = state::refresh, enabled = !state.busy) { Text("只读刷新账号与课程 / 恢复开课检查") }
-                    Text("开课检查每 3 秒一次，仅在课程页面可见且 App 前台时运行。不会自动加入课堂。")
+                    Text("每 3 秒前台检查开课 · 不会自动加入", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (state.loaded && state.courses.isEmpty()) Text("暂无课程。")
                     state.courses.forEach { course ->
                         Card(Modifier.fillMaxWidth()) {
-                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text(course.name, style = MaterialTheme.typography.titleLarge); Text(course.teacher)
+                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                SectionHeading(course.name, course.teacher, Icons.Outlined.AutoStories)
                                 val lessons = state.onLesson.filter { it.courseId == course.id }
                                 if (lessons.isEmpty()) Text("当前未在上课")
                                 lessons.forEach { lesson -> Button(onClick = { state.previewJoin(lesson.lessonId, course.name) }, enabled = !state.busy && state.unknownKey.isBlank()) { Text("正在上课 · 预览课堂签到 / 加入") } }

@@ -8,8 +8,13 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.NotificationsNone
+import androidx.compose.material.icons.outlined.School
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
@@ -24,16 +29,21 @@ private fun accountActivity(context: Context): Activity? = when (context) { is A
 
 @Composable
 internal fun MyScreen(school: SchoolState) {
-    Column(Modifier.widthIn(max = 720.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        AccountSection(demoOnly = school.demo)
-        HorizontalDivider()
-        Text("学校账号", style = MaterialTheme.typography.headlineSmall)
-        if (!school.homeVisible) Login(school, embedded = true)
-        else {
-            Text(if (school.demo) "学校演示模式" else if (school.cachedMode) "正在查看本机课表 · 未登录" else "已登录学校系统")
-            if (!school.demo && school.loggedIn) Text("会话到期：${school.expires}")
-            Text("课表在本机加密保存；学校会话与成绩仅保存在内存中。Nanyee 平台退出不影响学校账号。")
-            Button(onClick = school::logout) { Text(if (school.demo) "退出学校演示模式" else "退出学校并清除本机课表") }
+    Column(Modifier.widthIn(max = 720.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+            Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { AccountSection(demoOnly = school.demo) }
+        }
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+            Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SectionHeading("学校账号", "本机加密课表 · 与平台会话独立", Icons.Outlined.School, SectionAccent.ACADEMIC)
+                if (!school.homeVisible) Login(school, embedded = true)
+                else {
+                    Text(if (school.demo) "学校演示模式" else if (school.cachedMode) "正在查看本机课表 · 未登录" else "已登录学校系统")
+                    if (!school.demo && school.loggedIn) Text("会话到期：${school.expires}")
+                    Text("课表在本机加密保存；学校会话与成绩仅保存在内存中。Nanyee 平台退出不影响学校账号。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Button(onClick = school::logout) { Text(if (school.demo) "退出学校演示模式" else "退出学校并清除本机课表") }
+                }
+            }
         }
     }
 }
@@ -53,8 +63,8 @@ internal fun AccountSection(state: AccountState = viewModel(key = "platform-acco
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer); state.clearTransient() }
     }
-    Text("Nanyee 账号", style = MaterialTheme.typography.headlineSmall)
-    Text("与学校账号独立；与自习舱、自动评课共用一个平台会话。", style = MaterialTheme.typography.bodySmall)
+    var showScenarios by rememberSaveable { mutableStateOf(false) }
+    SectionHeading("Nanyee 账号", "自习舱与自动评课共用的平台会话", Icons.Outlined.AccountCircle)
     if (state.initializationError.isNotBlank()) Text(state.initializationError, color = MaterialTheme.colorScheme.error)
     val model = state.model
     if (model == null) { Button(onClick = { state.open(demoOnly) }) { Text("打开平台账号") }; return }
@@ -63,8 +73,9 @@ internal fun AccountSection(state: AccountState = viewModel(key = "platform-acco
     if (model.error.isNotBlank()) Text(model.error, color = MaterialTheme.colorScheme.error)
     if (model.message.isNotBlank()) Text(model.message, color = MaterialTheme.colorScheme.primary)
     if (state.demo) {
-        Text("离线演示 · 不联网、不改变真实账号。验证码：123456。")
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("离线演示 · 验证码 123456 · 不改变真实账号", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        TextButton(onClick = { showScenarios = !showScenarios }) { Text("演示场景 · ${state.fixture.failure.label} ${if (showScenarios) "收起" else "展开"}") }
+        if (showScenarios) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             AccountDemoFailure.entries.forEach { value -> FilterChip(selected = state.fixture.failure == value, onClick = { state.fixture.failure = value }, enabled = !model.busy, label = { Text(value.label) }) }
         }
     }
@@ -115,7 +126,7 @@ internal fun AccountSection(state: AccountState = viewModel(key = "platform-acco
                     }
                 }
             }
-            Text("提醒", style = MaterialTheme.typography.titleMedium)
+            SectionHeading("提醒", "仅显示当前账号的通知", Icons.Outlined.NotificationsNone, SectionAccent.SERVICE)
             if (model.notices.isEmpty()) Text("暂无提醒")
             model.notices.forEach { notice -> Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
