@@ -88,14 +88,13 @@ fun Nanyee(state: SchoolState) {
     val detail = if (!state.homeVisible) null else selectedDetail(detailDataIdentity, dataIdentity, detailIndex, detailItems)?.let { detailKind to it }
     val landscape = LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp
     val iconSize = (24 * LocalDensity.current.fontScale.coerceIn(1f, 1.35f)).dp
-    val labels = MainTab.entries.map { it.label }
     val icons = listOf(Icons.Outlined.CalendarMonth, Icons.Outlined.School, Icons.Outlined.RateReview, Icons.Outlined.Widgets, Icons.Outlined.Person)
     val tabState = rememberSaveableStateHolder()
     var platformMenu by remember { mutableStateOf(false) }
     Scaffold(
         contentWindowInsets = WindowInsets.safeDrawing,
-        topBar = { TopAppBar(expandedHeight = if (landscape) 48.dp else 56.dp, colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow), title = { Text(labels[state.tab] + if (landscape && state.demo) " · 演示模式" else "", fontWeight = FontWeight.Bold, style = if (landscape) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge, maxLines = 1) }, actions = {
-            if (state.tab == 1) Box {
+        topBar = { TopAppBar(expandedHeight = if (landscape) 48.dp else 56.dp, colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow), title = { Text(state.tab.label + if (landscape && state.demo) " · 演示模式" else "", fontWeight = FontWeight.Bold, style = if (landscape) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge, maxLines = 1) }, actions = {
+            if (state.tab == MainTab.CLASSROOM) Box {
                 IconButton(onClick = { platformMenu = true }) { Icon(Icons.Outlined.MoreHoriz, "课堂平台与服务器") }
                 DropdownMenu(expanded = platformMenu, onDismissRequest = { platformMenu = false }) {
                     ClassroomPlatform.entries.forEach { platform -> DropdownMenuItem(text = { Text(platform.label) }, onClick = { state.selectClassroom(platform); platformMenu = false }, leadingIcon = { RadioButton(selected = state.classroomPlatform == platform, onClick = null) }) }
@@ -105,12 +104,12 @@ fun Nanyee(state: SchoolState) {
                     }
                 }
             }
-            if ((state.tab == 0 || state.tab == 3 && state.toolsRoute == "grades") && state.homeVisible && !state.demo) IconButton(onClick = { state.reload() }, enabled = !state.busy) { Icon(Icons.Outlined.Refresh, "刷新", Modifier.size(iconSize)) }
+            if ((state.tab == MainTab.TIMETABLE || state.tab == MainTab.TOOLS && state.toolsRoute == "grades") && state.homeVisible && !state.demo) IconButton(onClick = { state.reload() }, enabled = !state.busy) { Icon(Icons.Outlined.Refresh, "刷新", Modifier.size(iconSize)) }
         }) },
-        bottomBar = { if (!landscape) NavigationBar(modifier = Modifier.height((if (LocalDensity.current.fontScale > 1.2f) 88.dp else 72.dp) + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()), containerColor = MaterialTheme.colorScheme.surfaceContainerLow) { labels.forEachIndexed { i, label -> NavigationBarItem(selected = state.tab == i, onClick = { state.selectTab(i) }, icon = { Icon(icons[i], null) }, label = { Text(label) }) } } }
+        bottomBar = { if (!landscape) NavigationBar(modifier = Modifier.height((if (LocalDensity.current.fontScale > 1.2f) 88.dp else 72.dp) + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()), containerColor = MaterialTheme.colorScheme.surfaceContainerLow) { MainTab.entries.forEach { tab -> NavigationBarItem(selected = state.tab == tab, onClick = { state.selectTab(tab) }, icon = { Icon(icons[tab.ordinal], null) }, label = { Text(tab.label) }) } } }
     ) { padding ->
         Row(Modifier.padding(padding).consumeWindowInsets(padding).fillMaxSize()) {
-            if (landscape) NavigationRail(windowInsets = WindowInsets(0)) { labels.forEachIndexed { i, label -> NavigationRailItem(selected = state.tab == i, onClick = { state.selectTab(i) }, icon = { Icon(icons[i], label) }) } }
+            if (landscape) NavigationRail(windowInsets = WindowInsets(0)) { MainTab.entries.forEach { tab -> NavigationRailItem(selected = state.tab == tab, onClick = { state.selectTab(tab) }, icon = { Icon(icons[tab.ordinal], tab.label) }) } }
         Column(Modifier.weight(1f).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
             if (state.autoLoggingIn) Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("正在自动登录…", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
@@ -118,17 +117,17 @@ fun Nanyee(state: SchoolState) {
             } else if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
             if (state.demo && !landscape) Surface(color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.fillMaxWidth()) { Text("演示模式 · 以下为示例数据，并非真实学业记录", Modifier.padding(horizontal = 12.dp, vertical = 8.dp), style = MaterialTheme.typography.labelMedium) }
             if (state.homeVisible && state.error.isNotEmpty()) ErrorCard(state)
-            tabState.SaveableStateProvider(state.tab) { when {
+            tabState.SaveableStateProvider(state.tab.ordinal) { when {
                 state.cacheRevocationFailed -> Column(Modifier.padding(12.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("本机课表尚未安全清除", style = MaterialTheme.typography.titleLarge)
                     Text(state.error)
                     Button(onClick = { state.logout() }) { Text("重试退出并清除课表") }
                 }
-                !state.homeVisible && state.tab == 0 -> Login(state)
-                state.tab == 0 -> Timetable(state) { detailKind = "course"; detailIndex = state.courses.indexOf(it); detailDataIdentity = state.courseDataIdentity }
-                state.tab == 1 -> ClassroomScreen(state, rain, rainDemo) { rainDemo = !rainDemo }
-                state.tab == 2 -> EvaluationToolsScreen(state, evaluation)
-                state.tab == 3 -> ToolsScreen(state, grab, grabDemo) { detailKind = "grade"; detailIndex = state.grades?.items("grades")?.indexOf(it) ?: -1; detailDataIdentity = state.gradeDataIdentity }
+                !state.homeVisible && state.tab == MainTab.TIMETABLE -> Login(state)
+                state.tab == MainTab.TIMETABLE -> Timetable(state) { detailKind = "course"; detailIndex = state.courses.indexOf(it); detailDataIdentity = state.courseDataIdentity }
+                state.tab == MainTab.CLASSROOM -> ClassroomScreen(state, rain, rainDemo) { rainDemo = !rainDemo }
+                state.tab == MainTab.EVALUATION -> EvaluationToolsScreen(state, evaluation)
+                state.tab == MainTab.TOOLS -> ToolsScreen(state, grab, grabDemo) { detailKind = "grade"; detailIndex = state.grades?.items("grades")?.indexOf(it) ?: -1; detailDataIdentity = state.gradeDataIdentity }
                 else -> MyScreen(state)
             } }
         }
@@ -190,7 +189,7 @@ fun Login(state: SchoolState, embedded: Boolean = false) {
         if (state.hint.isNotEmpty() && state.captchaText.isBlank()) Text(state.hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
         if (state.loginInFlight) TextButton(onClick = { state.cancelLogin() }) { Text("取消登录") }
         OutlinedButton(onClick = { state.startDemo() }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("演示模式") }
-        TextButton(onClick = { state.selectTab(3) }, modifier = Modifier.fillMaxWidth()) { Text("工具 · 学习舱预约（独立平台账号）") }
+        TextButton(onClick = { state.selectTab(MainTab.TOOLS) }, modifier = Modifier.fillMaxWidth()) { Text("工具 · 学习舱预约（独立平台账号）") }
         Text("学校登录可能使其他设备的教务会话下线。会话仅存于内存；勾选后，学号和密码将在本机加密保存。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

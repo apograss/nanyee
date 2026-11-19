@@ -23,7 +23,7 @@ import kotlinx.serialization.json.JsonObject
 
 @Composable
 internal fun ToolsScreen(school: SchoolState, grab: CourseGrabState, grabDemo: CourseGrabState, onGrade: (JsonObject) -> Unit) {
-    val back = { if (school.canReturnToCache) school.returnToCache(); school.closeTool(); school.selectTab(3) }
+    val back = { if (school.canReturnToCache) school.returnToCache(); school.closeTool(); school.selectTab(MainTab.TOOLS) }
     when (school.toolsRoute) {
         "cabin" -> CabinToolsScreen(school, onBack = back)
         "grab" -> CourseGrabScreen(school, grab, grabDemo, onBack = back)

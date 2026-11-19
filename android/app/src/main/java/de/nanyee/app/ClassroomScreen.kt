@@ -7,7 +7,7 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 internal fun ClassroomScreen(school: SchoolState, rain: RainState, rainDemo: Boolean, toggleRainDemo: () -> Unit) {
     val platformState = rememberSaveableStateHolder()
     platformState.SaveableStateProvider(school.classroomPlatform.name) {
-        val back = { school.selectTab(0) }
+        val back = { school.selectTab(MainTab.TIMETABLE) }
         when (school.classroomPlatform) {
             ClassroomPlatform.XUEXITONG -> XxtToolsScreen(onBack = back)
             ClassroomPlatform.RAIN -> RainToolsScreen(rain, rainDemo, onBack = back, toggleDemo = toggleRainDemo)
