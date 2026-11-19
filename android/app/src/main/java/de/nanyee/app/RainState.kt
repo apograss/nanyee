@@ -276,5 +276,5 @@ internal class RainState(application: Application) : AndroidViewModel(applicatio
         user = null; courses = emptyList(); onLesson = emptyList(); presentation = null; image = null; events.clear(); drafts = emptyMap(); resolvedLesson = ""; unknownKey = ""; loaded = false
         message = "已清除本机所有雨课堂服务器的登录凭据、Cookie 与草稿；不影响教务或学习通。"
     }
-    override fun onCleared() { stopVisibility(); (backend as? RainApi)?.disable(); super.onCleared() }
+    override fun onCleared() { stopVisibility(); if (::backend.isInitialized) (backend as? RainApi)?.disable(); super.onCleared() }
 }
