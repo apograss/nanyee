@@ -5,6 +5,19 @@ import org.junit.Test
 import java.time.LocalDate
 
 class PresentationTest {
+    @Test fun cjkTitlesBalanceWithoutSingleCharacterOrphansWhenTwoLinesFit() {
+        assertEquals("人体解\n剖学", balancedCjkTitle("人体解剖学", 4, 3))
+        assertEquals("人体解\n剖学", balancedCjkTitle("人体解剖学", 3, 3))
+        assertEquals("基础\n化学", balancedCjkTitle("基础化学", 3, 3))
+        assertEquals("基础\n化学", balancedCjkTitle("基础化学", 2, 3))
+        assertEquals("医学\n生物\n化学", balancedCjkTitle("医学生物化学", 2, 3))
+        assertEquals("人体解剖学", balancedCjkTitle("人体解剖学", 5, 3))
+        assertEquals("基础化学", balancedCjkTitle("基础化学", 3, 1))
+        assertEquals("基础化学", balancedCjkTitle("基础化学", 0, 3))
+        assertEquals("", balancedCjkTitle("", 3, 3))
+        assertEquals("Medical English", balancedCjkTitle("Medical English", 3, 3))
+        assertEquals("医学Ⅱ", balancedCjkTitle("医学Ⅱ", 2, 3))
+    }
     @Test fun timetableScalesTextAndRowsWithinAccessibleBounds() {
         assertEquals(1f, timetableFontScale(1f), 0.001f)
         assertEquals(1.3f, timetableFontScale(1.3f), 0.001f)

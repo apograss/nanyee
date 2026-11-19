@@ -13,6 +13,19 @@ internal fun captchaNeedsRefresh(expires: String, now: Instant): Boolean = runCa
 
 internal fun compactRoom(location: String): String = location.trim().replace(Regex("^教学楼\\s*(?=\\S)"), "")
 
+internal fun balancedCjkTitle(title: String, charsPerLine: Int, maxLines: Int): String {
+    val points = title.codePoints().toArray()
+    if (charsPerLine < 2 || maxLines < 2 || points.size <= charsPerLine || points.any { Character.UnicodeScript.of(it) != Character.UnicodeScript.HAN }) return title
+    val lines = (points.size - 1) / charsPerLine + 1
+    val length = points.size / lines
+    val extra = points.size % lines
+    var offset = 0
+    return (0 until lines).joinToString("\n") { line ->
+        val count = length + if (line < extra) 1 else 0
+        String(points, offset, count).also { offset += count }
+    }
+}
+
 internal fun timetableFontScale(scale: Float): Float = if (scale.isFinite() && scale > 0) scale.coerceAtMost(1.4f) else 1f
 
 internal fun timetablePeriodHeight(scale: Float): Float = 88f * timetableFontScale(scale).coerceAtLeast(1f)
