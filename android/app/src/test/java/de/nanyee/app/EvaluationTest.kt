@@ -1,6 +1,11 @@
 package de.nanyee.app
 
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.launch
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.ViewModelProvider
 import kotlinx.serialization.json.*
 import okhttp3.*
 import okhttp3.ResponseBody.Companion.toResponseBody
@@ -29,6 +34,47 @@ internal val evaluationFixture = """<script>entss.post('/new/student/ktpj/savePj
 """.trimIndent()
 
 class EvaluationTest {
+    @Test fun screenRecreationRetainsRunningAndCompletedBatchInSameViewModelStore() = runBlocking {
+        val store = ViewModelStore()
+        val provider = ViewModelProvider.create(store, ViewModelProvider.NewInstanceFactory())
+        val state = provider["manual-evaluation-live", EvaluationState::class.java]
+        val started = CompletableDeferred<Unit>()
+        val finish = CompletableDeferred<Unit>()
+        val source = object : EvaluationSource by DemoEvaluationSource() {
+            override suspend fun submit(preview: EvaluationPreview): Int { started.complete(Unit); finish.await(); return 20 }
+        }
+        state.run.prepare(source, source.pending().take(1))
+        val task = launch { state.run.submit(source) }
+        started.await()
+        val recreated = ViewModelProvider.create(store, ViewModelProvider.NewInstanceFactory())["manual-evaluation-live", EvaluationState::class.java]
+        assertSame(state, recreated)
+        assertTrue(recreated.run.confirmed); assertEquals(1, recreated.run.progress)
+        finish.complete(Unit); task.join()
+        assertEquals(1, recreated.run.results.size)
+        assertTrue(recreated.run.results.single().contains("提交成功"))
+        assertSame(recreated, provider["manual-evaluation-live", EvaluationState::class.java])
+        assertNotSame(state, provider["manual-evaluation-demo", EvaluationState::class.java])
+        store.clear()
+    }
+    @Test fun interruptedBatchPreservesPriorResultsAndUnknownInFlightCourse() = runBlocking {
+        val started = CompletableDeferred<Unit>()
+        var count = 0
+        val source = object : EvaluationSource by DemoEvaluationSource() {
+            override suspend fun submit(preview: EvaluationPreview): Int {
+                if (++count == 2) { started.complete(Unit); awaitCancellation() }
+                return 20
+            }
+        }
+        val run = ManualEvaluationRun()
+        run.prepare(source, source.pending())
+        val task = launch { run.submit(source) }
+        started.await(); task.cancel(); task.join()
+        assertEquals(2, count); assertEquals(2, run.results.size)
+        assertTrue(run.results.first().contains("提交成功"))
+        assertTrue(run.results.last().contains("演示课程 2：提交已中断，结果未知"))
+        assertTrue(run.confirmed); assertTrue(run.preview.isEmpty())
+        assertTrue(runCatching { run.submit(source) }.isFailure)
+    }
     @Test fun whitespaceNormalizationUsesPortableCharacterClassesWithoutInlineFlags() {
         assertFalse(evaluationWhitespace.pattern.contains("(?"))
         val row = payload("teadm" to " teacher-1\t", "dgksdm" to "hour-1", "ktpj" to "questionnaire-1", "kcmc" to "\u3000演示\u00a0\u0085\n课程\u3000")

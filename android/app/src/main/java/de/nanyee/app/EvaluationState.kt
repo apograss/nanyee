@@ -5,7 +5,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.Job
 
 internal class ManualEvaluationRun {
     var preview by mutableStateOf(emptyList<EvaluationPreview>()); private set
@@ -31,7 +30,10 @@ internal class ManualEvaluationRun {
                 source.submit(value)
                 results = results + "${value.draft.reference.courseName}：提交成功"
             } catch (e: Exception) {
-                if (e is CancellationException) throw e
+                if (e is CancellationException) {
+                    results = results + "${value.draft.reference.courseName}：提交已中断，结果未知，请先到教务系统核验；已停止后续课程。"
+                    throw e
+                }
                 results = results + "${value.draft.reference.courseName}：${(e as? SchoolError)?.message ?: "提交未确认，请到教务系统核验"}；已停止后续课程。"
                 throw e
             }
@@ -46,13 +48,12 @@ internal class EvaluationState : ViewModel() {
     var pending by mutableStateOf(emptyList<EvaluationReference>()); private set
     var selected by mutableStateOf(emptySet<String>())
     val run = ManualEvaluationRun()
+    val demoSource = DemoEvaluationSource()
     private var source: EvaluationSource? = null
-    private var job: Job? = null
-    fun reset() { job?.cancel(); busy = false; error = ""; listed = false; pending = emptyList(); selected = emptySet(); source = null; run.reset() }
     private fun work(action: suspend () -> Unit) {
         if (busy) return
         busy = true; error = ""
-        job = viewModelScope.launch {
+        viewModelScope.launch {
             try { action() } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 error = (e as? SchoolError)?.message ?: "评课未完成，可能尚未开放或表单无法读取；提交结果不确定时请先到教务系统核验。"
