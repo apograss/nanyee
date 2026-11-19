@@ -6,6 +6,26 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class DemoCabinBackendTest {
+    @Test fun revocationCancelsOnlyQueuedAndRetryingJobsForThatCredential() = runBlocking {
+        val api = DemoCabinBackend(); login(api)
+        val id = api.call("POST", "/credentials", cabinSecret("demo", "fixture-only", true)).obj().text("id")
+        val other = api.call("POST", "/credentials", cabinSecret("other", "fixture-only", true)).obj().text("id")
+        val draft = cabinDefaults().copy(cabins = listOf(1))
+        val states = listOf("queued", "retry_wait", "running", "succeeded", "failed", "cancelled", "verification_required")
+        val ids = states.map { state ->
+            val job = CabinSubmission(cabinJob(draft, id)).send(api).obj()
+            if (state != "queued") api.advance(job.text("id"), state)
+            job.text("id")
+        }
+        val unrelated = CabinSubmission(cabinJob(draft, other)).send(api).obj().text("id")
+        updateCabinPassword(api, id, "new-fixture")
+        api.call("DELETE", "/credentials/$id")
+        val jobs = cabinJobs(api.call("GET", "/jobs")).associateBy { it.text("id") }
+        states.forEachIndexed { index, state ->
+            assertEquals(if (state in listOf("queued", "retry_wait")) "cancelled" else state, jobs.getValue(ids[index]).text("state"))
+        }
+        assertEquals("queued", jobs.getValue(unrelated).text("state"))
+    }
     private suspend fun login(api: PlatformBackend) { api.call("POST", "/auth/login", payload("username" to "demo", "password" to "fixture-only")) }
     @Test fun demoFlowSupportsCredentialsBookingsReceiptsCancellationAndLogout() = runBlocking {
         val api = DemoCabinBackend()

@@ -93,11 +93,14 @@ internal fun CabinToolsScreen(school: SchoolState, state: CabinState = viewModel
                     Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Text(if (state.editingId == null) "同意托管学校密码" else "更新托管学校密码", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                            if (state.editingId != null) Text("更新将新建凭据并撤销旧凭据，避免继续使用旧账号的会话；引用旧凭据的任务需要重新创建。")
+                            if (state.editingId != null) {
+                                Text(state.credentials.firstOrNull { it.text("id") == state.editingId }?.get("metadata")?.obj()?.text("account_hint").orEmpty().ifBlank { "已托管的学校账号" })
+                                Text("仅修改原账号密码。提交时从服务器读取原账号，不更换账号。更换学校账号请先撤销原凭据，关联的排队预约将取消，再添加新凭据。")
+                            }
                             Text("学校账号与密码将加密存储在 nanyee.de，用于您离线时无人值守预约学习舱。凭据长期保存，可随时撤销。撤销会影响引用它的任务。只有点击同意后，才读取本机已记住的学校凭据来预填。")
                             if (!state.consent) Button(onClick = { state.agree(school::hostedSchoolPrefill) }, enabled = !state.busy) { Text("同意并继续") }
                             else {
-                                CabinField("学校学号", state.account, { state.account = it }, !state.busy)
+                                if (state.editingId == null) CabinField("学校学号", state.account, { state.account = it }, !state.busy)
                                 CabinField("学校密码", state.schoolPassword, { state.schoolPassword = it }, !state.busy, password = true)
                                 Button(onClick = { state.saveCredential() }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { Text("提交托管凭据") }
                             }
@@ -161,7 +164,7 @@ internal fun CabinToolsScreen(school: SchoolState, state: CabinState = viewModel
         }, confirmButton = { TextButton(onClick = { state.confirm() }, enabled = !state.busy) { Text("确认并创建") } }, dismissButton = { TextButton(onClick = { state.dismissConfirmation() }) { Text("返回修改") } })
     }
     action?.let { (kind, id) ->
-        AlertDialog(onDismissRequest = { action = null }, title = { Text(when (kind) { "cancel" -> "取消预约任务？"; "revoke" -> "撤销托管凭据？"; else -> "退出平台账号？" }) }, text = { Text(when (kind) { "cancel" -> "正在执行的任务可能已提交，请刷新并核验收据。"; "revoke" -> "撤销后无法继续使用，关联任务也将受到影响。"; else -> "清除本机平台 Cookie，不影响学校课表缓存。" }) }, confirmButton = {
+        AlertDialog(onDismissRequest = { action = null }, title = { Text(when (kind) { "cancel" -> "取消预约任务？"; "revoke" -> "撤销托管凭据？"; else -> "退出平台账号？" }) }, text = { Text(when (kind) { "cancel" -> "正在执行的任务可能已提交，请刷新并核验收据。"; "revoke" -> "撤销后无法继续使用，引用此凭据的排队或等待重试预约将取消。正在执行的预约请另行核验。"; else -> "清除本机平台 Cookie，不影响学校课表缓存。" }) }, confirmButton = {
             TextButton(onClick = { action = null; when (kind) { "cancel" -> state.cancelJob(id); "revoke" -> state.revoke(id); else -> state.logout() } }, enabled = !state.busy) { Text("确认") }
         }, dismissButton = { TextButton(onClick = { action = null }) { Text("返回") } })
     }

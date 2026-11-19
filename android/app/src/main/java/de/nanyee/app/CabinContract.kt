@@ -98,26 +98,29 @@ private fun sameCabinPayload(first: JsonElement?, second: JsonElement?): Boolean
 
 internal class CabinCredentialRecovery {
     private var baseline: Set<String>? = null
-    private var replaced: String? = null
-    private var created: JsonObject? = null
 
-    suspend fun save(backend: PlatformBackend, body: JsonObject, oldId: String?): JsonObject {
+    suspend fun save(backend: PlatformBackend, body: JsonObject): JsonObject {
         val current = cabinCredentials(backend.call("GET", "/credentials"))
-        if (baseline != null && created == null) created = current.firstOrNull { it.text("id") !in baseline!! }
-        if (created == null) {
-            baseline = current.map { it.text("id") }.toSet()
-            replaced = oldId
-            created = backend.call("POST", "/credentials", body).obj()
+        if (baseline != null) current.firstOrNull { it.text("id") !in baseline!! }?.let {
+            baseline = null
+            return it
         }
-        val result = created!!
-        replaced?.let { backend.call("DELETE", "/credentials/$it") }
-        baseline = null; replaced = null; created = null
+        baseline = current.map { it.text("id") }.toSet()
+        val result = backend.call("POST", "/credentials", body).obj()
+        baseline = null
         return result
     }
 }
 
+internal suspend fun updateCabinPassword(backend: PlatformBackend, id: String, password: String) {
+    val revealed = backend.call("POST", "/credentials/$id/reveal").obj()
+    val account = Json.parseToJsonElement(revealed.text("secret")).jsonObject.text("account")
+    require(account.isNotBlank()) { "托管凭据缺少学校账号，请撤销后重新创建。" }
+    backend.call("PUT", "/credentials/$id/secret", payload("secret" to payload("account" to account, "password" to password).toString()))
+}
+
 internal fun platformRequest(method: String, path: String, body: JsonObject?, csrf: String?, key: String? = null): Request {
-    require(path.matches(Regex("/(auth/(login|me|logout)|study-cabin/cabins|credentials(/[a-zA-Z0-9-]+(/secret)?)?|jobs(/[a-zA-Z0-9-]+/cancel)?)")))
+    require(path.matches(Regex("/(auth/(login|me|logout)|study-cabin/cabins|credentials(/[a-zA-Z0-9-]+(/(secret|reveal))?)?|jobs(/[a-zA-Z0-9-]+/cancel)?)")))
     val builder = Request.Builder().url("https://nanyee.de/api/v1$path")
     if (method != "GET") {
         if (path != "/auth/login") {
