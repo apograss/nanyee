@@ -105,10 +105,10 @@ internal class CabinState(app: Application) : AndroidViewModel(app) {
     fun saveCredential() {
         if (!consent || account.isBlank() || account.length > 64 || schoolPassword.isEmpty() || schoolPassword.length > 256) { error = "请同意托管，并填写学号（不超过 64 字符）与密码（不超过 256 字符）。"; return }
         val id = editingId
-        val body = cabinSecret(account.trim(), schoolPassword, id == null)
+        val body = cabinSecret(account.trim(), schoolPassword, true)
         schoolPassword = ""
         run {
-            api().call(if (id == null) "POST" else "PUT", if (id == null) "/credentials" else "/credentials/$id/secret", body)
+            createCabinCredential(api(), body, id)
             cancelCredential(); load(); message = "凭据已安全提交给 nanyee.de。"
         }
     }

@@ -80,6 +80,12 @@ internal class CabinSubmission(val body: JsonObject, val key: String = UUID.rand
     suspend fun send(backend: PlatformBackend): JsonElement = backend.call("POST", "/jobs", body, key)
 }
 
+internal suspend fun createCabinCredential(backend: PlatformBackend, body: JsonObject, replaced: String?): JsonObject {
+    val created = backend.call("POST", "/credentials", body).obj()
+    if (replaced != null) backend.call("DELETE", "/credentials/$replaced")
+    return created
+}
+
 internal fun platformRequest(method: String, path: String, body: JsonObject?, csrf: String?, key: String? = null): Request {
     require(path.matches(Regex("/(auth/(login|me|logout)|study-cabin/cabins|credentials(/[a-zA-Z0-9-]+(/secret)?)?|jobs(/[a-zA-Z0-9-]+/cancel)?)")))
     val builder = Request.Builder().url("https://nanyee.de/api/v1$path")

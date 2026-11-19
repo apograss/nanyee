@@ -93,6 +93,7 @@ internal fun CabinToolsScreen(school: SchoolState, state: CabinState = viewModel
                     Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Text(if (state.editingId == null) "同意托管学校密码" else "更新托管学校密码", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            if (state.editingId != null) Text("更新将新建凭据并撤销旧凭据，避免继续使用旧账号的会话；引用旧凭据的任务需要重新创建。")
                             Text("学校账号与密码将加密存储在 nanyee.de，用于您离线时无人值守预约学习舱。凭据长期保存，可随时撤销。撤销会影响引用它的任务。只有点击同意后，才读取本机已记住的学校凭据来预填。")
                             if (!state.consent) Button(onClick = { state.agree(school::hostedSchoolPrefill) }, enabled = !state.busy) { Text("同意并继续") }
                             else {
