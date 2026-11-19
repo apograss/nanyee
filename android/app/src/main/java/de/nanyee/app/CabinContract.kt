@@ -96,9 +96,15 @@ internal class CabinSubmission(val body: JsonObject, val key: String = UUID.rand
             val updated = runCatching { Instant.parse(it.text("updated_at")) }.getOrNull()
             created != null && !created.isBefore(earliest) &&
                 (!terminal || (updated != null && !updated.isBefore(earliest))) &&
-                (if (body.text("tool_id") == "evaluation") it["payload"] == body["payload"] else sameCabinPayload(it["payload"], body["payload"])) && it["credential_id"] == body["credential_id"] && it["operation"] == body["operation"]
+                (if (body.text("tool_id") == "evaluation") sameEvaluationPayload(it["payload"], body["payload"]) else sameCabinPayload(it["payload"], body["payload"])) && it["credential_id"] == body["credential_id"] && it["operation"] == body["operation"] && it["tool_id"] == body["tool_id"]
         }
     }
+}
+
+private fun sameEvaluationPayload(actual: JsonElement?, sent: JsonElement?): Boolean {
+    val a = actual as? JsonObject ?: return false
+    val b = sent as? JsonObject ?: return false
+    return b.all { (key, value) -> (a[key] ?: JsonNull) == value }
 }
 
 private fun sameCabinPayload(first: JsonElement?, second: JsonElement?): Boolean = runCatching {

@@ -15,6 +15,7 @@ import org.junit.Assert.*
 import org.junit.Test
 import java.net.URLDecoder
 import java.time.LocalDate
+import java.time.Instant
 import kotlin.random.Random
 
 internal val evaluationReference = EvaluationReference("teacher-1", "hour-1", "questionnaire-1")
@@ -34,6 +35,27 @@ internal val evaluationFixture = """<script>entss.post('/new/student/ktpj/savePj
 """.trimIndent()
 
 class EvaluationTest {
+    @Test fun evaluationReconciliationIgnoresServerDefaultsAndNormalizesAbsentToNull() = runBlocking {
+        val sent = Instant.parse("2030-01-01T00:00:00Z")
+        val body = evaluationJob("fixture", 30, "")
+        val pending = CabinSubmission(body, now = { sent })
+        val backend = object : PlatformBackend {
+            override suspend fun clearLocal() {}
+            override suspend fun call(method: String, path: String, body: JsonObject?, key: String?): JsonElement = JsonNull
+        }
+        pending.send(backend)
+        val payload = body["payload"]!!.jsonObject
+        fun job(p: JsonElement) = JsonObject(body + mapOf("payload" to p, "created_at" to JsonPrimitive(sent.toString()), "state" to JsonPrimitive("queued")))
+        val defaults = job(JsonObject(payload + mapOf("retry_until" to JsonNull, "server_default" to JsonPrimitive(true))))
+        assertEquals(defaults, pending.matchingJob(listOf(defaults)))
+        val explicitNull = CabinSubmission(JsonObject(body + ("payload" to JsonObject(payload + ("retry_until" to JsonNull)))), now = { sent })
+        explicitNull.send(backend)
+        assertEquals(job(payload), explicitNull.matchingJob(listOf(job(payload))))
+        assertNull(pending.matchingJob(listOf(job(JsonObject(payload + ("max_courses" to JsonPrimitive(31)))))))
+        assertNull(pending.matchingJob(listOf(job(JsonObject(payload - "strategy")))))
+        assertNull(pending.matchingJob(listOf(job(JsonNull))))
+        assertNull(pending.matchingJob(emptyList()))
+    }
     @Test fun screenRecreationRetainsRunningAndCompletedBatchInSameViewModelStore() = runBlocking {
         val store = ViewModelStore()
         val provider = ViewModelProvider.create(store, ViewModelProvider.NewInstanceFactory())
