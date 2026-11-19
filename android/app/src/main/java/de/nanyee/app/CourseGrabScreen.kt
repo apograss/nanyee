@@ -4,6 +4,8 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -18,9 +20,9 @@ internal fun CourseGrabScreen(school: SchoolState, live: CourseGrabState, demoSt
     val demo = school.demo || demoChoice
     val state = if (demo) demoState else live
     BackHandler { if (!state.locked) onBack() }
-    Column(Modifier.widthIn(max = 720.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.widthIn(max = 720.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         TextButton(onClick = onBack, enabled = !state.locked) { Text("返回工具") }
-        Text("抢课 · 本机", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        SectionHeading("抢课", "学校直连 · 本机前台运行", Icons.Outlined.Bolt, SectionAccent.SERVICE)
         Text("运行或等待开始时请保持 App 在前台；页面会保持屏幕常亮。没有后台服务，系统结束进程会中断；中断后请先到教务系统核验，不要直接重复提交。", color = MaterialTheme.colorScheme.error)
         Text(if (demo) "演示模式：不联网，不会真实选课。" else "复用学校直连会话；只读加载不会提交。没有退课或已选查询功能。")
         if (!school.demo) TextButton(onClick = { demoChoice = !demoChoice }, enabled = !live.locked && !demoState.locked) { Text(if (demoChoice) "返回真实学校数据" else "无账号体验演示") }
@@ -71,7 +73,7 @@ internal fun CourseGrabScreen(school: SchoolState, live: CourseGrabState, demoSt
         Text("已加载 ${state.courses.size} 门")
         state.courses.filter { state.query.isBlank() || it.name.contains(state.query, true) || it.teacher.contains(state.query, true) }.forEach { course ->
             Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(course.name, style = MaterialTheme.typography.titleMedium)
                     Text(course.teacher)
                     if (course.time.isNotBlank()) Text(course.time)

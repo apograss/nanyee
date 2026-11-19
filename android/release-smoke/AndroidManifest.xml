@@ -1,0 +1,5 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="de.nanyee.smoke">
+    <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="35" />
+    <application android:label="Nanyee release smoke" />
+    <instrumentation android:name="de.nanyee.smoke.Smoke" android:targetPackage="de.nanyee.app" />
+</manifest>

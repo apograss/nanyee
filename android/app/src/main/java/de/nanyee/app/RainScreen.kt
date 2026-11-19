@@ -13,7 +13,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AutoStories
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -27,7 +30,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.findViewTreeLifecycleOwner
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
 import com.journeyapps.barcodescanner.ScanContract
@@ -38,11 +40,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @Composable
-internal fun RainToolsScreen(onBack: () -> Unit) {
-    var demo by rememberSaveable { mutableStateOf(false) }
-    val real: RainState = viewModel(key = "rain-real")
-    val fake: RainState = viewModel(key = "rain-demo")
-    val state = if (demo) fake else real
+internal fun RainToolsScreen(state: RainState, demo: Boolean, onBack: () -> Unit, toggleDemo: () -> Unit) {
     LaunchedEffect(state) { state.initialize(demo) }
     val owner = LocalView.current.findViewTreeLifecycleOwner()
     DisposableEffect(owner, state) {
@@ -51,16 +49,15 @@ internal fun RainToolsScreen(onBack: () -> Unit) {
         owner?.lifecycle?.addObserver(observer); sync()
         onDispose { owner?.lifecycle?.removeObserver(observer); state.setForeground(false) }
     }
-    RainContent(state, onBack) { state.setForeground(false); demo = !demo }
+    RainContent(state, onBack) { state.setForeground(false); toggleDemo() }
 }
 
 @Composable
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 private fun RainContent(state: RainState, onBack: () -> Unit, toggleDemo: () -> Unit) {
     val context = LocalContext.current
     var deviceError by remember { mutableStateOf("") }
     var localConfirm by remember { mutableStateOf("") }
-    var pendingHost by remember { mutableStateOf<RainHost?>(null) }
     val scanner = rememberLauncherForActivityResult(ScanContract()) { result -> result.contents?.let(state::previewScan) }
     val locationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
         if (permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true) state.locate() else deviceError = "需要精确定位权限；不支持手动坐标或模拟定位。"
@@ -74,10 +71,10 @@ private fun RainContent(state: RainState, onBack: () -> Unit, toggleDemo: () -> 
         }
     }
     BackHandler(onBack = back)
-    Column(Modifier.widthIn(max = 920.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        TextButton(onClick = back, enabled = !state.busy) { Text(if (state.lesson != null) "离开课堂并返回课程" else "返回工具") }
-        Text("雨课堂", style = MaterialTheme.typography.headlineMedium)
-        Text(if (state.demo) "离线演示 · 不联网，不改变课堂状态。保存图片会写入本机相册。" else "雨课堂独立加密会话 · 仅当前本人账号 · 不共享教务或学习通 Cookie")
+    PullToRefreshBox(isRefreshing = state.busy, onRefresh = { if (state.user != null && !state.busy && state.lesson == null) state.refresh() }, modifier = Modifier.widthIn(max = 920.dp).fillMaxSize()) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (state.lesson != null || state.qr != null) TextButton(onClick = back, enabled = !state.busy) { Text(if (state.lesson != null) "离开课堂并返回课程" else "取消二维码登录") }
+        ClassroomAccountRow(state.user?.name ?: "未登录雨课堂", "雨课堂", state.demo, !state.busy, state.user != null, { localConfirm = "logout" }, toggleDemo)
         if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         if (state.error.isNotBlank()) Text(state.error, color = MaterialTheme.colorScheme.error)
         if (deviceError.isNotBlank()) Text(deviceError, color = MaterialTheme.colorScheme.error)
@@ -85,22 +82,16 @@ private fun RainContent(state: RainState, onBack: () -> Unit, toggleDemo: () -> 
         if (!state.ready && !state.busy) Button(onClick = { state.initialize(state.demo) }) { Text("重试打开加密存储") }
         if (state.ready) {
             if (state.unknownKey.isNotBlank()) Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("上次提交结果未知（可能已提交），已禁止后续课堂写入。请先到官方雨课堂核验；不会自动重试。")
                     TextButton(onClick = { localConfirm = "unknown" }, enabled = !state.busy) { Text("已在官方核验结果…") }
                 }
             }
-            Text("服务器：${state.host.domain}", style = MaterialTheme.typography.titleMedium)
-            if (state.lesson == null) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                RainHost.entries.forEach { host -> FilterChip(selected = state.host == host, onClick = { if (state.host != host) pendingHost = host }, enabled = !state.busy, label = { Text(host.domain.substringBefore('.')) }) }
-            }
-            TextButton(onClick = toggleDemo, enabled = !state.busy) { Text(if (state.demo) "返回真实雨课堂" else "无账号体验离线演示") }
             if (state.demo) {
-                Text("演示场景（切换后再执行对应操作）")
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) { RainDemoFailure.entries.forEach { value -> FilterChip(selected = state.scenario == value, onClick = { state.selectScenario(value) }, enabled = !state.busy, label = { Text(value.label) }) } }
+                ScenarioPicker(state.scenario.label, RainDemoFailure.entries.map { it.label }, !state.busy) { state.selectScenario(RainDemoFailure.entries[it]) }
             }
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (state.user == null || state.qr != null) Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("雨课堂账号", style = MaterialTheme.typography.titleLarge)
                     if (state.user != null) {
                         Text("${state.user?.name} · 仅本人账号")
@@ -121,13 +112,13 @@ private fun RainContent(state: RainState, onBack: () -> Unit, toggleDemo: () -> 
             }
             if (state.user != null) {
                 if (state.lesson == null) {
-                    TextButton(onClick = state::refresh, enabled = !state.busy) { Text("只读刷新账号与课程 / 恢复开课检查") }
-                    Text("开课检查每 3 秒一次，仅在课程页面可见且 App 前台时运行。不会自动加入课堂。")
+                    Text("我的课程", style = MaterialTheme.typography.titleLarge)
+                    Text("下拉刷新 · 每 3 秒前台检查开课 · 不自动加入", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (state.loaded && state.courses.isEmpty()) Text("暂无课程。")
                     state.courses.forEach { course ->
                         Card(Modifier.fillMaxWidth()) {
-                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text(course.name, style = MaterialTheme.typography.titleLarge); Text(course.teacher)
+                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                SectionHeading(course.name, course.teacher, Icons.Outlined.AutoStories)
                                 val lessons = state.onLesson.filter { it.courseId == course.id }
                                 if (lessons.isEmpty()) Text("当前未在上课")
                                 lessons.forEach { lesson -> Button(onClick = { state.previewJoin(lesson.lessonId, course.name) }, enabled = !state.busy && state.unknownKey.isBlank()) { Text("正在上课 · 预览课堂签到 / 加入") } }
@@ -147,6 +138,7 @@ private fun RainContent(state: RainState, onBack: () -> Unit, toggleDemo: () -> 
             }
         }
     }
+    }
     state.confirmation?.let { action ->
         AlertDialog(onDismissRequest = state::dismiss, title = { Text(if (action is RainAction.Export) "确认保存到本机相册" else "确认本人课堂操作") }, text = {
             Column(Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -160,9 +152,9 @@ private fun RainContent(state: RainState, onBack: () -> Unit, toggleDemo: () -> 
             else state.confirm()
         }) { Text("确认${if (action is RainAction.Export) "保存" else "提交"}") } }, dismissButton = { TextButton(onClick = state::dismiss) { Text("取消") } })
     }
-    if (localConfirm.isNotBlank() || pendingHost != null) AlertDialog(onDismissRequest = { localConfirm = ""; pendingHost = null }, title = { Text("请确认") }, text = {
-        Text(when { pendingHost != null -> "切换到 ${pendingHost?.domain}，将离开当前会话视图。不同服务器的加密 Cookie 与身份互不混用。"; localConfirm == "unknown" -> "我已在官方雨课堂核验上次操作结果。清除未知标记不会重发任何操作，下一次操作仍需手动确认。"; else -> "退出将发送课堂离开消息，并清除所有雨课堂服务器的本机 Cookie、会话标记及手写草稿；不影响教务或学习通。" })
-    }, confirmButton = { TextButton(onClick = { when { pendingHost != null -> state.switchHost(requireNotNull(pendingHost)); localConfirm == "unknown" -> state.acknowledgeUnknown(); else -> state.logout() }; localConfirm = ""; pendingHost = null }) { Text("确认") } }, dismissButton = { TextButton(onClick = { localConfirm = ""; pendingHost = null }) { Text("取消") } })
+    if (localConfirm.isNotBlank()) AlertDialog(onDismissRequest = { localConfirm = "" }, title = { Text("请确认") }, text = {
+        Text(if (localConfirm == "unknown") "我已在官方雨课堂核验上次操作结果。清除未知标记不会重发任何操作，下一次操作仍需手动确认。" else "退出将发送课堂离开消息，并清除所有雨课堂服务器的本机 Cookie、会话标记及手写草稿；不影响教务或学习通。")
+    }, confirmButton = { TextButton(onClick = { if (localConfirm == "unknown") state.acknowledgeUnknown() else state.logout(); localConfirm = "" }) { Text("确认") } }, dismissButton = { TextButton(onClick = { localConfirm = "" }) { Text("取消") } })
 }
 
 @Composable
@@ -170,7 +162,7 @@ private fun RainLessonContent(state: RainState, locate: () -> Unit) {
     Text("当前课堂", style = MaterialTheme.typography.titleLarge)
     Text(state.liveStatus)
     Text("离开、切到后台或切换演示时发送 leavelesson 并关闭直播。断线时无法保证送达。返回前台只重新连接，不会重新签到。")
-    TextButton(onClick = state::reconnect, enabled = !state.busy && !state.lessonFinished) { Text("重新连接直播") }
+    AssistChip(onClick = state::reconnect, enabled = !state.busy && !state.lessonFinished, label = { Text("重新连接直播") })
     Row(verticalAlignment = Alignment.CenterVertically) { Switch(state.follow, state::updateFollow, enabled = !state.busy); Text("跟随课堂翻页", Modifier.weight(1f).padding(start = 8.dp)) }
     val deck = state.presentation
     if (deck == null) Text("等待课堂发送课件信息；没有课件时也可查看直播时间线。") else {
@@ -185,7 +177,7 @@ private fun RainLessonContent(state: RainState, locate: () -> Unit) {
                 OutlinedButton(onClick = { state.updateFollow(false); state.selectSlide(state.slide - 1) }, enabled = !state.busy && state.slide > 0) { Text("上一页") }
                 OutlinedButton(onClick = { state.updateFollow(false); state.selectSlide(state.slide + 1) }, enabled = !state.busy && state.slide + 1 < deck.slides.size) { Text("下一页") }
             }
-            TextButton(onClick = state::loadImage, enabled = !state.busy) { Text("重新加载当前图片") }
+            AssistChip(onClick = state::loadImage, enabled = !state.busy, label = { Text("重新加载当前图片") })
             OutlinedButton(onClick = { state.loadPresentation() }, enabled = !state.busy) { Text("重新只读加载课件") }
             Button(onClick = { state.previewExport(false) }, enabled = !state.busy && slide.image.isNotBlank()) { Text("保存本页到相册…") }
             OutlinedButton(onClick = { state.previewExport(true) }, enabled = !state.busy) { Text("保存全部 ${deck.slides.size} 页到相册…") }
@@ -194,7 +186,7 @@ private fun RainLessonContent(state: RainState, locate: () -> Unit) {
     }
     if (state.exporting) TextButton(onClick = state::cancelExport) { Text("停止保存（已保存 ${state.saved} 张）") }
     Text("真实位置签到", style = MaterialTheme.typography.titleLarge)
-    TextButton(onClick = state::refreshEligibility, enabled = !state.busy && !state.lessonFinished) { Text("只读刷新位置签到要求") }
+    AssistChip(onClick = state::refreshEligibility, enabled = !state.busy && !state.lessonFinished, label = { Text("只读刷新位置签到要求") })
     val eligible = state.eligibility
     if (eligible == null) Text("尚未读取位置签到要求。") else {
         Text(if (eligible.signed) "已完成位置签到" else if (eligible.required) "当前要求位置签到" else "当前无需位置签到")

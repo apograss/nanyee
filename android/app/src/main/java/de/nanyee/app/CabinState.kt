@@ -41,7 +41,7 @@ internal class CabinState(app: Application) : AndroidViewModel(app) {
     var submitted by mutableStateOf(false); private set
 
     private suspend fun api(): PlatformBackend = backend ?: withContext(Dispatchers.IO) {
-        if (demo) DemoCabinBackend() else PlatformApi(EncryptedPlatformCookies(getApplication()))
+        if (demo) DemoCabinBackend() else PlatformSession.api(getApplication())
     }.also { backend = it }
 
     private fun run(action: suspend () -> Unit) {

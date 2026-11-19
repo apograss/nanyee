@@ -17,7 +17,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.serialization.json.*
 import java.time.Instant
 import java.time.LocalDate
-import java.time.LocalDateTime
 import java.time.ZoneId
 import java.util.UUID
 
@@ -34,7 +33,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
     )
     private var cachedTimetables by mutableStateOf<TimetableSnapshot?>(null)
     private var liveOwner = ""
-    private var loginDestination by mutableStateOf<Int?>(null)
+    private var loginDestination by mutableStateOf<MainTab?>(null)
     private var cacheReturnView: CachedTimetableView? = saved.get<String>("cacheReturnSemester")?.let {
         CachedTimetableView(it, saved["cacheReturnWeek"] ?: 1, saved["cacheReturnPinned"] ?: false)
     }
@@ -78,10 +77,19 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
     var hint by mutableStateOf("")
     var gradesLoading by mutableStateOf(false)
         private set
-    private var selectedTab by mutableIntStateOf(saved["tab"] ?: 0)
-    var tab: Int
+    private var selectedTab by mutableStateOf(restoredMainTab(saved["mainTab"]))
+    internal var tab: MainTab
         get() = selectedTab
-        set(value) { selectedTab = value; saved["tab"] = value }
+        set(value) { selectedTab = value; saved["mainTab"] = value.ordinal }
+    var toolsRoute by mutableStateOf(saved.get<String>("toolsRoute") ?: "")
+        private set
+    fun closeTool() { toolsRoute = ""; saved["toolsRoute"] = "" }
+    fun openTool(route: String) { toolsRoute = route; saved["toolsRoute"] = route }
+    private var selectedClassroom by mutableStateOf(ClassroomPlatform.restore(prefs.getString("classroomPlatform", null)))
+    internal val classroomPlatform get() = selectedClassroom
+    internal fun selectClassroom(value: ClassroomPlatform) {
+        selectedClassroom = value; prefs.edit().putString("classroomPlatform", value.name).apply()
+    }
     var semesters by mutableStateOf(emptyList<JsonObject>())
     private var selectedSemester by mutableStateOf(saved["semester"] ?: "")
     var semester: String
@@ -107,8 +115,6 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         set(value) { loadedGrades = value; gradeDataIdentity = UUID.randomUUID().toString() }
     var today by mutableStateOf(runCatching { LocalDate.parse(saved.get<String>("date")) }.getOrDefault(LocalDate.now(ZoneId.of("Asia/Shanghai"))))
         private set
-    var now by mutableStateOf(LocalDateTime.now(ZoneId.of("Asia/Shanghai")))
-        private set
 
     init {
         runCatching { timetableCache.retryRevokedDeletion() }
@@ -120,20 +126,21 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
             val restoreUserPickedWeek = userPickedWeek
             startDemo()
             if (semesters.any { it.text("code") == restoreSemester }) selectSemester(restoreSemester)
-            tab = restoreTab.coerceIn(0, 4); week = restoreWeek.coerceIn(1, totalWeeks)
+            tab = restoreTab; week = restoreWeek.coerceIn(1, totalWeeks)
             userPickedWeek = restoreUserPickedWeek; saved["userPickedWeek"] = userPickedWeek
         } else {
             clearCacheReturnView()
             if (saved.get<Boolean>("hadSession") == true) hint = "会话已过期，请重新登录"
-            if (!restoreCachedTimetable() && tab != 3) launch(silent = true) { fetchCaptcha() }
+            val restoreTab = tab
+            val cached = restoreCachedTimetable()
+            tab = restoreTab
+            if (!cached && schoolLoginRequired(tab, toolsRoute)) launch(silent = true) { fetchCaptcha() }
         }
         updateDate()
         viewModelScope.launch { while (true) { delay(1000); updateDate(); checkCaptcha(); if (loggedIn && !demo && runCatching { Instant.now().isAfter(Instant.parse(expires)) }.getOrDefault(true)) expireSession(reauthenticate = false) } }
     }
     private fun updateDate() {
-        val clock = LocalDateTime.now(ZoneId.of("Asia/Shanghai")).withSecond(0).withNano(0)
-        now = clock
-        val date = clock.toLocalDate()
+        val date = LocalDate.now(ZoneId.of("Asia/Shanghai"))
         if (date != today) {
             today = date
             if (homeVisible) followCurrentWeek()
@@ -165,7 +172,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
     }
     private suspend fun fetchCaptcha() { captchaAttemptAt = Instant.now(); captchaText = ""; captcha = api.request("captcha") }
     fun checkCaptcha() {
-        if (homeVisible || tab == 3 || busy || captcha == null || Instant.now().isBefore(captchaAttemptAt.plusSeconds(60))) return
+        if (homeVisible || !schoolLoginRequired(tab, toolsRoute) || busy || captcha == null || Instant.now().isBefore(captchaAttemptAt.plusSeconds(60))) return
         if (captchaNeedsRefresh(captcha?.text("expires_at") ?: "", Instant.now())) {
             hint = "验证码已更新，请重新输入"
             launch(silent = true) { fetchCaptcha() }
@@ -181,7 +188,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         val submittedPassword = password
         val submittedCaptcha = captchaText.trim()
         val submittedRemember = remember
-        val destination = loginDestination ?: 0
+        val destination = loginDestination ?: MainTab.TIMETABLE
         val requestedSemester = if (loginDestination != null) semester else ""
         if (captchaNeedsRefresh(captcha?.text("expires_at") ?: "", Instant.now())) {
             fetchCaptcha(); hint = "验证码已更新，请重新输入"; return@launch
@@ -198,7 +205,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         launch("timetable") { loadTimetable() }
         launch("grades") { loadGrades() }
     }
-    private suspend fun completeLogin(response: JsonObject, submittedAccount: String, submittedPassword: String, submittedRemember: Boolean, destination: Int, requestedSemester: String) {
+    private suspend fun completeLogin(response: JsonObject, submittedAccount: String, submittedPassword: String, submittedRemember: Boolean, destination: MainTab, requestedSemester: String) {
         val id = response.text("academic_session_id"); val expiry = response.text("expires_at")
         if (id.isEmpty() || expiry.isEmpty()) throw SchoolError(0, "INVALID_RESPONSE", "登录响应无效，请重试。")
         if (cachedTimetables != null && cachedTimetables?.owner != submittedAccount) { timetableCache.clear(); cachedTimetables = null }
@@ -246,16 +253,21 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
     }
     fun reload() {
         reauthAttempted = false
-        if (cachedMode) requireSchoolLogin(tab.takeIf { it in 0..2 } ?: 0)
+        if (cachedMode) requireSchoolLogin(if (tab == MainTab.TOOLS && toolsRoute == "grades") MainTab.TOOLS else MainTab.TIMETABLE)
         else if (!demo && loggedIn) {
-            if (tab <= 1) launch("timetable") { if (semesters.isEmpty()) loadTimetable() else queryTimetable() }
-            else launch("grades") { loadGrades() }
+            if (tab == MainTab.TIMETABLE) launch("timetable") { if (semesters.isEmpty()) loadTimetable() else queryTimetable() }
+            else if (tab == MainTab.TOOLS && toolsRoute == "grades") launch("grades") { loadGrades() }
         }
     }
-    fun selectTab(value: Int) {
-        if (value == 3 && !homeVisible) { jobs.remove("captcha")?.cancel(); busy = jobs.isNotEmpty() }
-        if (cachedMode && value == 2) { reauthAttempted = false; requireSchoolLogin(2) } else tab = value.coerceIn(0, 4)
-        if (value != 3 && !homeVisible && captcha == null && !busy) refreshCaptcha()
+    internal fun selectTab(value: MainTab) {
+        tab = value
+        if (!schoolLoginRequired(tab, toolsRoute) && !homeVisible) { jobs.remove("captcha")?.cancel(); busy = jobs.isNotEmpty() }
+        if (tab == MainTab.TOOLS && toolsRoute == "grades" && cachedMode) openGrades()
+        else if (schoolLoginRequired(tab, toolsRoute) && !homeVisible && captcha == null && !busy) refreshCaptcha()
+    }
+    fun openGrades() {
+        openTool("grades"); tab = MainTab.TOOLS
+        if (!homeVisible || cachedMode) { reauthAttempted = false; requireSchoolLogin(SchoolOperation.GRADES.tab) }
     }
 
     internal suspend fun hostedSchoolPrefill(): Pair<String, String>? = withContext(Dispatchers.IO) {
@@ -265,14 +277,14 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
             if (savedAccount.isBlank() || savedPassword.isEmpty()) null else savedAccount to savedPassword
         }
     }
-    private suspend fun ensureToolSession() {
+    private suspend fun ensureToolSession(destination: MainTab) {
         if (!loggedIn || session.isEmpty() || runCatching { Instant.parse(expires) <= Instant.now() }.getOrDefault(true)) {
             val credentials = hostedSchoolPrefill() ?: throw SchoolError(401, "LOGIN_REQUIRED", "请先在“我的”登录学校，或保存凭据后重试。")
             autoLoggingIn = true
             try {
                 when (val result = silentLogin(api, credentials.first, credentials.second, captchaOcr::recognize)) {
                     is SilentLoginResult.Success -> {
-                        completeLogin(result.session, credentials.first, credentials.second, true, 3, semester)
+                        completeLogin(result.session, credentials.first, credentials.second, true, destination, semester)
                         launch("timetable") { loadTimetable() }
                         launch("grades") { loadGrades() }
                     }
@@ -283,11 +295,11 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
     }
     internal suspend fun courseGrabAccess(): CourseGrabSource {
         check(!demo)
-        ensureToolSession()
+        ensureToolSession(SchoolOperation.COURSE_GRAB.tab)
         val owner = grabOwner.identity
         return ReacquiringCourseGrabSource {
             if (owner != grabOwner.identity) throw CancellationException("学校账号已更改")
-            ensureToolSession()
+            ensureToolSession(SchoolOperation.COURSE_GRAB.tab)
             if (owner != grabOwner.identity) throw CancellationException("学校账号已更改")
             val sourceSession = session
             ExpiringCourseGrabSource((api as DirectSchoolApi).courseGrab(sourceSession)) {
@@ -297,7 +309,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
     }
     internal suspend fun evaluationAccess(): EvaluationSource {
         if (demo) return DemoEvaluationSource()
-        ensureToolSession()
+        ensureToolSession(SchoolOperation.EVALUATION.tab)
         val sourceSession = session
         val source = (api as DirectSchoolApi).evaluations(sourceSession)
         return object : EvaluationSource by source {
@@ -318,7 +330,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         if (demo) courses = demoCourses(code)
         else if (cachedMode) {
             val table = cachedTimetables?.tables?.get(code)
-            if (table == null) { courses = emptyList(); semesterStart = ""; requireSchoolLogin(1, rememberView = false) } else { courses = table.courses; totalWeeks = table.totalWeeks; semesterStart = table.semesterStart; week = week.coerceAtMost(totalWeeks); followCurrentWeek() }
+            if (table == null) { courses = emptyList(); semesterStart = ""; requireSchoolLogin(SchoolOperation.TIMETABLE.tab, rememberView = false) } else { courses = table.courses; totalWeeks = table.totalWeeks; semesterStart = table.semesterStart; week = week.coerceAtMost(totalWeeks); followCurrentWeek() }
         } else if (loggedIn) { semesterStart = ""; courses = emptyList(); launch("timetable") { queryTimetable() } }
     }
     fun setWeeks(value: Int) {
@@ -356,7 +368,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         courses = table.courses; totalWeeks = table.totalWeeks; semesterStart = table.semesterStart
         week = restored.week; userPickedWeek = restored.userPickedWeek; saved["userPickedWeek"] = userPickedWeek
         if (view == null) followCurrentWeek()
-        cachedMode = true; tab = 0
+        cachedMode = true; tab = MainTab.TIMETABLE
         return true
     }
     private fun rememberCacheView() {
@@ -368,7 +380,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         cacheReturnView = null
         saved.remove<String>("cacheReturnSemester"); saved.remove<Int>("cacheReturnWeek"); saved.remove<Boolean>("cacheReturnPinned")
     }
-    private fun requireSchoolLogin(destination: Int, rememberView: Boolean = true, allowSilent: Boolean = true) {
+    private fun requireSchoolLogin(destination: MainTab, rememberView: Boolean = true, allowSilent: Boolean = true) {
         if (autoLoggingIn) return
         if (rememberView) rememberCacheView()
         clearRequests(); loginDestination = destination
@@ -403,7 +415,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
     private suspend fun showManualLogin(reason: String) {
         api.clear()
         autoLoggingIn = false; cachedMode = false; captcha = null; captchaText = ""
-        hint = if (loginDestination == 2) "请登录学校系统查看成绩" else "请登录学校系统更新课表"
+        hint = if (loginDestination == MainTab.TOOLS && toolsRoute == "grades") "请登录学校系统查看成绩" else "请登录学校系统更新课表"
         error = reason
         try { fetchCaptcha() } catch (e: Exception) {
             if (e is CancellationException) throw e
@@ -419,7 +431,8 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         val destination = tab
         clearRequests(); session = ""; expires = ""; liveOwner = ""; loggedIn = false; grades = null; api.clear()
         val restored = restoreCachedTimetable()
-        if (destination == 3) { tab = 3; hint = "学校会话已过期，需要更新时请重新登录。"; return }
+        tab = destination
+        if (!schoolLoginRequired(destination, toolsRoute)) { hint = "学校会话已过期，需要更新时请重新登录。"; return }
         if (reauthenticate) requireSchoolLogin(destination, allowSilent = !reauthAttempted)
         else {
             hint = "学校会话已过期，需要更新时请重新登录。"
@@ -456,7 +469,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         clearRequests()
         saved["demo"] = true; saved["hadSession"] = false
         resetTimetableSelection()
-        session = ""; expires = ""; loginDestination = null; cachedMode = false; demo = true; loggedIn = true; tab = 0; error = ""; week = 1
+        session = ""; expires = ""; loginDestination = null; cachedMode = false; demo = true; loggedIn = true; tab = MainTab.TIMETABLE; error = ""; week = 1
         semesterStart = today.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY)).toString()
         semesters = listOf(payload("code" to "202501", "label" to "2025-2026-1"), payload("code" to "202402", "label" to "2024-2025-2")); semester = "202501"
         courses = demoCourses(semester)

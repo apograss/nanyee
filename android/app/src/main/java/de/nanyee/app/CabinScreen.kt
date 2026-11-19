@@ -5,6 +5,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CloudQueue
+import androidx.compose.material.icons.outlined.EventSeat
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -29,15 +32,16 @@ internal fun CabinToolsScreen(school: SchoolState, state: CabinState = viewModel
     var demoChoice by rememberSaveable { mutableStateOf(false) }
     var action by remember { mutableStateOf<Pair<String, String>?>(null) }
     val uri = LocalUriHandler.current
-    LaunchedEffect(opened, school.demo, demoChoice) { if (opened) state.open(school.demo || demoChoice, evaluationMode) }
+    val sessionRevision by PlatformSession.revision.collectAsState()
+    LaunchedEffect(opened, school.demo, demoChoice, sessionRevision) { if (opened) state.open(school.demo || demoChoice, evaluationMode) }
     DisposableEffect(state) { onDispose { state.cancelCredential(); state.platformPassword = "" } }
     BackHandler(opened) { state.cancelCredential(); if (onBack != null) onBack() else opened = false }
     if (!opened) {
-        Column(Modifier.widthIn(max = 720.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(Modifier.widthIn(max = 720.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("校园工具", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             Text("按需开启，让日常更从容。", color = MaterialTheme.colorScheme.onSurfaceVariant)
             Card(onClick = { opened = true }, modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("学习舱预约", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text("选择舱位优先级，交给服务器按时尝试预约。")
                     Text("需要独立的 Nanyee 平台账号", style = MaterialTheme.typography.bodySmall)
@@ -47,12 +51,12 @@ internal fun CabinToolsScreen(school: SchoolState, state: CabinState = viewModel
         return
     }
     PullToRefreshBox(isRefreshing = state.busy, onRefresh = { if (state.user != null) state.refresh() }, modifier = Modifier.widthIn(max = 720.dp).fillMaxSize()) {
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            TextButton(onClick = { state.cancelCredential(); if (onBack != null) onBack() else opened = false }) { Text("返回工具") }
-            Text(if (evaluationMode) "自动评课 · 服务器" else "学习舱预约", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            if (state.demo) Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) { Text("演示模式 · 不联网、不托管真实密码、不执行真实操作", Modifier.padding(16.dp)) }
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            TextButton(onClick = { state.cancelCredential(); if (onBack != null) onBack() else opened = false }) { Text(if (evaluationMode) "返回课程评价" else "返回工具") }
+            SectionHeading(if (evaluationMode) "自动评课" else "自习舱预约", "Nanyee 服务器 · 托管前需明确同意", if (evaluationMode) Icons.Outlined.CloudQueue else Icons.Outlined.EventSeat)
+            if (state.demo) Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) { Text("演示模式 · 不联网、不托管真实密码、不执行真实操作", Modifier.padding(12.dp)) }
             if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-            if (state.error.isNotBlank()) Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) { Text(state.error, Modifier.padding(16.dp)) }
+            if (state.error.isNotBlank()) Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) { Text(state.error, Modifier.padding(12.dp)) }
             if (state.message.isNotBlank()) Text(state.message, color = MaterialTheme.colorScheme.primary)
             if (state.user == null) {
                 Text("Nanyee 平台账号", style = MaterialTheme.typography.titleLarge)
@@ -80,7 +84,7 @@ internal fun CabinToolsScreen(school: SchoolState, state: CabinState = viewModel
                 }
                 state.credentials.forEach { credential ->
                     Card(Modifier.fillMaxWidth()) {
-                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(credential["metadata"]?.obj()?.text("account_hint").orEmpty().ifBlank { "已托管的学校账号" })
                             if (state.selectedCredential == credential.text("id")) Text("当前使用", color = MaterialTheme.colorScheme.primary)
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -95,7 +99,7 @@ internal fun CabinToolsScreen(school: SchoolState, state: CabinState = viewModel
                 OutlinedButton(onClick = { state.editCredential() }, enabled = !state.busy && state.pending == null) { Text("添加托管凭据") }
                 if (state.credentialEditor) {
                     Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
-                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Text(if (state.editingId == null) "同意托管学校密码" else "更新托管学校密码", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                             if (state.editingId != null) {
                                 Text(state.credentials.firstOrNull { it.text("id") == state.editingId }?.get("metadata")?.obj()?.text("account_hint").orEmpty().ifBlank { "已托管的学校账号" })
@@ -138,7 +142,7 @@ internal fun CabinToolsScreen(school: SchoolState, state: CabinState = viewModel
                 if (state.jobs.isEmpty()) Text(if (evaluationMode) "还没有自动评课任务。" else "还没有学习舱预约。")
                 state.jobs.forEach { job ->
                     Card(Modifier.fillMaxWidth()) {
-                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Text(cabinStatus(job.text("state"), job.text("tool_id")), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                             val payload = job["payload"]?.obj() ?: JsonObject(emptyMap())
                             if (!evaluationMode) Text(payload.text("title"))
@@ -220,7 +224,7 @@ private fun CabinBookingForm(state: CabinState) {
 }
 
 @Composable
-private fun CabinField(label: String, value: String, onChange: (String) -> Unit, enabled: Boolean, password: Boolean = false) {
+internal fun CabinField(label: String, value: String, onChange: (String) -> Unit, enabled: Boolean, password: Boolean = false) {
     OutlinedTextField(value = value, onValueChange = onChange, label = { Text(label) }, enabled = enabled, singleLine = true, modifier = Modifier.fillMaxWidth(), visualTransformation = if (password) PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None, keyboardOptions = KeyboardOptions(keyboardType = if (password) KeyboardType.Password else KeyboardType.Text, autoCorrectEnabled = false))
 }
 

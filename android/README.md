@@ -17,6 +17,16 @@ Debug APK 使用 Android 默认开发密钥签名，可直接安装。发布正�
 
 本环境 SDK 安装于 `/home/ubuntu/android-sdk`。建议将 JDK、SDK 和模拟器安装步骤加入环境 blueprint，以便后续会话复用。
 
+## 我的 · Nanyee 账号
+
+“我的”同时保留学校账号区域，平台账号无需学校登录。Nanyee 登录、退出、资料、邮箱绑定/换绑/解绑、密码找回、托管凭据维护、任务与回执、站内提醒使用与自习舱/自动评课相同的加密 Cookie 和共享客户端；注册只链接网站。凭据新增仍走工具中的托管同意流程；不提供账号删除、昵称修改或停止其他评课账号。
+
+每次平台写请求（包括发送验证码、登录、查看秘密）均先确认。服务器要求 Turnstile 时显示“请在网页完成验证”及网站入口，不尝试绕过；401 清空账号视图并回到登录。邮箱解绑与网站一致：验证当前密码，不额外发送验证码。密码重置成功提示所有平台会话退出。提醒仅对服务端允许关闭的条目在本机记忆关闭状态。
+
+密码、验证码、新的托管秘密、确认请求与查看明文均不写入 SavedState 或磁盘；离开页面/进入后台时清空，明文窗口禁止系统截图。旋转保留 ViewModel，进程恢复仅恢复路由、任务编号与非明文验证码挑战；秘密必须重新输入、重新确认。演示独立使用内存后端，提供成功、空列表、失败、会话过期与网页验证场景，演示验证码为 `123456`。
+
+`PlatformAccountLiveListingTest` 仅在 `NANYEE_PLATFORM_USERNAME` / `NANYEE_PLATFORM_PASSWORD` 同时存在时运行：只允许平台登录及 GET me/credentials/jobs/notices，不查看秘密、不提交业务写入、不注销服务器会话，只输出数量或通过/失败。退出测试仅清理内存 Cookie。
+
 ## 使用与隐私
 
 - 默认由手机直连学校 `uis.smu.edu.cn` / `zhjw.smu.edu.cn`，不经过 Nanyee 服务器。旧 `SchoolApi` 保留为独立数据源，界面和缓存模型不变。
@@ -25,7 +35,7 @@ Debug APK 使用 Android 默认开发密钥签名，可直接安装。发布正�
 - 学校会话、Cookie、验证码、成绩仅在内存中保存。成功加载的课表、学期列表与更新时间使用独立的 EncryptedSharedPreferences 加密保存；重启直接查看本机课表，不代表已经登录。已加载过的学期可离线切换，未缓存的学期、刷新和成绩需要重新登录。
 - 我的 → “退出并清除本机课表”会删除课表缓存，不删除已选择记住的凭据。会话过期时仍可查看缓存；加密存储损坏时会提示重新登录，不会阻止启动。
 - 课表从学校周课表接口读取，校历使用学校 `getDatesOfWeek` 第一周的周一日期；学校校历不可用时明确提示手动选周，不猜测开学日期。直连会话和验证码流程分别在本机最多保留 30 分钟、5 分钟（不代表学校保证的有效期）。按北京时间每天及返回前台重新计算本周，手动选周保持不变，可点“回到本周”。演示模式使用当前周周一作为明确标注的示例校历。
-- 底部导航为“今天 / 课表 / 成绩 / 工具 / 我的”（横屏使用侧栏）。“今天”是已有课表后的默认首页，按实际日期而非手动选中的周次展示当前课、下一课倒计时、当天其他课程、下一有课日预览及更新时间；支持缓存与演示。每分钟和回到前台更新时间，跨日自动刷新；缺少校历、课时不明或学期外均明确提示，不编造时间。
+- 底部导航为“课表 / 课堂 / 评课 / 工具 / 我的”（横屏使用侧栏），默认打开课表。课堂右上角切换学习通 / 雨课堂，平台选择保存在本机；切换平台、标签及旋转时分别保留可恢复的界面状态。评课独立提供服务器自动评课与本机手动评课；工具包含成绩、自习舱预约、抢课。课堂、评课与工具入口不依赖学校登录；成绩仍需学校会话，不使用课表缓存伪造学业数据。
 - 课程网格左右滑动切换一周，始终保留七列；也可使用周次下拉框。资源参考说明见 [WAKEUP-NOTES.md](WAKEUP-NOTES.md)。
 - “记住学号和密码”使用 Android Keystore 支持的 EncryptedSharedPreferences。取消勾选立即删除；不备份应用数据。
 - 仅学期总周数作为普通偏好保存（1–30，默认 20）。
@@ -44,7 +54,7 @@ Debug APK 使用 Android 默认开发密钥签名，可直接安装。发布正�
 
 ## 课程评价
 
-- 工具 → 课程评价提供两个独立模式：自动评课沿用 Nanyee 平台登录与明确托管同意（`academic` / `evaluation`），手动一键则完全直连学校、复用内存会话与静默登录，不使用 Nanyee 服务器。
+- 评课提供两个独立模式：自动评课沿用 Nanyee 平台登录与明确托管同意（`academic` / `evaluation`），手动一键则完全直连学校、复用内存会话与静默登录，不使用 Nanyee 服务器。
 - 自动模式按 `evaluation:submit:v1` 确认，固定 `legacy_positive_random`，每轮 1–60 门，可选带时区的未来截止时间。未填时服务器默认运行 180 天；每日运行窗口由服务器配置。展示状态、下次运行、最近一轮日志/收据，识别 HTTP 200 + `X-Job-Deduplicated`，支持确认取消；凭据失效通知可进入更新表单。
 - 手动模式仅查询今天与昨天的待评课程，可全选/多选，加载表单并预览固定答案，二次明确确认后逐门提交。首个上游错误立即停止，结果未知不自动重放；再次操作前须只读刷新核验。无课程时提示可能尚未开放或已评完。
 - 学校端仅移植 `client.py` / `evaluation.py` 中的 `xsktpjData`、`showXsktpjwj.page`、`savePj`，不探测其他端点。策略与星级计分/星串答案按 Python 实现移植。演示模式的两条流程都用内存假后端，不联网、不提交真实评价。
@@ -85,7 +95,7 @@ emulator -avd nanyee
 
 ## 学习通 · 第一期
 
-工具 → 学习通独立直连超星，不共享教务 UIS/zhjw 或 Nanyee 平台的会话。支持密码登录、二维码授权登录、课程和活动只读列表，以及仅当前本人账号的普通、拍照、签到码、手势、二维码和真实位置签到。拍照支持系统相机及相册；确认后才向 pan-yz 上传并提交签到。扫码使用 Apache-2.0 的 ZXing Android Embedded（无 Play Services）。每次提交前均显示课程、活动、当前账号和相关输入的确认摘要；拼图需要用户手动移动，不含自动解题器。要求人脸检查的活动直接显示不支持。
+课堂 → 学习通独立直连超星，不共享教务 UIS/zhjw 或 Nanyee 平台的会话。支持密码登录、二维码授权登录、课程和活动只读列表，以及仅当前本人账号的普通、拍照、签到码、手势、二维码和真实位置签到。拍照支持系统相机及相册；确认后才向 pan-yz 上传并提交签到。扫码使用 Apache-2.0 的 ZXing Android Embedded（无 Play Services）。每次提交前均显示课程、活动、当前账号和相关输入的确认摘要；拼图需要用户手动移动，不含自动解题器。要求人脸检查的活动直接显示不支持。
 
 凭据仅在用户选择保存时存入独立 EncryptedSharedPreferences；Cookie 始终加密持久化。过期后的只读操作可用保存的密码重新登录，任何签到写入均不自动重放。没有保存密码的二维码会话过期后需要再次授权。退出登录清除学习通凭据、Cookie、草稿和照片。旋转使用保留 ViewModel；进程重建恢复加密的课程/活动及输入草稿，但不恢复提交动作、验证码、二维码内容或位置。被中断的提交显示“结果未知”，必须先在官方学习通核验。
 
@@ -109,7 +119,7 @@ ANDROID_HOME=/home/ubuntu/android-sdk ./gradlew testDebugUnitTest --tests 'de.na
 
 ## 雨课堂 · 第三期
 
-工具 → 雨课堂使用独立的 `rain_classroom_private` 加密存储，不共享学校或学习通凭据。支持 www / pro / changjiang / huanghe 四个官方服务器；Cookie、当前身份和待核验标记按服务器隔离，即使 Cookie 声明 `.yuketang.cn` 也不会跨服务器发送。扫码登录使用官方 pre-info 的 qrContent/token 和 login 长轮询；仅在页面可见且 RESUMED 时等待授权。已授权 Cookie 加密保留，过期需重新扫码。**密码登录未移植**：参考客户端需要腾讯验证码 ticket/rand，本期未集成腾讯 SDK 或验证码 WebView，不绕过验证码；也未实现短信或微信 OAuth。
+课堂 → 雨课堂使用独立的 `rain_classroom_private` 加密存储，不共享学校或学习通凭据。支持 www / pro / changjiang / huanghe 四个官方服务器；Cookie、当前身份和待核验标记按服务器隔离，即使 Cookie 声明 `.yuketang.cn` 也不会跨服务器发送。扫码登录使用官方 pre-info 的 qrContent/token 和 login 长轮询；仅在页面可见且 RESUMED 时等待授权。已授权 Cookie 加密保留，过期需重新扫码。**密码登录未移植**：参考客户端需要腾讯验证码 ticket/rand，本期未集成腾讯 SDK 或验证码 WebView，不绕过验证码；也未实现短信或微信 OAuth。
 
 课程列表只读；开课列表在课程页前台每 3 秒检查，离开或后台立即取消，读取失败暂停并要求手动刷新。不会自动签到。课堂签到会带 `joinIfNotIn: true`，确认摘要明确可能加入课堂。相机扫码只接受当前服务器的 HTTPS 课堂码，不接受任意网址、其他服务器或自定义 URL scheme；先确认提交 scan，再单独确认 checkin，不串联自动写入。
 
@@ -122,6 +132,23 @@ ANDROID_HOME=/home/ubuntu/android-sdk ./gradlew testDebugUnitTest --tests 'de.na
 旋转保留独立 ViewModel；进程重建只恢复服务器、加密 Cookie、待核验标记和本人手写草稿，不持久化课堂 Bearer/lessonToken、位置、二维码或确认动作。进程重建后重新打开课堂仍需确认 checkin，然后可恢复该课堂的手写草稿。退出清除所有雨课堂服务器的本机凭据、Cookie、草稿，不影响学校或学习通。
 
 离线演示覆盖扫码授权、课程/空列表、开课检查、两步扫码加入、课堂签到、真实定位、课件/图片、直播、手动作答及重试、相册的成功、失败与未知结果；演示无网络，相册保存仍会真实写入本机且需确认。新增请求、解析、会话隔离、手写答案、防重放与可见性测试。**本期仅运行离线测试和构建，没有真实雨课堂凭据或请求**；线上兼容性、相机、定位、MediaStore、WebSocket 实际服务及设备旋转/进程重建均未验证。
+
+### 安装包与 release 验证
+
+安装包使用 `assembleRelease`：R8 压缩代码、移除未使用资源，保留 ONNX Runtime 的 JNI 类及序列化、OkHttp 公共后缀表、Tink protobuf 所需的反射入口；依赖自带的 consumer rules 也会合并。所有现有运行时依赖均有实际调用；体积最大的 Material 扩展图标库只保留用到的图标，ONNX Runtime 用于本机验证码识别，均非无用依赖。
+
+默认 release 只带 `arm64-v8a,armeabi-v7a`，debug 的 ABI、调试和测试设置不变。可用 `-PreleaseAbis=x86_64` 构建模拟器验证包，或 `-PreleaseAbis=arm64-v8a` 比较单 ABI 体积；这些覆盖项只作用于 release。release 使用本机 debug keystore 签名，方便直接安装，**不是正式商店发布签名**，不同机器的 debug key 可能不同。不要用它替代正式发布密钥。
+
+```sh
+ANDROID_HOME=/home/ubuntu/android-sdk ./gradlew assembleRelease --no-daemon --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process
+# 另行构建 x86_64 release，再安装到模拟器（同样启用 R8/resource shrinking）
+ANDROID_HOME=/home/ubuntu/android-sdk ./gradlew assembleRelease -PreleaseAbis=x86_64 --no-daemon --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process
+adb install -r app/build/outputs/apk/release/app-release.apk
+mkdir -p "$HOME/out/nanyee-release-smoke"
+ANDROID_HOME=/home/ubuntu/android-sdk bash release-smoke/run.sh "$HOME/out/nanyee-release-smoke"
+```
+
+独立 smoke instrumentation APK 使用同一个 debug key，不放入应用，也不添加测试框架依赖；通过已安装 release 应用的 ClassLoader 反射调用保留后的 ONNX API，打开其真实 `captcha_model.onnx`，执行 `[1,1,28,80]` 离线输入并验证 `[1,4,10]` 有限输出，再启动 MainActivity。不读取账号、不请求网络端点，不验证真实验证码识别准确率；应用自身已有的登录页可能按原行为刷新公开验证码。之后可卸载 `de.nanyee.smoke`。界面验证仍需单独截图，不能用此 smoke 代替。
 
 ### Android 许可与来源
 

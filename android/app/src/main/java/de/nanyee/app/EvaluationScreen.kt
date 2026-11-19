@@ -4,6 +4,14 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.FactCheck
+import androidx.compose.material.icons.outlined.Assessment
+import androidx.compose.material.icons.outlined.Bolt
+import androidx.compose.material.icons.outlined.CloudQueue
+import androidx.compose.material.icons.outlined.EventSeat
+import androidx.compose.material.icons.outlined.RateReview
+import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -11,45 +19,47 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.serialization.json.JsonObject
 
 @Composable
-internal fun ToolsScreen(school: SchoolState, evaluation: EvaluationState, grab: CourseGrabState, grabDemo: CourseGrabState) {
-    var route by rememberSaveable { mutableStateOf("") }
-    val back = { route = "" }
-    when (route) {
+internal fun ToolsScreen(school: SchoolState, grab: CourseGrabState, grabDemo: CourseGrabState, onGrade: (JsonObject) -> Unit) {
+    val back = { if (school.canReturnToCache) school.returnToCache(); school.closeTool(); school.selectTab(MainTab.TOOLS) }
+    when (school.toolsRoute) {
         "cabin" -> CabinToolsScreen(school, onBack = back)
-        "automatic" -> CabinToolsScreen(school, state = viewModel(key = "evaluation-platform"), evaluationMode = true, onBack = { route = "evaluation" })
-        "manual" -> ManualEvaluationScreen(school, evaluation, onBack = { route = "evaluation" })
         "grab" -> CourseGrabScreen(school, grab, grabDemo, onBack = back)
-        "xuexitong" -> XxtToolsScreen(onBack = back)
-        "rain" -> RainToolsScreen(onBack = back)
-        else -> {
-            BackHandler(route.isNotEmpty()) { route = "" }
-            Column(Modifier.widthIn(max = 720.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                if (route.isNotEmpty()) TextButton(onClick = back) { Text("返回工具") }
-                Text(if (route == "evaluation") "课程评价" else "校园工具", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                if (route == "evaluation") {
-                    ToolCard("自动评课 · 服务器", "明确同意托管学校凭据后，由 Nanyee 每天无人值守运行。", { route = "automatic" })
-                    ToolCard("手动一键 · 本机", "直连学校，只读加载、选择课程、预览答案；确认后逐门提交。不使用 Nanyee 服务器。", { route = "manual" })
-                } else {
-                    Text("按需开启，让日常更从容。")
-                    ToolCard("学习舱预约", "选择舱位优先级，交给服务器按时尝试预约。", { route = "cabin" })
-                    ToolCard("课程评价", "服务器自动评课，或本机预览确认后手动一键提交。", { route = "evaluation" })
-                    ToolCard("抢课", "学校直连，本机按志愿顺序尝试；请保持 App 前台运行。", { route = "grab" })
-                    ToolCard("学习通", "独立账号、课程与活动；确认后仅为本人签到，也可离线体验演示。", { route = "xuexitong" })
-                    ToolCard("雨课堂", "独立扫码登录、当前课堂、课件与手动作答；每次写入均需确认。", { route = "rain" })
-                }
+        "grades" -> {
+            BackHandler(onBack = back)
+            Column(Modifier.fillMaxSize()) {
+                TextButton(onClick = back) { Text("返回工具") }
+                if (!school.homeVisible) Login(school)
+                else if (school.cachedMode) {
+                    Text("成绩不会缓存在本机，请登录学校系统查看。", Modifier.padding(12.dp))
+                    Button(onClick = school::openGrades, enabled = !school.busy) { Text("登录学校系统查看成绩") }
+                } else Grades(school, onGrade)
             }
+        }
+        else -> Column(Modifier.widthIn(max = 720.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            SectionHeading("校园工具", "按需开启，让日常更从容。", Icons.Outlined.Widgets)
+            CompactEntry("成绩", "学校直连 · 成绩、绩点与排名", Icons.Outlined.Assessment, SectionAccent.ACADEMIC, onClick = school::openGrades)
+            CompactEntry("自习舱预约", "服务器按舱位优先级定时尝试预约", Icons.Outlined.EventSeat, SectionAccent.BRAND, onClick = { school.openTool("cabin") })
+            CompactEntry("抢课", "学校直连 · 按志愿顺序在本机尝试", Icons.Outlined.Bolt, SectionAccent.SERVICE, onClick = { school.openTool("grab") })
         }
     }
 }
 
 @Composable
-private fun ToolCard(title: String, description: String, onClick: () -> Unit) {
-    Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Text(description)
+internal fun EvaluationToolsScreen(school: SchoolState, evaluation: EvaluationState) {
+    var route by rememberSaveable { mutableStateOf("") }
+    val back = { route = "" }
+    when (route) {
+        "automatic" -> CabinToolsScreen(school, state = viewModel(key = "evaluation-platform"), evaluationMode = true, onBack = back)
+        "manual" -> ManualEvaluationScreen(school, evaluation, onBack = back)
+        else -> {
+            Column(Modifier.widthIn(max = 720.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                SectionHeading("课程评价", "本机直连或服务器托管，按需选择。", Icons.Outlined.RateReview, SectionAccent.ACADEMIC)
+                CompactEntry("自动评课 · 服务器", "同意托管学校凭据后，每天自动运行", Icons.Outlined.CloudQueue, SectionAccent.BRAND, onClick = { route = "automatic" })
+                CompactEntry("手动一键 · 本机", "学校直连 · 选择、预览、确认后逐门提交", Icons.AutoMirrored.Outlined.FactCheck, SectionAccent.ACADEMIC, onClick = { route = "manual" })
+            }
         }
     }
 }
@@ -63,7 +73,7 @@ private fun ManualEvaluationScreen(school: SchoolState, evaluation: EvaluationSt
     val demoState: EvaluationState = viewModel(key = "manual-evaluation-demo")
     val state = if (demo) demoState else evaluation
     BackHandler(!state.busy) { state.run.dismiss(); onBack() }
-    Column(Modifier.widthIn(max = 720.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.widthIn(max = 720.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         TextButton(onClick = { state.run.dismiss(); onBack() }, enabled = !state.busy) { Text("返回课程评价") }
         Text("手动一键评课", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Text(if (demo) "演示模式 · 不联网，不会提交真实评价。" else "学校直连 · 不托管密码，不使用 Nanyee 服务器。只读加载不会提交评价。")
@@ -91,7 +101,7 @@ private fun ManualEvaluationScreen(school: SchoolState, evaluation: EvaluationSt
         }
         state.run.preview.forEach { value ->
             Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(value.draft.reference.courseName, fontWeight = FontWeight.Bold)
                     value.draft.questions.forEach { question ->
                         val chosen = question.options.first { it.code == value.selections[question.indicator] }
