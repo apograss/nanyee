@@ -147,6 +147,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
             if (submittedRemember && remember) secure.edit().putString("account", submittedAccount).putString("password", submittedPassword).apply()
             password = ""; captchaText = ""; loggedIn = true; demo = false; tab = 0
             saved["hadSession"] = true; saved["demo"] = false
+            resetTimetableSelection()
         } catch (e: Exception) {
             if (e is CancellationException) throw e
             runCatching { fetchCaptcha() }
@@ -183,9 +184,13 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         hint = "已取消登录，请输入新验证码"
         launch(silent = true) { fetchCaptcha() }
     }
+    private fun resetTimetableSelection() {
+        userPickedWeek = false; saved["userPickedWeek"] = false; week = 1; semester = ""
+    }
     fun logout() {
         val wasDemo = demo
         clearRequests()
+        resetTimetableSelection()
         saved["demo"] = false; saved["hadSession"] = false
         session = ""; expires = ""; loggedIn = false; demo = false; courses = emptyList(); grades = null; semesters = emptyList(); semester = ""; gradesLoading = false; error = ""
         if (!wasDemo) { password = ""; captcha = null; captchaText = ""; api.clear(); launch(silent = true) { fetchCaptcha() } } else if (captcha == null) launch(silent = true) { fetchCaptcha() } else checkCaptcha()
@@ -194,7 +199,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         if (loginInFlight) { captcha = null; captchaText = "" }
         clearRequests()
         saved["demo"] = true; saved["hadSession"] = false
-        userPickedWeek = false; saved["userPickedWeek"] = false
+        resetTimetableSelection()
         session = ""; expires = ""; demo = true; loggedIn = true; tab = 0; error = ""; week = 1
         semesters = listOf(payload("code" to "202501", "label" to "2025-2026-1"), payload("code" to "202402", "label" to "2024-2025-2")); semester = "202501"
         courses = demoCourses(semester)
