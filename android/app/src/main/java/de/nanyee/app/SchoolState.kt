@@ -20,7 +20,13 @@ import java.util.UUID
 class SchoolState(app: Application, private val saved: SavedStateHandle) : AndroidViewModel(app) {
     private val api = SchoolApi()
     private val prefs = app.getSharedPreferences("preferences", 0)
-    private val timetableCache by lazy { TimetableCacheStore(EncryptedTimetableStorage(app)) }
+    private val timetableCache = RevocableTimetableCache(
+        { TimetableCacheStore(EncryptedTimetableStorage(app)) },
+        object : CacheRevocation {
+            override fun isRevoked() = prefs.getBoolean("timetableCacheRevoked", false)
+            override fun setRevoked(value: Boolean) { check(prefs.edit().putBoolean("timetableCacheRevoked", value).commit()) { "无法保存课表撤销标记" } }
+        }
+    )
     private var cachedTimetables by mutableStateOf<TimetableSnapshot?>(null)
     private var liveOwner = ""
     private var loginDestination by mutableStateOf<Int?>(null)
@@ -44,6 +50,8 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
     var loggedIn by mutableStateOf(false)
     var demo by mutableStateOf(false)
     var cachedMode by mutableStateOf(false)
+        private set
+    var cacheRevocationFailed by mutableStateOf(false)
         private set
     val homeVisible get() = loggedIn || cachedMode
     val canReturnToCache get() = !homeVisible && loginDestination != null
@@ -90,6 +98,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         private set
 
     init {
+        runCatching { timetableCache.retryRevokedDeletion() }
         if (remember) runCatching { if (secure.getString("account", "") == account.trim()) password = secure.getString("password", "") ?: "" }
         if (saved.get<Boolean>("demo") == true) {
             val restoreTab = tab
@@ -304,9 +313,14 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         if (returnView != null && restoreCachedTimetable(returnView)) return
         if (!wasDemo) {
             password = ""; captcha = null; captchaText = ""; api.clear()
-            val cacheCleared = runCatching { timetableCache.clear() }.isSuccess
+            val deletion = runCatching { timetableCache.clear() }
+            cacheRevocationFailed = deletion.isFailure
+            if (cacheRevocationFailed) {
+                error = "学校会话已退出，但无法保存课表撤销标记。请重试退出；如仍失败，请在系统设置中清除应用数据。"
+                return
+            }
             launch(silent = true) { fetchCaptcha() }
-            if (!cacheCleared) error = "学校会话已退出，但本机课表未能清除，重启后仍可能显示。请在系统设置中清除应用数据。"
+            if (deletion.getOrThrow() == false) error = "学校会话已退出，本机课表已撤销；暂未完成物理删除，将在下次启动时重试。"
         } else if (captcha == null) launch(silent = true) { fetchCaptcha() } else checkCaptcha()
     }
     fun startDemo() {

@@ -68,6 +68,41 @@ internal class TimetableCacheStore(private val storage: TimetableCacheStorage) {
     fun clear() = storage.write(null)
 }
 
+internal interface CacheRevocation {
+    fun isRevoked(): Boolean
+    fun setRevoked(value: Boolean)
+}
+
+internal class RevocableTimetableCache(private val store: () -> TimetableCacheStore, private val revocation: CacheRevocation) {
+    private var revokedInMemory = false
+
+    fun retryRevokedDeletion(): Boolean {
+        if (!revokedInMemory && !revocation.isRevoked()) return true
+        revokedInMemory = true
+        return runCatching {
+            store().clear()
+            revocation.setRevoked(false)
+            revokedInMemory = false
+        }.isSuccess
+    }
+
+    fun load(): TimetableSnapshot? {
+        if (revokedInMemory || revocation.isRevoked()) { retryRevokedDeletion(); return null }
+        return store().load()
+    }
+
+    fun save(value: TimetableSnapshot) {
+        check(retryRevokedDeletion()) { "本机课表撤销尚未完成" }
+        store().save(value)
+    }
+
+    fun clear(): Boolean {
+        revokedInMemory = true
+        revocation.setRevoked(true)
+        return retryRevokedDeletion()
+    }
+}
+
 internal class EncryptedTimetableStorage(context: Context) : TimetableCacheStorage {
     private val preferences = EncryptedSharedPreferences.create(
         context, "school_timetable", MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),

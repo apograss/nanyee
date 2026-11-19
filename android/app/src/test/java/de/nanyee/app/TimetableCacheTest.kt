@@ -5,6 +5,60 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class TimetableCacheTest {
+    private class Revocation : CacheRevocation {
+        var revoked = false
+        var failWrite = false
+        override fun isRevoked() = revoked
+        override fun setRevoked(value: Boolean) { check(!failWrite); revoked = value }
+    }
+
+    @Test fun failedDeletionRemainsRevokedAcrossRestartAndRetriesWithoutReading() {
+        val flag = Revocation()
+        var failDelete = true
+        var reads = 0
+        var deletes = 0
+        val storage = object : TimetableCacheStorage {
+            override fun read(): String? { reads++; return TimetableCacheCodec.encode(snapshot()) }
+            override fun write(value: String?) { assertTrue(flag.revoked); deletes++; check(!failDelete) }
+        }
+        fun cache() = RevocableTimetableCache({ TimetableCacheStore(storage) }, flag)
+        assertFalse(cache().clear())
+        assertTrue(flag.revoked)
+        val restarted = cache()
+        assertNull(restarted.load())
+        assertTrue(flag.revoked)
+        assertEquals(0, reads)
+        failDelete = false
+        assertNull(restarted.load())
+        assertFalse(flag.revoked)
+        assertEquals(3, deletes)
+        assertEquals(0, reads)
+    }
+
+    @Test fun flagWriteFailureIsReportedBeforeAnyDeletion() {
+        val flag = Revocation().apply { failWrite = true }
+        var deletions = 0
+        val cache = RevocableTimetableCache({ TimetableCacheStore(object : TimetableCacheStorage {
+            override fun read(): String? = error("must not read revoked cache")
+            override fun write(value: String?) { deletions++ }
+        }) }, flag)
+        assertTrue(runCatching { cache.clear() }.isFailure)
+        assertEquals(0, deletions)
+        assertNull(cache.load())
+    }
+
+    @Test fun successfulRevocationDeletesCacheAndAllowsNewSnapshots() {
+        val storage = MemoryStorage()
+        val flag = Revocation()
+        val cache = RevocableTimetableCache({ TimetableCacheStore(storage) }, flag)
+        cache.save(snapshot())
+        assertEquals(snapshot(), cache.load())
+        assertTrue(cache.clear())
+        assertNull(cache.load())
+        assertFalse(flag.revoked)
+        cache.save(snapshot())
+        assertEquals(snapshot(), cache.load())
+    }
     @Test fun restoresViewedSemesterAndWeekInsteadOfLastDownload() {
         val value = snapshot()
         val viewed = CachedTimetableView("202502", 7, true)

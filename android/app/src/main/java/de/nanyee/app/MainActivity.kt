@@ -86,6 +86,11 @@ fun Nanyee(state: SchoolState) {
             if (state.demo && !landscape) Surface(color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.fillMaxWidth()) { Text("演示模式 · 以下为示例数据，并非真实学业记录", Modifier.padding(horizontal = 20.dp, vertical = 8.dp), style = MaterialTheme.typography.labelMedium) }
             if (state.homeVisible && state.error.isNotEmpty()) ErrorCard(state)
             when {
+                state.cacheRevocationFailed -> Column(Modifier.padding(24.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Text("本机课表尚未安全清除", style = MaterialTheme.typography.titleLarge)
+                    Text(state.error)
+                    Button(onClick = { state.logout() }) { Text("重试退出并清除课表") }
+                }
                 !state.homeVisible -> Login(state)
                 state.tab == 0 -> Timetable(state) { detailKind = "course"; detailIndex = state.courses.indexOf(it); detailDataIdentity = state.courseDataIdentity }
                 state.tab == 1 -> Grades(state) { detailKind = "grade"; detailIndex = state.grades?.items("grades")?.indexOf(it) ?: -1; detailDataIdentity = state.gradeDataIdentity }
