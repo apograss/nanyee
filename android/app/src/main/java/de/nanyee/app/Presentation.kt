@@ -17,6 +17,12 @@ internal fun currentTeachingWeek(semesterStart: String, today: LocalDate, totalW
     return week.takeIf { it in 1..totalWeeks.toLong() }?.toInt()
 }
 
+internal fun weekAfterSwipe(week: Int, totalWeeks: Int, distance: Float, threshold: Float): Int {
+    if (totalWeeks < 1 || !distance.isFinite() || !threshold.isFinite() || threshold <= 0) return week
+    val delta = when { distance <= -threshold -> 1; distance >= threshold -> -1; else -> 0 }
+    return (week + delta).coerceIn(1, totalWeeks)
+}
+
 internal fun semesterStartFromMetadata(metadata: JsonObject, today: LocalDate): String? {
     listOf("semester_monday", "semester_start", "start_date", "startDate").forEach { key ->
         runCatching { LocalDate.parse(metadata.text(key)) }.getOrNull()?.let { return it.toString() }

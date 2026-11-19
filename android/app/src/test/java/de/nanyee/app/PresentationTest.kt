@@ -5,6 +5,17 @@ import org.junit.Test
 import java.time.LocalDate
 
 class PresentationTest {
+    @Test fun horizontalSwipesChangeOneWeekAndRespectBounds() {
+        assertEquals(4, weekAfterSwipe(3, 20, -100f, 64f))
+        assertEquals(2, weekAfterSwipe(3, 20, 100f, 64f))
+        assertEquals(3, weekAfterSwipe(3, 20, 20f, 64f))
+        assertEquals(1, weekAfterSwipe(1, 20, 100f, 64f))
+        assertEquals(20, weekAfterSwipe(20, 20, -100f, 64f))
+        assertEquals(1, weekAfterSwipe(1, 1, -100f, 64f))
+        assertEquals(1, weekAfterSwipe(1, 0, -100f, 64f))
+        assertEquals(3, weekAfterSwipe(3, 20, Float.NaN, 64f))
+        assertEquals(3, weekAfterSwipe(3, 20, -100f, 0f))
+    }
     @Test fun detailsRestoreOnlyForTheSameLoadedList() {
         val items = listOf(payload("name" to "示例课程"))
         assertEquals(items.single(), selectedDetail("list-a", "list-a", 0, items))

@@ -8,6 +8,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.BackHandler
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.*
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -18,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -216,7 +218,18 @@ fun Timetable(state: SchoolState, onCourse: (JsonObject) -> Unit) {
             }
         }
         Spacer(Modifier.height(4.dp))
-        Row(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(Modifier.fillMaxSize().pointerInput(state.semester) {
+            var distance = 0f
+            detectHorizontalDragGestures(
+                onDragStart = { distance = 0f },
+                onDragCancel = { distance = 0f },
+                onHorizontalDrag = { change, amount -> change.consume(); distance += amount },
+                onDragEnd = {
+                    val selected = weekAfterSwipe(state.week, state.totalWeeks, distance, 64.dp.toPx())
+                    if (selected != state.week) state.selectWeek(selected)
+                }
+            )
+        }.verticalScroll(rememberScrollState()).padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
             Column(Modifier.width(36.dp)) {
                 (1..nodes).forEach { node -> Column(Modifier.height(64.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("$node", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
