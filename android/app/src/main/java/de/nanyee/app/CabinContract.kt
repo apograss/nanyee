@@ -8,6 +8,19 @@ import java.time.*
 import java.util.UUID
 
 internal val cabinZone: ZoneId = ZoneId.of("Asia/Shanghai")
+internal const val platformCsrfHeader = "X-CSRF-Token"
+
+internal fun platformUser(value: JsonElement): JsonObject {
+    val response = value as? JsonObject ?: error("平台账号响应格式无效")
+    require(response.text("csrf_header").ifEmpty { platformCsrfHeader } == platformCsrfHeader) { "平台 CSRF 协议不受支持" }
+    return (response["user"] as? JsonObject)?.takeIf { it.isNotEmpty() } ?: error("平台账号响应缺少用户")
+}
+
+internal fun cabinCredentials(value: JsonElement): List<JsonObject> = value.objectList().filter {
+    it.text("purpose") == "study_cabin" && it.text("upstream") == "infospace" && it.text("status") == "active"
+}
+
+internal fun cabinJobs(value: JsonElement): List<JsonObject> = value.objectList().filter { it.text("tool_id") == "study_cabin" }
 
 internal data class CabinDraft(
     val date: String,
@@ -73,7 +86,7 @@ internal fun platformRequest(method: String, path: String, body: JsonObject?, cs
     if (method != "GET") {
         if (path != "/auth/login") {
             check(!csrf.isNullOrEmpty()) { "请重新登录平台账号。" }
-            builder.header("X-CSRF-Token", csrf)
+            builder.header(platformCsrfHeader, csrf)
         }
         if (method == "DELETE") builder.delete() else builder.method(method, (body ?: JsonObject(emptyMap())).toString().toRequestBody("application/json".toMediaType()))
     }
@@ -94,4 +107,4 @@ internal fun cabinNextAction(action: String): String = when (action) {
     else -> "请到 nanyee.de 查看任务并核验预约结果。"
 }
 
-internal fun JsonElement.objectList(): List<JsonObject> = (this as? JsonArray)?.mapNotNull { it as? JsonObject } ?: error("响应格式无效")
+internal fun JsonElement.objectList(): List<JsonObject> = (this as? JsonArray)?.map { it as? JsonObject ?: error("响应列表项格式无效") } ?: error("响应格式无效")

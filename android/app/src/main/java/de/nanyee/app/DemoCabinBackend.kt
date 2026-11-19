@@ -1,6 +1,7 @@
 package de.nanyee.app
 
 import kotlinx.serialization.json.*
+import java.time.Instant
 import java.util.UUID
 
 internal class DemoCabinBackend : PlatformBackend {
@@ -15,18 +16,29 @@ internal class DemoCabinBackend : PlatformBackend {
         if (path == "/auth/login") signedIn = true
         if (!signedIn) throw PlatformFailure(401, "AUTHENTICATION_REQUIRED", "请登录演示平台账号。")
         return when {
-            path == "/auth/login" || path == "/auth/me" -> buildJsonObject { putJsonObject("user") { put("nickname", "演示同学") } }
+            path == "/auth/login" || path == "/auth/me" -> buildJsonObject {
+                put("csrf_header", platformCsrfHeader)
+                putJsonObject("user") {
+                    put("id", "00000000-0000-4000-8000-000000000001"); put("username", "demo"); put("nickname", "演示同学")
+                    put("email", JsonNull); put("email_verified", false); put("role", "student"); put("status", "active"); put("registration_trust_level", "community_quiz")
+                }
+            }
             path == "/auth/logout" -> { clearLocal(); JsonNull }
             path == "/credentials" && method == "GET" -> JsonArray(credentials)
             path == "/credentials" -> {
-                val value = buildJsonObject { put("id", UUID.randomUUID().toString()); put("purpose", "study_cabin"); put("upstream", "infospace"); put("status", "active"); put("metadata", body?.get("metadata") ?: JsonObject(emptyMap())) }
+                val value = buildJsonObject {
+                    put("id", UUID.randomUUID().toString()); put("purpose", "study_cabin"); put("upstream", "infospace"); put("status", "active")
+                    put("expires_at", JsonNull); put("created_at", Instant.now().toString()); put("last_used_at", JsonNull)
+                    put("consent_version", "credential-hosting-v1"); put("metadata", body?.get("metadata") ?: JsonObject(emptyMap()))
+                }
                 credentials.add(value); value
             }
             path.startsWith("/credentials/") -> {
                 val index = credentials.indexOfFirst { it.text("id") == path.split('/')[2] }
                 require(index >= 0)
-                val value = JsonObject(credentials[index] + if (method == "DELETE") mapOf("status" to JsonPrimitive("revoked")) else mapOf("metadata" to (body?.get("metadata") ?: JsonObject(emptyMap()))))
-                credentials[index] = value; value
+                val value = JsonObject(credentials[index] + if (method == "DELETE") mapOf("status" to JsonPrimitive("revoked")) else mapOf("metadata" to (body?.get("metadata") ?: credentials[index]["metadata"]!!)))
+                credentials[index] = value
+                if (method == "DELETE") value else JsonObject(value + ("resumed_job_id" to JsonNull))
             }
             path == "/jobs" && method == "GET" -> JsonArray(jobs)
             path == "/jobs" -> {
@@ -36,13 +48,21 @@ internal class DemoCabinBackend : PlatformBackend {
                     return jobs.first { it.text("id") == result.text("id") }
                 }
                 require(credentials.any { it.text("id") == body.text("credential_id") && it.text("status") == "active" })
-                val value = JsonObject(body + mapOf("id" to JsonPrimitive(UUID.randomUUID().toString()), "state" to JsonPrimitive("queued")))
+                val value = buildJsonObject {
+                    put("id", UUID.randomUUID().toString()); put("tool_id", body["tool_id"]!!); put("operation", body["operation"]!!)
+                    put("state", "queued"); put("payload", body["payload"]!!); put("credential_id", body["credential_id"]!!)
+                    put("scheduled_for", body["scheduled_for"]!!); put("attempt_count", 0); put("max_attempts", 1440)
+                    put("cancel_requested_at", JsonNull); put("receipt", JsonNull); put("error_code", JsonNull); put("next_action", JsonNull)
+                    val now = Instant.now().toString()
+                    put("created_at", now); put("updated_at", now)
+                }
                 jobs.add(0, value); submissions[key] = body to value; value
             }
             path.endsWith("/cancel") -> {
                 val index = jobs.indexOfFirst { it.text("id") == path.split('/')[2] }
                 require(index >= 0)
-                val value = JsonObject(jobs[index] + ("state" to JsonPrimitive("cancelled")))
+                val now = JsonPrimitive(Instant.now().toString())
+                val value = JsonObject(jobs[index] + mapOf("state" to JsonPrimitive("cancelled"), "cancel_requested_at" to now, "updated_at" to now))
                 jobs[index] = value; value
             }
             else -> error("不支持的演示操作")
@@ -53,10 +73,17 @@ internal class DemoCabinBackend : PlatformBackend {
         require(index >= 0)
         val job = jobs[index]
         val request = job["payload"]?.obj() ?: JsonObject(emptyMap())
+        val cabinId = request["cabin_ids"]!!.jsonArray.first().jsonPrimitive.int
+        val cabin = cabins.objectList().first { it.number("dev_id") == cabinId }
         val receipt = buildJsonObject {
-            put("room_name", "演示学习舱"); put("target_date", request.text("target_date"))
+            put("dev_id", cabinId); put("room_name", cabin.text("name")); put("target_date", request.text("target_date"))
             put("start_time", request.text("start_time")); put("end_time", request.text("end_time"))
         }
-        jobs[index] = JsonObject(job + mapOf("state" to JsonPrimitive(state), "receipt" to if (state == "succeeded") receipt else JsonNull, "next_action" to if (state == "verification_required") JsonPrimitive("verify_upstream") else JsonNull))
+        jobs[index] = JsonObject(job + mapOf(
+            "state" to JsonPrimitive(state), "receipt" to if (state == "succeeded") receipt else JsonNull,
+            "next_action" to if (state == "verification_required") JsonPrimitive("verify_upstream") else JsonNull,
+            "error_code" to when (state) { "verification_required" -> JsonPrimitive("RESULT_UNKNOWN"); "failed" -> JsonPrimitive("ATTEMPT_WINDOW_EXPIRED"); else -> JsonNull },
+            "attempt_count" to JsonPrimitive(job.number("attempt_count") + 1), "updated_at" to JsonPrimitive(Instant.now().toString())
+        ))
     }
 }

@@ -56,7 +56,7 @@ internal class CabinState(app: Application) : AndroidViewModel(app) {
         if (initialized && demo == demoMode) return
         generation++; work?.cancel(); busy = false; clearSensitive(); backend = null; username = ""
         demo = demoMode; initialized = true; draft = cabinDefaults(); error = ""; message = ""
-        run { user = api().call("GET", "/auth/me").obj()["user"]?.obj(); load() }
+        run { user = platformUser(api().call("GET", "/auth/me")); load() }
     }
 
     private fun clearSensitive() {
@@ -70,7 +70,7 @@ internal class CabinState(app: Application) : AndroidViewModel(app) {
         if (username.length !in 2..24 || platformPassword.length !in 1..128) { error = "平台用户名为 2–24 字符，密码为 1–128 字符。"; return }
         val body = payload("username" to username, "password" to platformPassword)
         platformPassword = ""
-        run { user = api().call("POST", "/auth/login", body).obj()["user"]?.obj(); load() }
+        run { user = platformUser(api().call("POST", "/auth/login", body)); load() }
     }
 
     fun logout() = run {
@@ -82,13 +82,13 @@ internal class CabinState(app: Application) : AndroidViewModel(app) {
     }
 
     private suspend fun load() {
-        credentials = api().call("GET", "/credentials").objectList().filter { it.text("purpose") == "study_cabin" && it.text("upstream") == "infospace" && it.text("status") == "active" }
+        credentials = cabinCredentials(api().call("GET", "/credentials"))
         if (credentials.none { it.text("id") == selectedCredential }) selectedCredential = credentials.firstOrNull()?.text("id").orEmpty()
         cabins = api().call("GET", "/study-cabin/cabins").objectList()
-        jobs = api().call("GET", "/jobs").objectList().filter { it.text("tool_id") == "study_cabin" }
+        jobs = cabinJobs(api().call("GET", "/jobs"))
     }
 
-    fun refresh() = run { user = api().call("GET", "/auth/me").obj()["user"]?.obj(); load() }
+    fun refresh() = run { user = platformUser(api().call("GET", "/auth/me")); load() }
 
     fun editCredential(id: String? = null) {
         if (busy || pending != null) return
