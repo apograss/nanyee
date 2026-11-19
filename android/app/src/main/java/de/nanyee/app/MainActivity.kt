@@ -161,9 +161,11 @@ fun Timetable(state: SchoolState, onCourse: (JsonObject) -> Unit) {
                     Text("周${"一二三四五六日"[day - 1]}", fontSize = 11.sp, fontWeight = if (day == today) FontWeight.Bold else FontWeight.Normal, color = if (day == today) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Spacer(Modifier.height(4.dp))
-                Box(Modifier.fillMaxWidth().height((nodes * 64).dp)) {
-                    active.filter { it.number("weekday") == day }.forEach { course ->
-                        Surface(onClick = { onCourse(course) }, color = colors[state.courses.indexOf(course).coerceAtLeast(0) % colors.size], shape = RoundedCornerShape(8.dp), modifier = Modifier.offset(y = ((course.number("start_node") - 1) * 64).dp).fillMaxWidth().height(((course.number("end_node") - course.number("start_node") + 1) * 64 - 4).dp)) {
+                BoxWithConstraints(Modifier.fillMaxWidth().height((nodes * 64).dp)) {
+                    layoutCourses(active.filter { it.number("weekday") == day }).forEach { placement ->
+                        val course = placement.course
+                        val laneWidth = maxWidth / placement.laneCount
+                        Surface(onClick = { onCourse(course) }, color = colors[state.courses.indexOf(course).coerceAtLeast(0) % colors.size], shape = RoundedCornerShape(8.dp), modifier = Modifier.offset(x = laneWidth * placement.lane, y = ((course.number("start_node") - 1) * 64).dp).width(laneWidth).padding(end = if (placement.laneCount > 1) 1.dp else 0.dp).height(((course.number("end_node") - course.number("start_node") + 1) * 64 - 4).dp)) {
                             Column(Modifier.padding(horizontal = 3.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text(course.text("name"), fontWeight = FontWeight.Bold, fontSize = 11.sp, lineHeight = 15.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
                                 Text(course.text("location"), fontSize = 9.sp, lineHeight = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
