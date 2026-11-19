@@ -147,9 +147,13 @@ internal class XxtState(app: Application, private val savedState: SavedStateHand
         else classroomPage = read { api().classroom(requireNotNull(course), selected, requireNotNull(user)) }
     }
     private fun resetSign() {
+        discardPhoto()
         monitorPick(false); pickTracker = XxtPickTracker(); pickAlert = false; pickMessage = "等待前台监测…"
         classroomFlow = XxtClassFlow(); classroomPage = null; classroomDraft = XxtClassDraft(); classroomConfirmation = null; classroomResult = null
-        flow = XxtFlow(); confirmation = null; captcha = null; code = ""; qr = ""; position = null; photoPath = ""; validateToken = ""; message = if (pendingWrite) "结果未知，请先在官方学习通核验；不会自动重试。" else ""
+        flow = XxtFlow(); confirmation = null; captcha = null; code = ""; qr = ""; position = null; validateToken = ""; message = if (pendingWrite) "结果未知，请先在官方学习通核验；不会自动重试。" else ""
+    }
+    private fun discardPhoto() {
+        if (photoPath.isNotBlank()) photoPath = xxtDiscardPhoto(photoPath, getApplication<Application>().filesDir, pendingWrite)
     }
     fun acknowledgeUnknown() = run {
         pendingWrite = false; resetSign(); save()
@@ -163,7 +167,8 @@ internal class XxtState(app: Application, private val savedState: SavedStateHand
     fun scanned(value: String) { if (!busy) { qr = value; confirmation = null } }
     fun locate() = run { position = xxtCurrentPosition(getApplication()); confirmation = null }
     fun importPhoto(uri: Uri) = run {
-        photoPath = withContext(Dispatchers.IO) {
+        check(!pendingWrite) { "请先核验上次结果。" }
+        val replacement = withContext(Dispatchers.IO) {
             val bytes = getApplication<Application>().contentResolver.openInputStream(uri)?.use { input ->
                 val output = java.io.ByteArrayOutputStream(); val buffer = ByteArray(8192)
                 while (true) { val count = input.read(buffer); if (count < 0) break; require(output.size() + count <= 6 * 1024 * 1024); output.write(buffer, 0, count) }
@@ -175,9 +180,13 @@ internal class XxtState(app: Application, private val savedState: SavedStateHand
             val options = BitmapFactory.Options().apply { inSampleSize = 1; while (bounds.outWidth / inSampleSize > 2048 || bounds.outHeight / inSampleSize > 2048) inSampleSize *= 2 }
             val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options) ?: throw IllegalArgumentException()
             val file = File(getApplication<Application>().filesDir, "${if (demo) "xxt_demo_photo_" else "xxt_photo_"}${UUID.randomUUID()}.jpg")
-            try { file.outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 88, it) } } finally { bitmap.recycle() }
+            try { file.outputStream().use { check(bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 88, it)) } }
+            catch (e: Exception) { file.delete(); throw e }
+            finally { bitmap.recycle() }
             file.absolutePath
         }
+        try { discardPhoto(); photoPath = replacement }
+        catch (e: Exception) { File(replacement).delete(); throw e }
         confirmation = null; save()
     }
     private fun plan() = XxtSignPlan(requireNotNull(course), requireNotNull(activity), requireNotNull(detail), code, qr, photoPath, position)
@@ -259,6 +268,7 @@ internal class XxtState(app: Application, private val savedState: SavedStateHand
         val result = api().sign(requireNotNull(user), value, validateToken, flow.enc2)
         flow.finish(result)
         pendingWrite = result == XxtSignResult.Unknown
+        if (result !is XxtSignResult.Captcha) discardPhoto()
         save()
         when (result) {
             XxtSignResult.Success -> message = "签到成功。"

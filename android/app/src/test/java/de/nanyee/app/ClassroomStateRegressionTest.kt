@@ -5,9 +5,12 @@ import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.SavedStateHandle
 import org.junit.Assert.*
 import org.junit.Test
+import org.junit.Rule
+import org.junit.rules.TemporaryFolder
 import sun.misc.Unsafe
 
 class ClassroomStateRegressionTest {
+    @get:Rule val photos = TemporaryFolder()
     private fun application(): Application {
         val field = Unsafe::class.java.getDeclaredField("theUnsafe").apply { isAccessible = true }
         return (field.get(null) as Unsafe).allocateInstance(Application::class.java) as Application
@@ -50,5 +53,27 @@ class ClassroomStateRegressionTest {
         assertEquals("live" to 4, slides.target)
         slides.clear()
         assertNull(slides.target)
+    }
+
+    @Test fun discardedPhotosAreDeletedButUnresolvedEvidenceIsRetained() {
+        val old = photos.newFile("xxt_photo_old.jpg")
+        val replacement = photos.newFile("xxt_demo_photo_new.jpg")
+        assertEquals("", xxtDiscardPhoto(old.path, photos.root, false))
+        assertFalse(old.exists())
+        assertTrue(replacement.exists())
+        assertEquals(replacement.path, xxtDiscardPhoto(replacement.path, photos.root, true))
+        assertTrue(replacement.exists())
+        assertEquals("", xxtDiscardPhoto(replacement.path, photos.root, false))
+        assertFalse(replacement.exists())
+        assertEquals("", xxtDiscardPhoto("", photos.root, false))
+    }
+
+    @Test fun discardedPhotoCannotDeleteUnrelatedOrOutsideFiles() {
+        val other = photos.newFile("unrelated.jpg")
+        val outside = java.io.File(photos.newFolder("other"), "xxt_photo_other.jpg").apply { createNewFile() }
+        xxtDiscardPhoto(other.path, photos.root, false)
+        xxtDiscardPhoto(outside.path, photos.root, false)
+        assertTrue(other.exists())
+        assertTrue(outside.exists())
     }
 }
