@@ -83,6 +83,24 @@ emulator -avd nanyee
 
 未使用真实学生账号验证上游学校登录，演示模式不代表真实学校响应。
 
+## 学习通 · 第一期
+
+工具 → 学习通独立直连超星，不共享教务 UIS/zhjw 或 Nanyee 平台的会话。支持密码登录、二维码授权登录、课程和活动只读列表，以及仅当前本人账号的普通、拍照、签到码、手势、二维码和真实位置签到。拍照支持系统相机及相册；确认后才向 pan-yz 上传并提交签到。扫码使用 Apache-2.0 的 ZXing Android Embedded（无 Play Services）。每次提交前均显示课程、活动、当前账号和相关输入的确认摘要；拼图需要用户手动移动，不含自动解题器。要求人脸检查的活动直接显示不支持。
+
+凭据仅在用户选择保存时存入独立 EncryptedSharedPreferences；Cookie 始终加密持久化。过期后的只读操作可用保存的密码重新登录，任何签到写入均不自动重放。没有保存密码的二维码会话过期后需要再次授权。退出登录清除学习通凭据、Cookie、草稿和照片。旋转使用保留 ViewModel；进程重建恢复加密的课程/活动及输入草稿，但不恢复提交动作、验证码、二维码内容或位置。被中断的提交显示“结果未知”，必须先在官方学习通核验。
+
+位置只来自 Android LocationManager，拒绝模拟位置、陈旧位置和超过 100 米误差的位置；WGS84 转为参考客户端使用的 BD-09。参考客户端的地址逆解析依赖百度 SDK，因此本实现使用活动地址文本，不接入地图厂商 SDK。已知活动目标坐标时显示距离；未知时明确提示无法计算。没有坐标编辑框、不发送参考客户端伪造的防作弊概率或百度定位来源声明。演示后端不联网，提供各签到类型、手动拼图、拒绝和未知结果；定位演示仍要求手机真实定位，扫码演示可使用界面提供的测试码内容。
+
+未提供学习通真实账号；本期仅运行演示和离线单元测试，不宣称已验证超星线上协议。可选只读测试 `XuexitongLiveListingTest` 仅在同时设置 `XUEXITONG_LIVE_ACCOUNT` / `XUEXITONG_LIVE_PASSWORD` 后启用。请求层白名单仅允许登录、自己的用户信息、课程与活动列表，拒绝签到、上传和其他写入路径。不要将凭据放进命令行或提交到仓库。无账号时测试跳过且不联网：
+
+```sh
+ANDROID_HOME=/home/ubuntu/android-sdk ./gradlew testDebugUnitTest --tests 'de.nanyee.app.XuexitongLiveListingTest' --rerun-tasks --info --no-daemon --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process
+```
+
+### Android 许可与来源
+
+本 Android 应用包含移植自 [AneryCoft/course_helper](https://github.com/AneryCoft/course_helper) 的学习通加密、协议与解析逻辑，原项目许可为 **GPL-3.0**，参考版本 `5344bef2146cb701abf57220d84a79d35daeaf45`。相应源文件标明来源，完整 GPL-3.0 文本见 [`LICENSE`](LICENSE)（其中保留 Free Software Foundation 的原始版权声明）。参考的 Dart 源文件没有单独的作者版权头；其作者归属保留为 AneryCoft/course_helper。分发此 Android 应用须遵守 GPL-3.0，包括提供完整对应源码；该声明不改变仓库中独立 web/backend 等其他部分的许可。
+
 ## 可选的真实账号只读集成测试
 
 仅在本地环境同时设置 `NANYEE_LIVE_ACCOUNT` 和 `NANYEE_LIVE_PASSWORD` 后运行；缺少任一变量时 JUnit assume 跳过，不加载模型、不联网。不要将凭据写入命令行参数、Gradle 属性或文件。测试使用同一模型及预处理、JVM ONNX Runtime 和直连数据源，依次读取学期、当前学期前 20 周课表、校历和成绩；不执行选课或评教。登录可能影响其他设备的学校会话。学期外允许当前周为空，但校历、课表和成绩必须非空。
