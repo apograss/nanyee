@@ -5,6 +5,16 @@ import org.junit.Test
 import java.time.LocalDate
 
 class PresentationTest {
+    @Test fun explicitLinesKeepTheirSplitAfterTheSharedSizeFits() {
+        val lines = explicitCjkTitle("人体解剖学", 3).lines()
+        assertEquals(listOf("人体解", "剖学"), lines)
+        val smaller = nextCourseTitleFit(CourseTitleFit(14f), 11.5f, true)
+        lines.forEach { _ ->
+            assertEquals(smaller, nextCourseTitleFit(smaller, 11.5f, false))
+        }
+        assertFalse(smaller.fallback)
+    }
+
     @Test fun renderDrivenTitleUsesFixedBalancedLinesInsteadOfCapacityEstimates() {
         assertEquals("人体解\n剖学", explicitCjkTitle("人体解剖学", 3))
         assertEquals("基础\n化学", explicitCjkTitle("基础化学", 3))

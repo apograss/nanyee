@@ -59,20 +59,30 @@ private fun CourseTitle(name: String, style: TextStyle, maxLines: Int, modifier:
         val floor = minOf(style.fontSize.value, 11.5f / density.fontScale)
         var fit by remember(name, maxWidth, maxHeight, style, density.fontScale, maxLines) { mutableStateOf(CourseTitleFit(style.fontSize.value)) }
         val fitting = explicit != name && !fit.fallback
-        Text(
-            if (fitting) explicit else name,
-            Modifier.fillMaxWidth(),
-            softWrap = !fitting,
-            maxLines = maxLines,
-            overflow = TextOverflow.Ellipsis,
-            style = style.copy(fontSize = fit.fontSize.sp),
-            onTextLayout = { layout ->
-                if (fitting) {
-                    val overflow = layout.hasVisualOverflow || layout.lineCount > explicit.lines().size || (0 until layout.lineCount).any { layout.isLineEllipsized(it) }
-                    val next = nextCourseTitleFit(fit, floor, overflow)
-                    if (next != fit) fit = next
+        val renderedFit = fit
+        if (fitting) {
+            val lines = remember(explicit) { explicit.lines() }
+            Column(Modifier.fillMaxWidth()) {
+                lines.forEach { line ->
+                    Text(
+                        line,
+                        Modifier.fillMaxWidth(),
+                        softWrap = false,
+                        maxLines = 1,
+                        overflow = TextOverflow.Clip,
+                        style = style.copy(fontSize = renderedFit.fontSize.sp),
+                        onTextLayout = { layout ->
+                            if (fit == renderedFit) {
+                                val overflow = layout.hasVisualOverflow || layout.didOverflowWidth
+                                val next = nextCourseTitleFit(renderedFit, floor, overflow)
+                                if (next != renderedFit) fit = next
+                            }
+                        }
+                    )
                 }
             }
-        )
+        } else {
+            Text(name, Modifier.fillMaxWidth(), maxLines = maxLines, overflow = TextOverflow.Ellipsis, style = style.copy(fontSize = renderedFit.fontSize.sp))
+        }
     }
 }
