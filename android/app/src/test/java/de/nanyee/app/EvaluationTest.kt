@@ -29,6 +29,13 @@ internal val evaluationFixture = """<script>entss.post('/new/student/ktpj/savePj
 """.trimIndent()
 
 class EvaluationTest {
+    @Test fun whitespaceNormalizationUsesPortableCharacterClassesWithoutInlineFlags() {
+        assertFalse(evaluationWhitespace.pattern.contains("(?"))
+        val row = payload("teadm" to " teacher-1\t", "dgksdm" to "hour-1", "ktpj" to "questionnaire-1", "kcmc" to "\u3000演示\u00a0\u0085\n课程\u3000")
+        val parsed = pendingEvaluations(buildJsonObject { put("rows", JsonArray(listOf(row))) }).single()
+        assertEquals("teacher-1", parsed.teacher)
+        assertEquals("演示 课程", parsed.courseName)
+    }
     @Test fun pendingFiltersCompletedMissingAndDuplicateRowsAndNormalizesText() {
         val row = payload("pjdm" to "", "teadm" to " teacher-1 ", "dgksdm" to "hour-1", "ktpj" to "questionnaire-1", "kcmc" to "演示  课程")
         val rows = JsonArray(listOf(row, row, JsonObject(row + ("pjdm" to JsonPrimitive("done"))), payload("teadm" to "missing"), JsonNull))

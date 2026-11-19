@@ -44,7 +44,8 @@ internal fun evaluationDraftRequest(reference: EvaluationReference): Request {
 }
 internal fun evaluationSubmitRequest(preview: EvaluationPreview): Request = evaluationFormRequest("savePj", evaluationSubmission(preview))
 
-private fun boundedEvaluationText(value: String, limit: Int): String = value.replace(Regex("(?U)\\s+"), " ").trim().take(limit)
+internal val evaluationWhitespace = Regex("[\\s\\p{Z}\\u0085]+")
+private fun boundedEvaluationText(value: String, limit: Int): String = value.replace(evaluationWhitespace, " ").trim().take(limit)
 private fun JsonObject.evaluationText(key: String, limit: Int): String = boundedEvaluationText(text(key), limit)
 
 internal fun pendingEvaluations(value: JsonElement): List<EvaluationReference> {
