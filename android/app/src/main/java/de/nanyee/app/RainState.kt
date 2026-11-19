@@ -139,6 +139,7 @@ internal class RainState(application: Application) : AndroidViewModel(applicatio
     fun updateFollow(value: Boolean) { follow = value; if (value) followLiveSlides() }
     private fun followLiveSlides() {
         val target = liveSlides.target ?: return
+        deckWork?.cancel()
         if (presentation?.id == target.first) selectSlideNumber(target.second)
         else loadPresentation(target.first, target.second)
     }

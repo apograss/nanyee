@@ -3,6 +3,10 @@ package de.nanyee.app
 import android.app.Application
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModel
+import androidx.compose.runtime.MutableState
+import kotlinx.coroutines.*
+import kotlin.coroutines.CoroutineContext
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.Rule
@@ -14,6 +18,16 @@ class ClassroomStateRegressionTest {
     private fun application(): Application {
         val field = Unsafe::class.java.getDeclaredField("theUnsafe").apply { isAccessible = true }
         return (field.get(null) as Unsafe).allocateInstance(Application::class.java) as Application
+    }
+    private fun synchronousScope(state: ViewModel) {
+        val scope = Class.forName("androidx.lifecycle.viewmodel.internal.CloseableCoroutineScope")
+            .getConstructor(CoroutineContext::class.java).newInstance(Dispatchers.Unconfined + Job()) as AutoCloseable
+        state.addCloseable("androidx.lifecycle.viewmodel.internal.ViewModelCoroutineScope.JOB_KEY", scope)
+    }
+    @Suppress("UNCHECKED_CAST")
+    private fun setState(state: Any, name: String, value: Any?) {
+        val field = state.javaClass.getDeclaredField("${name}\$delegate").apply { isAccessible = true }
+        (field.get(state) as MutableState<Any?>).value = value
     }
 
     @Test fun clearingUnusedRainStateDoesNotReadUninitializedBackend() {
@@ -53,6 +67,37 @@ class ClassroomStateRegressionTest {
         assertEquals("live" to 4, slides.target)
         slides.clear()
         assertNull(slides.target)
+    }
+
+    @Test fun resumingFollowLoadsLiveDeckAndCancelsInFlightHistoricalLoad() {
+        val state = RainState(application())
+        synchronousScope(state)
+        val waiting = CompletableDeferred<RainPresentation>()
+        val backend = object : RainBackend by DemoRainBackend(RainHost.WWW) {
+            override suspend fun presentation(lesson: RainLesson, id: String): RainPresentation {
+                if (id == "waiting") return waiting.await()
+                return RainPresentation(id, id, (1..4).map { RainSlide("$id-$it", it, "") })
+            }
+        }
+        RainState::class.java.getDeclaredField("backend").apply { isAccessible = true }.set(state, backend)
+        setState(state, "lesson", RainLesson(RainHost.WWW, "owner", "lesson", "bearer", "token"))
+        val accept = RainState::class.java.getDeclaredMethod("accept", RainFrame::class.java).apply { isAccessible = true }
+        accept.invoke(state, RainFrame("hello", "first", 1))
+        state.selectEvent(RainEvent("slide", "old", 1, "historical", 1))
+        accept.invoke(state, RainFrame("showpresentation", "live", 2))
+        assertEquals("historical", state.presentation?.id)
+        state.updateFollow(true)
+        assertEquals("live", state.presentation?.id)
+        assertEquals(1, state.slide)
+        accept.invoke(state, RainFrame("slidenav", slide = 3))
+        assertEquals("live", state.presentation?.id)
+        assertEquals(2, state.slide)
+        state.selectEvent(RainEvent("slide", "waiting", 1, "waiting", 1))
+        state.updateFollow(true)
+        waiting.complete(RainPresentation("waiting", "waiting", emptyList()))
+        assertEquals("live", state.presentation?.id)
+        assertEquals(2, state.slide)
+        ViewModelStore().apply { put("rain", state); clear() }
     }
 
     @Test fun discardedPhotosAreDeletedButUnresolvedEvidenceIsRetained() {
