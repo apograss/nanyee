@@ -148,6 +148,6 @@ class CabinRecoveryTest {
         val backend = Backend()
         try { updateCabinPassword(backend, "existing", "fixture5678", "new-fixture", "尾号 1234"); fail() } catch (_: IllegalArgumentException) {}
         assertTrue(backend.calls.isEmpty())
-        assertTrue(runCatching { platformRequest("POST", "/credentials/existing/reveal", null, "fixture") }.isFailure)
+        assertTrue(runCatching { platformRequest("POST", "/credentials/existing/reveal", null, null) }.isFailure)
     }
 }

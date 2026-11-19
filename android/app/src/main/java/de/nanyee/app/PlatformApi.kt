@@ -5,6 +5,8 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.*
 import okhttp3.*
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -54,6 +56,16 @@ internal class PlatformCookies(private val storage: PlatformCookieStorage) : Coo
 
 internal class PlatformFailure(val status: Int, val code: String, message: String) : Exception(message)
 
+internal object PlatformSession {
+    private var backend: PlatformApi? = null
+    private val changes = MutableStateFlow(0)
+    val revision = changes.asStateFlow()
+    @Synchronized fun api(context: Context): PlatformApi = backend ?: PlatformApi(EncryptedPlatformCookies(context.applicationContext)).also { backend = it }
+    fun changed() { changes.value += 1 }
+}
+
+internal fun platformPublicWrite(path: String) = path in setOf("/auth/login", "/account/password-reset", "/account/password-reset/confirm")
+
 internal fun platformRetryAt(header: String?, now: Long): Long = header?.toLongOrNull()?.coerceAtLeast(0)?.let { seconds ->
     if (seconds > (Long.MAX_VALUE - now) / 1000) Long.MAX_VALUE else now + seconds * 1000
 } ?: runCatching { ZonedDateTime.parse(header, DateTimeFormatter.RFC_1123_DATE_TIME).toInstant().toEpochMilli() }.getOrDefault(now + 60000)
@@ -73,12 +85,12 @@ internal class PlatformApi(storage: PlatformCookieStorage, private val transport
     private val cookies = PlatformCookies(storage)
     private var retryAt = 0L
     private val client = OkHttpClient.Builder().cookieJar(cookies).retryOnConnectionFailure(false).followRedirects(false).followSslRedirects(false).callTimeout(45, TimeUnit.SECONDS).build()
-    override suspend fun clearLocal() = withContext(Dispatchers.IO) { cookies.clear() }
+    override suspend fun clearLocal() = withContext(Dispatchers.IO) { cookies.clear(); PlatformSession.changed() }
     override suspend fun call(method: String, path: String, body: JsonObject?, key: String?): JsonElement = withContext(Dispatchers.IO) {
         if (System.currentTimeMillis() < retryAt) throw PlatformFailure(429, "RATE_LIMITED", "请求过于频繁，请在 ${(retryAt - System.currentTimeMillis()) / 1000 + 1} 秒后重试。")
         cookies.refresh()
         val csrf = cookies.csrf()
-        if (method != "GET" && path != "/auth/login" && csrf.isNullOrBlank()) throw PlatformFailure(401, "AUTHENTICATION_REQUIRED", platformErrorMessage(401, "AUTHENTICATION_REQUIRED"))
+        if (method != "GET" && !platformPublicWrite(path) && csrf.isNullOrBlank()) throw PlatformFailure(401, "AUTHENTICATION_REQUIRED", platformErrorMessage(401, "AUTHENTICATION_REQUIRED"))
         val request = platformRequest(method, path, body, csrf, key)
         try {
             (transport ?: client).newCall(request).awaitResult { response ->
@@ -89,6 +101,7 @@ internal class PlatformApi(storage: PlatformCookieStorage, private val transport
                     if (response.code == 429) retryAt = platformRetryAt(response.header("Retry-After"), System.currentTimeMillis())
                     throw PlatformFailure(response.code, code, platformErrorMessage(response.code, code))
                 }
+                if (path in setOf("/auth/login", "/auth/logout", "/account/password-reset/confirm") && method == "POST") PlatformSession.changed()
                 if (method == "POST" && path == "/jobs") jobDeduplicated = response.header("X-Job-Deduplicated").equals("true", ignoreCase = true)
                 if (response.code == 204) JsonNull else data ?: throw PlatformFailure(0, "INVALID_RESPONSE", "平台响应格式无效。")
             }

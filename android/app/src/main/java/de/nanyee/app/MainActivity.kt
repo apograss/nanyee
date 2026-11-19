@@ -125,21 +125,12 @@ fun Nanyee(state: SchoolState) {
                     Text(state.error)
                     Button(onClick = { state.logout() }) { Text("重试退出并清除课表") }
                 }
-                !state.homeVisible && state.tab in listOf(0, 4) -> Login(state)
+                !state.homeVisible && state.tab == 0 -> Login(state)
                 state.tab == 0 -> Timetable(state) { detailKind = "course"; detailIndex = state.courses.indexOf(it); detailDataIdentity = state.courseDataIdentity }
                 state.tab == 1 -> ClassroomScreen(state, rain, rainDemo) { rainDemo = !rainDemo }
                 state.tab == 2 -> EvaluationToolsScreen(state, evaluation)
                 state.tab == 3 -> ToolsScreen(state, grab, grabDemo) { detailKind = "grade"; detailIndex = state.grades?.items("grades")?.indexOf(it) ?: -1; detailDataIdentity = state.gradeDataIdentity }
-                else -> Column(Modifier.widthIn(max = 520.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                    Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.primaryContainer) { Icon(Icons.Outlined.School, null, Modifier.padding(20.dp).size(36.dp)) }
-                    Text("学校登录", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) { Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(if (state.demo) "当前处于演示模式" else if (state.cachedMode) "正在查看本机课表 · 未登录" else "已登录学校系统", color = MaterialTheme.colorScheme.primary)
-                    if (!state.demo && state.loggedIn) Text("会话到期：${runCatching { DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.of("Asia/Shanghai")).format(Instant.parse(state.expires)) }.getOrDefault(state.expires)}（北京时间）")
-                    Text("课表在本机加密保存；学校会话与成绩仅保存在内存中。", style = MaterialTheme.typography.bodyMedium)
-                    } }
-                    OutlinedButton(onClick = { state.logout() }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Outlined.Logout, null); Spacer(Modifier.width(8.dp)); Text(if (state.demo) "退出演示模式" else "退出并清除本机课表") }
-                }
+                else -> MyScreen(state)
             } }
         }
         }
@@ -176,8 +167,8 @@ fun Nanyee(state: SchoolState) {
 }
 
 @Composable
-fun Login(state: SchoolState) {
-    Column(Modifier.widthIn(max = 480.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+fun Login(state: SchoolState, embedded: Boolean = false) {
+    Column(Modifier.widthIn(max = 480.dp).then(if (embedded) Modifier.fillMaxWidth() else Modifier.fillMaxSize().verticalScroll(rememberScrollState())).padding(horizontal = 24.dp, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         if (state.error.isNotEmpty()) ErrorCard(state)
         Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.primaryContainer) { Icon(Icons.Outlined.School, null, Modifier.padding(18.dp).size(32.dp), tint = MaterialTheme.colorScheme.primary) }
         Text("学校登录", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)

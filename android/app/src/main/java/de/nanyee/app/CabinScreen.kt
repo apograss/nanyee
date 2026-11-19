@@ -29,7 +29,8 @@ internal fun CabinToolsScreen(school: SchoolState, state: CabinState = viewModel
     var demoChoice by rememberSaveable { mutableStateOf(false) }
     var action by remember { mutableStateOf<Pair<String, String>?>(null) }
     val uri = LocalUriHandler.current
-    LaunchedEffect(opened, school.demo, demoChoice) { if (opened) state.open(school.demo || demoChoice, evaluationMode) }
+    val sessionRevision by PlatformSession.revision.collectAsState()
+    LaunchedEffect(opened, school.demo, demoChoice, sessionRevision) { if (opened) state.open(school.demo || demoChoice, evaluationMode) }
     DisposableEffect(state) { onDispose { state.cancelCredential(); state.platformPassword = "" } }
     BackHandler(opened) { state.cancelCredential(); if (onBack != null) onBack() else opened = false }
     if (!opened) {
@@ -220,7 +221,7 @@ private fun CabinBookingForm(state: CabinState) {
 }
 
 @Composable
-private fun CabinField(label: String, value: String, onChange: (String) -> Unit, enabled: Boolean, password: Boolean = false) {
+internal fun CabinField(label: String, value: String, onChange: (String) -> Unit, enabled: Boolean, password: Boolean = false) {
     OutlinedTextField(value = value, onValueChange = onChange, label = { Text(label) }, enabled = enabled, singleLine = true, modifier = Modifier.fillMaxWidth(), visualTransformation = if (password) PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None, keyboardOptions = KeyboardOptions(keyboardType = if (password) KeyboardType.Password else KeyboardType.Text, autoCorrectEnabled = false))
 }
 
