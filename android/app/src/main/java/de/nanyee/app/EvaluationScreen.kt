@@ -13,13 +13,13 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 
 @Composable
-internal fun ToolsScreen(school: SchoolState) {
+internal fun ToolsScreen(school: SchoolState, evaluation: EvaluationState) {
     var route by rememberSaveable { mutableStateOf("") }
     val back = { route = "" }
     when (route) {
         "cabin" -> CabinToolsScreen(school, onBack = back)
         "automatic" -> CabinToolsScreen(school, state = viewModel(key = "evaluation-platform"), evaluationMode = true, onBack = { route = "evaluation" })
-        "manual" -> ManualEvaluationScreen(school, onBack = { route = "evaluation" })
+        "manual" -> ManualEvaluationScreen(school, evaluation, onBack = { route = "evaluation" })
         else -> {
             BackHandler(route.isNotEmpty()) { route = "" }
             Column(Modifier.widthIn(max = 720.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -49,11 +49,12 @@ private fun ToolCard(title: String, description: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ManualEvaluationScreen(school: SchoolState, onBack: () -> Unit) {
+private fun ManualEvaluationScreen(school: SchoolState, evaluation: EvaluationState, onBack: () -> Unit) {
     var demoChoice by rememberSaveable { mutableStateOf(false) }
     var confirming by remember { mutableStateOf(false) }
     val demo = school.demo || demoChoice
-    val state: EvaluationState = viewModel(key = if (demo) "manual-evaluation-demo" else "manual-evaluation-live")
+    val demoState: EvaluationState = viewModel(key = "manual-evaluation-demo")
+    val state = if (demo) demoState else evaluation
     BackHandler(!state.busy) { state.run.dismiss(); onBack() }
     Column(Modifier.widthIn(max = 720.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         TextButton(onClick = { state.run.dismiss(); onBack() }, enabled = !state.busy) { Text("返回课程评价") }
@@ -61,7 +62,8 @@ private fun ManualEvaluationScreen(school: SchoolState, onBack: () -> Unit) {
         Text(if (demo) "演示模式 · 不联网，不会提交真实评价。" else "学校直连 · 不托管密码，不使用 Nanyee 服务器。只读加载不会提交评价。")
         if (state.error.isNotBlank()) Text(state.error, color = MaterialTheme.colorScheme.error)
         if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-        Button(onClick = { state.load { if (demo) state.demoSource else school.evaluationAccess() } }, enabled = !state.busy) { Text("只读加载待评课程") }
+        if (state.run.stale) Text("学校会话已变更，上轮结果已过期；请先核验已提交的课程，再重新只读加载。", color = MaterialTheme.colorScheme.error)
+        Button(onClick = { state.load({ if (demo) "demo" else school.evaluationSessionIdentity }) { if (demo) state.demoSource else school.evaluationAccess() } }, enabled = !state.busy) { Text("只读加载待评课程") }
         if (!school.demo) TextButton(onClick = { demoChoice = !demoChoice }, enabled = !state.busy) { Text(if (demoChoice) "返回真实学校数据" else "无账号体验演示") }
         if (state.listed && state.pending.isEmpty()) Text("暂无待评课程。可能评教尚未开放，或今天及昨天的课程已评完。")
         if (state.pending.isNotEmpty()) {

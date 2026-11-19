@@ -11,20 +11,23 @@ internal class ManualEvaluationRun {
     var results by mutableStateOf(emptyList<String>()); private set
     var progress by mutableIntStateOf(0); private set
     var confirmed by mutableStateOf(false); private set
+    var stale by mutableStateOf(false); private set
     suspend fun prepare(source: EvaluationSource, references: List<EvaluationReference>) {
-        preview = emptyList(); results = emptyList(); progress = 0; confirmed = false
+        preview = emptyList(); results = emptyList(); progress = 0; confirmed = false; stale = false
         require(references.isNotEmpty())
         val drafts = references.map { source.draft(it) }
         preview = drafts.map { EvaluationPreview(it, evaluationAnswers(it)) }
     }
     fun dismiss() { preview = emptyList() }
-    fun reset() { dismiss(); results = emptyList(); progress = 0; confirmed = false }
+    fun reset() { dismiss(); results = emptyList(); progress = 0; confirmed = false; stale = false }
+    fun markStale() { dismiss(); if (confirmed) stale = true }
     suspend fun submit(source: EvaluationSource) {
         check(!confirmed && preview.isNotEmpty())
         confirmed = true
         val values = preview
         preview = emptyList()
         for ((index, value) in values.withIndex()) {
+            if (stale) { results = results + "学校会话已变更，已停止后续课程。"; return }
             progress = index + 1
             try {
                 source.submit(value)
@@ -50,6 +53,14 @@ internal class EvaluationState : ViewModel() {
     val run = ManualEvaluationRun()
     val demoSource = DemoEvaluationSource()
     private var source: EvaluationSource? = null
+    private var sessionIdentity: String? = null
+    private var sessionVersion = 0
+    fun onSessionChanged(identity: String) {
+        if (sessionIdentity == identity) return
+        sessionIdentity = identity; sessionVersion++
+        source = null; pending = emptyList(); selected = emptySet(); listed = false; error = ""
+        run.markStale()
+    }
     private fun work(action: suspend () -> Unit) {
         if (busy) return
         busy = true; error = ""
@@ -60,12 +71,23 @@ internal class EvaluationState : ViewModel() {
             } finally { busy = false }
         }
     }
-    fun load(provider: suspend () -> EvaluationSource) = work {
+    fun load(identity: () -> String, provider: suspend () -> EvaluationSource) = work { loadForSession(identity, provider) }
+    internal suspend fun loadForSession(identity: () -> String, provider: suspend () -> EvaluationSource) {
         run.reset(); source = null; pending = emptyList(); selected = emptySet(); listed = false
         val next = provider()
-        pending = next.pending(); source = next; selected = pending.map { it.key }.toSet(); listed = true
+        onSessionChanged(identity())
+        val version = sessionVersion
+        val values = next.pending()
+        if (version != sessionVersion) return
+        pending = values; source = next; selected = pending.map { it.key }.toSet(); listed = true
     }
-    fun prepare() = work { run.prepare(checkNotNull(source), pending.filter { it.key in selected }) }
+    fun prepare() = work { prepareForSession() }
+    internal suspend fun prepareForSession() {
+        val current = source ?: return
+        val version = sessionVersion
+        run.prepare(current, pending.filter { it.key in selected })
+        if (version != sessionVersion) run.dismiss()
+    }
     fun confirm() = work { pending = emptyList(); selected = emptySet(); listed = false; run.submit(checkNotNull(source)) }
 }
 

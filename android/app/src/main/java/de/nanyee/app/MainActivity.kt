@@ -57,6 +57,8 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Nanyee(state: SchoolState) {
+    val evaluation: EvaluationState = viewModel(key = "manual-evaluation-live")
+    LaunchedEffect(state.evaluationSessionIdentity) { evaluation.onSessionChanged(state.evaluationSessionIdentity) }
     BackHandler(enabled = state.demo || state.loginInFlight || state.canReturnToCache) { if (state.demo) state.logout() else if (state.loginInFlight) state.cancelLogin() else state.returnToCache() }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle) {
@@ -99,7 +101,7 @@ fun Nanyee(state: SchoolState) {
                 state.tab == 0 -> TodayScreen(state) { detailKind = "course"; detailIndex = state.courses.indexOf(it); detailDataIdentity = state.courseDataIdentity }
                 state.tab == 1 -> Timetable(state) { detailKind = "course"; detailIndex = state.courses.indexOf(it); detailDataIdentity = state.courseDataIdentity }
                 state.tab == 2 -> Grades(state) { detailKind = "grade"; detailIndex = state.grades?.items("grades")?.indexOf(it) ?: -1; detailDataIdentity = state.gradeDataIdentity }
-                state.tab == 3 -> ToolsScreen(state)
+                state.tab == 3 -> ToolsScreen(state, evaluation)
                 else -> Column(Modifier.widthIn(max = 520.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                     Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.primaryContainer) { Icon(Icons.Outlined.School, null, Modifier.padding(20.dp).size(36.dp)) }
                     Text("学校登录", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)

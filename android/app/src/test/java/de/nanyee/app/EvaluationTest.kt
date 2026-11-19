@@ -35,6 +35,76 @@ internal val evaluationFixture = """<script>entss.post('/new/student/ktpj/savePj
 """.trimIndent()
 
 class EvaluationTest {
+    @Test fun schoolSessionChangeClearsIdleCoursesAndPreviewWithoutCallingOldSource() = runBlocking {
+        val state = EvaluationState()
+        var oldDrafts = 0
+        val old = object : EvaluationSource by DemoEvaluationSource() {
+            override suspend fun draft(reference: EvaluationReference): EvaluationDraft {
+                oldDrafts++
+                return DemoEvaluationSource().draft(reference)
+            }
+        }
+        state.loadForSession({ "session-a" }) { old }
+        state.prepareForSession()
+        assertEquals(3, oldDrafts); assertEquals(3, state.run.preview.size)
+        state.onSessionChanged("session-a")
+        assertEquals(3, state.run.preview.size)
+        state.onSessionChanged("")
+        state.onSessionChanged("session-b")
+        assertTrue(state.pending.isEmpty()); assertTrue(state.selected.isEmpty()); assertFalse(state.listed)
+        assertTrue(state.run.preview.isEmpty())
+        state.prepareForSession()
+        assertEquals(3, oldDrafts)
+        val fresh = DemoEvaluationSource()
+        state.loadForSession({ "session-b" }) { fresh }
+        state.prepareForSession()
+        assertEquals(3, state.run.preview.size)
+    }
+    @Test fun sessionChangeRetainsInFlightResultsAndMarksCompletedBatchStale() = runBlocking {
+        val state = EvaluationState()
+        val started = CompletableDeferred<Unit>()
+        val finish = CompletableDeferred<Unit>()
+        var submissions = 0
+        val source = object : EvaluationSource by DemoEvaluationSource() {
+            override suspend fun submit(preview: EvaluationPreview): Int {
+                submissions++; started.complete(Unit); finish.await(); return 20
+            }
+        }
+        state.loadForSession({ "session-a" }) { source }
+        state.prepareForSession()
+        val task = launch { state.run.submit(source) }
+        started.await()
+        state.onSessionChanged("session-b")
+        assertTrue(state.run.stale)
+        finish.complete(Unit); task.join()
+        assertEquals(1, submissions)
+        assertTrue(state.run.results.first().contains("提交成功"))
+        assertTrue(state.run.results.last().contains("学校会话已变更"))
+        val retained = state.run.results.toList()
+        state.onSessionChanged("session-c")
+        assertEquals(retained, state.run.results)
+        assertTrue(state.run.confirmed); assertTrue(state.run.stale)
+    }
+    @Test fun lateListingAndPreviewCannotRestoreCoursesFromOldSession() = runBlocking {
+        val state = EvaluationState()
+        val listed = CompletableDeferred<Unit>()
+        val finish = CompletableDeferred<Unit>()
+        val slow = object : EvaluationSource by DemoEvaluationSource() {
+            override suspend fun pending(): List<EvaluationReference> { listed.complete(Unit); finish.await(); return DemoEvaluationSource().pending() }
+        }
+        val task = launch { state.loadForSession({ "session-a" }) { slow } }
+        listed.await(); state.onSessionChanged("session-b"); finish.complete(Unit); task.join()
+        assertTrue(state.pending.isEmpty()); assertFalse(state.listed)
+        val drafting = CompletableDeferred<Unit>()
+        val draftFinish = CompletableDeferred<Unit>()
+        val slowDraft = object : EvaluationSource by DemoEvaluationSource() {
+            override suspend fun draft(reference: EvaluationReference): EvaluationDraft { drafting.complete(Unit); draftFinish.await(); return DemoEvaluationSource().draft(reference) }
+        }
+        state.loadForSession({ "session-b" }) { slowDraft }
+        val preparing = launch { state.prepareForSession() }
+        drafting.await(); state.onSessionChanged("session-c"); draftFinish.complete(Unit); preparing.join()
+        assertTrue(state.run.preview.isEmpty()); assertTrue(state.pending.isEmpty())
+    }
     @Test fun evaluationReconciliationIgnoresServerDefaultsAndNormalizesAbsentToNull() = runBlocking {
         val sent = Instant.parse("2030-01-01T00:00:00Z")
         val body = evaluationJob("fixture", 30, "")
