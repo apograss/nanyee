@@ -189,7 +189,7 @@ fun Timetable(state: SchoolState, onCourse: (JsonObject) -> Unit) {
     Column(Modifier.widthIn(max = 1000.dp).fillMaxSize()) {
         Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Picker("选择学期", state.semesters.map { it.text("code") to it.text("label") }, state.semester, { state.selectSemester(it) }, Modifier.weight(1.6f))
-                Picker("选择周次", (1..state.totalWeeks).map { it.toString() to "第 $it 周" }, state.week.toString(), { state.week = it.toInt() }, Modifier.weight(1f))
+                Picker("选择周次", (1..state.totalWeeks).map { it.toString() to "第 $it 周" }, state.week.toString(), { state.selectWeek(it.toInt()) }, Modifier.weight(1f))
                 TextButton(onClick = { weeksInput = state.totalWeeks.toString(); weeksDialog = true }, contentPadding = PaddingValues(2.dp)) { Text("共 ${state.totalWeeks} 周", fontSize = 11.sp, maxLines = 1) }
         }
         val active = state.courses.filter { (it["weeks"] as? JsonArray)?.any { w -> (w as? JsonPrimitive)?.intOrNull == state.week } == true }

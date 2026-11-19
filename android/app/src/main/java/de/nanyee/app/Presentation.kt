@@ -13,7 +13,8 @@ internal fun captchaNeedsRefresh(expires: String, now: Instant): Boolean = runCa
 internal fun selectedDetail(savedIdentity: String, dataIdentity: String, index: Int, items: List<JsonObject>): JsonObject? =
     if (savedIdentity.isNotEmpty() && savedIdentity == dataIdentity) items.getOrNull(index) else null
 
-internal fun weekAfterDateChange(week: Int, totalWeeks: Int, previous: LocalDate, current: LocalDate): Int {
+internal fun weekAfterDateChange(week: Int, totalWeeks: Int, previous: LocalDate, current: LocalDate, userPicked: Boolean = false): Int {
+    if (userPicked) return week.coerceIn(1, totalWeeks)
     val monday = TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)
     val delta = ChronoUnit.WEEKS.between(previous.with(monday), current.with(monday))
     return (week + delta).coerceIn(1, totalWeeks.toLong()).toInt()

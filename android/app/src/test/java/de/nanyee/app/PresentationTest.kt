@@ -18,6 +18,8 @@ class PresentationTest {
         val sunday = LocalDate.parse("2026-01-04")
         assertEquals(3, weekAfterDateChange(3, 20, sunday, sunday))
         assertEquals(4, weekAfterDateChange(3, 20, sunday, sunday.plusDays(1)))
+        assertEquals(3, weekAfterDateChange(3, 20, sunday, sunday.plusDays(1), userPicked = true))
+        assertEquals(3, weekAfterDateChange(3, 20, sunday, sunday.minusWeeks(1), userPicked = true))
         assertEquals(20, weekAfterDateChange(20, 20, sunday, sunday.plusWeeks(1)))
         assertEquals(1, weekAfterDateChange(1, 20, sunday, sunday.minusWeeks(1)))
     }

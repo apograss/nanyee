@@ -54,6 +54,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         set(value) { selectedSemester = value; saved["semester"] = value }
     var totalWeeks by mutableIntStateOf(prefs.getInt("weeks", 20).coerceIn(1, 30))
     private var selectedWeek by mutableIntStateOf(saved["week"] ?: 1)
+    private var userPickedWeek = saved.get<Boolean>("userPickedWeek") ?: false
     var week: Int
         get() = selectedWeek
         set(value) { selectedWeek = value; saved["week"] = value }
@@ -78,9 +79,11 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
             val restoreTab = tab
             val restoreSemester = semester
             val restoreWeek = week
+            val restoreUserPickedWeek = userPickedWeek
             startDemo()
             if (semesters.any { it.text("code") == restoreSemester }) selectSemester(restoreSemester)
             tab = restoreTab.coerceIn(0, 2); week = restoreWeek.coerceIn(1, totalWeeks)
+            userPickedWeek = restoreUserPickedWeek; saved["userPickedWeek"] = userPickedWeek
         } else {
             if (saved.get<Boolean>("hadSession") == true) hint = "会话已过期，请重新登录"
             launch(silent = true) { fetchCaptcha() }
@@ -91,12 +94,15 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
     private fun updateDate() {
         val now = LocalDate.now(ZoneId.of("Asia/Shanghai"))
         if (now != today) {
-            if (loggedIn) week = weekAfterDateChange(week, totalWeeks, today, now)
+            if (loggedIn) week = weekAfterDateChange(week, totalWeeks, today, now, userPickedWeek)
             today = now
         }
         saved["date"] = now.toString()
     }
     fun onResume() { updateDate(); checkCaptcha() }
+    fun selectWeek(value: Int) {
+        week = value.coerceIn(1, totalWeeks); userPickedWeek = true; saved["userPickedWeek"] = true
+    }
     private fun launch(key: String = "captcha", silent: Boolean = false, block: suspend () -> Unit) {
         jobs.remove(key)?.cancel()
         val generation = sessionGeneration
@@ -188,6 +194,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         if (loginInFlight) { captcha = null; captchaText = "" }
         clearRequests()
         saved["demo"] = true; saved["hadSession"] = false
+        userPickedWeek = false; saved["userPickedWeek"] = false
         session = ""; expires = ""; demo = true; loggedIn = true; tab = 0; error = ""; week = 1
         semesters = listOf(payload("code" to "202501", "label" to "2025-2026-1"), payload("code" to "202402", "label" to "2024-2025-2")); semester = "202501"
         courses = demoCourses(semester)
