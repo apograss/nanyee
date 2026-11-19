@@ -11,6 +11,10 @@ android {
     buildFeatures { compose = true }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
+    sourceSets.getByName("test").resources.srcDir("src/main/assets")
+}
+configurations.matching { it.name.endsWith("UnitTestRuntimeClasspath") || it.name.endsWith("UnitTestCompileClasspath") }.configureEach {
+    exclude(group = "com.microsoft.onnxruntime", module = "onnxruntime-android")
 }
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2024.12.01"))
@@ -21,5 +25,8 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")
+    implementation("org.jsoup:jsoup:1.18.3")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("com.microsoft.onnxruntime:onnxruntime:1.20.0")
 }

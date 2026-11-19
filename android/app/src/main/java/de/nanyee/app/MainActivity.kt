@@ -72,17 +72,20 @@ fun Nanyee(state: SchoolState) {
     val detail = if (!state.homeVisible) null else selectedDetail(detailDataIdentity, dataIdentity, detailIndex, detailItems)?.let { detailKind to it }
     val landscape = LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp
     val iconSize = (24 * LocalDensity.current.fontScale.coerceIn(1f, 1.35f)).dp
-    val labels = listOf("课表", "成绩", "我的")
-    val icons = listOf(Icons.Outlined.CalendarMonth, Icons.Outlined.BarChart, Icons.Outlined.Person)
+    val labels = listOf("今天", "课表", "成绩", "我的")
+    val icons = listOf(Icons.Outlined.Today, Icons.Outlined.CalendarMonth, Icons.Outlined.BarChart, Icons.Outlined.Person)
     Scaffold(
         contentWindowInsets = WindowInsets.safeDrawing,
-        topBar = { if (state.homeVisible) TopAppBar(expandedHeight = if (landscape) 44.dp else 64.dp, title = { Text(labels[state.tab] + if (landscape && state.demo) " · 演示模式" else "", fontWeight = FontWeight.Bold, style = if (landscape) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge, maxLines = 1) }, actions = { if (state.tab < 2 && !state.demo) IconButton(onClick = { state.reload() }, enabled = !state.busy) { Icon(Icons.Outlined.Refresh, "刷新", Modifier.size(iconSize)) } }) },
+        topBar = { if (state.homeVisible) TopAppBar(expandedHeight = if (landscape) 44.dp else 64.dp, title = { Text(labels[state.tab] + if (landscape && state.demo) " · 演示模式" else "", fontWeight = FontWeight.Bold, style = if (landscape) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge, maxLines = 1) }, actions = { if (state.tab < 3 && !state.demo) IconButton(onClick = { state.reload() }, enabled = !state.busy) { Icon(Icons.Outlined.Refresh, "刷新", Modifier.size(iconSize)) } }) },
         bottomBar = { if (state.homeVisible && !landscape) NavigationBar { labels.forEachIndexed { i, label -> NavigationBarItem(selected = state.tab == i, onClick = { state.selectTab(i) }, icon = { Icon(icons[i], null) }, label = { Text(label) }) } } }
     ) { padding ->
         Row(Modifier.padding(padding).consumeWindowInsets(padding).fillMaxSize()) {
             if (landscape && state.homeVisible) NavigationRail(windowInsets = WindowInsets(0)) { labels.forEachIndexed { i, label -> NavigationRailItem(selected = state.tab == i, onClick = { state.selectTab(i) }, icon = { Icon(icons[i], label) }) } }
         Column(Modifier.weight(1f).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
-            if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+            if (state.autoLoggingIn) Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("正在自动登录…", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                TextButton(onClick = { state.returnToCache() }) { Text("取消") }
+            } else if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
             if (state.demo && !landscape) Surface(color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.fillMaxWidth()) { Text("演示模式 · 以下为示例数据，并非真实学业记录", Modifier.padding(horizontal = 20.dp, vertical = 8.dp), style = MaterialTheme.typography.labelMedium) }
             if (state.homeVisible && state.error.isNotEmpty()) ErrorCard(state)
             when {
@@ -92,8 +95,9 @@ fun Nanyee(state: SchoolState) {
                     Button(onClick = { state.logout() }) { Text("重试退出并清除课表") }
                 }
                 !state.homeVisible -> Login(state)
-                state.tab == 0 -> Timetable(state) { detailKind = "course"; detailIndex = state.courses.indexOf(it); detailDataIdentity = state.courseDataIdentity }
-                state.tab == 1 -> Grades(state) { detailKind = "grade"; detailIndex = state.grades?.items("grades")?.indexOf(it) ?: -1; detailDataIdentity = state.gradeDataIdentity }
+                state.tab == 0 -> TodayScreen(state) { detailKind = "course"; detailIndex = state.courses.indexOf(it); detailDataIdentity = state.courseDataIdentity }
+                state.tab == 1 -> Timetable(state) { detailKind = "course"; detailIndex = state.courses.indexOf(it); detailDataIdentity = state.courseDataIdentity }
+                state.tab == 2 -> Grades(state) { detailKind = "grade"; detailIndex = state.grades?.items("grades")?.indexOf(it) ?: -1; detailDataIdentity = state.gradeDataIdentity }
                 else -> Column(Modifier.widthIn(max = 520.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                     Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.primaryContainer) { Icon(Icons.Outlined.School, null, Modifier.padding(20.dp).size(36.dp)) }
                     Text("学校登录", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
