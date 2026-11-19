@@ -159,7 +159,7 @@ internal fun CabinToolsScreen(school: SchoolState, state: CabinState = viewModel
                 Text("优先级：\n" + state.draft.cabins.mapIndexed { index, id -> "${index + 1}. ${state.cabins.firstOrNull { it.number("dev_id") == id }?.text("name").orEmpty()}" }.joinToString("\n"))
                 Text("使用凭据：" + state.credentials.firstOrNull { it.text("id") == submission.body.text("credential_id") }?.get("metadata")?.obj()?.text("account_hint").orEmpty())
                 Text("首次尝试：${cabinDisplayMoment(submission.body.text("scheduled_for"))}\n停止尝试：${cabinDisplayMoment(payload.text("attempt_until"))}\n均为北京时间。")
-                Text("确认后服务器将使用托管凭据尝试真实预约，直到成功或停止时间。")
+                Text(if (state.demo) "演示模式，不会真正预约。确认后仅创建本机演示任务。" else "确认后服务器将使用托管凭据尝试真实预约，直到成功或停止时间。")
             }
         }, confirmButton = { TextButton(onClick = { state.confirm() }, enabled = !state.busy) { Text("确认并创建") } }, dismissButton = { TextButton(onClick = { state.dismissConfirmation() }) { Text("返回修改") } })
     }
@@ -222,11 +222,12 @@ private fun CabinTime(label: String, value: String, onChange: (String) -> Unit, 
     var expanded by remember { mutableStateOf(false) }
     Box {
         OutlinedButton(onClick = { expanded = true }, enabled = enabled, modifier = Modifier.fillMaxWidth()) { Text("$label · $value") }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, modifier = Modifier.heightIn(max = 320.dp)) {
             (0..89).forEach { index ->
                 val option = LocalTime.of(8, 0).plusMinutes(index * 10L).toString()
                 DropdownMenuItem(text = { Text(option) }, onClick = { expanded = false; onChange(option) })
             }
+            Spacer(Modifier.height(24.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()))
         }
     }
 }
