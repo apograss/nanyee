@@ -133,6 +133,7 @@ internal class XxtApi(private val storage: XxtStorage, private val transport: Ca
         val latest = detail(plan.activity)
         if (latest.face) throw XxtFailure("UNSUPPORTED", "此活动要求人脸签到，请使用官方学习通。")
         if (latest != plan.detail) throw XxtFailure("CHANGED", "活动要求已变更，请重新加载并确认。")
+        if (plan.position != null && (current.cid.isBlank() || current.sc.isBlank())) throw XxtFailure("UNSUPPORTED", "学习通未返回当前设备的位置签名信息，请使用官方学习通。")
         val objectId = if (plan.detail.photo) upload(plan.photoPath, current) else ""
         val fields = xxtSignFields(current, plan, xxtAes(UUID.randomUUID().toString(), "QrCbNY@MuK1X8HGw", false), System.currentTimeMillis(), objectId, validate, enc2)
         return try { xxtSignResult(raw(xxtRequest("$XXT_MOBILE/pptSign/stuSignajax", fields, post = plan.detail.type != 0 || plan.detail.photo)).toString(Charsets.UTF_8)) }

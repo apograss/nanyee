@@ -1,0 +1,195 @@
+package de.nanyee.app
+
+import android.app.Application
+import android.graphics.BitmapFactory
+import android.net.Uri
+import androidx.compose.runtime.*
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.*
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import java.io.File
+import java.util.UUID
+
+internal class XxtState(app: Application) : AndroidViewModel(app) {
+    private val storage: XxtStorage by lazy { EncryptedXxtStorage(getApplication()) }
+    private var backend: XxtBackend? = null
+    private var work: Job? = null
+    private var draftWork: Job? = null
+    private var initialized = false
+    private var generation = 0
+    private var flow = XxtFlow()
+    private var validateToken = ""
+    private var pendingWrite = false
+    var demo by mutableStateOf(false); private set
+    var busy by mutableStateOf(false); private set
+    var user by mutableStateOf<XxtUser?>(null); private set
+    var courses by mutableStateOf(emptyList<XxtCourse>()); private set
+    var activities by mutableStateOf(emptyList<XxtActivity>()); private set
+    var course by mutableStateOf<XxtCourse?>(null); private set
+    var activity by mutableStateOf<XxtActivity?>(null); private set
+    var detail by mutableStateOf<XxtSignDetail?>(null); private set
+    var code by mutableStateOf(""); private set
+    var qr by mutableStateOf(""); private set
+    var photoPath by mutableStateOf(""); private set
+    var position by mutableStateOf<XxtPosition?>(null); private set
+    var qrLogin by mutableStateOf<XxtQrLogin?>(null); private set
+    var captcha by mutableStateOf<XxtCaptcha?>(null); private set
+    var confirmation by mutableStateOf<XxtSignPlan?>(null); private set
+    var error by mutableStateOf(""); private set
+    var message by mutableStateOf(""); private set
+    var loaded by mutableStateOf(false); private set
+    val completed get() = flow.stage in setOf(XxtStage.UNKNOWN, XxtStage.SUCCESS)
+    private suspend fun api(): XxtBackend = backend ?: withContext(Dispatchers.IO) { if (demo) DemoXxtBackend() else XxtApi(storage) }.also { backend = it }
+    private fun run(action: suspend () -> Unit) {
+        if (busy) return
+        busy = true; error = ""
+        val token = generation
+        work = viewModelScope.launch {
+            try { action() }
+            catch (e: CancellationException) { throw e }
+            catch (e: Exception) {
+                if (token == generation) {
+                    error = when (e) { is XxtFailure -> e.message.orEmpty(); is IllegalArgumentException, is IllegalStateException -> "无法继续，请检查输入并重新加载活动。"; else -> "学习通操作失败，请稍后重试。" }
+                    if (pendingWrite) { message = "结果未知，请在官方学习通确认；不会自动重试。"; if (flow.stage == XxtStage.WRITING) flow.finish(XxtSignResult.Unknown) }
+                }
+            }
+            finally { if (token == generation) busy = false }
+        }
+    }
+    private suspend fun save() = withContext(Dispatchers.IO) {
+        if (!demo) storage.write("journal", Json.encodeToString(XxtJournal(false, course, activity, detail, code, photoPath, pendingWrite)))
+    }
+    private suspend fun <T> read(action: suspend () -> T): T = try { action() } catch (e: XxtFailure) {
+        if (demo || e.kind != "SESSION") throw e
+        val account = withContext(Dispatchers.IO) { storage.read("account") }
+        val password = withContext(Dispatchers.IO) { storage.read("password") }
+        if (account.isBlank() || password.isBlank()) { user = null; throw e }
+        user = api().login(account, password)
+        action()
+    }
+    fun initialize(asDemo: Boolean) {
+        if (initialized) return
+        initialized = true; demo = asDemo
+        run {
+            if (demo) { user = api().user(); courses = api().courses(); loaded = true }
+            else {
+                val journal = withContext(Dispatchers.IO) { storage.read("journal") }
+                val restored = runCatching { Json.decodeFromString<XxtJournal>(journal) }.getOrNull()
+                course = restored?.course; activity = restored?.activity; detail = restored?.detail; code = restored?.code.orEmpty(); photoPath = restored?.photo.orEmpty()
+                pendingWrite = restored?.writePending == true
+                if (pendingWrite) message = "上次操作被中断，结果未知，请先在官方学习通确认；不会恢复提交。"
+                if (withContext(Dispatchers.IO) { storage.read("active") } == "true") {
+                    user = read { api().user() }; courses = read { api().courses() }; loaded = true
+                    course?.let { activities = read { api().activities(it) } }
+                    activity?.let { detail = read { api().detail(it) } }
+                }
+            }
+        }
+    }
+    fun login(account: String, password: String, remember: Boolean) = run {
+        require(account.isNotBlank() && password.isNotBlank())
+        user = api().login(account, password)
+        withContext(Dispatchers.IO) { storage.write("account", if (remember) account else ""); storage.write("password", if (remember) password else ""); storage.write("active", "true") }
+        courses = api().courses(); loaded = true
+    }
+    fun beginQrLogin() = run {
+        qrLogin = api().qrLogin()
+        try {
+            repeat(90) {
+                delay(2000)
+                val result = api().pollQr(qrLogin!!)
+                if (result != null) {
+                    user = result
+                    withContext(Dispatchers.IO) { storage.write("account", ""); storage.write("password", ""); storage.write("active", "true") }
+                    qrLogin = null; courses = api().courses(); loaded = true
+                    return@run
+                }
+            }
+            error = "登录二维码已过期，请重新获取。"
+        } finally { qrLogin = null }
+    }
+    fun stopQrLogin() { if (qrLogin != null) { work?.cancel(); qrLogin = null; busy = false } }
+    fun refresh() = run {
+        user = read { api().user() }; courses = read { api().courses() }; loaded = true
+        course?.let { activities = read { api().activities(it) } }
+        activity?.let { detail = read { api().detail(it) } }
+    }
+    fun selectCourse(value: XxtCourse) = run {
+        resetSign(); activity = null; detail = null; course = value; activities = emptyList(); loaded = false; save()
+        activities = read { api().activities(value) }; loaded = true
+    }
+    fun selectActivity(value: XxtActivity) = run {
+        resetSign(); activity = value; detail = null; save()
+        detail = read { api().detail(value) }; save()
+    }
+    private fun resetSign() { flow = XxtFlow(); confirmation = null; captcha = null; code = ""; qr = ""; position = null; photoPath = ""; validateToken = ""; message = ""; pendingWrite = false }
+    fun back() = run {
+        if (activity != null) { activity = null; detail = null } else { course = null; activities = emptyList() }
+        resetSign(); loaded = true; save()
+    }
+    fun updateCode(value: String) { if (!busy) { code = value.filter(Char::isDigit).take(20); confirmation = null; draftWork?.cancel(); draftWork = viewModelScope.launch { try { save() } catch (e: CancellationException) { throw e } catch (_: Exception) { error = "无法安全保存学习通草稿。" } } } }
+    fun scanned(value: String) { if (!busy) { qr = value; confirmation = null } }
+    fun locate() = run { position = xxtCurrentPosition(getApplication()); confirmation = null }
+    fun importPhoto(uri: Uri) = run {
+        photoPath = withContext(Dispatchers.IO) {
+            val bytes = getApplication<Application>().contentResolver.openInputStream(uri)?.use { input ->
+                val output = java.io.ByteArrayOutputStream(); val buffer = ByteArray(8192)
+                while (true) { val count = input.read(buffer); if (count < 0) break; require(output.size() + count <= 6 * 1024 * 1024); output.write(buffer, 0, count) }
+                output.toByteArray()
+            } ?: throw IllegalArgumentException()
+            require(bytes.size in 1..6 * 1024 * 1024)
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }; BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+            require(bounds.outWidth in 1..16000 && bounds.outHeight in 1..16000 && bounds.outWidth.toLong() * bounds.outHeight <= 40000000)
+            val options = BitmapFactory.Options().apply { while (bounds.outWidth / inSampleSize > 2048 || bounds.outHeight / inSampleSize > 2048) inSampleSize *= 2 }
+            val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options) ?: throw IllegalArgumentException()
+            val file = File(getApplication<Application>().filesDir, "xxt_photo_${UUID.randomUUID()}.jpg")
+            try { file.outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 88, it) } } finally { bitmap.recycle() }
+            file.absolutePath
+        }
+        confirmation = null; save()
+    }
+    private fun plan() = XxtSignPlan(requireNotNull(course), requireNotNull(activity), requireNotNull(detail), code, qr, photoPath, position)
+    fun preview() = run {
+        check(!pendingWrite) { "请先核验上次结果。" }
+        flow.preview(plan(), System.currentTimeMillis()); save()
+        if (flow.stage == XxtStage.CAPTCHA) captcha = api().captcha(requireNotNull(flow.plan)) else confirmation = flow.plan
+    }
+    fun verifyCaptcha(x: Int) = run {
+        val token = api().solveCaptcha(requireNotNull(captcha), x, requireNotNull(flow.plan))
+        flow.verified(token); validateToken = token; captcha = null; confirmation = flow.plan
+    }
+    fun reloadCaptcha() = run { captcha = api().captcha(requireNotNull(flow.plan)) }
+    fun dismissConfirmation() { confirmation = null }
+    fun dismissCaptcha() { captcha = null; flow.dismiss() }
+    fun submit() = run {
+        val value = flow.begin(System.currentTimeMillis()); confirmation = null
+        pendingWrite = true; save()
+        val result = api().sign(requireNotNull(user), value, validateToken, flow.enc2)
+        flow.finish(result)
+        pendingWrite = result == XxtSignResult.Unknown
+        save()
+        when (result) {
+            XxtSignResult.Success -> message = "签到成功。"
+            XxtSignResult.Rejected -> message = "签到未成功，请核对活动要求并在官方学习通查看详情。"
+            XxtSignResult.Unknown -> message = "结果未知，请在官方学习通确认；不会自动重试。"
+            is XxtSignResult.Captcha -> { validateToken = ""; captcha = api().captcha(value) }
+        }
+    }
+    fun logout() {
+        val old = work; generation++; work?.cancel(); draftWork?.cancel(); busy = true
+        work = viewModelScope.launch {
+            try {
+                old?.join()
+                draftWork?.join()
+                if (!demo) { backend?.clear() ?: withContext(Dispatchers.IO) { storage.clear() } }
+                else backend?.clear()
+                withContext(Dispatchers.IO) { getApplication<Application>().filesDir.listFiles()?.filter { it.name.startsWith("xxt_photo_") }?.forEach { it.delete() } }
+                withContext(Dispatchers.IO) { File(getApplication<Application>().cacheDir, "xxt_camera").deleteRecursively() }
+                backend = null; user = null; courses = emptyList(); activities = emptyList(); course = null; activity = null; detail = null; loaded = false; qrLogin = null; resetSign(); error = ""
+            } catch (_: Exception) { error = "本地学习通数据未能完全清除，请重试或在系统设置清除应用数据。" }
+            finally { busy = false }
+        }
+    }
+}

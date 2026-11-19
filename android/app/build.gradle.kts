@@ -27,6 +27,7 @@ dependencies {
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")
     implementation("org.jsoup:jsoup:1.18.3")
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     testImplementation("junit:junit:4.13.2")
     testImplementation("com.microsoft.onnxruntime:onnxruntime:1.20.0")
 }

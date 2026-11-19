@@ -21,6 +21,7 @@ internal fun ToolsScreen(school: SchoolState, evaluation: EvaluationState, grab:
         "automatic" -> CabinToolsScreen(school, state = viewModel(key = "evaluation-platform"), evaluationMode = true, onBack = { route = "evaluation" })
         "manual" -> ManualEvaluationScreen(school, evaluation, onBack = { route = "evaluation" })
         "grab" -> CourseGrabScreen(school, grab, grabDemo, onBack = back)
+        "xuexitong" -> XxtToolsScreen(onBack = back)
         else -> {
             BackHandler(route.isNotEmpty()) { route = "" }
             Column(Modifier.widthIn(max = 720.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -34,6 +35,7 @@ internal fun ToolsScreen(school: SchoolState, evaluation: EvaluationState, grab:
                     ToolCard("学习舱预约", "选择舱位优先级，交给服务器按时尝试预约。", { route = "cabin" })
                     ToolCard("课程评价", "服务器自动评课，或本机预览确认后手动一键提交。", { route = "evaluation" })
                     ToolCard("抢课", "学校直连，本机按志愿顺序尝试；请保持 App 前台运行。", { route = "grab" })
+                    ToolCard("学习通", "独立账号、课程与活动；确认后仅为本人签到，也可离线体验演示。", { route = "xuexitong" })
                 }
             }
         }
