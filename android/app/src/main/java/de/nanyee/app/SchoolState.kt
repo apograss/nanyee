@@ -24,6 +24,9 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
     private var cachedTimetables by mutableStateOf<TimetableSnapshot?>(null)
     private var liveOwner = ""
     private var loginDestination by mutableStateOf<Int?>(null)
+    private var cacheReturnView: CachedTimetableView? = saved.get<String>("cacheReturnSemester")?.let {
+        CachedTimetableView(it, saved["cacheReturnWeek"] ?: 1, saved["cacheReturnPinned"] ?: false)
+    }
     private val secure by lazy {
         EncryptedSharedPreferences.create(app, "school_credentials", MasterKey.Builder(app).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(), EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV, EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM)
     }
@@ -167,7 +170,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
             password = ""; captchaText = ""; loggedIn = true; demo = false; cachedMode = false; tab = destination
             saved["hadSession"] = true; saved["demo"] = false
             resetTimetableSelection()
-            semester = requestedSemester; loginDestination = null
+            semester = requestedSemester; loginDestination = null; clearCacheReturnView()
         } catch (e: Exception) {
             if (e is CancellationException) throw e
             runCatching { fetchCaptcha() }
@@ -220,6 +223,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
     }
     fun selectTab(value: Int) { if (cachedMode && value == 1) requireSchoolLogin(1) else tab = value }
     fun selectSemester(code: String) {
+        if (cachedMode && cachedTimetables?.tables?.containsKey(code) != true) rememberCacheView()
         semester = code
         if (demo) courses = demoCourses(code)
         else if (cachedMode) {
@@ -252,24 +256,37 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         val snapshot = TimetableSnapshot(liveOwner, semesters, semester, previous + (semester to table))
         runCatching { timetableCache.save(snapshot) }.onSuccess { cachedTimetables = snapshot }.onFailure { error = "课表已加载，但无法加密保存到本机。" }
     }
-    private fun restoreCachedTimetable(): Boolean {
+    private fun restoreCachedTimetable(view: CachedTimetableView? = null): Boolean {
         val snapshot = runCatching { timetableCache.load() }.getOrElse { hint = "本机课表无法读取，请重新登录"; null } ?: return false
         cachedTimetables = snapshot
-        semesters = snapshot.semesters; semester = snapshot.selectedSemester
+        val restored = snapshot.restoreView(view)
+        semesters = snapshot.semesters; semester = restored.semester
         val table = snapshot.tables.getValue(semester)
         courses = table.courses; totalWeeks = table.totalWeeks; semesterStart = table.semesterStart
-        week = week.coerceIn(1, totalWeeks); followCurrentWeek()
+        week = restored.week; userPickedWeek = restored.userPickedWeek; saved["userPickedWeek"] = userPickedWeek
+        if (view == null) followCurrentWeek()
         cachedMode = true; tab = 0
         return true
     }
+    private fun rememberCacheView() {
+        if (cacheReturnView != null || cachedTimetables?.tables?.containsKey(semester) != true) return
+        cacheReturnView = CachedTimetableView(semester, week, userPickedWeek)
+        saved["cacheReturnSemester"] = semester; saved["cacheReturnWeek"] = week; saved["cacheReturnPinned"] = userPickedWeek
+    }
+    private fun clearCacheReturnView() {
+        cacheReturnView = null
+        saved.remove<String>("cacheReturnSemester"); saved.remove<Int>("cacheReturnWeek"); saved.remove<Boolean>("cacheReturnPinned")
+    }
     private fun requireSchoolLogin(destination: Int) {
+        rememberCacheView()
         clearRequests(); loginDestination = destination; cachedMode = false
         hint = if (destination == 1) "请登录学校系统查看成绩" else "请登录学校系统更新课表"
         launch(silent = true) { fetchCaptcha() }
     }
     fun returnToCache() {
         clearRequests(); loginDestination = null
-        restoreCachedTimetable()
+        restoreCachedTimetable(cacheReturnView)
+        clearCacheReturnView()
     }
     private fun expireSession() {
         clearRequests(); session = ""; expires = ""; liveOwner = ""; loggedIn = false; grades = null; api.clear()
@@ -281,6 +298,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         if (!wasDemo) cachedTimetables = null
         clearRequests()
         resetTimetableSelection()
+        clearCacheReturnView()
         saved["demo"] = false; saved["hadSession"] = false
         session = ""; expires = ""; liveOwner = ""; loginDestination = null; loggedIn = false; demo = false; cachedMode = false; courses = emptyList(); grades = null; semesters = emptyList(); semester = ""; gradesLoading = false; error = ""
         if (!wasDemo) { password = ""; captcha = null; captchaText = ""; api.clear(); launch(silent = true) { fetchCaptcha() } } else if (captcha == null) launch(silent = true) { fetchCaptcha() } else checkCaptcha()

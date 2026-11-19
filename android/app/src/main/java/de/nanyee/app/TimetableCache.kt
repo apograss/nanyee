@@ -25,6 +25,15 @@ data class TimetableSnapshot(
     val version: Int = 1
 )
 
+internal data class CachedTimetableView(val semester: String, val week: Int, val userPickedWeek: Boolean)
+
+internal fun TimetableSnapshot.restoreView(view: CachedTimetableView?): CachedTimetableView {
+    val code = view?.semester?.takeIf { it in tables } ?: selectedSemester
+    val table = tables.getValue(code)
+    return if (view?.semester == code) view.copy(week = view.week.coerceIn(1, table.totalWeeks))
+    else CachedTimetableView(code, 1, false)
+}
+
 internal object TimetableCacheCodec {
     private val json = Json { ignoreUnknownKeys = true }
     private val courseKeys = setOf("course_id", "name", "weekday", "start_node", "end_node", "start_time", "end_time", "location", "teachers", "weeks", "activity", "credit_hours")

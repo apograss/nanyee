@@ -5,6 +5,14 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class TimetableCacheTest {
+    @Test fun restoresViewedSemesterAndWeekInsteadOfLastDownload() {
+        val value = snapshot()
+        val viewed = CachedTimetableView("202502", 7, true)
+        assertEquals(viewed, value.restoreView(viewed))
+        assertEquals(CachedTimetableView("202502", 18, true), value.restoreView(viewed.copy(week = 30)))
+        assertEquals(CachedTimetableView("202601", 1, false), value.restoreView(null))
+        assertEquals(CachedTimetableView("202601", 1, false), value.restoreView(viewed.copy(semester = "missing")))
+    }
     private class MemoryStorage : TimetableCacheStorage {
         var value: String? = null
         override fun read() = value
