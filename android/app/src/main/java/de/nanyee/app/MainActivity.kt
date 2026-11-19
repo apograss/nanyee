@@ -64,7 +64,10 @@ fun Nanyee(state: SchoolState) {
     }
     var detailKind by rememberSaveable(state.sessionGeneration) { mutableStateOf("") }
     var detailIndex by rememberSaveable(state.sessionGeneration) { mutableIntStateOf(-1) }
-    val detail = if (!state.loggedIn) null else (if (detailKind == "course") state.courses else state.grades?.items("grades") ?: emptyList()).getOrNull(detailIndex)?.let { detailKind to it }
+    var detailDataIdentity by rememberSaveable(state.sessionGeneration) { mutableStateOf("") }
+    val detailItems = if (detailKind == "course") state.courses else state.grades?.items("grades") ?: emptyList()
+    val dataIdentity = if (detailKind == "course") state.courseDataIdentity else state.gradeDataIdentity
+    val detail = if (!state.loggedIn) null else selectedDetail(detailDataIdentity, dataIdentity, detailIndex, detailItems)?.let { detailKind to it }
     val landscape = LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp
     val iconSize = (24 * LocalDensity.current.fontScale.coerceIn(1f, 1.35f)).dp
     val labels = listOf("课表", "成绩", "我的")
@@ -82,8 +85,8 @@ fun Nanyee(state: SchoolState) {
             if (state.loggedIn && state.error.isNotEmpty()) ErrorCard(state)
             when {
                 !state.loggedIn -> Login(state)
-                state.tab == 0 -> Timetable(state) { detailKind = "course"; detailIndex = state.courses.indexOf(it) }
-                state.tab == 1 -> Grades(state) { detailKind = "grade"; detailIndex = state.grades?.items("grades")?.indexOf(it) ?: -1 }
+                state.tab == 0 -> Timetable(state) { detailKind = "course"; detailIndex = state.courses.indexOf(it); detailDataIdentity = state.courseDataIdentity }
+                state.tab == 1 -> Grades(state) { detailKind = "grade"; detailIndex = state.grades?.items("grades")?.indexOf(it) ?: -1; detailDataIdentity = state.gradeDataIdentity }
                 else -> Column(Modifier.widthIn(max = 520.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                     Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.primaryContainer) { Icon(Icons.Outlined.School, null, Modifier.padding(20.dp).size(36.dp)) }
                     Text("学校登录", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)

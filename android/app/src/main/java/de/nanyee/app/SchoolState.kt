@@ -15,6 +15,7 @@ import kotlinx.serialization.json.*
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.util.UUID
 
 class SchoolState(app: Application, private val saved: SavedStateHandle) : AndroidViewModel(app) {
     private val api = SchoolApi()
@@ -56,8 +57,18 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
     var week: Int
         get() = selectedWeek
         set(value) { selectedWeek = value; saved["week"] = value }
-    var courses by mutableStateOf(emptyList<JsonObject>())
-    var grades by mutableStateOf<JsonObject?>(null)
+    var courseDataIdentity by mutableStateOf(UUID.randomUUID().toString())
+        private set
+    var gradeDataIdentity by mutableStateOf(UUID.randomUUID().toString())
+        private set
+    private var loadedCourses by mutableStateOf(emptyList<JsonObject>())
+    var courses: List<JsonObject>
+        get() = loadedCourses
+        set(value) { loadedCourses = value; courseDataIdentity = UUID.randomUUID().toString() }
+    private var loadedGrades by mutableStateOf<JsonObject?>(null)
+    var grades: JsonObject?
+        get() = loadedGrades
+        set(value) { loadedGrades = value; gradeDataIdentity = UUID.randomUUID().toString() }
     var today by mutableStateOf(runCatching { LocalDate.parse(saved.get<String>("date")) }.getOrDefault(LocalDate.now(ZoneId.of("Asia/Shanghai"))))
         private set
 

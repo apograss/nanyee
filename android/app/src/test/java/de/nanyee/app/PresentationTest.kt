@@ -5,6 +5,15 @@ import org.junit.Test
 import java.time.LocalDate
 
 class PresentationTest {
+    @Test fun detailsRestoreOnlyForTheSameLoadedList() {
+        val items = listOf(payload("name" to "示例课程"))
+        assertEquals(items.single(), selectedDetail("list-a", "list-a", 0, items))
+        assertNull(selectedDetail("old-session-list", "new-session-list", 0, items))
+        assertNull(selectedDetail("list-a", "refreshed-list", 0, items))
+        assertNull(selectedDetail("list-a", "list-a", 0, emptyList()))
+        assertNull(selectedDetail("list-a", "list-a", -1, items))
+        assertNull(selectedDetail("", "", 0, items))
+    }
     @Test fun weekTracksMondayBoundariesAndStaysInsideSemester() {
         val sunday = LocalDate.parse("2026-01-04")
         assertEquals(3, weekAfterDateChange(3, 20, sunday, sunday))
