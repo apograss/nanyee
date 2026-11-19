@@ -14,7 +14,7 @@ import kotlinx.coroutines.withTimeout
 import kotlin.coroutines.resume
 import kotlin.math.*
 
-internal suspend fun xxtCurrentPosition(context: Context): XxtPosition {
+internal suspend fun xxtCurrentPosition(context: Context, bd09: Boolean = true): XxtPosition {
     check(context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) { "需要精确定位权限；不支持手动填写坐标。" }
     val manager = requireNotNull(context.getSystemService(LocationManager::class.java))
     val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER).filter { manager.isProviderEnabled(it) }
@@ -25,7 +25,7 @@ internal suspend fun xxtCurrentPosition(context: Context): XxtPosition {
                 override fun onLocationChanged(location: Location) {
                     @Suppress("DEPRECATION") val mock = location.isFromMockProvider
                     if (mock || !location.hasAccuracy() || location.accuracy !in 0f..100f || (SystemClock.elapsedRealtimeNanos() - location.elapsedRealtimeNanos) !in 0..120000000000L) return
-                    val (lat, lon) = xxtBd09(location.latitude, location.longitude)
+                    val (lat, lon) = if (bd09) xxtBd09(location.latitude, location.longitude) else location.latitude to location.longitude
                     if (continuation.isActive) { manager.removeUpdates(this); continuation.resume(XxtPosition(lat, lon, System.currentTimeMillis(), location.accuracy)) }
                 }
                 override fun onProviderEnabled(provider: String) = Unit
