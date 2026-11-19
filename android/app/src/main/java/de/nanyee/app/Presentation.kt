@@ -13,6 +13,10 @@ internal fun captchaNeedsRefresh(expires: String, now: Instant): Boolean = runCa
 
 internal fun compactRoom(location: String): String = location.trim().replace(Regex("^教学楼\\s*(?=\\S)"), "")
 
+internal fun timetableFontScale(scale: Float): Float = if (scale.isFinite() && scale > 0) scale.coerceAtMost(1.4f) else 1f
+
+internal fun timetablePeriodHeight(scale: Float): Float = 88f * timetableFontScale(scale).coerceAtLeast(1f)
+
 internal fun currentTeachingWeek(semesterStart: String, today: LocalDate, totalWeeks: Int): Int? {
     val start = runCatching { LocalDate.parse(semesterStart).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)) }.getOrNull() ?: return null
     val week = Math.floorDiv(ChronoUnit.DAYS.between(start, today), 7) + 1

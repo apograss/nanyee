@@ -11,12 +11,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import kotlinx.serialization.json.JsonObject
 
 @Composable
-fun CourseDay(courses: List<JsonObject>, allCourses: List<JsonObject>, colors: List<Color>, nodes: Int, onCourse: (JsonObject) -> Unit, onConflicts: (List<JsonObject>) -> Unit, modifier: Modifier = Modifier) {
-    BoxWithConstraints(modifier.height((nodes * 64).dp)) {
+fun CourseDay(courses: List<JsonObject>, allCourses: List<JsonObject>, colors: List<Color>, nodes: Int, periodHeight: Dp, onCourse: (JsonObject) -> Unit, onConflicts: (List<JsonObject>) -> Unit, modifier: Modifier = Modifier) {
+    BoxWithConstraints(modifier.height(periodHeight * nodes)) {
         courseGroups(courses).forEach { group ->
             val placements = layoutCourses(group)
             val collapse = maxWidth / placements.first().laneCount < 44.dp
@@ -25,7 +26,7 @@ fun CourseDay(courses: List<JsonObject>, allCourses: List<JsonObject>, colors: L
                 val course = placement.course
                 val laneWidth = if (collapse) maxWidth else maxWidth / placement.laneCount
                 val span = if (collapse) requireNotNull(courseSpan(group)) else course.number("start_node")..course.number("end_node")
-                Surface(onClick = { if (collapse && group.size > 1) onConflicts(group) else onCourse(course) }, color = colors[allCourses.indexOf(course).coerceAtLeast(0) % colors.size], shape = RoundedCornerShape(8.dp), modifier = Modifier.offset(x = if (collapse) 0.dp else laneWidth * placement.lane, y = ((span.first - 1) * 64).dp).width(laneWidth).padding(end = if (!collapse && placement.laneCount > 1) 2.dp else 0.dp).height(((span.last - span.first + 1) * 64 - 4).dp)) {
+                Surface(onClick = { if (collapse && group.size > 1) onConflicts(group) else onCourse(course) }, color = colors[allCourses.indexOf(course).coerceAtLeast(0) % colors.size], shape = RoundedCornerShape(8.dp), modifier = Modifier.offset(x = if (collapse) 0.dp else laneWidth * placement.lane, y = periodHeight * (span.first - 1)).width(laneWidth).padding(end = if (!collapse && placement.laneCount > 1) 2.dp else 0.dp).height(periodHeight * (span.last - span.first + 1) - 4.dp)) {
                     Column(Modifier.padding(horizontal = 3.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Text(course.text("start_time"), Modifier.weight(1f), fontSize = 8.sp, lineHeight = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)

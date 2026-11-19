@@ -5,6 +5,16 @@ import org.junit.Test
 import java.time.LocalDate
 
 class PresentationTest {
+    @Test fun timetableScalesTextAndRowsWithinAccessibleBounds() {
+        assertEquals(1f, timetableFontScale(1f), 0.001f)
+        assertEquals(1.3f, timetableFontScale(1.3f), 0.001f)
+        assertEquals(1.4f, timetableFontScale(2f), 0.001f)
+        assertEquals(1f, timetableFontScale(Float.NaN), 0.001f)
+        assertEquals(1f, timetableFontScale(0f), 0.001f)
+        assertEquals(88f, timetablePeriodHeight(1f), 0.001f)
+        assertEquals(123.2f, timetablePeriodHeight(2f), 0.001f)
+        assertTrue(timetablePeriodHeight(1.3f) > timetablePeriodHeight(1f))
+    }
     @Test fun roomsDropOnlyTheGenericTeachingBuildingPrefix() {
         assertEquals("201", compactRoom("教学楼 201"))
         assertEquals("A-201", compactRoom("教学楼A-201"))

@@ -176,7 +176,7 @@ fun ErrorCard(state: SchoolState) {
 fun Picker(label: String, options: List<Pair<String, String>>, selected: String, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {
     var expanded by remember { mutableStateOf(false) }
     Box(modifier) {
-        OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)) { Text(options.firstOrNull { it.first == selected }?.second ?: label, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)); Icon(Icons.Outlined.ExpandMore, null, Modifier.size(18.dp)) }
+        OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)) { Text(options.firstOrNull { it.first == selected }?.second ?: label, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)); Icon(Icons.Outlined.ExpandMore, null, Modifier.size(18.dp)) }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, modifier = Modifier.heightIn(max = 360.dp)) { options.forEach { (value, text) -> DropdownMenuItem(text = { Text(text) }, onClick = { expanded = false; onSelect(value) }) } }
     }
 }
@@ -187,7 +187,10 @@ fun Timetable(state: SchoolState, onCourse: (JsonObject) -> Unit) {
     var weeksInput by remember { mutableStateOf(state.totalWeeks.toString()) }
     var conflicts by remember(state.sessionGeneration) { mutableStateOf<List<JsonObject>?>(null) }
     val density = LocalDensity.current
-    CompositionLocalProvider(LocalDensity provides Density(density.density, density.fontScale.coerceAtMost(1.05f))) {
+    val fontScale = timetableFontScale(density.fontScale)
+    val periodHeight = timetablePeriodHeight(fontScale).dp
+    val periodWidth = (36 * fontScale.coerceAtLeast(1f)).dp
+    CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
     Column(Modifier.widthIn(max = 1000.dp).fillMaxSize()) {
         Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Picker("选择学期", state.semesters.map { it.text("code") to it.text("label") }, state.semester, { state.selectSemester(it) }, Modifier.weight(1.6f))
@@ -210,7 +213,7 @@ fun Timetable(state: SchoolState, onCourse: (JsonObject) -> Unit) {
         val nodes = maxOf(nodeTimes.size, active.maxOfOrNull { it.number("end_node") } ?: nodeTimes.size)
         val today = state.today.dayOfWeek.value
         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-            Spacer(Modifier.width(36.dp))
+            Spacer(Modifier.width(periodWidth))
             (1..7).forEach { day ->
                 Box(Modifier.weight(1f).height(32.dp).clip(RoundedCornerShape(10.dp)).background(if (day == today) MaterialTheme.colorScheme.primaryContainer else Color.Transparent), contentAlignment = Alignment.Center) {
                     Text("周${"一二三四五六日"[day - 1]}", fontSize = 11.sp, fontWeight = if (day == today) FontWeight.Bold else FontWeight.Normal, color = if (day == today) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
@@ -230,13 +233,13 @@ fun Timetable(state: SchoolState, onCourse: (JsonObject) -> Unit) {
                 }
             )
         }.verticalScroll(rememberScrollState()).padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-            Column(Modifier.width(36.dp)) {
-                (1..nodes).forEach { node -> Column(Modifier.height(64.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(Modifier.width(periodWidth)) {
+                (1..nodes).forEach { node -> Column(Modifier.height(periodHeight).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("$node", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(nodeTimes.getOrNull(node - 1) ?: "—", fontSize = 8.sp, maxLines = 1, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } }
             }
-            (1..7).forEach { day -> CourseDay(active.filter { it.number("weekday") == day }, state.courses, colors, nodes, onCourse, { conflicts = it }, Modifier.weight(1f)) }
+            (1..7).forEach { day -> CourseDay(active.filter { it.number("weekday") == day }, state.courses, colors, nodes, periodHeight, onCourse, { conflicts = it }, Modifier.weight(1f)) }
         }
     }
     }
