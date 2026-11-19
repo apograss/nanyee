@@ -16,7 +16,13 @@ fun JsonObject.number(key: String) = text(key).toIntOrNull() ?: 0
 fun JsonObject.items(key: String) = (get(key) as? JsonArray)?.map { it.obj() } ?: emptyList()
 fun payload(vararg fields: Pair<String, String>) = buildJsonObject { fields.forEach { put(it.first, it.second) } }
 
-class SchoolError(val status: Int, val code: String, message: String) : Exception(message)
+class SchoolError(val status: Int, val code: String, message: String, val reason: String = "") : Exception(message)
+
+interface SchoolDataSource {
+    suspend fun request(path: String, body: JsonObject? = null): JsonObject
+    suspend fun timetableSemesterStart(body: JsonObject): String
+    fun clear()
+}
 
 internal suspend fun <T> Call.awaitResult(parse: (Response) -> T): T = suspendCancellableCoroutine { continuation ->
     continuation.invokeOnCancellation { cancel() }
@@ -30,7 +36,7 @@ internal suspend fun <T> Call.awaitResult(parse: (Response) -> T): T = suspendCa
     })
 }
 
-class SchoolApi {
+class SchoolApi : SchoolDataSource {
     private val cookies = mutableListOf<Cookie>()
     private var retryAt = 0L
     private val client = OkHttpClient.Builder().callTimeout(60, TimeUnit.SECONDS).cookieJar(object : CookieJar {
@@ -43,12 +49,12 @@ class SchoolApi {
         }
     }).build()
 
-    fun clear() { synchronized(cookies) { cookies.clear() } }
+    override fun clear() { synchronized(cookies) { cookies.clear() } }
 
-    suspend fun request(path: String, body: JsonObject? = null): JsonObject =
+    override suspend fun request(path: String, body: JsonObject?): JsonObject =
         Json.parseToJsonElement(requestContent(path, body)).obj()
 
-    suspend fun timetableSemesterStart(body: JsonObject): String =
+    override suspend fun timetableSemesterStart(body: JsonObject): String =
         semesterStartFromExport(requestContent("timetable.wakeup", body))
 
     private suspend fun requestContent(path: String, body: JsonObject?): String = withContext(Dispatchers.IO) {
@@ -67,7 +73,7 @@ class SchoolApi {
                     val error = data["error"]?.obj() ?: JsonObject(emptyMap())
                     val code = error.text("code")
                     val retry = response.header("Retry-After")
-                    if (code == "RATE_LIMITED") {
+                    if (response.code == 429 || code == "RATE_LIMITED") {
                         retryAt = retry?.toLongOrNull()?.let { System.currentTimeMillis() + it * 1000 }
                             ?: runCatching { java.time.ZonedDateTime.parse(retry, java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME).toInstant().toEpochMilli() }.getOrDefault(System.currentTimeMillis() + 60000)
                     }
@@ -77,7 +83,7 @@ class SchoolApi {
                         else -> ""
                     }
                     val id = error.text("request_id").ifEmpty { response.header("X-Request-ID") ?: "" }
-                    throw SchoolError(response.code, code, message + advice + if (id.isNotEmpty()) "\n请求编号：$id" else "")
+                    throw SchoolError(response.code, code, message + advice + if (id.isNotEmpty()) "\n请求编号：$id" else "", error["details"]?.obj()?.text("smu_reason").orEmpty())
                 }
                 content
             }
