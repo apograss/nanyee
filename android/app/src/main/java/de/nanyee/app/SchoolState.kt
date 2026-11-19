@@ -110,6 +110,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
             tab = restoreTab.coerceIn(0, 2); week = restoreWeek.coerceIn(1, totalWeeks)
             userPickedWeek = restoreUserPickedWeek; saved["userPickedWeek"] = userPickedWeek
         } else {
+            clearCacheReturnView()
             if (saved.get<Boolean>("hadSession") == true) hint = "会话已过期，请重新登录"
             if (!restoreCachedTimetable()) launch(silent = true) { fetchCaptcha() }
         }
@@ -237,7 +238,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         if (demo) courses = demoCourses(code)
         else if (cachedMode) {
             val table = cachedTimetables?.tables?.get(code)
-            if (table == null) { courses = emptyList(); semesterStart = ""; requireSchoolLogin(0) } else { courses = table.courses; totalWeeks = table.totalWeeks; semesterStart = table.semesterStart; week = week.coerceAtMost(totalWeeks); followCurrentWeek() }
+            if (table == null) { courses = emptyList(); semesterStart = ""; requireSchoolLogin(0, rememberView = false) } else { courses = table.courses; totalWeeks = table.totalWeeks; semesterStart = table.semesterStart; week = week.coerceAtMost(totalWeeks); followCurrentWeek() }
         } else if (loggedIn) { semesterStart = ""; courses = emptyList(); launch("timetable") { queryTimetable() } }
     }
     fun setWeeks(value: Int) {
@@ -278,7 +279,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         return true
     }
     private fun rememberCacheView() {
-        if (cacheReturnView != null || cachedTimetables?.tables?.containsKey(semester) != true) return
+        if (cachedTimetables?.tables?.containsKey(semester) != true) { clearCacheReturnView(); return }
         cacheReturnView = CachedTimetableView(semester, week, userPickedWeek)
         saved["cacheReturnSemester"] = semester; saved["cacheReturnWeek"] = week; saved["cacheReturnPinned"] = userPickedWeek
     }
@@ -286,8 +287,8 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         cacheReturnView = null
         saved.remove<String>("cacheReturnSemester"); saved.remove<Int>("cacheReturnWeek"); saved.remove<Boolean>("cacheReturnPinned")
     }
-    private fun requireSchoolLogin(destination: Int) {
-        rememberCacheView()
+    private fun requireSchoolLogin(destination: Int, rememberView: Boolean = true) {
+        if (rememberView) rememberCacheView()
         clearRequests(); loginDestination = destination; cachedMode = false
         hint = if (destination == 1) "请登录学校系统查看成绩" else "请登录学校系统更新课表"
         launch(silent = true) { fetchCaptcha() }
