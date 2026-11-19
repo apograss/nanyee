@@ -48,6 +48,8 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
     var captcha by mutableStateOf<JsonObject?>(null)
     private var session by mutableStateOf("")
     internal val evaluationSessionIdentity get() = session
+    private val grabOwner = GrabSessionOwner()
+    internal val courseGrabOwnerIdentity get() = grabOwner.identity
     private var reauthAttempted = false
     var sessionGeneration by mutableIntStateOf(0)
         private set
@@ -201,6 +203,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         if (id.isEmpty() || expiry.isEmpty()) throw SchoolError(0, "INVALID_RESPONSE", "登录响应无效，请重试。")
         if (cachedTimetables != null && cachedTimetables?.owner != submittedAccount) { timetableCache.clear(); cachedTimetables = null }
         if (submittedRemember && remember) withContext(Dispatchers.IO) { secure.edit().putString("account", submittedAccount).putString("password", submittedPassword).apply() }
+        grabOwner.login(submittedAccount)
         session = id; expires = expiry; liveOwner = submittedAccount
         password = ""; captchaText = ""; loggedIn = true; demo = false; cachedMode = false; tab = destination; autoLoggingIn = false
         saved["hadSession"] = true; saved["demo"] = false
@@ -262,8 +265,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
             if (savedAccount.isBlank() || savedPassword.isEmpty()) null else savedAccount to savedPassword
         }
     }
-    internal suspend fun evaluationAccess(): EvaluationSource {
-        if (demo) return DemoEvaluationSource()
+    private suspend fun ensureToolSession() {
         if (!loggedIn || session.isEmpty() || runCatching { Instant.parse(expires) <= Instant.now() }.getOrDefault(true)) {
             val credentials = hostedSchoolPrefill() ?: throw SchoolError(401, "LOGIN_REQUIRED", "请先在“我的”登录学校，或保存凭据后重试。")
             autoLoggingIn = true
@@ -278,6 +280,24 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
                 }
             } finally { autoLoggingIn = false }
         }
+    }
+    internal suspend fun courseGrabAccess(): CourseGrabSource {
+        check(!demo)
+        ensureToolSession()
+        val owner = grabOwner.identity
+        return ReacquiringCourseGrabSource {
+            if (owner != grabOwner.identity) throw CancellationException("学校账号已更改")
+            ensureToolSession()
+            if (owner != grabOwner.identity) throw CancellationException("学校账号已更改")
+            val sourceSession = session
+            ExpiringCourseGrabSource((api as DirectSchoolApi).courseGrab(sourceSession)) {
+                if (session == sourceSession) expireSession(reauthenticate = false)
+            }
+        }
+    }
+    internal suspend fun evaluationAccess(): EvaluationSource {
+        if (demo) return DemoEvaluationSource()
+        ensureToolSession()
         val sourceSession = session
         val source = (api as DirectSchoolApi).evaluations(sourceSession)
         return object : EvaluationSource by source {
@@ -407,6 +427,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         }
     }
     fun logout() {
+        grabOwner.logout()
         val wasDemo = demo
         val returnView = cacheReturnView.takeIf { wasDemo }
         if (!wasDemo) cachedTimetables = null
@@ -429,6 +450,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         } else if (captcha == null) launch(silent = true) { fetchCaptcha() } else checkCaptcha()
     }
     fun startDemo() {
+        grabOwner.logout()
         if (cachedMode) rememberCacheView()
         if (loginInFlight) { captcha = null; captchaText = "" }
         clearRequests()
