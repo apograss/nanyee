@@ -209,6 +209,40 @@ class CourseGrabTest {
         assertTrue(runCatching { source.courses("12", 1) }.exceptionOrNull() is GrabThrottle)
         assertEquals(1, count)
     }
+    @Test fun closedRoundRedirectFixtureIsDistinctFromAuthenticationFailure() = runBlocking {
+        for (mode in listOf("closed", "login-page", "sso", "http-error", "empty")) {
+            var diagnostic: GrabDiscoveryDiagnostics? = null
+            val api = DirectSchoolApi(Fixture { request ->
+                val path = request.url.encodedPath
+                val builder = Response.Builder().request(request).protocol(Protocol.HTTP_1_1).message("fixture")
+                val redirect = when {
+                    path == "/new/student/xsxk/" && mode == "sso" -> "https://uis.smu.edu.cn/authserver/login?ticket=secret"
+                    path == "/new/student/xsxk/" && mode != "empty" -> "/"
+                    path == "/" -> "/new/welcome.page"
+                    else -> null
+                }
+                val body = if (path == "/new/welcome.page" && request.url.query == null && mode == "login-page") "<title>登录</title><input type=password>" else "<title>教务管理系统</title>选课尚未开放"
+                builder.code(if (mode == "http-error" && path == "/new/student/xsxk/") 503 else if (redirect != null) 302 else 200)
+                    .apply { if (redirect != null) header("Location", redirect) }.body(body.toResponseBody()).build()
+            })
+            DirectSchoolApi::class.java.getDeclaredField("session").apply { isAccessible = true }.set(api, "fixture")
+            val result = runCatching { api.courseGrab("fixture") { diagnostic = it }.categories() }
+            assertNotNull(diagnostic)
+            when (mode) {
+                "closed" -> { assertTrue(result.exceptionOrNull() is GrabSelectionClosed); assertEquals(listOf("/new/student/xsxk/", "/", "/new/welcome.page"), diagnostic!!.paths) }
+                "login-page", "sso" -> assertEquals(410, (result.exceptionOrNull() as SchoolError).status)
+                "http-error" -> assertEquals(503, (result.exceptionOrNull() as SchoolError).status)
+                else -> assertTrue(result.getOrThrow().isEmpty())
+            }
+        }
+    }
+    @Test fun diagnosticsNeverEmitAccountDataOrRawUrls() {
+        val diagnostic = grabDiscoveryDiagnostics(200, listOf("/new/student/xsxk/", "/private/secret-account"), """<title>张三 2026123456 教务管理系统</title><header>李四 123456</header><p>张三 2026123456 当前不在选课时间 secret@example.com</p><a href="/xklx/12?ticket=secret">课程</a><div data-href="/xsxk.html?xklxdm=01">入口</div>""")
+        assertEquals(1, diagnostic.pathLinks); assertEquals(1, diagnostic.queryLinks)
+        assertTrue(diagnostic.notice.contains("当前不在选课时间")); assertTrue(diagnostic.notice.length <= 200)
+        for (secret in listOf("张三", "李四", "2026123456", "123456", "secret", "example.com")) assertFalse(diagnostic.toString().contains(secret))
+        assertEquals("", grabDiscoveryDiagnostics(null, emptyList(), "").notice)
+    }
     private class Fixture(val respond: (Request) -> Response) : Call.Factory {
         override fun newCall(request: Request): Call = object : Call {
             override fun request() = request

@@ -15,6 +15,22 @@ internal data class GrabPage(val total: Int, val courses: List<GrabCourse>)
 internal enum class GrabOutcome { ENROLLED, LIMIT, CONFLICT, NOT_OPEN, REJECTED, UNKNOWN }
 internal data class GrabReply(val outcome: GrabOutcome, val message: String)
 internal class GrabThrottle(val waitMillis: Long) : Exception("学校限流，等待后重试")
+internal class GrabSelectionClosed : Exception("当前不在选课时间")
+internal data class GrabDiscoveryDiagnostics(val status: Int?, val paths: List<String>, val finalPath: String, val title: String, val pathLinks: Int, val queryLinks: Int, val notice: String)
+internal fun grabDiagnosticPath(path: String): String = if (path in setOf("/", "/new/welcome.page", "/new/student/xsxk/", "/new/student/xsxk", "/new/login", "/new/ssoLogin", "/authserver/login", "/cas/login")) path else "/[其他路径已隐藏]"
+internal fun grabDiscoveryDiagnostics(status: Int?, paths: List<String>, html: String): GrabDiscoveryDiagnostics {
+    val doc = Jsoup.parse(html)
+    doc.select("script,style,noscript,input,textarea,select,nav,header,footer").remove()
+    // Preserve only public school/UI vocabulary; names and account identifiers are never emitted.
+    val publicText = Regex("南方医科大学|教务管理系统|教学管理系统|统一身份认证|统一认证登录|学生个人中心|当前不在选课时间|不是选课时间|不在选课时间|暂无可选类别|没有可选类别|选课尚未开放|选课未开放|选课时间|选课通知|选课|当前|尚未|开放|暂无|通知|欢迎|教务|系统|登录|首页|学生|课程|管理|时间|请|稍后|重试|[，。！？：；、（）《》 ·—-]+")
+    fun safe(value: String) = publicText.findAll(value).joinToString("…") { it.value }.take(200)
+    val text = doc.body().text()
+    val index = text.indexOf("选课")
+    val links = doc.select("[href],[data-href],[onclick]").map { listOf("href", "data-href", "onclick").joinToString(" ") { key -> it.attr(key) } }
+    return GrabDiscoveryDiagnostics(status, paths.map(::grabDiagnosticPath), paths.lastOrNull()?.let(::grabDiagnosticPath).orEmpty(), safe(doc.title()),
+        links.count { Regex("/xklx/\\d{1,8}(?!\\d)").containsMatchIn(it) }, links.count { Regex("xklxdm=\\d{1,8}(?!\\d)").containsMatchIn(it) },
+        if (index < 0) "" else safe(text.substring((index - 40).coerceAtLeast(0), (index + 160).coerceAtMost(text.length))))
+}
 internal data class GrabClockSample(val wallMillis: Long, val elapsedMillis: Long, val serverMillis: Long)
 internal fun grabClockOffset(samples: List<GrabClockSample>): Long = samples.filter { it.elapsedMillis >= 0 }.minByOrNull { it.elapsedMillis }
     ?.let { it.serverMillis - (it.wallMillis + it.elapsedMillis / 2) } ?: throw SchoolError(503, "CLOCK_UNAVAILABLE", "无法读取学校时间，请稍后重试。")
@@ -22,7 +38,7 @@ internal fun grabRetryMillis(header: String?, now: Instant = Instant.now()): Lon
     ?: runCatching { java.time.Duration.between(now, ZonedDateTime.parse(header, DateTimeFormatter.RFC_1123_DATE_TIME).toInstant()).toMillis().coerceAtLeast(1000) }.getOrDefault(60000)
 
 internal fun grabCategories(html: String): List<GrabCategory> {
-    if (listOf("统一认证登录", "扫码登录").any { it in html }) throw SchoolError(410, "SESSION_EXPIRED", "学校会话已过期，请重新登录。")
+    if (listOf("统一认证登录", "扫码登录", "密码登录").any { it in html } || Jsoup.parse(html).select("input[type=password]").isNotEmpty()) throw SchoolError(410, "SESSION_EXPIRED", "学校会话已过期，请重新登录。")
     val values = linkedMapOf<String, String>()
     val code = Regex("(?:/xklx/|xklxdm=)(\\d{1,8})(?!\\d)", RegexOption.IGNORE_CASE)
     Jsoup.parse(html).select("[data-href], [href], [onclick]").forEach { element ->

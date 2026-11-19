@@ -125,6 +125,7 @@ internal class CourseGrabState : ViewModel() {
     val run = CourseGrabRun()
     var busy by mutableStateOf(false); private set
     var error by mutableStateOf(""); private set
+    var discoveryNotice by mutableStateOf(""); private set
     var categories by mutableStateOf(emptyList<GrabCategory>()); private set
     var category by mutableStateOf<GrabCategory?>(null); private set
     var courses by mutableStateOf(emptyList<GrabCourse>()); private set
@@ -144,13 +145,15 @@ internal class CourseGrabState : ViewModel() {
         if (identity == session) return
         if (source != null || run.active || (session != null && identity.isEmpty())) job?.cancel()
         session = identity; source = null; categories = emptyList(); category = null; courses = emptyList(); preferences = emptyList(); confirmation = null
+        discoveryNotice = ""
     }
     private fun work(block: suspend () -> Unit) {
         if (locked) return
-        busy = true; error = ""
+        busy = true; error = ""; discoveryNotice = ""
         job = viewModelScope.launch {
             try { block() }
             catch (e: CancellationException) { throw e }
+            catch (e: GrabSelectionClosed) { discoveryNotice = "当前不在选课时间" }
             catch (e: Exception) { error = when (e) { is GrabThrottle -> "学校限流，请等待 ${e.waitMillis / 1000} 秒后重试"; is SchoolError -> e.message.orEmpty(); else -> "学校数据暂时无法读取，请稍后重试" } }
             finally { busy = false }
         }
@@ -161,7 +164,7 @@ internal class CourseGrabState : ViewModel() {
         onSessionChanged(identity())
         source = next
         categories = next.categories()
-        if (categories.isEmpty()) error = "暂无选课类型，可能尚未开放。"
+        if (categories.isEmpty()) discoveryNotice = "没有可选类别，当前可能不在选课时间。"
     }
     fun choose(value: GrabCategory) = work {
         confirmation = null; category = value; courses = emptyList(); preferences = emptyList()

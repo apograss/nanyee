@@ -42,10 +42,21 @@ class CourseSelectionLiveListingTest {
                             }
                         }
                         assertTrue("Silent login failed; details omitted", login is SilentLoginResult.Success)
-                        val listing: CourseGrabListing = api.courseGrab((login as SilentLoginResult.Success).session.text("academic_session_id"))
+                        val listing: CourseGrabListing = api.courseGrab((login as SilentLoginResult.Success).session.text("academic_session_id")) { diagnostic ->
+                            println("Discovery HTTP status: ${diagnostic.status ?: "no response"}")
+                            println("Discovery redirect paths: ${diagnostic.paths.joinToString(" -> ")}")
+                            println("Discovery final path: ${diagnostic.finalPath}")
+                            println("Discovery page <title> (public vocabulary only): ${diagnostic.title}")
+                            println("Discovery link counts: /xklx/{code}=${diagnostic.pathLinks}; xklxdm={code}=${diagnostic.queryLinks}")
+                            println("Discovery visible 选课 context (public vocabulary only, <=200 chars): ${diagnostic.notice}")
+                        }
                         stage = "category discovery"
-                        val categories = listing.categories()
+                        val categories = try { listing.categories() } catch (_: GrabSelectionClosed) {
+                            println("Discovery outcome: 当前不在选课时间")
+                            emptyList()
+                        }
                         println("Course category count: ${categories.size}")
+                        if (categories.isEmpty()) println("Discovery observation: 没有可选类别")
                         stage = "first-page listing"
                         categories.forEachIndexed { index, category ->
                             val page = listing.courses(category.code, 1)

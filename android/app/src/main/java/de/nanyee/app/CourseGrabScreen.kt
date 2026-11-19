@@ -30,6 +30,7 @@ internal fun CourseGrabScreen(school: SchoolState, live: CourseGrabState, demoSt
             }
         }
         if (state.error.isNotBlank()) Text(state.error, color = MaterialTheme.colorScheme.error)
+        if (state.discoveryNotice.isNotBlank()) Text(state.discoveryNotice)
         if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         Button(onClick = { state.load({ if (demo) "demo-${state.scenario}" else school.evaluationSessionIdentity }) { if (demo) DemoCourseGrabSource(state.scenario) else school.courseGrabAccess() } }, enabled = !state.locked) { Text("只读加载选课类型") }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

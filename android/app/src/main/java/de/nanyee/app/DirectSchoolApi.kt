@@ -162,7 +162,7 @@ internal class DirectSchoolApi(private val transport: Call.Factory? = null) : Sc
         if (session.isEmpty() || body?.text("academic_session_id") != session) throw SchoolError(410, "SESSION_EXPIRED", "学校会话已过期，请重新登录。")
     }
 
-    internal fun courseGrab(sessionId: String): CourseGrabSource = object : CourseGrabSource {
+    internal fun courseGrab(sessionId: String, diagnostics: (GrabDiscoveryDiagnostics) -> Unit = {}): CourseGrabSource = object : CourseGrabSource {
         private fun check() = checkSession(payload("academic_session_id" to sessionId))
         private suspend fun <T> read(request: Request, parse: (Response) -> T): T {
             check()
@@ -173,21 +173,42 @@ internal class DirectSchoolApi(private val transport: Call.Factory? = null) : Sc
             }
         }
         override suspend fun categories(): List<GrabCategory> = withContext(Dispatchers.IO) {
-            read(requestBuilder("$ACADEMIC/new/welcome.page?ui=new").build()) { content(it) }
-            var url = "$ACADEMIC/new/student/xsxk/".toHttpUrl()
-            repeat(5) {
-                val result = read(requestBuilder(url.toString()).build()) { response ->
-                    if (response.isRedirect) null to response.header("Location") else content(response) to null
+            val paths = mutableListOf<String>()
+            var status: Int? = null
+            var html = ""
+            suspend fun get(start: String): Pair<String, String> {
+                var url = start.toHttpUrl()
+                repeat(5) {
+                    paths.add(url.encodedPath)
+                    status = null; html = ""
+                    val result = read(requestBuilder(url.toString()).build()) { response ->
+                        status = response.code
+                        html = response.peekBody(65536).string()
+                        if (response.isRedirect) null to response.header("Location") else content(response) to null
+                    }
+                    if (result.first != null) return result.first!! to url.encodedPath
+                    val next = result.second?.let { url.resolve(it) }
+                    if (next != null) paths.add(next.encodedPath)
+                    if (next == null || next.scheme != "https" || next.host != "zhjw.smu.edu.cn" || next.encodedPath !in setOf("/", "/new/welcome.page", "/new/student/xsxk/", "/new/student/xsxk")) throw SchoolError(410, "SESSION_EXPIRED", "学校会话已过期，请重新登录。")
+                    paths.removeAt(paths.lastIndex)
+                    url = next
                 }
-                if (result.first != null) {
-                    if (!url.encodedPath.startsWith("/new/student/xsxk")) throw SchoolError(404, "NOT_OPEN", "学校选课当前未开放，请在开放期间重试。")
-                    return@withContext grabCategories(result.first!!)
-                }
-                val next = result.second?.let { url.resolve(it) }
-                if (next == null || next.scheme != "https" || next.host != "zhjw.smu.edu.cn") throw SchoolError(410, "SESSION_EXPIRED", "学校会话已过期，请重新登录。")
-                url = next
+                throw SchoolError(503, "UPSTREAM_UNAVAILABLE", "学校跳转次数过多。")
             }
-            throw SchoolError(503, "UPSTREAM_UNAVAILABLE", "学校跳转次数过多。")
+            try {
+                grabCategories(get("$ACADEMIC/new/welcome.page?ui=new").first)
+                paths.clear()
+                val (body, path) = get("$ACADEMIC/new/student/xsxk/")
+                val categories = grabCategories(body)
+                if (path == "/new/welcome.page" && paths == listOf("/new/student/xsxk/", "/", "/new/welcome.page")) throw GrabSelectionClosed()
+                if (path !in setOf("/new/student/xsxk/", "/new/student/xsxk")) throw SchoolError(503, "UPSTREAM_UNAVAILABLE", "学校选课页面异常。")
+                categories
+            } catch (e: GrabThrottle) {
+                status = 429
+                throw e
+            } finally {
+                diagnostics(grabDiscoveryDiagnostics(status, paths, html))
+            }
         }
         override suspend fun courses(category: String, page: Int): GrabPage = withContext(Dispatchers.IO) {
             read(grabRequest(category, page = page)) { grabCourses(Json.parseToJsonElement(content(it))) }
