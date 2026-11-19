@@ -26,21 +26,19 @@ internal fun balancedCjkTitle(title: String, charsPerLine: Int, maxLines: Int): 
     }
 }
 
-internal data class FittedCourseTitle(val text: String, val fontSize: Float)
-
-internal fun fitCjkTitle(title: String, fontSize: Float, minimumFontSize: Float, maxLines: Int, capacityAt: (Float) -> Int): FittedCourseTitle {
-    require(fontSize.isFinite() && fontSize > 0 && minimumFontSize.isFinite() && minimumFontSize > 0)
+internal fun explicitCjkTitle(title: String, maxLines: Int): String {
     val points = title.codePoints().toArray()
-    if (points.isEmpty() || maxLines < 2 || points.any { Character.UnicodeScript.of(it) != Character.UnicodeScript.HAN }) return FittedCourseTitle(title, fontSize)
-    val floor = minimumFontSize.coerceAtMost(fontSize)
-    var size = fontSize
-    while (true) {
-        val capacity = capacityAt(size)
-        val lines = if (capacity > 0) (points.size - 1) / capacity + 1 else points.size
-        val orphan = points.size > 1 && (capacity < 1 || lines > 1 && points.size / lines == 1)
-        if (!orphan || size <= floor) return FittedCourseTitle(balancedCjkTitle(title, capacity, maxLines), size)
-        size = (size * 0.9f).coerceAtLeast(floor)
-    }
+    if (points.size < 4) return title
+    return balancedCjkTitle(title, (points.size + 1) / 2, maxLines)
+}
+
+internal data class CourseTitleFit(val fontSize: Float, val fallback: Boolean = false)
+
+internal fun nextCourseTitleFit(current: CourseTitleFit, minimumFontSize: Float, overflow: Boolean): CourseTitleFit {
+    require(current.fontSize.isFinite() && current.fontSize > 0 && minimumFontSize.isFinite() && minimumFontSize > 0)
+    if (!overflow || current.fallback) return current
+    return if (current.fontSize > minimumFontSize) current.copy(fontSize = (current.fontSize * 0.9f).coerceAtLeast(minimumFontSize))
+    else current.copy(fallback = true)
 }
 
 internal fun timetableFontScale(scale: Float): Float = if (scale.isFinite() && scale > 0) scale.coerceAtMost(1.4f) else 1f
