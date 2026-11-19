@@ -49,6 +49,7 @@ private fun ToolCard(title: String, description: String, onClick: () -> Unit) {
 }
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 private fun ManualEvaluationScreen(school: SchoolState, evaluation: EvaluationState, onBack: () -> Unit) {
     var demoChoice by rememberSaveable { mutableStateOf(false) }
     var confirming by remember { mutableStateOf(false) }
@@ -62,6 +63,11 @@ private fun ManualEvaluationScreen(school: SchoolState, evaluation: EvaluationSt
         Text(if (demo) "演示模式 · 不联网，不会提交真实评价。" else "学校直连 · 不托管密码，不使用 Nanyee 服务器。只读加载不会提交评价。")
         if (state.error.isNotBlank()) Text(state.error, color = MaterialTheme.colorScheme.error)
         if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+        if (demo) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            DemoEvaluationScenario.entries.forEach { scenario ->
+                FilterChip(selected = state.demoScenario == scenario, onClick = { state.selectDemoScenario(scenario) }, enabled = !state.busy, label = { Text(scenario.label) })
+            }
+        }
         if (state.run.stale) Text("学校会话已变更，上轮结果已过期；请先核验已提交的课程，再重新只读加载。", color = MaterialTheme.colorScheme.error)
         Button(onClick = { state.load({ if (demo) "demo" else school.evaluationSessionIdentity }) { if (demo) state.demoSource else school.evaluationAccess() } }, enabled = !state.busy) { Text("只读加载待评课程") }
         if (!school.demo) TextButton(onClick = { demoChoice = !demoChoice }, enabled = !state.busy) { Text(if (demoChoice) "返回真实学校数据" else "无账号体验演示") }

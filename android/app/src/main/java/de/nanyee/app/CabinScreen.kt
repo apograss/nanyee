@@ -139,23 +139,26 @@ internal fun CabinToolsScreen(school: SchoolState, state: CabinState = viewModel
                 state.jobs.forEach { job ->
                     Card(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Text(cabinStatus(job.text("state")), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            Text(cabinStatus(job.text("state"), job.text("tool_id")), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                             val payload = job["payload"]?.obj() ?: JsonObject(emptyMap())
                             if (!evaluationMode) Text(payload.text("title"))
-                            if (evaluationMode) Text("下次运行：${cabinDisplayMoment(job.text("scheduled_for"))}") else Text("${payload.text("target_date")}\n${payload.text("start_time")}–${payload.text("end_time")}")
+                            if (evaluationMode) {
+                                evaluationNextRun(job)?.let { Text("下次运行：${cabinDisplayMoment(it)}") }
+                                evaluationFailure(job).takeIf { it.isNotBlank() }?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                            } else Text("${payload.text("target_date")}\n${payload.text("start_time")}–${payload.text("end_time")}")
                             if (!evaluationMode) Text("首次尝试：${cabinDisplayMoment(job.text("scheduled_for"))}", style = MaterialTheme.typography.bodySmall)
                             val receipt = job["receipt"] as? JsonObject
                             if (receipt != null) {
                                 if (evaluationMode) {
                                     Text("最近一轮：待评 ${receipt.number("pending_count")} · 已提交 ${receipt.number("submitted_count")}")
-                                    receipt.items("logs").forEach { Text(it.text("message"), style = MaterialTheme.typography.bodySmall) }
+                                    evaluationRoundLogs(job).forEach { Text(it.text("message"), style = MaterialTheme.typography.bodySmall) }
                                 } else Text("预约收据\n${receipt.text("room_name")}\n${receipt.text("target_date")} ${receipt.text("start_time")}–${receipt.text("end_time")}")
                             }
-                            if (job.text("state") == "verification_required" || job.text("next_action").isNotBlank()) Text(cabinNextAction(job.text("next_action")), color = MaterialTheme.colorScheme.error)
+                            if (job.text("state") == "verification_required" || job.text("next_action").isNotBlank()) Text(cabinNextAction(job.text("next_action"), job.text("tool_id")), color = MaterialTheme.colorScheme.error)
                             if (job.text("state") in listOf("queued", "running", "retry_wait")) OutlinedButton(onClick = { action = "cancel" to job.text("id") }, enabled = !state.busy) { Text(if (evaluationMode) "取消常驻评课" else "取消预约任务") }
                             if (state.demo) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 listOf("running", "retry_wait", "succeeded", "failed", "verification_required").forEach { status ->
-                                    TextButton(onClick = { state.advanceDemo(job.text("id"), status) }, enabled = !state.busy) { Text("演示：${cabinStatus(status)}") }
+                                    TextButton(onClick = { state.advanceDemo(job.text("id"), status) }, enabled = !state.busy) { Text("演示：${cabinStatus(status, job.text("tool_id"))}") }
                                 }
                             }
                         }

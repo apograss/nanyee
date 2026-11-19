@@ -155,17 +155,40 @@ internal fun platformRequest(method: String, path: String, body: JsonObject?, cs
     return builder.build()
 }
 
-internal fun cabinStatus(state: String): String = when (state) {
+internal fun cabinStatus(state: String, toolId: String = "study_cabin"): String = if (toolId == "evaluation") when (state) {
+    "queued" -> "等待评课"; "running" -> "正在评课"; "retry_wait" -> "等待重试"
+    "succeeded" -> "评课成功"; "failed" -> "评课失败"; "cancelled" -> "已取消"
+    "verification_required" -> "需要核验"; else -> "未知状态"
+} else when (state) {
     "queued" -> "等待预约"; "running" -> "正在尝试"; "retry_wait" -> "等待重试"
     "succeeded" -> "预约成功"; "failed" -> "预约失败"; "cancelled" -> "已取消"
     "verification_required" -> "需要核验"; else -> "未知状态"
 }
 
-internal fun cabinNextAction(action: String): String = when (action) {
-    "verify_upstream" -> "结果不确定，请到学校预约网站核验；不要重复预约。"
+internal fun evaluationNextRun(job: JsonObject): String? = job.text("scheduled_for").takeIf {
+    it.isNotBlank() && job.text("state") in setOf("queued", "retry_wait") &&
+        !job.text("error_code").startsWith("CREDENTIAL_") && job.text("next_action") != "replace_credential"
+}
+
+internal fun evaluationFailure(job: JsonObject): String = when {
+    job.text("error_code").startsWith("CREDENTIAL_") || job.text("next_action") == "replace_credential" -> "学校托管凭据失效或不可用，请更新凭据后重试。"
+    job.text("error_code").isNotBlank() -> "评课未完成：${job.text("error_code")}"
+    job.text("state") == "failed" -> "评课失败，请到 nanyee.de 查看失败原因。"
+    else -> ""
+}
+
+internal fun evaluationRoundLogs(job: JsonObject): List<JsonObject> {
+    val receipt = job["receipt"] as? JsonObject ?: return emptyList()
+    return receipt.items("logs").filterNot {
+        evaluationFailure(job).isNotBlank() && receipt.number("submitted_count") == 0 && it.text("event") == "evaluation_completed"
+    }
+}
+
+internal fun cabinNextAction(action: String, toolId: String = "study_cabin"): String = when (action) {
+    "verify_upstream" -> if (toolId == "evaluation") "结果不确定，请到学校教务系统核验；不要重复评课。" else "结果不确定，请到学校预约网站核验；不要重复预约。"
     "replace_credential" -> "请更新托管的学校凭据。"
     "automatic_retry" -> "服务器将自动重试，请稍候。"
-    else -> "请到 nanyee.de 查看任务并核验预约结果。"
+    else -> if (toolId == "evaluation") "请到 nanyee.de 查看任务并核验评课结果。" else "请到 nanyee.de 查看任务并核验预约结果。"
 }
 
 internal fun JsonElement.objectList(): List<JsonObject> = (this as? JsonArray)?.map { it as? JsonObject ?: error("响应列表项格式无效") } ?: error("响应格式无效")

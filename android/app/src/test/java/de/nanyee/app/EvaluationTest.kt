@@ -4,6 +4,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelProvider
 import kotlinx.serialization.json.*
@@ -35,6 +36,56 @@ internal val evaluationFixture = """<script>entss.post('/new/student/ktpj/savePj
 """.trimIndent()
 
 class EvaluationTest {
+    @Test fun evaluationLabelsAndNextRunRespectToolAndFailureState() {
+        assertEquals("等待评课", cabinStatus("queued", "evaluation"))
+        assertEquals("正在评课", cabinStatus("running", "evaluation"))
+        assertEquals("评课成功", cabinStatus("succeeded", "evaluation"))
+        assertEquals("评课失败", cabinStatus("failed", "evaluation"))
+        assertEquals("等待预约", cabinStatus("queued"))
+        assertTrue(cabinNextAction("verify_upstream", "evaluation").contains("不要重复评课"))
+        val queued = payload("state" to "queued", "scheduled_for" to "2030-01-01T00:00:00Z")
+        assertNotNull(evaluationNextRun(queued)); assertEquals("", evaluationFailure(queued))
+        for (state in listOf("succeeded", "failed", "cancelled", "verification_required", "running"))
+            assertNull(evaluationNextRun(JsonObject(queued + ("state" to JsonPrimitive(state)))))
+        val invalid = JsonObject(queued + ("error_code" to JsonPrimitive("CREDENTIAL_INVALID")))
+        assertNull(evaluationNextRun(invalid)); assertTrue(evaluationFailure(invalid).contains("凭据"))
+        assertNull(evaluationNextRun(JsonObject(queued + ("next_action" to JsonPrimitive("replace_credential")))))
+        assertNull(evaluationNextRun(JsonObject(emptyMap())))
+        assertTrue(evaluationRoundLogs(JsonObject(emptyMap())).isEmpty())
+        assertTrue(evaluationFailure(payload("state" to "failed")).contains("评课失败"))
+        assertTrue(evaluationFailure(payload("error_code" to "UPSTREAM_ERROR")).contains("UPSTREAM_ERROR"))
+        val failedReceipt = buildJsonObject {
+            put("submitted_count", 0)
+            putJsonArray("logs") {
+                add(payload("event" to "evaluation_completed", "message" to "本轮评课完成"))
+                add(payload("event" to "evaluation_failed", "message" to "失败原因"))
+            }
+        }
+        val failed = JsonObject(invalid + ("receipt" to failedReceipt))
+        assertEquals(listOf("失败原因"), evaluationRoundLogs(failed).map { it.text("message") })
+    }
+    @Test fun manualDemoSupportsNotOpenEmptyAndMidBatchFailureWithoutNetwork() = runBlocking {
+        val notOpen = DemoEvaluationSource(DemoEvaluationScenario.NOT_OPEN) {}
+        val error = runCatching { notOpen.pending() }.exceptionOrNull() as SchoolError
+        assertEquals("EVALUATION_NOT_OPEN", error.code)
+        assertTrue(DemoEvaluationSource(DemoEvaluationScenario.NOTHING_PENDING) {}.pending().isEmpty())
+        val demo = DemoEvaluationSource(DemoEvaluationScenario.MID_BATCH_ERROR) {}
+        val run = ManualEvaluationRun()
+        run.prepare(demo, demo.pending())
+        assertTrue(runCatching { run.submit(demo) }.isFailure)
+        assertEquals(2, run.progress); assertEquals(2, run.results.size)
+        assertTrue(run.results.first().contains("提交成功"))
+        assertTrue(run.results.last().contains("第二门课程上游提交失败"))
+        assertEquals(2, demo.pending().size)
+    }
+    @Test fun defaultManualDemoSuspendsBeforeSubmittingAndCancellationKeepsCoursePending() = runBlocking {
+        val demo = DemoEvaluationSource()
+        val run = ManualEvaluationRun()
+        run.prepare(demo, demo.pending())
+        assertNull(withTimeoutOrNull(100) { run.submit(demo); true })
+        assertTrue(run.results.single().contains("结果未知"))
+        assertEquals(3, demo.pending().size)
+    }
     @Test fun schoolSessionChangeClearsIdleCoursesAndPreviewWithoutCallingOldSource() = runBlocking {
         val state = EvaluationState()
         var oldDrafts = 0
@@ -301,6 +352,12 @@ class EvaluationTest {
         assertTrue(backend.call("GET", "/notices").jsonArray.isEmpty())
         val next = CabinSubmission(request).send(backend).jsonObject
         backend.advance(next.text("id"), "failed")
+        val failed = backend.call("GET", "/jobs").jsonArray.first().jsonObject
+        assertNull(evaluationNextRun(failed))
+        assertTrue(evaluationFailure(failed).contains("凭据"))
+        assertEquals(0, failed["receipt"]!!.jsonObject.number("submitted_count"))
+        assertFalse(failed["receipt"]!!.jsonObject.items("logs").any { it.text("event") == "evaluation_completed" })
+        assertTrue(evaluationRoundLogs(failed).single().text("message").contains("凭据失效"))
         assertEquals("credential_invalid", backend.call("GET", "/notices").jsonArray.single().jsonObject.text("kind"))
         val updated = backend.call("PUT", "/credentials/${credential.text("id")}/secret", cabinSecret("demo-only", "updated-demo", false, "evaluation")).jsonObject
         assertEquals(next.text("id"), updated.text("resumed_job_id"))

@@ -97,7 +97,14 @@ internal class DemoCabinBackend : PlatformBackend {
             val receipt = buildJsonObject {
                 put("strategy", "legacy_positive_random"); put("pending_count", 3); put("submitted_count", if (state == "succeeded") 3 else 0)
                 put("submissions", JsonArray(emptyList()))
-                putJsonArray("logs") { add(payload("event" to "evaluation_completed", "message" to "演示：本轮评课完成，无真实提交。")) }
+                putJsonArray("logs") {
+                    when (state) {
+                        "succeeded" -> add(payload("event" to "evaluation_completed", "message" to "演示：本轮评课完成，无真实提交。"))
+                        "failed" -> add(payload("event" to "evaluation_failed", "message" to "演示：学校托管凭据失效，本轮未提交。"))
+                        "verification_required" -> add(payload("event" to "evaluation_failed", "message" to "演示：评课结果不确定，请先核验。"))
+                        else -> add(payload("event" to "evaluation_started", "message" to "演示：本轮尚未完成，无真实提交。"))
+                    }
+                }
             }
             jobs[index] = JsonObject(job + mapOf("state" to JsonPrimitive(if (state == "succeeded") "queued" else state),
                 "receipt" to receipt, "scheduled_for" to JsonPrimitive(Instant.now().plusSeconds(86400).toString()),

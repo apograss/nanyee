@@ -4,6 +4,7 @@ import androidx.compose.runtime.*
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 internal class ManualEvaluationRun {
@@ -51,7 +52,14 @@ internal class EvaluationState : ViewModel() {
     var pending by mutableStateOf(emptyList<EvaluationReference>()); private set
     var selected by mutableStateOf(emptySet<String>())
     val run = ManualEvaluationRun()
-    val demoSource = DemoEvaluationSource()
+    var demoScenario by mutableStateOf(DemoEvaluationScenario.NORMAL); private set
+    var demoSource = DemoEvaluationSource(); private set
+    fun selectDemoScenario(value: DemoEvaluationScenario) {
+        if (busy) return
+        onSessionChanged("demo-$value")
+        run.reset()
+        demoScenario = value; demoSource = DemoEvaluationSource(value)
+    }
     private var source: EvaluationSource? = null
     private var sessionIdentity: String? = null
     private var sessionVersion = 0
@@ -91,14 +99,28 @@ internal class EvaluationState : ViewModel() {
     fun confirm() = work { pending = emptyList(); selected = emptySet(); listed = false; run.submit(checkNotNull(source)) }
 }
 
-internal class DemoEvaluationSource : EvaluationSource {
+internal enum class DemoEvaluationScenario(val label: String) {
+    NORMAL("正常评课"), NOT_OPEN("评教未开放"), NOTHING_PENDING("暂无待评"), MID_BATCH_ERROR("第二门提交失败")
+}
+
+internal class DemoEvaluationSource(
+    private val scenario: DemoEvaluationScenario = DemoEvaluationScenario.NORMAL,
+    private val pause: suspend () -> Unit = { delay(1500) }
+) : EvaluationSource {
     private val remaining = (1..3).map { EvaluationReference("teacher-$it", "hour-$it", "form-$it", "演示教师 $it", "演示课程 $it") }.toMutableList()
-    override suspend fun pending() = remaining.toList()
+    override suspend fun pending(): List<EvaluationReference> = when (scenario) {
+        DemoEvaluationScenario.NOT_OPEN -> throw SchoolError(403, "EVALUATION_NOT_OPEN", "演示：评教尚未开放。")
+        DemoEvaluationScenario.NOTHING_PENDING -> emptyList()
+        else -> remaining.toList()
+    }
     override suspend fun draft(reference: EvaluationReference) = EvaluationDraft(reference, emptyMap(), listOf(
         EvaluationQuestion(5, "quality", "教学质量", (1..5).map { EvaluationOption("option-$it", it * 5, "满意度 $it") }),
         EvaluationQuestion(1, "attendance", "是否迟到", listOf(EvaluationOption("yes", 0, "是"), EvaluationOption("no", 0, "否")))
     ))
     override suspend fun submit(preview: EvaluationPreview): Int {
+        pause()
+        if (scenario == DemoEvaluationScenario.MID_BATCH_ERROR && preview.draft.reference.teacher == "teacher-2")
+            throw SchoolError(502, "UPSTREAM_ERROR", "演示：第二门课程上游提交失败")
         evaluationSubmission(preview)
         remaining.removeAll { it.key == preview.draft.reference.key }
         return preview.draft.questions.sumOf { q -> q.options.first { it.code == preview.selections[q.indicator] }.score }
