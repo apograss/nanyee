@@ -227,7 +227,12 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
             if (table == null) { courses = emptyList(); semesterStart = ""; requireSchoolLogin(0) } else { courses = table.courses; totalWeeks = table.totalWeeks; semesterStart = table.semesterStart; week = week.coerceAtMost(totalWeeks); followCurrentWeek() }
         } else if (loggedIn) { semesterStart = ""; courses = emptyList(); launch("timetable") { queryTimetable() } }
     }
-    fun setWeeks(value: Int) { totalWeeks = value.coerceIn(1, 30); week = week.coerceAtMost(totalWeeks); followCurrentWeek(); prefs.edit().putInt("weeks", totalWeeks).apply(); if (!demo && loggedIn) launch("timetable") { queryTimetable() } }
+    fun setWeeks(value: Int) {
+        if (cachedMode) { error = "离线课表的周数以已下载数据为准，请登录后修改。"; return }
+        totalWeeks = value.coerceIn(1, 30); week = week.coerceAtMost(totalWeeks); followCurrentWeek()
+        prefs.edit().putInt("weeks", totalWeeks).apply()
+        if (!demo && loggedIn) launch("timetable") { queryTimetable() }
+    }
     private fun clearRequests() {
         sessionGeneration++
         jobs.values.toList().forEach { it.cancel() }; jobs.clear(); busy = false; loginInFlight = false
