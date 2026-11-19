@@ -91,10 +91,24 @@ private fun sameCabinPayload(first: JsonElement?, second: JsonElement?): Boolean
         OffsetDateTime.parse(a.text("attempt_until")).toInstant() == OffsetDateTime.parse(b.text("attempt_until")).toInstant()
 }.getOrDefault(false)
 
-internal suspend fun createCabinCredential(backend: PlatformBackend, body: JsonObject, replaced: String?): JsonObject {
-    val created = backend.call("POST", "/credentials", body).obj()
-    if (replaced != null) backend.call("DELETE", "/credentials/$replaced")
-    return created
+internal class CabinCredentialRecovery {
+    private var baseline: Set<String>? = null
+    private var replaced: String? = null
+    private var created: JsonObject? = null
+
+    suspend fun save(backend: PlatformBackend, body: JsonObject, oldId: String?): JsonObject {
+        val current = cabinCredentials(backend.call("GET", "/credentials"))
+        if (baseline != null && created == null) created = current.firstOrNull { it.text("id") !in baseline!! }
+        if (created == null) {
+            baseline = current.map { it.text("id") }.toSet()
+            replaced = oldId
+            created = backend.call("POST", "/credentials", body).obj()
+        }
+        val result = created!!
+        replaced?.let { backend.call("DELETE", "/credentials/$it") }
+        baseline = null; replaced = null; created = null
+        return result
+    }
 }
 
 internal fun platformRequest(method: String, path: String, body: JsonObject?, csrf: String?, key: String? = null): Request {

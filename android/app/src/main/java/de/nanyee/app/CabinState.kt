@@ -12,6 +12,7 @@ internal class CabinState(app: Application) : AndroidViewModel(app) {
     private var work: Job? = null
     private var initialized = false
     private var generation = 0
+    private var credentialRecovery = CabinCredentialRecovery()
     var demo by mutableStateOf(false); private set
     var busy by mutableStateOf(false); private set
     var user by mutableStateOf<JsonObject?>(null); private set
@@ -61,6 +62,7 @@ internal class CabinState(app: Application) : AndroidViewModel(app) {
     }
 
     private fun clearSensitive() {
+        credentialRecovery = CabinCredentialRecovery()
         user = null; platformPassword = ""; account = ""; schoolPassword = ""; credentials = emptyList()
         selectedCredential = ""; jobs = emptyList(); cabins = emptyList(); consent = false; credentialEditor = false
         editingId = null; confirmation = null; pending = null; submitted = false; canDiscardPending = false
@@ -109,7 +111,7 @@ internal class CabinState(app: Application) : AndroidViewModel(app) {
         val body = cabinSecret(account.trim(), schoolPassword, true)
         schoolPassword = ""
         run {
-            createCabinCredential(api(), body, id)
+            selectedCredential = credentialRecovery.save(api(), body, id).text("id")
             cancelCredential(); load(); message = "凭据已安全提交给 nanyee.de。"
         }
     }
