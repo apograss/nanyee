@@ -268,7 +268,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
     private fun restoreCachedTimetable(view: CachedTimetableView? = null): Boolean {
         val snapshot = runCatching { timetableCache.load() }.getOrElse { hint = "本机课表无法读取，请重新登录"; null } ?: return false
         cachedTimetables = snapshot
-        val restored = snapshot.restoreView(view)
+        val restored = snapshot.restoreView(view, CachedTimetableView(semester, week, userPickedWeek))
         semesters = snapshot.semesters; semester = restored.semester
         val table = snapshot.tables.getValue(semester)
         courses = table.courses; totalWeeks = table.totalWeeks; semesterStart = table.semesterStart

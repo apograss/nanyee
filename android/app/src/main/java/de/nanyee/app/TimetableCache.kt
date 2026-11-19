@@ -27,10 +27,11 @@ data class TimetableSnapshot(
 
 internal data class CachedTimetableView(val semester: String, val week: Int, val userPickedWeek: Boolean)
 
-internal fun TimetableSnapshot.restoreView(view: CachedTimetableView?): CachedTimetableView {
-    val code = view?.semester?.takeIf { it in tables } ?: selectedSemester
+internal fun TimetableSnapshot.restoreView(view: CachedTimetableView?, savedView: CachedTimetableView? = null): CachedTimetableView {
+    val preferred = view ?: savedView?.takeIf { it.userPickedWeek && it.semester in tables }
+    val code = preferred?.semester?.takeIf { it in tables } ?: selectedSemester
     val table = tables.getValue(code)
-    return if (view?.semester == code) view.copy(week = view.week.coerceIn(1, table.totalWeeks))
+    return if (preferred?.semester == code) preferred.copy(week = preferred.week.coerceIn(1, table.totalWeeks))
     else CachedTimetableView(code, 1, false)
 }
 

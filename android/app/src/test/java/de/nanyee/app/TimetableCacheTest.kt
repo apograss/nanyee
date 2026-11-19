@@ -67,6 +67,16 @@ class TimetableCacheTest {
         assertEquals(CachedTimetableView("202601", 1, false), value.restoreView(null))
         assertEquals(CachedTimetableView("202601", 1, false), value.restoreView(viewed.copy(semester = "missing")))
     }
+    @Test fun recreationRestoresPinnedWeekOnlyForAnAvailableSavedSemester() {
+        val value = snapshot()
+        val pinned = CachedTimetableView("202502", 7, true)
+        assertEquals(pinned, value.restoreView(null, pinned))
+        assertEquals(pinned.copy(week = 18), value.restoreView(null, pinned.copy(week = 30)))
+        val default = CachedTimetableView("202601", 1, false)
+        assertEquals(default, value.restoreView(null, pinned.copy(semester = "missing")))
+        assertEquals(default, value.restoreView(null, pinned.copy(userPickedWeek = false)))
+        assertEquals(default, value.restoreView(null, null))
+    }
     private class MemoryStorage : TimetableCacheStorage {
         var value: String? = null
         override fun read() = value
