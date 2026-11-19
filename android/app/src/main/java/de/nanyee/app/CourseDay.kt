@@ -27,7 +27,10 @@ fun CourseDay(courses: List<JsonObject>, allCourses: List<JsonObject>, colors: L
                 val span = if (collapse) requireNotNull(courseSpan(group)) else course.number("start_node")..course.number("end_node")
                 Surface(onClick = { if (collapse && group.size > 1) onConflicts(group) else onCourse(course) }, color = colors[allCourses.indexOf(course).coerceAtLeast(0) % colors.size], shape = RoundedCornerShape(8.dp), modifier = Modifier.offset(x = if (collapse) 0.dp else laneWidth * placement.lane, y = ((span.first - 1) * 64).dp).width(laneWidth).padding(end = if (!collapse && placement.laneCount > 1) 2.dp else 0.dp).height(((span.last - span.first + 1) * 64 - 4).dp)) {
                     Column(Modifier.padding(horizontal = 3.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        if (collapse && group.size > 1) Text("+${group.size - 1}", Modifier.align(Alignment.End), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Text(course.text("start_time"), Modifier.weight(1f), fontSize = 8.sp, lineHeight = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            if (collapse && group.size > 1) Text("+${group.size - 1}", fontSize = 10.sp, lineHeight = 10.sp, maxLines = 1, fontWeight = FontWeight.Bold)
+                        }
                         Text(course.text("name"), fontWeight = FontWeight.Bold, fontSize = 10.sp, lineHeight = 14.sp, maxLines = if (span.first == span.last) 1 else 3, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall.copy(lineBreak = LineBreak.Heading))
                         Text(course.text("location"), fontSize = 8.sp, lineHeight = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }

@@ -19,13 +19,15 @@ internal fun periodStartTimes(courses: List<JsonObject>): List<String> {
         listOf("08:00", "08:45", "09:50", "10:35", "11:20", "14:30", "15:15", "16:15", "17:00", "19:30", "20:30"),
         listOf("08:30", "09:15", "10:20", "11:05", "11:50", "14:00", "14:45", "15:45", "16:30", "19:30", "20:30")
     )
-    val known = courses.filter { it.number("start_node") in 1..60 }
+    val observed = courses.filter { it.number("start_node") in 1..60 }
         .groupBy { it.number("start_node") }.mapValues { (_, items) ->
-            items.mapNotNull { runCatching { LocalTime.parse(it.text("start_time")).toString() }.getOrNull() }.distinct().singleOrNull()
-        }.filterValues { it != null }
-    val matching = campusTimes.filter { times -> known.all { (node, time) -> times.getOrNull(node - 1) == time } }
+            items.mapNotNull { runCatching { LocalTime.parse(it.text("start_time")).toString() }.getOrNull() }.distinct()
+        }
+    val known = observed.mapValues { (_, times) -> times.singleOrNull() }.filterValues { it != null }
+    val conflicts = observed.filterValues { it.size > 1 }.keys
+    val matching = if (conflicts.isNotEmpty()) emptyList() else campusTimes.filter { times -> known.all { (node, time) -> times.getOrNull(node - 1) == time } }
     val count = maxOf(11, courses.maxOfOrNull { it.number("end_node").coerceIn(1, 60) } ?: 11)
-    return (1..count).map { node -> known[node] ?: matching.mapNotNull { it.getOrNull(node - 1) }.distinct().singleOrNull() ?: "—" }
+    return (1..count).map { node -> if (node in conflicts) "—" else known[node] ?: matching.mapNotNull { it.getOrNull(node - 1) }.distinct().singleOrNull() ?: "—" }
 }
 
 internal fun weekAfterDateChange(week: Int, totalWeeks: Int, previous: LocalDate, current: LocalDate, userPicked: Boolean = false): Int {
