@@ -56,7 +56,7 @@ class CabinRecoveryTest {
         assertNull(pending.matchingJob(listOf(recent)))
         pending.send(Backend())
         assertNull(pending.matchingJob(listOf(job(sent.minusSeconds(3600), "cancelled"))))
-        assertNull(pending.matchingJob(listOf(job(sent.minusSeconds(60), "cancelled", sent.minusSeconds(30)))))
+        assertNull(pending.matchingJob(listOf(job(sent.minusSeconds(120), "cancelled", sent.minusSeconds(121)))))
         assertNull(pending.matchingJob(listOf(job(sent.minusSeconds(121), "queued"))))
         assertEquals(recent, pending.matchingJob(listOf(recent)))
         val skewed = job(sent.minusSeconds(120), "queued")
@@ -67,6 +67,23 @@ class CabinRecoveryTest {
         clock = sent.plusSeconds(600)
         pending.send(Backend())
         assertEquals(recent, pending.matchingJob(listOf(recent)))
+    }
+    @Test fun terminalReconciliationAllowsPhoneClockAheadAfterLostResponse() = runBlocking {
+        val phoneTime = Instant.parse("2030-01-01T00:02:00Z")
+        val body = cabinJob(cabinDefaults().copy(cabins = listOf(1)), "fixture")
+        val pending = CabinSubmission(body, now = { phoneTime })
+        val lossy = Backend().apply { failCreate = true }
+        assertTrue(runCatching { pending.send(lossy) }.isFailure)
+        for (state in listOf("succeeded", "failed", "cancelled")) {
+            val job = JsonObject(body + mapOf("state" to JsonPrimitive(state),
+                "created_at" to JsonPrimitive(phoneTime.minusSeconds(120).toString()),
+                "updated_at" to JsonPrimitive(phoneTime.minusSeconds(120).toString())))
+            assertEquals(job, pending.matchingJob(listOf(job)))
+            val tooOld = JsonObject(job + ("updated_at" to JsonPrimitive(phoneTime.minusSeconds(121).toString())))
+            assertNull(pending.matchingJob(listOf(tooOld)))
+            val missing = JsonObject(job - "updated_at")
+            assertNull(pending.matchingJob(listOf(missing)))
+        }
     }
     private class Backend : PlatformBackend {
         val calls = mutableListOf<String>()

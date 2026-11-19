@@ -89,12 +89,13 @@ internal class CabinSubmission(val body: JsonObject, val key: String = UUID.rand
     }
     fun matchingJob(jobs: List<JsonObject>): JsonObject? {
         val sent = firstSentAt ?: return null
+        val earliest = sent.minusSeconds(120)
         return jobs.firstOrNull {
             val created = runCatching { Instant.parse(it.text("created_at")) }.getOrNull()
             val terminal = it.text("state") in setOf("succeeded", "failed", "cancelled")
             val updated = runCatching { Instant.parse(it.text("updated_at")) }.getOrNull()
-            created != null && !created.isBefore(sent.minusSeconds(120)) &&
-                (!terminal || (updated != null && !updated.isBefore(sent))) &&
+            created != null && !created.isBefore(earliest) &&
+                (!terminal || (updated != null && !updated.isBefore(earliest))) &&
                 sameCabinPayload(it["payload"], body["payload"]) && it["credential_id"] == body["credential_id"] && it["operation"] == body["operation"]
         }
     }
