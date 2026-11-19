@@ -7,6 +7,14 @@ import org.junit.Test
 import java.time.Instant
 
 class AccountContractTest {
+    @Test fun jobDetailsUseServerFieldNamesAndIgnoreLegacyAttempts() {
+        val row = accountPayload("operation" to "reserve", "state" to "failed", "created_at" to "created", "updated_at" to "updated", "attempt_count" to 3, "attempts" to 999, "error_code" to "UPSTREAM_UNAVAILABLE", "next_action" to "retry")
+        assertEquals("reserve · failed\n创建：created\n更新：updated\n尝试：3\n错误：UPSTREAM_UNAVAILABLE\n后续：retry", accountJobDetails(row))
+        assertTrue(accountJobDetails(accountPayload("attempt_count" to 0)).contains("尝试：0\n"))
+        assertFalse(accountJobDetails(accountPayload("attempts" to 999)).contains("999"))
+        assertTrue(accountJobDetails(accountPayload()).contains("尝试：\n"))
+    }
+
     @Test fun everyAccountRequestStaysOnPlatformWithCorrectCsrfAndMethod() {
         val requests = listOf(
             "POST" to "/auth/login", "GET" to "/auth/me", "POST" to "/auth/logout",

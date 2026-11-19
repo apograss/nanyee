@@ -18,8 +18,8 @@ internal class DemoAccountBackend(initiallySignedIn: Boolean = false) : Platform
         accountPayload("id" to "demo-revoked", "purpose" to "evaluation", "upstream" to "academic", "status" to "revoked", "expires_at" to JsonNull)
     )
     private var jobRows = listOf(
-        accountPayload("id" to "demo-job", "tool_id" to "evaluation", "state" to "queued", "operation" to "evaluate", "attempts" to 0, "created_at" to "2026-11-19T00:00:00Z", "receipt" to accountPayload("logs" to JsonArray(listOf(accountPayload("message" to "离线演示：等待执行"))))),
-        accountPayload("id" to "demo-failed-job", "tool_id" to "study_cabin", "state" to "failed", "operation" to "reserve", "receipt" to accountPayload("message" to "离线演示失败回执"), "error_code" to "UPSTREAM_UNAVAILABLE")
+        accountPayload("id" to "demo-job", "tool_id" to "evaluation", "state" to "queued", "operation" to "evaluate", "attempt_count" to 0, "created_at" to "2026-11-19T00:00:00Z", "updated_at" to "2026-11-19T00:00:00Z", "receipt" to accountPayload("logs" to JsonArray(listOf(accountPayload("message" to "离线演示：等待执行"))))),
+        accountPayload("id" to "demo-failed-job", "tool_id" to "study_cabin", "state" to "failed", "operation" to "reserve", "attempt_count" to 3, "created_at" to "2026-11-19T00:00:00Z", "updated_at" to "2026-11-19T00:05:00Z", "receipt" to accountPayload("message" to "离线演示失败回执"), "error_code" to "UPSTREAM_UNAVAILABLE")
     )
     private fun profile() = accountPayload("user" to accountPayload("id" to "demo-user", "username" to "demo", "nickname" to "演示同学", "email" to (email?.let(::JsonPrimitive) ?: JsonNull), "email_verified" to (email != null), "role" to "user"), "csrf_header" to platformCsrfHeader)
     private fun challenge(): JsonObject = accountPayload("challenge_id" to "demo-challenge", "expires_at" to Instant.now().plusSeconds(600).toString(), "resend_at" to Instant.now().plusSeconds(60).toString(), "masked_email" to "d***@example.invalid")

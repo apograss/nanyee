@@ -40,6 +40,9 @@ internal fun accountCredentialAction(kind: AccountWrite, id: String, body: JsonO
 
 internal fun accountPurpose(value: String) = when (value) { "school" -> "学校统一认证"; "evaluation" -> "自动评课"; "study_cabin" -> "自习舱预约"; "qun_checkin" -> "群报数"; else -> value }
 internal fun accountStatus(value: String) = when (value) { "active" -> "有效"; "revoked" -> "已撤销"; "expired" -> "已过期"; "deleted" -> "已删除"; else -> value }
+internal fun accountJobDetails(row: JsonObject) =
+    "${row.text("operation")} · ${row.text("state")}\n创建：${row.text("created_at")}\n更新：${row.text("updated_at")}\n尝试：${row.text("attempt_count")}\n错误：${row.text("error_code")}\n后续：${row.text("next_action")}"
+
 internal fun accountReceipt(value: JsonElement): String {
     fun redact(node: JsonElement): JsonElement = when (node) {
         is JsonObject -> JsonObject(node.mapValues { (key, child) -> if (listOf("password", "secret", "token", "cookie", "authorization", "session").any { key.contains(it, true) }) JsonPrimitive("[隐藏]") else redact(child) })

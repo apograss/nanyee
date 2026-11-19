@@ -212,7 +212,7 @@ private fun AccountJobs(state: AccountState, model: AccountModel, enabled: Boole
     model.jobs.forEach { row -> OutlinedButton(onClick = { state.job(row.text("id")) }, enabled = enabled) { Text("${accountPurpose(row.text("tool_id"))} · ${cabinStatus(row.text("state"), row.text("tool_id"))}\n${row.text("id")}") } }
     model.job?.takeIf { model.route == "job" }?.let { row ->
         Text("任务详情", style = MaterialTheme.typography.titleMedium)
-        Text("${row.text("operation")} · ${row.text("state")}\n创建：${row.text("created_at")}\n更新：${row.text("updated_at")}\n尝试：${row.text("attempts")}\n错误：${row.text("error_code")}\n后续：${row.text("next_action")}")
+        Text(accountJobDetails(row))
         Text(accountReceipt(row["receipt"] ?: JsonNull))
         OutlinedButton(onClick = { model.review(AccountWrite.CANCEL, row.text("id")) }, enabled = enabled && row.text("state") !in setOf("succeeded", "failed", "cancelled")) { Text("取消此任务…") }
     }
