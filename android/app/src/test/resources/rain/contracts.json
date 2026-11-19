@@ -1,0 +1,14 @@
+{
+  "profile": {"code":0,"data":{"user_profile":{"user_id":1001,"name":"示例同学","phone_number":"not-retained"}}},
+  "qr": {"code":0,"data":{"token":"fixture-qr-token","qrContent":"https://www.yuketang.cn/fixture/login","qrImage":"https://unused.example/image"}},
+  "courses": {"data":[{"course_id":11,"classroom_id":22,"course_name":"航海概论","teacher":{"name":"示例老师"}}]},
+  "onLesson": {"code":0,"data":{"onLessonClassrooms":[{"courseId":"11","lessonId":"33"}]}},
+  "checkin": {"code":0,"data":{"lessonToken":"fixture-lesson-token"}},
+  "eligibility": {"needLocationSignIn":true,"signed":false,"address":"活动地址说明","lat":99,"lng":99},
+  "presentation": {"title":"示例课件","width":1280,"height":720,"slides":[
+    {"id":"s1","index":0,"cover":"https://images.example/1.png","coverAlt":"https://images.example/1-large.png","note":"SERVER-KEY-LEAK","problem":{"problemId":"p1","problemType":1,"body":"<p>手动选择</p>","answers":["SERVER-KEY-LEAK"],"remark":"SERVER-KEY-LEAK","studentAnswer":"SERVER-KEY-LEAK","options":[{"key":"A","value":"甲","correct":true},{"key":"B","value":"乙"}]}},
+    {"id":"s2","index":1,"cover":"https://images.example/2.png","problem":{"problemId":"p2","problemType":4,"body":"手动填空","blanks":[{"num":1,"answers":["SERVER-KEY-LEAK"]},{"num":2,"answers":["SERVER-KEY-LEAK"]}]}}
+  ]},
+  "hello": {"op":"hello","presentation":"old","slideindex":1,"timeline":[{"type":"slide","dt":90000,"pres":"deck","si":2},{"type":"problem","title":"题目开放","dt":90001,"prob":"p1","pres":"deck","si":1,"limit":10,"answer":"SERVER-KEY-LEAK"}]},
+  "unlock": {"op":"unlockproblem","problem":{"prob":"p1","dt":90001,"limit":30,"answers":["SERVER-KEY-LEAK"]}}
+}

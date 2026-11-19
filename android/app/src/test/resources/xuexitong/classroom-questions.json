@@ -1,0 +1,7 @@
+{"result":1,"data":{"questionlist":[
+ {"id":"single","type":0,"ismust":1,"content":"<p>选择课堂形式</p>","answer":[{"name":"A","content":"讨论","isanswer":true},{"name":"B","content":"实践","isanswer":false}],"personAnswer":{"myoption":"A"},"studentAnswer":null,"analysis":"secret-explanation"},
+ {"id":"multi","type":1,"ismust":1,"content":"想参加哪些环节？","answer":[{"name":"A","content":"实验","isanswer":false},{"name":"B","content":"交流","isanswer":true}]},
+ {"id":"blank","type":2,"ismust":1,"content":"填入两个关键词","answer":[{"content":"secret-blank-1"},{"content":"secret-blank-2"}],"personAnswer":{"blankAnswer":[{"content":"secret-prefill"}]}},
+ {"id":"short","type":4,"ismust":1,"content":"你的想法？","answer":[{"content":"secret-short"}],"answerText":"secret-key"},
+ {"id":"judge","type":16,"ismust":1,"content":"是否愿意分享？","answer":[{"name":"A","content":"是","isanswer":true},{"name":"B","content":"否","isanswer":false}]}
+],"pptUserAttend":null}}
