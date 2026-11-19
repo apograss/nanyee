@@ -212,7 +212,7 @@ internal fun demoCourses(semester: String): List<JsonObject> {
     val names = if (previous) listOf("医学生物学", "有机化学", "医学伦理学", "大学物理") else listOf("人体解剖学", "大学英语", "医用高等数学", "基础化学", "医学导论", "体育")
     return names.mapIndexed { i, name -> buildJsonObject {
             put("name", name); put("weekday", (i + if (previous) 1 else 0) % 5 + 1); put("start_node", if (i % 2 == 0) 1 else 3); put("end_node", if (i % 2 == 0) 2 else 4)
-            put("start_time", if (i % 2 == 0) "08:00" else "10:10"); put("end_time", if (i % 2 == 0) "09:40" else "11:50")
+            put("start_time", if (i % 2 == 0) "08:00" else "09:50"); put("end_time", if (i % 2 == 0) "09:25" else "11:15")
             put("location", "教学楼 ${201 + i}"); put("teachers", "示例教师"); put("weeks", JsonArray((1..20).map { JsonPrimitive(it) }))
         } }
 }

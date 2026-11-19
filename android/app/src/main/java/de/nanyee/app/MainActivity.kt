@@ -196,7 +196,7 @@ fun Timetable(state: SchoolState, onCourse: (JsonObject) -> Unit) {
         if (active.isEmpty()) Text(if (state.busy) "正在加载课表…" else "本周暂无课程", Modifier.padding(20.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
         val dark = isSystemInDarkTheme()
         val colors = if (dark) listOf(Color(0xFF244F47), Color(0xFF394563), Color(0xFF58452E), Color(0xFF503D55)) else listOf(Color(0xFFDCEFE7), Color(0xFFE4E9F9), Color(0xFFF8EBD4), Color(0xFFF1E3EF))
-        val nodeTimes = listOf("08:00", "08:55", "10:10", "11:05", "14:30", "15:25", "16:30", "19:00", "19:55")
+        val nodeTimes = periodStartTimes(state.courses)
         val nodes = maxOf(nodeTimes.size, active.maxOfOrNull { it.number("end_node") } ?: nodeTimes.size)
         val today = state.today.dayOfWeek.value
         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -212,8 +212,7 @@ fun Timetable(state: SchoolState, onCourse: (JsonObject) -> Unit) {
             Column(Modifier.width(36.dp)) {
                 (1..nodes).forEach { node -> Column(Modifier.height(64.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("$node", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    val time = state.courses.firstOrNull { it.number("start_node") == node }?.text("start_time")
-                    Text(time ?: nodeTimes.getOrNull(node - 1) ?: "—", fontSize = 8.sp, maxLines = 1, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(nodeTimes.getOrNull(node - 1) ?: "—", fontSize = 8.sp, maxLines = 1, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } }
             }
             (1..7).forEach { day -> CourseDay(active.filter { it.number("weekday") == day }, state.courses, colors, nodes, onCourse, { conflicts = it }, Modifier.weight(1f)) }

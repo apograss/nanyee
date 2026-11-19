@@ -3,6 +3,7 @@ package de.nanyee.app
 import java.math.RoundingMode
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.DayOfWeek
 import java.time.temporal.ChronoUnit
 import java.time.temporal.TemporalAdjusters
@@ -12,6 +13,20 @@ internal fun captchaNeedsRefresh(expires: String, now: Instant): Boolean = runCa
 
 internal fun selectedDetail(savedIdentity: String, dataIdentity: String, index: Int, items: List<JsonObject>): JsonObject? =
     if (savedIdentity.isNotEmpty() && savedIdentity == dataIdentity) items.getOrNull(index) else null
+
+internal fun periodStartTimes(courses: List<JsonObject>): List<String> {
+    val campusTimes = listOf(
+        listOf("08:00", "08:45", "09:50", "10:35", "11:20", "14:30", "15:15", "16:15", "17:00", "19:30", "20:30"),
+        listOf("08:30", "09:15", "10:20", "11:05", "11:50", "14:00", "14:45", "15:45", "16:30", "19:30", "20:30")
+    )
+    val known = courses.filter { it.number("start_node") in 1..60 }
+        .groupBy { it.number("start_node") }.mapValues { (_, items) ->
+            items.mapNotNull { runCatching { LocalTime.parse(it.text("start_time")).toString() }.getOrNull() }.distinct().singleOrNull()
+        }.filterValues { it != null }
+    val matching = campusTimes.filter { times -> known.all { (node, time) -> times.getOrNull(node - 1) == time } }
+    val count = maxOf(11, courses.maxOfOrNull { it.number("end_node").coerceIn(1, 60) } ?: 11)
+    return (1..count).map { node -> known[node] ?: matching.mapNotNull { it.getOrNull(node - 1) }.distinct().singleOrNull() ?: "—" }
+}
 
 internal fun weekAfterDateChange(week: Int, totalWeeks: Int, previous: LocalDate, current: LocalDate, userPicked: Boolean = false): Int {
     if (userPicked) return week.coerceIn(1, totalWeeks)
