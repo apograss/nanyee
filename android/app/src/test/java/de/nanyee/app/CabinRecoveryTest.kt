@@ -106,15 +106,31 @@ class CabinRecoveryTest {
             override suspend fun clearLocal() {}
             override suspend fun call(method: String, path: String, body: JsonObject?, key: String?): JsonElement {
                 calls += "$method $path"
-                if (path.endsWith("/reveal")) return payload("secret" to payload("account" to "original-fixture", "password" to "old-fixture").toString())
                 assertEquals(setOf("secret"), body!!.keys)
                 val secret = Json.parseToJsonElement(body.text("secret")).jsonObject
-                assertEquals("original-fixture", secret.text("account"))
+                assertEquals("fixture0000", secret.text("account"))
                 assertEquals("new-fixture", secret.text("password"))
                 return JsonNull
             }
         }
-        updateCabinPassword(backend, "existing", "new-fixture")
-        assertEquals(listOf("POST /credentials/existing/reveal", "PUT /credentials/existing/secret"), calls)
+        updateCabinPassword(backend, "existing", "fixture0000", "new-fixture", "尾号 0000")
+        assertEquals(listOf("PUT /credentials/existing/secret"), calls)
+    }
+
+    @Test fun accountHintRequiresMatchingVisibleSuffix() {
+        assertTrue(cabinAccountMatchesHint("fixture1234", "尾号 1234"))
+        assertTrue(cabinAccountMatchesHint("fixture1234", "******1234"))
+        assertFalse(cabinAccountMatchesHint("fixture5678", "尾号 1234"))
+        assertFalse(cabinAccountMatchesHint("", "尾号 1234"))
+        assertFalse(cabinAccountMatchesHint("fixture1234", ""))
+        assertFalse(cabinAccountMatchesHint("fixture1234", "尾号 ****"))
+        assertFalse(cabinAccountMatchesHint("fixture1234", "尾号 234"))
+    }
+
+    @Test fun mismatchedHintCannotMakeAnyNetworkCall() = runBlocking {
+        val backend = Backend()
+        try { updateCabinPassword(backend, "existing", "fixture5678", "new-fixture", "尾号 1234"); fail() } catch (_: IllegalArgumentException) {}
+        assertTrue(backend.calls.isEmpty())
+        assertTrue(runCatching { platformRequest("POST", "/credentials/existing/reveal", null, "fixture") }.isFailure)
     }
 }

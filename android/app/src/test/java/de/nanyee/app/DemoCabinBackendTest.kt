@@ -8,7 +8,7 @@ import org.junit.Test
 class DemoCabinBackendTest {
     @Test fun revocationCancelsOnlyQueuedAndRetryingJobsForThatCredential() = runBlocking {
         val api = DemoCabinBackend(); login(api)
-        val id = api.call("POST", "/credentials", cabinSecret("demo", "fixture-only", true)).obj().text("id")
+        val id = api.call("POST", "/credentials", cabinSecret("demo0000", "fixture-only", true)).obj().text("id")
         val other = api.call("POST", "/credentials", cabinSecret("other", "fixture-only", true)).obj().text("id")
         val draft = cabinDefaults().copy(cabins = listOf(1))
         val states = listOf("queued", "retry_wait", "running", "succeeded", "failed", "cancelled", "verification_required")
@@ -18,7 +18,7 @@ class DemoCabinBackendTest {
             job.text("id")
         }
         val unrelated = CabinSubmission(cabinJob(draft, other)).send(api).obj().text("id")
-        updateCabinPassword(api, id, "new-fixture")
+        updateCabinPassword(api, id, "demo0000", "new-fixture", "尾号 0000")
         api.call("DELETE", "/credentials/$id")
         val jobs = cabinJobs(api.call("GET", "/jobs")).associateBy { it.text("id") }
         states.forEachIndexed { index, state ->

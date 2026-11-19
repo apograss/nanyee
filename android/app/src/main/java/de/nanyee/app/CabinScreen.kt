@@ -95,12 +95,12 @@ internal fun CabinToolsScreen(school: SchoolState, state: CabinState = viewModel
                             Text(if (state.editingId == null) "同意托管学校密码" else "更新托管学校密码", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                             if (state.editingId != null) {
                                 Text(state.credentials.firstOrNull { it.text("id") == state.editingId }?.get("metadata")?.obj()?.text("account_hint").orEmpty().ifBlank { "已托管的学校账号" })
-                                Text("仅修改原账号密码。提交时从服务器读取原账号，不更换账号。更换学校账号请先撤销原凭据，关联的排队预约将取消，再添加新凭据。")
+                                Text("仅修改原账号密码。请填写与上方账号提示相符的学校学号；可从本机已记住的凭据预填，不读取服务器托管秘密。更换学校账号请先撤销原凭据，关联的排队预约将取消，再添加新凭据。")
                             }
                             Text("学校账号与密码将加密存储在 nanyee.de，用于您离线时无人值守预约学习舱。凭据长期保存，可随时撤销。撤销会影响引用它的任务。只有点击同意后，才读取本机已记住的学校凭据来预填。")
                             if (!state.consent) Button(onClick = { state.agree(school::hostedSchoolPrefill) }, enabled = !state.busy) { Text("同意并继续") }
                             else {
-                                if (state.editingId == null) CabinField("学校学号", state.account, { state.account = it }, !state.busy)
+                                CabinField("学校学号", state.account, { state.account = it }, !state.busy)
                                 CabinField("学校密码", state.schoolPassword, { state.schoolPassword = it }, !state.busy, password = true)
                                 Button(onClick = { state.saveCredential() }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { Text("提交托管凭据") }
                             }

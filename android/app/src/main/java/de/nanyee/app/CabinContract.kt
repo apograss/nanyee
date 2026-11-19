@@ -124,15 +124,18 @@ internal class CabinCredentialRecovery {
     }
 }
 
-internal suspend fun updateCabinPassword(backend: PlatformBackend, id: String, password: String) {
-    val revealed = backend.call("POST", "/credentials/$id/reveal").obj()
-    val account = Json.parseToJsonElement(revealed.text("secret")).jsonObject.text("account")
-    require(account.isNotBlank()) { "托管凭据缺少学校账号，请撤销后重新创建。" }
+internal fun cabinAccountMatchesHint(account: String, hint: String): Boolean {
+    val suffix = Regex("[A-Za-z0-9]{4}$").find(hint.trim())?.value ?: return false
+    return account.trim().length in 4..64 && account.trim().takeLast(4) == suffix
+}
+
+internal suspend fun updateCabinPassword(backend: PlatformBackend, id: String, account: String, password: String, hint: String) {
+    require(cabinAccountMatchesHint(account, hint)) { "学号与原凭据提示不符或提示无法核对。更换账号请先撤销原凭据，再创建新凭据。" }
     backend.call("PUT", "/credentials/$id/secret", payload("secret" to payload("account" to account, "password" to password).toString()))
 }
 
 internal fun platformRequest(method: String, path: String, body: JsonObject?, csrf: String?, key: String? = null): Request {
-    require(path.matches(Regex("/(auth/(login|me|logout)|study-cabin/cabins|credentials(/[a-zA-Z0-9-]+(/(secret|reveal))?)?|jobs(/[a-zA-Z0-9-]+/cancel)?)")))
+    require(path.matches(Regex("/(auth/(login|me|logout)|study-cabin/cabins|credentials(/[a-zA-Z0-9-]+(/secret)?)?|jobs(/[a-zA-Z0-9-]+/cancel)?)")))
     val builder = Request.Builder().url("https://nanyee.de/api/v1$path")
     if (method != "GET") {
         if (path != "/auth/login") {

@@ -100,21 +100,26 @@ internal class CabinState(app: Application) : AndroidViewModel(app) {
     fun cancelCredential() { credentialEditor = false; consent = false; editingId = null; account = ""; schoolPassword = "" }
     fun agree(prefill: suspend () -> Pair<String, String>?) {
         consent = true
-        if (editingId != null) return
         run {
-            val remembered = if (demo) "demo" to "demo-only" else prefill()
-            account = remembered?.first.orEmpty(); schoolPassword = remembered?.second.orEmpty()
+            val remembered = if (demo) "demo0000" to "demo-only" else prefill()
+            account = remembered?.first.orEmpty(); schoolPassword = if (editingId == null) remembered?.second.orEmpty() else ""
         }
     }
     fun saveCredential() {
-        if (!consent || (editingId == null && (account.isBlank() || account.length > 64)) || schoolPassword.isEmpty() || schoolPassword.length > 256) { error = "请同意托管，并填写学号（不超过 64 字符）与密码（不超过 256 字符）。"; return }
+        if (!consent || account.isBlank() || account.length > 64 || schoolPassword.isEmpty() || schoolPassword.length > 256) { error = "请同意托管，并填写学号（不超过 64 字符）与密码（不超过 256 字符）。"; return }
         val id = editingId
+        val schoolAccount = account.trim()
+        val hint = credentials.firstOrNull { it.text("id") == id }?.get("metadata")?.obj()?.text("account_hint").orEmpty()
+        if (id != null && !cabinAccountMatchesHint(schoolAccount, hint)) {
+            error = "学号与原凭据提示不符或提示无法核对。更换账号请先撤销原凭据，再创建新凭据。"
+            return
+        }
         val password = schoolPassword
         val body = if (id == null) cabinSecret(account.trim(), password, true) else null
         schoolPassword = ""
         run {
             if (id == null) selectedCredential = credentialRecovery.save(api(), body!!).text("id")
-            else updateCabinPassword(api(), id, password)
+            else updateCabinPassword(api(), id, schoolAccount, password, hint)
             cancelCredential(); load(); message = "凭据已安全提交给 nanyee.de。"
         }
     }

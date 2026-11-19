@@ -7,7 +7,6 @@ import java.util.UUID
 internal class DemoCabinBackend : PlatformBackend {
     private var signedIn = false
     private val credentials = mutableListOf<JsonObject>()
-    private val accounts = mutableMapOf<String, String>()
     private val jobs = mutableListOf<JsonObject>()
     private val submissions = mutableMapOf<String, Pair<JsonObject, JsonObject>>()
     private val cabins = JsonArray((1..4).map { buildJsonObject { put("dev_id", it); put("name", "演示学习舱 $it") } })
@@ -32,19 +31,13 @@ internal class DemoCabinBackend : PlatformBackend {
                     put("expires_at", JsonNull); put("created_at", Instant.now().toString()); put("last_used_at", JsonNull)
                     put("consent_version", "credential-hosting-v1"); put("metadata", body?.get("metadata") ?: JsonObject(emptyMap()))
                 }
-                accounts[value.text("id")] = Json.parseToJsonElement(body!!.text("secret")).jsonObject.text("account")
                 credentials.add(value); value
             }
             path.startsWith("/credentials/") -> {
                 val index = credentials.indexOfFirst { it.text("id") == path.split('/')[2] }
                 require(index >= 0)
                 val id = credentials[index].text("id")
-                if (path.endsWith("/reveal")) {
-                    require(credentials[index].text("status") == "active")
-                    return payload("secret" to payload("account" to accounts.getValue(id), "password" to "demo-only").toString())
-                }
                 if (method == "DELETE") {
-                    accounts.remove(id)
                     val now = JsonPrimitive(Instant.now().toString())
                     jobs.indices.filter { jobs[it].text("credential_id") == id && jobs[it].text("state") in setOf("queued", "retry_wait") }.forEach {
                         jobs[it] = JsonObject(jobs[it] + mapOf("state" to JsonPrimitive("cancelled"), "cancel_requested_at" to now, "updated_at" to now))
