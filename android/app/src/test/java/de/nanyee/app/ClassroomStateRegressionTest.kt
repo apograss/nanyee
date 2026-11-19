@@ -11,13 +11,13 @@ import org.junit.Assert.*
 import org.junit.Test
 import org.junit.Rule
 import org.junit.rules.TemporaryFolder
-import sun.misc.Unsafe
 
 class ClassroomStateRegressionTest {
     @get:Rule val photos = TemporaryFolder()
     private fun application(): Application {
-        val field = Unsafe::class.java.getDeclaredField("theUnsafe").apply { isAccessible = true }
-        return (field.get(null) as Unsafe).allocateInstance(Application::class.java) as Application
+        val unsafe = Class.forName("sun.misc.Unsafe")
+        val field = unsafe.getDeclaredField("theUnsafe").apply { isAccessible = true }
+        return unsafe.getMethod("allocateInstance", Class::class.java).invoke(field.get(null), Application::class.java) as Application
     }
     private fun synchronousScope(state: ViewModel) {
         val scope = Class.forName("androidx.lifecycle.viewmodel.internal.CloseableCoroutineScope")
