@@ -10,21 +10,29 @@ import android.os.Bundle
 import android.os.Looper
 import android.os.SystemClock
 import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
 import kotlin.math.*
 
+internal class XxtLocationFailure(message: String) : Exception(message)
+
+internal fun xxtLocationTimeout(sawMock: Boolean) = XxtLocationFailure(
+    if (sawMock) "检测到模拟定位，请关闭模拟定位后重试" else "定位超时，请到室外或打开 GPS 后重试"
+)
+
 internal suspend fun xxtCurrentPosition(context: Context, bd09: Boolean = true): XxtPosition {
-    check(context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) { "需要精确定位权限；不支持手动填写坐标。" }
+    if (context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) throw XxtLocationFailure("需要精确定位权限；不支持手动填写坐标。")
     val manager = requireNotNull(context.getSystemService(LocationManager::class.java))
     val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER).filter { manager.isProviderEnabled(it) }
-    check(providers.isNotEmpty()) { "请打开系统定位服务。" }
-    return withTimeout(25000) {
-        suspendCancellableCoroutine { continuation ->
+    if (providers.isEmpty()) throw XxtLocationFailure("请打开系统定位服务。")
+    var sawMock = false
+    return withTimeoutOrNull(25000) {
+        suspendCancellableCoroutine<XxtPosition> { continuation ->
             val listener = object : LocationListener {
                 override fun onLocationChanged(location: Location) {
                     @Suppress("DEPRECATION") val mock = location.isFromMockProvider
-                    if (mock || !location.hasAccuracy() || location.accuracy !in 0f..100f || (SystemClock.elapsedRealtimeNanos() - location.elapsedRealtimeNanos) !in 0..120000000000L) return
+                    if (mock) { sawMock = true; return }
+                    if (!location.hasAccuracy() || location.accuracy !in 0f..100f || (SystemClock.elapsedRealtimeNanos() - location.elapsedRealtimeNanos) !in 0..120000000000L) return
                     val (lat, lon) = if (bd09) xxtBd09(location.latitude, location.longitude) else location.latitude to location.longitude
                     if (continuation.isActive) { manager.removeUpdates(this); continuation.resume(XxtPosition(lat, lon, System.currentTimeMillis(), location.accuracy)) }
                 }
@@ -36,7 +44,7 @@ internal suspend fun xxtCurrentPosition(context: Context, bd09: Boolean = true):
             try { providers.forEach { manager.requestLocationUpdates(it, 0, 0f, listener, Looper.getMainLooper()) } }
             catch (e: Exception) { manager.removeUpdates(listener); continuation.cancel(e) }
         }
-    }
+    } ?: throw xxtLocationTimeout(sawMock)
 }
 
 internal fun xxtBd09(latitude: Double, longitude: Double): Pair<Double, Double> {

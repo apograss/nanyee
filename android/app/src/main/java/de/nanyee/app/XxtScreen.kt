@@ -140,7 +140,7 @@ private fun XxtScreen(state: XxtState, onBack: () -> Unit, onToggleDemo: () -> U
                     else {
                         Text(xxtSignLabel(detail))
                         if (detail.photo) {
-                            Text("照片仅在确认后上传至超星云盘；可使用系统相机或相册。")
+                            Text(if (state.demo) "演示模式：照片仅用于本地预览，不会上传；可使用系统相机或相册。" else "照片仅在确认后上传至超星云盘；可使用系统相机或相册。")
                             OutlinedButton(onClick = {
                                 try {
                                     val dir = File(context.cacheDir, "xxt_camera").apply { mkdirs() }
@@ -182,7 +182,7 @@ private fun XxtScreen(state: XxtState, onBack: () -> Unit, onToggleDemo: () -> U
                 Text("账号：${state.user?.name}（仅当前本人）\n课程：${plan.course.name}\n活动：${plan.activity.name}\n方式：${xxtSignLabel(plan.detail)}")
                 if (state.error.isNotBlank()) Text(state.error, color = MaterialTheme.colorScheme.error)
                 if (plan.code.isNotBlank()) Text("${if (plan.detail.type == 3) "手势顺序" else "签到码"}：${plan.code}")
-                if (plan.detail.photo) Text("将向超星 pan-yz 上传上方预览照片，然后提交签到。")
+                if (plan.detail.photo) Text(xxtPhotoConfirmation(state.demo))
                 if (plan.qr.isNotBlank()) Text("使用相机扫描的当前活动二维码。")
                 plan.position?.let { Text("使用刚获取的真实位置（BD-09）：${"%.6f".format(it.latitude)}, ${"%.6f".format(it.longitude)}\n地址：${plan.detail.address.ifBlank { "当前位置" }}\n精度约 ${it.accuracy.roundToInt()} 米") }
                 Text(if (state.demo) "离线演示：没有网络请求。" else "将改变当前账号的签到状态。请核对后提交，勿替他人签到。")

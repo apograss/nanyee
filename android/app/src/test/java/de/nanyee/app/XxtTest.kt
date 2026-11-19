@@ -19,6 +19,17 @@ internal class MemoryXxtStorage : XxtStorage {
     override fun clear() { values.clear() }
 }
 class XxtTest {
+    @Test fun locationTimeoutDistinguishesMockFromMissingFixes() {
+        assertEquals("检测到模拟定位，请关闭模拟定位后重试", xxtLocationTimeout(true).message)
+        assertEquals("定位超时，请到室外或打开 GPS 后重试", xxtLocationTimeout(false).message)
+    }
+
+    @Test fun photoConfirmationSeparatesDemoFromRealUpload() {
+        assertEquals("演示模式：仅模拟照片签到，不会上传照片或提交真实签到。", xxtPhotoConfirmation(true))
+        assertFalse(xxtPhotoConfirmation(true).contains("pan-yz"))
+        assertEquals("将向超星 pan-yz 上传上方预览照片，然后提交签到。", xxtPhotoConfirmation(false))
+    }
+
     private val course = XxtCourse("101", "201", "301", "示例课程", "示例老师")
     private val activity = XxtActivity("402", "课堂签到", "", 2, true, 1000)
     private val owner = XxtUser("12345", "示例本人", "device-cid", "device-sc")

@@ -73,7 +73,7 @@ internal class RainState(application: Application) : AndroidViewModel(applicatio
         }
     }
     private fun fail(e: Exception) {
-        error = (e as? RainFailure)?.message ?: "操作未完成；输入不完整、本地存储不可用或响应格式有变，请刷新后重试。"
+        error = when (e) { is XxtLocationFailure, is RainFailure -> e.message.orEmpty(); else -> "操作未完成；输入不完整、本地存储不可用或响应格式有变，请刷新后重试。" }
         if (e is RainFailure && e.kind == "SESSION") { leaveLesson(); qr = null; user = null; courses = emptyList(); onLesson = emptyList(); unknownKey = "" }
     }
     private fun read(block: suspend () -> Unit) {

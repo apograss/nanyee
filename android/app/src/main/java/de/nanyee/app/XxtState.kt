@@ -63,7 +63,7 @@ internal class XxtState(app: Application, private val savedState: SavedStateHand
             catch (e: CancellationException) { throw e }
             catch (e: Exception) {
                 if (token == generation) {
-                    error = when (e) { is XxtFailure -> e.message.orEmpty(); is IllegalArgumentException, is IllegalStateException -> "无法继续，请检查输入并重新加载活动。"; else -> "学习通操作失败，请稍后重试。" }
+                    error = when (e) { is XxtLocationFailure, is XxtFailure -> e.message.orEmpty(); is IllegalArgumentException, is IllegalStateException -> "无法继续，请检查输入并重新加载活动。"; else -> "学习通操作失败，请稍后重试。" }
                     if (pendingWrite) { message = "结果未知，请在官方学习通确认；不会自动重试。"; if (flow.stage == XxtStage.WRITING) flow.finish(XxtSignResult.Unknown) }
                 }
             }

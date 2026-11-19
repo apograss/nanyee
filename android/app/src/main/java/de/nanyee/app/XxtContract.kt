@@ -16,6 +16,9 @@ import javax.crypto.spec.SecretKeySpec
 
 internal const val XXT_MOBILE = "https://mobilelearn.chaoxing.com"
 internal class XxtFailure(val kind: String, message: String) : Exception(message)
+
+internal fun xxtPhotoConfirmation(demo: Boolean): String =
+    if (demo) "演示模式：仅模拟照片签到，不会上传照片或提交真实签到。" else "将向超星 pan-yz 上传上方预览照片，然后提交签到。"
 @Serializable internal data class XxtUser(val uid: String, val name: String, val cid: String = "", val sc: String = "")
 @Serializable internal data class XxtCourse(val id: String, val classId: String, val cpi: String, val name: String, val teacher: String)
 @Serializable internal data class XxtActivity(val id: String, val name: String, val description: String, val type: Int, val ongoing: Boolean, val start: Long, val end: Long = 0, val signType: Int = -1, val topicId: String = "")
