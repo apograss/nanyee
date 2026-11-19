@@ -98,9 +98,9 @@ private fun ManualEvaluationScreen(school: SchoolState, evaluation: EvaluationSt
             Text("使用旧工具偏高随机档位。此处显示的答案会原样提交，不会在确认时重新生成。")
             Button(onClick = { confirming = true }, enabled = !state.busy) { Text(if (demo) "确认演示提交" else "确认提交以上评价") }
         }
-        if (state.run.progress > 0) Text("逐门进度：${state.run.progress}")
+        if (state.run.progress > 0) Text(if (state.busy && state.run.confirmed) "正在提交第 ${state.run.progress} 门…" else "逐门进度：${state.run.progress}")
         state.run.results.forEach { Text(it) }
-        if (state.run.confirmed) Text("本轮已执行或已停止。结果未知时请先到教务系统核验；不要直接重复提交。")
+        if (state.run.confirmed && !state.busy) Text("本轮已执行或已停止。结果未知时请先到教务系统核验；不要直接重复提交。")
     }
     if (confirming) AlertDialog(onDismissRequest = { confirming = false }, title = { Text("确认提交课程评价？") }, text = { Text(if (demo) "演示模式，不会真正评课。" else "将逐门向学校提交上方预览的评价；第一处错误后立即停止。真实提交不可撤回，请确认您同意这些答案。") }, confirmButton = {
         TextButton(onClick = { confirming = false; state.confirm() }, enabled = !state.busy) { Text("确认提交") }

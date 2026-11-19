@@ -70,7 +70,7 @@ internal fun CabinToolsScreen(school: SchoolState, state: CabinState = viewModel
             } else {
                 Text("${state.user?.text("nickname")?.ifBlank { "Nanyee 用户" }} · ${if (state.demo) "演示平台" else "nanyee.de"}", style = MaterialTheme.typography.titleMedium)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = { state.refresh() }, enabled = !state.busy) { Text("刷新预约") }
+                    TextButton(onClick = { state.refresh() }, enabled = !state.busy) { Text(if (evaluationMode) "刷新评课" else "刷新预约") }
                     TextButton(onClick = { action = "logout" to "" }, enabled = !state.busy) { Text("退出平台账号") }
                 }
                 Text("托管学校凭据", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
