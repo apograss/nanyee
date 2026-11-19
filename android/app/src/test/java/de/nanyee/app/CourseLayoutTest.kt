@@ -24,6 +24,15 @@ class CourseLayoutTest {
         assertEquals(listOf(3, 1), groups.map { it.size })
     }
 
+    @Test fun collapsedCardSpansEntireConflictUnion() {
+        val group = courseGroups(listOf(course(2, 4), course(1, 2))).single()
+        assertEquals(1..4, courseSpan(group))
+        assertEquals(2..8, courseSpan(listOf(course(4, 6), course(2, 8))))
+        assertEquals(3..4, courseSpan(listOf(course(3, 4))))
+        assertNull(courseSpan(emptyList()))
+        assertNull(courseSpan(listOf(course(0, 2), course(4, 3))))
+    }
+
     @Test fun nestedAndChainedOverlapsUseDistinctLanes() {
         val result = layoutCourses(listOf(course(1, 4), course(2, 2), course(3, 5), course(5, 6)))
         assertEquals(listOf(2, 2, 2, 2), result.map { it.laneCount })

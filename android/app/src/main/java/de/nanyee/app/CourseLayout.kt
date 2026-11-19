@@ -4,6 +4,12 @@ import kotlinx.serialization.json.JsonObject
 
 data class CoursePlacement(val course: JsonObject, val lane: Int, val laneCount: Int)
 
+fun courseSpan(courses: List<JsonObject>): IntRange? {
+    val valid = courses.filter { it.number("start_node") > 0 && it.number("end_node") >= it.number("start_node") }
+    if (valid.isEmpty()) return null
+    return valid.minOf { it.number("start_node") }..valid.maxOf { it.number("end_node") }
+}
+
 fun courseGroups(courses: List<JsonObject>): List<List<JsonObject>> {
     val groups = mutableListOf<MutableList<JsonObject>>()
     var end = 0
