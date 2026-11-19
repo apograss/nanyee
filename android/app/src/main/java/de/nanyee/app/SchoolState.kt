@@ -295,7 +295,6 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
     fun logout() {
         val wasDemo = demo
         val returnView = cacheReturnView.takeIf { wasDemo }
-        if (!wasDemo && runCatching { timetableCache.clear() }.isFailure) { error = "无法清除本机课表，请重试。"; return }
         if (!wasDemo) cachedTimetables = null
         clearRequests()
         resetTimetableSelection()
@@ -303,7 +302,12 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         saved["demo"] = false; saved["hadSession"] = false
         session = ""; expires = ""; liveOwner = ""; loginDestination = null; loggedIn = false; demo = false; cachedMode = false; courses = emptyList(); grades = null; semesters = emptyList(); semester = ""; gradesLoading = false; error = ""
         if (returnView != null && restoreCachedTimetable(returnView)) return
-        if (!wasDemo) { password = ""; captcha = null; captchaText = ""; api.clear(); launch(silent = true) { fetchCaptcha() } } else if (captcha == null) launch(silent = true) { fetchCaptcha() } else checkCaptcha()
+        if (!wasDemo) {
+            password = ""; captcha = null; captchaText = ""; api.clear()
+            val cacheCleared = runCatching { timetableCache.clear() }.isSuccess
+            launch(silent = true) { fetchCaptcha() }
+            if (!cacheCleared) error = "学校会话已退出，但本机课表未能清除，重启后仍可能显示。请在系统设置中清除应用数据。"
+        } else if (captcha == null) launch(silent = true) { fetchCaptcha() } else checkCaptcha()
     }
     fun startDemo() {
         if (cachedMode) rememberCacheView()
