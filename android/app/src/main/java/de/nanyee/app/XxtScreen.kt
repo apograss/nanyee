@@ -179,6 +179,7 @@ private fun XxtScreen(state: XxtState, onBack: () -> Unit, onToggleDemo: () -> U
         AlertDialog(onDismissRequest = state::dismissConfirmation, title = { Text("确认本人签到") }, text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("账号：${state.user?.name}（仅当前本人）\n课程：${plan.course.name}\n活动：${plan.activity.name}\n方式：${xxtSignLabel(plan.detail)}")
+                if (state.error.isNotBlank()) Text(state.error, color = MaterialTheme.colorScheme.error)
                 if (plan.code.isNotBlank()) Text("${if (plan.detail.type == 3) "手势顺序" else "签到码"}：${plan.code}")
                 if (plan.detail.photo) Text("将向超星 pan-yz 上传上方预览照片，然后提交签到。")
                 if (plan.qr.isNotBlank()) Text("使用相机扫描的当前活动二维码。")

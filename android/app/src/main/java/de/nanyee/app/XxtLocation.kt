@@ -16,7 +16,7 @@ import kotlin.math.*
 
 internal suspend fun xxtCurrentPosition(context: Context): XxtPosition {
     check(context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) { "需要精确定位权限；不支持手动填写坐标。" }
-    val manager = context.getSystemService(LocationManager::class.java)
+    val manager = requireNotNull(context.getSystemService(LocationManager::class.java))
     val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER).filter { manager.isProviderEnabled(it) }
     check(providers.isNotEmpty()) { "请打开系统定位服务。" }
     return withTimeout(25000) {

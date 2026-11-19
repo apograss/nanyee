@@ -5,6 +5,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.compose.runtime.*
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.*
 import kotlinx.serialization.encodeToString
@@ -12,7 +13,7 @@ import kotlinx.serialization.json.Json
 import java.io.File
 import java.util.UUID
 
-internal class XxtState(app: Application) : AndroidViewModel(app) {
+internal class XxtState(app: Application, private val savedState: SavedStateHandle) : AndroidViewModel(app) {
     private val storage: XxtStorage by lazy { EncryptedXxtStorage(getApplication()) }
     private var backend: XxtBackend? = null
     private var work: Job? = null
@@ -40,7 +41,7 @@ internal class XxtState(app: Application) : AndroidViewModel(app) {
     var error by mutableStateOf(""); private set
     var message by mutableStateOf(""); private set
     var loaded by mutableStateOf(false); private set
-    val completed get() = flow.stage in setOf(XxtStage.UNKNOWN, XxtStage.SUCCESS)
+    val completed get() = pendingWrite || flow.stage in setOf(XxtStage.UNKNOWN, XxtStage.SUCCESS)
     private suspend fun api(): XxtBackend = backend ?: withContext(Dispatchers.IO) { if (demo) DemoXxtBackend() else XxtApi(storage) }.also { backend = it }
     private fun run(action: suspend () -> Unit) {
         if (busy) return
@@ -58,39 +59,40 @@ internal class XxtState(app: Application) : AndroidViewModel(app) {
             finally { if (token == generation) busy = false }
         }
     }
-    private suspend fun save() = withContext(Dispatchers.IO) {
-        if (!demo) storage.write("journal", Json.encodeToString(XxtJournal(false, course, activity, detail, code, photoPath, pendingWrite)))
+    private suspend fun save() {
+        val value = Json.encodeToString(XxtJournal(demo, course, activity, detail, code, photoPath, pendingWrite))
+        if (demo) savedState["draft"] = value else withContext(Dispatchers.IO) { storage.write("journal", value) }
     }
-    private suspend fun <T> read(action: suspend () -> T): T = try { action() } catch (e: XxtFailure) {
-        if (demo || e.kind != "SESSION") throw e
-        val account = withContext(Dispatchers.IO) { storage.read("account") }
-        val password = withContext(Dispatchers.IO) { storage.read("password") }
-        if (account.isBlank() || password.isBlank()) { user = null; throw e }
-        user = api().login(account, password)
-        action()
+    private suspend fun <T> read(action: suspend () -> T): T = if (demo) action() else xxtReadRecover(
+        credentials = { withContext(Dispatchers.IO) { storage.read("account") to storage.read("password") } },
+        login = { account, password -> acceptLogin(api().login(account, password)) }, expired = { user = null }, action = action)
+    private suspend fun acceptLogin(value: XxtUser) {
+        if (!demo) {
+            val previous = withContext(Dispatchers.IO) { storage.read("owner") }
+            if (previous.isNotBlank() && previous != value.uid) { course = null; activity = null; detail = null; activities = emptyList(); resetSign(); save() }
+            withContext(Dispatchers.IO) { storage.write("owner", value.uid) }
+        }
+        user = value
     }
     fun initialize(asDemo: Boolean) {
         if (initialized) return
         initialized = true; demo = asDemo
         run {
-            if (demo) { user = api().user(); courses = api().courses(); loaded = true }
-            else {
-                val journal = withContext(Dispatchers.IO) { storage.read("journal") }
+                val journal = if (demo) savedState.get<String>("draft").orEmpty() else withContext(Dispatchers.IO) { storage.read("journal") }
                 val restored = runCatching { Json.decodeFromString<XxtJournal>(journal) }.getOrNull()
                 course = restored?.course; activity = restored?.activity; detail = restored?.detail; code = restored?.code.orEmpty(); photoPath = restored?.photo.orEmpty()
                 pendingWrite = restored?.writePending == true
                 if (pendingWrite) message = "上次操作被中断，结果未知，请先在官方学习通确认；不会恢复提交。"
-                if (withContext(Dispatchers.IO) { storage.read("active") } == "true") {
+                if (demo || withContext(Dispatchers.IO) { storage.read("active") } == "true") {
                     user = read { api().user() }; courses = read { api().courses() }; loaded = true
                     course?.let { activities = read { api().activities(it) } }
                     activity?.let { detail = read { api().detail(it) } }
                 }
-            }
         }
     }
     fun login(account: String, password: String, remember: Boolean) = run {
         require(account.isNotBlank() && password.isNotBlank())
-        user = api().login(account, password)
+        acceptLogin(api().login(account, password))
         withContext(Dispatchers.IO) { storage.write("account", if (remember) account else ""); storage.write("password", if (remember) password else ""); storage.write("active", "true") }
         courses = api().courses(); loaded = true
     }
@@ -101,7 +103,7 @@ internal class XxtState(app: Application) : AndroidViewModel(app) {
                 delay(2000)
                 val result = api().pollQr(qrLogin!!)
                 if (result != null) {
-                    user = result
+                    acceptLogin(result)
                     withContext(Dispatchers.IO) { storage.write("account", ""); storage.write("password", ""); storage.write("active", "true") }
                     qrLogin = null; courses = api().courses(); loaded = true
                     return@run
@@ -122,6 +124,7 @@ internal class XxtState(app: Application) : AndroidViewModel(app) {
     }
     fun selectActivity(value: XxtActivity) = run {
         resetSign(); activity = value; detail = null; save()
+        user = read { api().user() }
         detail = read { api().detail(value) }; save()
     }
     private fun resetSign() { flow = XxtFlow(); confirmation = null; captcha = null; code = ""; qr = ""; position = null; photoPath = ""; validateToken = ""; message = ""; pendingWrite = false }
@@ -142,9 +145,9 @@ internal class XxtState(app: Application) : AndroidViewModel(app) {
             require(bytes.size in 1..6 * 1024 * 1024)
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }; BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
             require(bounds.outWidth in 1..16000 && bounds.outHeight in 1..16000 && bounds.outWidth.toLong() * bounds.outHeight <= 40000000)
-            val options = BitmapFactory.Options().apply { while (bounds.outWidth / inSampleSize > 2048 || bounds.outHeight / inSampleSize > 2048) inSampleSize *= 2 }
+            val options = BitmapFactory.Options().apply { inSampleSize = 1; while (bounds.outWidth / inSampleSize > 2048 || bounds.outHeight / inSampleSize > 2048) inSampleSize *= 2 }
             val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options) ?: throw IllegalArgumentException()
-            val file = File(getApplication<Application>().filesDir, "xxt_photo_${UUID.randomUUID()}.jpg")
+            val file = File(getApplication<Application>().filesDir, "${if (demo) "xxt_demo_photo_" else "xxt_photo_"}${UUID.randomUUID()}.jpg")
             try { file.outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 88, it) } } finally { bitmap.recycle() }
             file.absolutePath
         }
@@ -153,6 +156,8 @@ internal class XxtState(app: Application) : AndroidViewModel(app) {
     private fun plan() = XxtSignPlan(requireNotNull(course), requireNotNull(activity), requireNotNull(detail), code, qr, photoPath, position)
     fun preview() = run {
         check(!pendingWrite) { "请先核验上次结果。" }
+        user = read { api().user() }
+        detail = read { api().detail(requireNotNull(activity)) }
         flow.preview(plan(), System.currentTimeMillis()); save()
         if (flow.stage == XxtStage.CAPTCHA) captcha = api().captcha(requireNotNull(flow.plan)) else confirmation = flow.plan
     }
@@ -164,6 +169,10 @@ internal class XxtState(app: Application) : AndroidViewModel(app) {
     fun dismissConfirmation() { confirmation = null }
     fun dismissCaptcha() { captcha = null; flow.dismiss() }
     fun submit() = run {
+        val confirmedUid = requireNotNull(user).uid
+        val current = read { api().user() }
+        check(current.uid == confirmedUid) { "账号已变更，请重新加载并确认。" }
+        user = current
         val value = flow.begin(System.currentTimeMillis()); confirmation = null
         pendingWrite = true; save()
         val result = api().sign(requireNotNull(user), value, validateToken, flow.enc2)
@@ -185,9 +194,10 @@ internal class XxtState(app: Application) : AndroidViewModel(app) {
                 draftWork?.join()
                 if (!demo) { backend?.clear() ?: withContext(Dispatchers.IO) { storage.clear() } }
                 else backend?.clear()
-                withContext(Dispatchers.IO) { getApplication<Application>().filesDir.listFiles()?.filter { it.name.startsWith("xxt_photo_") }?.forEach { it.delete() } }
+                withContext(Dispatchers.IO) { getApplication<Application>().filesDir.listFiles()?.filter { it.name.startsWith(if (demo) "xxt_demo_photo_" else "xxt_photo_") }?.forEach { it.delete() } }
                 withContext(Dispatchers.IO) { File(getApplication<Application>().cacheDir, "xxt_camera").deleteRecursively() }
                 backend = null; user = null; courses = emptyList(); activities = emptyList(); course = null; activity = null; detail = null; loaded = false; qrLogin = null; resetSign(); error = ""
+                savedState.remove<String>("draft")
             } catch (_: Exception) { error = "本地学习通数据未能完全清除，请重试或在系统设置清除应用数据。" }
             finally { busy = false }
         }

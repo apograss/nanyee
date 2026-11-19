@@ -2,6 +2,14 @@ package de.nanyee.app
 
 import kotlinx.serialization.Serializable
 
+internal suspend fun <T> xxtReadRecover(credentials: suspend () -> Pair<String, String>, login: suspend (String, String) -> Unit, expired: () -> Unit, action: suspend () -> T): T = try { action() } catch (e: XxtFailure) {
+    if (e.kind != "SESSION") throw e
+    val (account, password) = credentials()
+    if (account.isBlank() || password.isBlank()) { expired(); throw e }
+    login(account, password)
+    action()
+}
+
 internal enum class XxtStage { EDIT, CONFIRM, CAPTCHA, WRITING, SUCCESS, REJECTED, UNKNOWN }
 internal class XxtFlow {
     var stage = XxtStage.EDIT; private set
