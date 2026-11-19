@@ -1,0 +1,38 @@
+# Nanyee Android
+
+原生 Kotlin / Jetpack Compose Material 3 客户端，最低 Android 8（API 26）。支持系统深色模式。
+
+## 构建和安装
+
+使用 JDK 17；安装 Android command-line tools 并通过 `sdkmanager` 安装 `platform-tools`、`platforms;android-35`、`build-tools;35.0.0`。设置 `ANDROID_HOME`（或在未跟踪的 `local.properties` 中设置 `sdk.dir`）。
+
+```sh
+cd android
+./gradlew assembleDebug testDebugUnitTest
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb shell am start -n de.nanyee.app/.MainActivity
+```
+
+Debug APK 使用 Android 默认开发密钥签名，可直接安装。发布正式版本前请配置自己的签名密钥；不要提交密钥。
+
+本环境 SDK 安装于 `/home/ubuntu/android-sdk`。建议将 JDK、SDK 和模拟器安装步骤加入环境 blueprint，以便后续会话复用。
+
+## 使用与隐私
+
+- API：`https://nanyee.de/api/v1`；无需平台账号即可进行学校登录。
+- 验证码手工输入，点击图片刷新；失败后重新获取一次性流程。
+- 学校会话、Cookie、验证码、课表、成绩仅在内存中保存，关闭进程后需重新登录。会话到期或收到 401/410 会回到学校登录。
+- “记住学号和密码”使用 Android Keystore 支持的 EncryptedSharedPreferences。取消勾选立即删除；不备份应用数据。
+- 仅学期总周数作为普通偏好保存（1–30，默认 20）。
+- 所有构建均可在登录页选择“演示模式”；横幅明确标注示例数据，不发送学校查询请求。
+- MVP 不含 OCR、Turnstile、成绩筛选与导出。遇到人机验证提示时请稍后重试或使用网站。
+
+## 模拟器
+
+```sh
+sdkmanager 'emulator' 'system-images;android-35;google_apis;x86_64'
+avdmanager create avd -n nanyee -k 'system-images;android-35;google_apis;x86_64' --device pixel_6
+emulator -avd nanyee
+```
+
+未使用真实学生账号验证上游学校登录，演示模式不代表真实学校响应。

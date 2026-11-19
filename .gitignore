@@ -29,3 +29,7 @@ tmp/
 *.key
 *.age
 secrets/
+android/.gradle/
+android/local.properties
+android/**/build/
+android/*.jks
