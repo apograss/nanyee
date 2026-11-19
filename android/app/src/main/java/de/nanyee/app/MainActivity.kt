@@ -17,6 +17,7 @@ import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
@@ -60,6 +61,11 @@ fun Nanyee(state: SchoolState) {
     val evaluation: EvaluationState = viewModel(key = "manual-evaluation-live")
     val grab: CourseGrabState = viewModel(key = "course-grab-live")
     val grabDemo: CourseGrabState = viewModel(key = "course-grab-demo")
+    var rainDemo by rememberSaveable { mutableStateOf(false) }
+    val rainReal: RainState = viewModel(key = "rain-real")
+    val rainFake: RainState = viewModel(key = "rain-demo")
+    val rain = if (rainDemo) rainFake else rainReal
+    var pendingRainHost by remember { mutableStateOf<RainHost?>(null) }
     val view = androidx.compose.ui.platform.LocalView.current
     DisposableEffect(view, grab.run.active, grabDemo.run.active) {
         view.keepScreenOn = grab.run.active || grabDemo.run.active
@@ -83,16 +89,29 @@ fun Nanyee(state: SchoolState) {
     val detail = if (!state.homeVisible) null else selectedDetail(detailDataIdentity, dataIdentity, detailIndex, detailItems)?.let { detailKind to it }
     val landscape = LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp
     val iconSize = (24 * LocalDensity.current.fontScale.coerceIn(1f, 1.35f)).dp
-    val appVisible = state.homeVisible || state.tab == 3
-    val labels = listOf("今天", "课表", "成绩", "工具", "我的")
-    val icons = listOf(Icons.Outlined.Today, Icons.Outlined.CalendarMonth, Icons.Outlined.BarChart, Icons.Outlined.Widgets, Icons.Outlined.Person)
+    val labels = MainTab.entries.map { it.label }
+    val icons = listOf(Icons.Outlined.CalendarMonth, Icons.Outlined.School, Icons.Outlined.RateReview, Icons.Outlined.Widgets, Icons.Outlined.Person)
+    val tabState = rememberSaveableStateHolder()
+    var platformMenu by remember { mutableStateOf(false) }
     Scaffold(
         contentWindowInsets = WindowInsets.safeDrawing,
-        topBar = { if (appVisible) TopAppBar(expandedHeight = if (landscape) 44.dp else 64.dp, title = { Text(labels[state.tab] + if (landscape && state.demo) " · 演示模式" else "", fontWeight = FontWeight.Bold, style = if (landscape) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge, maxLines = 1) }, actions = { if (state.tab < 3 && !state.demo) IconButton(onClick = { state.reload() }, enabled = !state.busy) { Icon(Icons.Outlined.Refresh, "刷新", Modifier.size(iconSize)) } }) },
-        bottomBar = { if (appVisible && !landscape) NavigationBar { labels.forEachIndexed { i, label -> NavigationBarItem(selected = state.tab == i, onClick = { state.selectTab(i) }, icon = { Icon(icons[i], null) }, label = { Text(label) }) } } }
+        topBar = { TopAppBar(expandedHeight = if (landscape) 44.dp else 64.dp, title = { Text(labels[state.tab] + if (landscape && state.demo) " · 演示模式" else "", fontWeight = FontWeight.Bold, style = if (landscape) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge, maxLines = 1) }, actions = {
+            if (state.tab == 1) Box {
+                IconButton(onClick = { platformMenu = true }) { Icon(Icons.Outlined.MoreHoriz, "课堂平台与服务器") }
+                DropdownMenu(expanded = platformMenu, onDismissRequest = { platformMenu = false }) {
+                    ClassroomPlatform.entries.forEach { platform -> DropdownMenuItem(text = { Text(platform.label) }, onClick = { state.selectClassroom(platform); platformMenu = false }, leadingIcon = { RadioButton(selected = state.classroomPlatform == platform, onClick = null) }) }
+                    if (state.classroomPlatform == ClassroomPlatform.RAIN) {
+                        HorizontalDivider()
+                        RainHost.entries.forEach { host -> DropdownMenuItem(text = { Text(host.domain) }, enabled = rain.ready && !rain.busy && rain.lesson == null, onClick = { if (rain.host != host) pendingRainHost = host; platformMenu = false }, leadingIcon = { RadioButton(selected = rain.host == host, onClick = null) }) }
+                    }
+                }
+            }
+            if ((state.tab == 0 || state.tab == 3 && state.toolsRoute == "grades") && state.homeVisible && !state.demo) IconButton(onClick = { state.reload() }, enabled = !state.busy) { Icon(Icons.Outlined.Refresh, "刷新", Modifier.size(iconSize)) }
+        }) },
+        bottomBar = { if (!landscape) NavigationBar { labels.forEachIndexed { i, label -> NavigationBarItem(selected = state.tab == i, onClick = { state.selectTab(i) }, icon = { Icon(icons[i], null) }, label = { Text(label) }) } } }
     ) { padding ->
         Row(Modifier.padding(padding).consumeWindowInsets(padding).fillMaxSize()) {
-            if (landscape && appVisible) NavigationRail(windowInsets = WindowInsets(0)) { labels.forEachIndexed { i, label -> NavigationRailItem(selected = state.tab == i, onClick = { state.selectTab(i) }, icon = { Icon(icons[i], label) }) } }
+            if (landscape) NavigationRail(windowInsets = WindowInsets(0)) { labels.forEachIndexed { i, label -> NavigationRailItem(selected = state.tab == i, onClick = { state.selectTab(i) }, icon = { Icon(icons[i], label) }) } }
         Column(Modifier.weight(1f).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
             if (state.autoLoggingIn) Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("正在自动登录…", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
@@ -100,17 +119,17 @@ fun Nanyee(state: SchoolState) {
             } else if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
             if (state.demo && !landscape) Surface(color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.fillMaxWidth()) { Text("演示模式 · 以下为示例数据，并非真实学业记录", Modifier.padding(horizontal = 20.dp, vertical = 8.dp), style = MaterialTheme.typography.labelMedium) }
             if (state.homeVisible && state.error.isNotEmpty()) ErrorCard(state)
-            when {
+            tabState.SaveableStateProvider(state.tab) { when {
                 state.cacheRevocationFailed -> Column(Modifier.padding(24.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     Text("本机课表尚未安全清除", style = MaterialTheme.typography.titleLarge)
                     Text(state.error)
                     Button(onClick = { state.logout() }) { Text("重试退出并清除课表") }
                 }
-                !state.homeVisible && state.tab != 3 -> Login(state)
-                state.tab == 0 -> TodayScreen(state) { detailKind = "course"; detailIndex = state.courses.indexOf(it); detailDataIdentity = state.courseDataIdentity }
-                state.tab == 1 -> Timetable(state) { detailKind = "course"; detailIndex = state.courses.indexOf(it); detailDataIdentity = state.courseDataIdentity }
-                state.tab == 2 -> Grades(state) { detailKind = "grade"; detailIndex = state.grades?.items("grades")?.indexOf(it) ?: -1; detailDataIdentity = state.gradeDataIdentity }
-                state.tab == 3 -> ToolsScreen(state, evaluation, grab, grabDemo)
+                !state.homeVisible && state.tab in listOf(0, 4) -> Login(state)
+                state.tab == 0 -> Timetable(state) { detailKind = "course"; detailIndex = state.courses.indexOf(it); detailDataIdentity = state.courseDataIdentity }
+                state.tab == 1 -> ClassroomScreen(state, rain, rainDemo) { rainDemo = !rainDemo }
+                state.tab == 2 -> EvaluationToolsScreen(state, evaluation)
+                state.tab == 3 -> ToolsScreen(state, grab, grabDemo) { detailKind = "grade"; detailIndex = state.grades?.items("grades")?.indexOf(it) ?: -1; detailDataIdentity = state.gradeDataIdentity }
                 else -> Column(Modifier.widthIn(max = 520.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                     Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.primaryContainer) { Icon(Icons.Outlined.School, null, Modifier.padding(20.dp).size(36.dp)) }
                     Text("学校登录", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
@@ -121,10 +140,11 @@ fun Nanyee(state: SchoolState) {
                     } }
                     OutlinedButton(onClick = { state.logout() }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Outlined.Logout, null); Spacer(Modifier.width(8.dp)); Text(if (state.demo) "退出演示模式" else "退出并清除本机课表") }
                 }
-            }
+            } }
         }
         }
     }
+    pendingRainHost?.let { host -> AlertDialog(onDismissRequest = { pendingRainHost = null }, title = { Text("请确认") }, text = { Text("切换到 ${host.domain}，将离开当前会话视图。不同服务器的加密 Cookie 与身份互不混用。") }, confirmButton = { TextButton(onClick = { rain.switchHost(host); pendingRainHost = null }) { Text("确认") } }, dismissButton = { TextButton(onClick = { pendingRainHost = null }) { Text("取消") } }) }
     detail?.let { (kind, item) -> AlertDialog(onDismissRequest = { detailIndex = -1 }, confirmButton = { TextButton(onClick = { detailIndex = -1 }) { Text("关闭") } }, title = { Text(item.text("name")) }, text = {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (kind == "course") {

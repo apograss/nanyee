@@ -11,34 +11,47 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.serialization.json.JsonObject
 
 @Composable
-internal fun ToolsScreen(school: SchoolState, evaluation: EvaluationState, grab: CourseGrabState, grabDemo: CourseGrabState) {
+internal fun ToolsScreen(school: SchoolState, grab: CourseGrabState, grabDemo: CourseGrabState, onGrade: (JsonObject) -> Unit) {
+    val back = { if (school.canReturnToCache) school.returnToCache(); school.closeTool(); school.selectTab(3) }
+    when (school.toolsRoute) {
+        "cabin" -> CabinToolsScreen(school, onBack = back)
+        "grab" -> CourseGrabScreen(school, grab, grabDemo, onBack = back)
+        "grades" -> {
+            BackHandler(onBack = back)
+            Column(Modifier.fillMaxSize()) {
+                TextButton(onClick = back) { Text("返回工具") }
+                if (!school.homeVisible) Login(school)
+                else if (school.cachedMode) {
+                    Text("成绩不会缓存在本机，请登录学校系统查看。", Modifier.padding(20.dp))
+                    Button(onClick = school::openGrades, enabled = !school.busy) { Text("登录学校系统查看成绩") }
+                } else Grades(school, onGrade)
+            }
+        }
+        else -> Column(Modifier.widthIn(max = 720.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("校园工具", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text("按需开启，让日常更从容。")
+            ToolCard("成绩", "学校直连，查看课程成绩、绩点与排名；仅保留在内存中。", school::openGrades)
+            ToolCard("自习舱预约", "选择舱位优先级，交给服务器按时尝试预约。", { school.openTool("cabin") })
+            ToolCard("抢课", "学校直连，本机按志愿顺序尝试；请保持 App 前台运行。", { school.openTool("grab") })
+        }
+    }
+}
+
+@Composable
+internal fun EvaluationToolsScreen(school: SchoolState, evaluation: EvaluationState) {
     var route by rememberSaveable { mutableStateOf("") }
     val back = { route = "" }
     when (route) {
-        "cabin" -> CabinToolsScreen(school, onBack = back)
-        "automatic" -> CabinToolsScreen(school, state = viewModel(key = "evaluation-platform"), evaluationMode = true, onBack = { route = "evaluation" })
-        "manual" -> ManualEvaluationScreen(school, evaluation, onBack = { route = "evaluation" })
-        "grab" -> CourseGrabScreen(school, grab, grabDemo, onBack = back)
-        "xuexitong" -> XxtToolsScreen(onBack = back)
-        "rain" -> RainToolsScreen(onBack = back)
+        "automatic" -> CabinToolsScreen(school, state = viewModel(key = "evaluation-platform"), evaluationMode = true, onBack = back)
+        "manual" -> ManualEvaluationScreen(school, evaluation, onBack = back)
         else -> {
-            BackHandler(route.isNotEmpty()) { route = "" }
             Column(Modifier.widthIn(max = 720.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                if (route.isNotEmpty()) TextButton(onClick = back) { Text("返回工具") }
-                Text(if (route == "evaluation") "课程评价" else "校园工具", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                if (route == "evaluation") {
-                    ToolCard("自动评课 · 服务器", "明确同意托管学校凭据后，由 Nanyee 每天无人值守运行。", { route = "automatic" })
-                    ToolCard("手动一键 · 本机", "直连学校，只读加载、选择课程、预览答案；确认后逐门提交。不使用 Nanyee 服务器。", { route = "manual" })
-                } else {
-                    Text("按需开启，让日常更从容。")
-                    ToolCard("学习舱预约", "选择舱位优先级，交给服务器按时尝试预约。", { route = "cabin" })
-                    ToolCard("课程评价", "服务器自动评课，或本机预览确认后手动一键提交。", { route = "evaluation" })
-                    ToolCard("抢课", "学校直连，本机按志愿顺序尝试；请保持 App 前台运行。", { route = "grab" })
-                    ToolCard("学习通", "独立账号、课程与活动；确认后仅为本人签到，也可离线体验演示。", { route = "xuexitong" })
-                    ToolCard("雨课堂", "独立扫码登录、当前课堂、课件与手动作答；每次写入均需确认。", { route = "rain" })
-                }
+                Text("课程评价", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                ToolCard("自动评课 · 服务器", "明确同意托管学校凭据后，由 Nanyee 每天无人值守运行。", { route = "automatic" })
+                ToolCard("手动一键 · 本机", "直连学校，只读加载、选择课程、预览答案；确认后逐门提交。不使用 Nanyee 服务器。", { route = "manual" })
             }
         }
     }

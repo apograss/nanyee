@@ -27,7 +27,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.findViewTreeLifecycleOwner
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
 import com.journeyapps.barcodescanner.ScanContract
@@ -38,11 +37,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @Composable
-internal fun RainToolsScreen(onBack: () -> Unit) {
-    var demo by rememberSaveable { mutableStateOf(false) }
-    val real: RainState = viewModel(key = "rain-real")
-    val fake: RainState = viewModel(key = "rain-demo")
-    val state = if (demo) fake else real
+internal fun RainToolsScreen(state: RainState, demo: Boolean, onBack: () -> Unit, toggleDemo: () -> Unit) {
     LaunchedEffect(state) { state.initialize(demo) }
     val owner = LocalView.current.findViewTreeLifecycleOwner()
     DisposableEffect(owner, state) {
@@ -51,7 +46,7 @@ internal fun RainToolsScreen(onBack: () -> Unit) {
         owner?.lifecycle?.addObserver(observer); sync()
         onDispose { owner?.lifecycle?.removeObserver(observer); state.setForeground(false) }
     }
-    RainContent(state, onBack) { state.setForeground(false); demo = !demo }
+    RainContent(state, onBack) { state.setForeground(false); toggleDemo() }
 }
 
 @Composable
@@ -60,7 +55,6 @@ private fun RainContent(state: RainState, onBack: () -> Unit, toggleDemo: () -> 
     val context = LocalContext.current
     var deviceError by remember { mutableStateOf("") }
     var localConfirm by remember { mutableStateOf("") }
-    var pendingHost by remember { mutableStateOf<RainHost?>(null) }
     val scanner = rememberLauncherForActivityResult(ScanContract()) { result -> result.contents?.let(state::previewScan) }
     val locationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
         if (permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true) state.locate() else deviceError = "需要精确定位权限；不支持手动坐标或模拟定位。"
@@ -75,7 +69,7 @@ private fun RainContent(state: RainState, onBack: () -> Unit, toggleDemo: () -> 
     }
     BackHandler(onBack = back)
     Column(Modifier.widthIn(max = 920.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        TextButton(onClick = back, enabled = !state.busy) { Text(if (state.lesson != null) "离开课堂并返回课程" else "返回工具") }
+        TextButton(onClick = back, enabled = !state.busy) { Text(if (state.lesson != null) "离开课堂并返回课程" else "返回课表") }
         Text("雨课堂", style = MaterialTheme.typography.headlineMedium)
         Text(if (state.demo) "离线演示 · 不联网，不改变课堂状态。保存图片会写入本机相册。" else "雨课堂独立加密会话 · 仅当前本人账号 · 不共享教务或学习通 Cookie")
         if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -91,9 +85,6 @@ private fun RainContent(state: RainState, onBack: () -> Unit, toggleDemo: () -> 
                 }
             }
             Text("服务器：${state.host.domain}", style = MaterialTheme.typography.titleMedium)
-            if (state.lesson == null) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                RainHost.entries.forEach { host -> FilterChip(selected = state.host == host, onClick = { if (state.host != host) pendingHost = host }, enabled = !state.busy, label = { Text(host.domain.substringBefore('.')) }) }
-            }
             TextButton(onClick = toggleDemo, enabled = !state.busy) { Text(if (state.demo) "返回真实雨课堂" else "无账号体验离线演示") }
             if (state.demo) {
                 Text("演示场景（切换后再执行对应操作）")
@@ -160,9 +151,9 @@ private fun RainContent(state: RainState, onBack: () -> Unit, toggleDemo: () -> 
             else state.confirm()
         }) { Text("确认${if (action is RainAction.Export) "保存" else "提交"}") } }, dismissButton = { TextButton(onClick = state::dismiss) { Text("取消") } })
     }
-    if (localConfirm.isNotBlank() || pendingHost != null) AlertDialog(onDismissRequest = { localConfirm = ""; pendingHost = null }, title = { Text("请确认") }, text = {
-        Text(when { pendingHost != null -> "切换到 ${pendingHost?.domain}，将离开当前会话视图。不同服务器的加密 Cookie 与身份互不混用。"; localConfirm == "unknown" -> "我已在官方雨课堂核验上次操作结果。清除未知标记不会重发任何操作，下一次操作仍需手动确认。"; else -> "退出将发送课堂离开消息，并清除所有雨课堂服务器的本机 Cookie、会话标记及手写草稿；不影响教务或学习通。" })
-    }, confirmButton = { TextButton(onClick = { when { pendingHost != null -> state.switchHost(requireNotNull(pendingHost)); localConfirm == "unknown" -> state.acknowledgeUnknown(); else -> state.logout() }; localConfirm = ""; pendingHost = null }) { Text("确认") } }, dismissButton = { TextButton(onClick = { localConfirm = ""; pendingHost = null }) { Text("取消") } })
+    if (localConfirm.isNotBlank()) AlertDialog(onDismissRequest = { localConfirm = "" }, title = { Text("请确认") }, text = {
+        Text(if (localConfirm == "unknown") "我已在官方雨课堂核验上次操作结果。清除未知标记不会重发任何操作，下一次操作仍需手动确认。" else "退出将发送课堂离开消息，并清除所有雨课堂服务器的本机 Cookie、会话标记及手写草稿；不影响教务或学习通。")
+    }, confirmButton = { TextButton(onClick = { if (localConfirm == "unknown") state.acknowledgeUnknown() else state.logout(); localConfirm = "" }) { Text("确认") } }, dismissButton = { TextButton(onClick = { localConfirm = "" }) { Text("取消") } })
 }
 
 @Composable

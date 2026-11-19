@@ -17,7 +17,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.serialization.json.*
 import java.time.Instant
 import java.time.LocalDate
-import java.time.LocalDateTime
 import java.time.ZoneId
 import java.util.UUID
 
@@ -78,10 +77,19 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
     var hint by mutableStateOf("")
     var gradesLoading by mutableStateOf(false)
         private set
-    private var selectedTab by mutableIntStateOf(saved["tab"] ?: 0)
+    private var selectedTab by mutableIntStateOf(restoredMainTab(saved["mainTab"]))
     var tab: Int
         get() = selectedTab
-        set(value) { selectedTab = value; saved["tab"] = value }
+        set(value) { selectedTab = restoredMainTab(value); saved["mainTab"] = selectedTab }
+    var toolsRoute by mutableStateOf(saved.get<String>("toolsRoute") ?: "")
+        private set
+    fun closeTool() { toolsRoute = ""; saved["toolsRoute"] = "" }
+    fun openTool(route: String) { toolsRoute = route; saved["toolsRoute"] = route }
+    private var selectedClassroom by mutableStateOf(ClassroomPlatform.restore(prefs.getString("classroomPlatform", null)))
+    internal val classroomPlatform get() = selectedClassroom
+    internal fun selectClassroom(value: ClassroomPlatform) {
+        selectedClassroom = value; prefs.edit().putString("classroomPlatform", value.name).apply()
+    }
     var semesters by mutableStateOf(emptyList<JsonObject>())
     private var selectedSemester by mutableStateOf(saved["semester"] ?: "")
     var semester: String
@@ -107,8 +115,6 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         set(value) { loadedGrades = value; gradeDataIdentity = UUID.randomUUID().toString() }
     var today by mutableStateOf(runCatching { LocalDate.parse(saved.get<String>("date")) }.getOrDefault(LocalDate.now(ZoneId.of("Asia/Shanghai"))))
         private set
-    var now by mutableStateOf(LocalDateTime.now(ZoneId.of("Asia/Shanghai")))
-        private set
 
     init {
         runCatching { timetableCache.retryRevokedDeletion() }
@@ -125,15 +131,16 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         } else {
             clearCacheReturnView()
             if (saved.get<Boolean>("hadSession") == true) hint = "会话已过期，请重新登录"
-            if (!restoreCachedTimetable() && tab != 3) launch(silent = true) { fetchCaptcha() }
+            val restoreTab = tab
+            val cached = restoreCachedTimetable()
+            tab = restoreTab
+            if (!cached && schoolLoginRequired(tab, toolsRoute)) launch(silent = true) { fetchCaptcha() }
         }
         updateDate()
         viewModelScope.launch { while (true) { delay(1000); updateDate(); checkCaptcha(); if (loggedIn && !demo && runCatching { Instant.now().isAfter(Instant.parse(expires)) }.getOrDefault(true)) expireSession(reauthenticate = false) } }
     }
     private fun updateDate() {
-        val clock = LocalDateTime.now(ZoneId.of("Asia/Shanghai")).withSecond(0).withNano(0)
-        now = clock
-        val date = clock.toLocalDate()
+        val date = LocalDate.now(ZoneId.of("Asia/Shanghai"))
         if (date != today) {
             today = date
             if (homeVisible) followCurrentWeek()
@@ -165,7 +172,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
     }
     private suspend fun fetchCaptcha() { captchaAttemptAt = Instant.now(); captchaText = ""; captcha = api.request("captcha") }
     fun checkCaptcha() {
-        if (homeVisible || tab == 3 || busy || captcha == null || Instant.now().isBefore(captchaAttemptAt.plusSeconds(60))) return
+        if (homeVisible || !schoolLoginRequired(tab, toolsRoute) || busy || captcha == null || Instant.now().isBefore(captchaAttemptAt.plusSeconds(60))) return
         if (captchaNeedsRefresh(captcha?.text("expires_at") ?: "", Instant.now())) {
             hint = "验证码已更新，请重新输入"
             launch(silent = true) { fetchCaptcha() }
@@ -246,16 +253,21 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
     }
     fun reload() {
         reauthAttempted = false
-        if (cachedMode) requireSchoolLogin(tab.takeIf { it in 0..2 } ?: 0)
+        if (cachedMode) requireSchoolLogin(if (tab == 3 && toolsRoute == "grades") 3 else 0)
         else if (!demo && loggedIn) {
-            if (tab <= 1) launch("timetable") { if (semesters.isEmpty()) loadTimetable() else queryTimetable() }
-            else launch("grades") { loadGrades() }
+            if (tab == 0) launch("timetable") { if (semesters.isEmpty()) loadTimetable() else queryTimetable() }
+            else if (tab == 3 && toolsRoute == "grades") launch("grades") { loadGrades() }
         }
     }
     fun selectTab(value: Int) {
-        if (value == 3 && !homeVisible) { jobs.remove("captcha")?.cancel(); busy = jobs.isNotEmpty() }
-        if (cachedMode && value == 2) { reauthAttempted = false; requireSchoolLogin(2) } else tab = value.coerceIn(0, 4)
-        if (value != 3 && !homeVisible && captcha == null && !busy) refreshCaptcha()
+        tab = restoredMainTab(value)
+        if (!schoolLoginRequired(tab, toolsRoute) && !homeVisible) { jobs.remove("captcha")?.cancel(); busy = jobs.isNotEmpty() }
+        if (tab == 3 && toolsRoute == "grades" && cachedMode) openGrades()
+        else if (schoolLoginRequired(tab, toolsRoute) && !homeVisible && captcha == null && !busy) refreshCaptcha()
+    }
+    fun openGrades() {
+        openTool("grades"); tab = 3
+        if (!homeVisible || cachedMode) { reauthAttempted = false; requireSchoolLogin(3) }
     }
 
     internal suspend fun hostedSchoolPrefill(): Pair<String, String>? = withContext(Dispatchers.IO) {
@@ -403,7 +415,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
     private suspend fun showManualLogin(reason: String) {
         api.clear()
         autoLoggingIn = false; cachedMode = false; captcha = null; captchaText = ""
-        hint = if (loginDestination == 2) "请登录学校系统查看成绩" else "请登录学校系统更新课表"
+        hint = if (loginDestination == 3 && toolsRoute == "grades") "请登录学校系统查看成绩" else "请登录学校系统更新课表"
         error = reason
         try { fetchCaptcha() } catch (e: Exception) {
             if (e is CancellationException) throw e
@@ -419,7 +431,8 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         val destination = tab
         clearRequests(); session = ""; expires = ""; liveOwner = ""; loggedIn = false; grades = null; api.clear()
         val restored = restoreCachedTimetable()
-        if (destination == 3) { tab = 3; hint = "学校会话已过期，需要更新时请重新登录。"; return }
+        tab = destination
+        if (!schoolLoginRequired(destination, toolsRoute)) { hint = "学校会话已过期，需要更新时请重新登录。"; return }
         if (reauthenticate) requireSchoolLogin(destination, allowSilent = !reauthAttempted)
         else {
             hint = "学校会话已过期，需要更新时请重新登录。"

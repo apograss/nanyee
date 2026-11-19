@@ -48,7 +48,7 @@ internal fun CabinToolsScreen(school: SchoolState, state: CabinState = viewModel
     }
     PullToRefreshBox(isRefreshing = state.busy, onRefresh = { if (state.user != null) state.refresh() }, modifier = Modifier.widthIn(max = 720.dp).fillMaxSize()) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            TextButton(onClick = { state.cancelCredential(); if (onBack != null) onBack() else opened = false }) { Text("返回工具") }
+            TextButton(onClick = { state.cancelCredential(); if (onBack != null) onBack() else opened = false }) { Text(if (evaluationMode) "返回课程评价" else "返回工具") }
             Text(if (evaluationMode) "自动评课 · 服务器" else "学习舱预约", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             if (state.demo) Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) { Text("演示模式 · 不联网、不托管真实密码、不执行真实操作", Modifier.padding(16.dp)) }
             if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())

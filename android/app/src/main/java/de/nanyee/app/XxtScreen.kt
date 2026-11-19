@@ -71,7 +71,7 @@ private fun XxtScreen(state: XxtState, onBack: () -> Unit, onToggleDemo: () -> U
     val back = { if (!state.busy) { if (state.course != null) state.back() else onBack() } }
     BackHandler { if (state.qrLogin != null) state.stopQrLogin() else back() }
     Column(Modifier.widthIn(max = 720.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        TextButton(onClick = back, enabled = !state.busy) { Text(if (state.course == null) "返回工具" else if (state.activity == null) "返回课程" else "返回活动") }
+        TextButton(onClick = back, enabled = !state.busy) { Text(if (state.course == null) "返回课表" else if (state.activity == null) "返回课程" else "返回活动") }
         Text("学习通", style = MaterialTheme.typography.headlineMedium)
         Text(if (state.demo) "离线演示 · 不联网，不上传，不会真实签到" else "独立学习通会话 · 仅当前本人账号 · 不共享教务登录")
         if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
