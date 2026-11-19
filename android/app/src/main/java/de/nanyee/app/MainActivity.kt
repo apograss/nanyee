@@ -191,7 +191,7 @@ fun Timetable(state: SchoolState, onCourse: (JsonObject) -> Unit) {
     val periodHeight = timetablePeriodHeight(fontScale).dp
     val periodWidth = (36 * fontScale.coerceAtLeast(1f)).dp
     CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
-    Column(Modifier.widthIn(max = 1000.dp).fillMaxSize()) {
+    Column(Modifier.widthIn(max = 900.dp).fillMaxSize()) {
         Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Picker("选择学期", state.semesters.map { it.text("code") to it.text("label") }, state.semester, { state.selectSemester(it) }, Modifier.weight(1.6f))
                 Picker("选择周次", (1..state.totalWeeks).map { it.toString() to "第 $it 周" }, state.week.toString(), { state.selectWeek(it.toInt()) }, Modifier.weight(1f))
