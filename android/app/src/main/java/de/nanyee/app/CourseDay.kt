@@ -36,18 +36,22 @@ fun CourseDay(courses: List<JsonObject>, allCourses: List<JsonObject>, colors: L
                 val span = if (collapse) requireNotNull(courseSpan(group)) else course.number("start_node")..course.number("end_node")
                 val name = course.text("name")
                 val maxTitleLines = if (span.first == span.last) 1 else 3
-                val glyphWidth = remember(name, titleStyle, measurer) {
-                    name.codePoints().toArray().maxOfOrNull { measurer.measure(AnnotatedString(String(Character.toChars(it))), titleStyle, maxLines = 1).size.width }?.coerceAtLeast(1) ?: 1
-                }
                 val titleWidth = with(density) { (laneWidth - 6.dp - if (!collapse && placement.laneCount > 1) 2.dp else 0.dp).toPx().coerceAtLeast(0f) }
-                val title = balancedCjkTitle(name, (titleWidth / glyphWidth).toInt(), maxTitleLines)
+                val title = remember(name, titleWidth, titleStyle, measurer, density.fontScale, maxTitleLines) {
+                    fitCjkTitle(name, titleStyle.fontSize.value, 11.5f / density.fontScale, maxTitleLines) { size ->
+                        val glyphWidth = name.codePoints().toArray().maxOfOrNull {
+                            measurer.measure(AnnotatedString(String(Character.toChars(it))), titleStyle.copy(fontSize = size.sp), maxLines = 1).size.width
+                        }?.coerceAtLeast(1) ?: 1
+                        (titleWidth / glyphWidth).toInt()
+                    }
+                }
                 Surface(onClick = { if (collapse && group.size > 1) onConflicts(group) else onCourse(course) }, color = colors[allCourses.indexOf(course).coerceAtLeast(0) % colors.size], shape = RoundedCornerShape(8.dp), modifier = Modifier.offset(x = if (collapse) 0.dp else laneWidth * placement.lane, y = periodHeight * (span.first - 1)).width(laneWidth).padding(end = if (!collapse && placement.laneCount > 1) 2.dp else 0.dp).height(periodHeight * (span.last - span.first + 1) - 4.dp)) {
                     Column(Modifier.padding(horizontal = 3.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Text(course.text("start_time"), Modifier.weight(1f), fontSize = 8.sp, lineHeight = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             if (collapse && group.size > 1) Text("+${group.size - 1}", fontSize = 10.sp, lineHeight = 10.sp, maxLines = 1, fontWeight = FontWeight.Bold)
                         }
-                        Text(title, Modifier.weight(1f, fill = false), maxLines = maxTitleLines, overflow = TextOverflow.Ellipsis, style = titleStyle)
+                        Text(title.text, Modifier.weight(1f, fill = false), maxLines = maxTitleLines, overflow = TextOverflow.Ellipsis, style = titleStyle.copy(fontSize = title.fontSize.sp))
                         Text(compactRoom(course.text("location")), fontSize = 8.sp, lineHeight = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                 }

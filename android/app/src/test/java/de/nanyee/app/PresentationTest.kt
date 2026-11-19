@@ -5,6 +5,25 @@ import org.junit.Test
 import java.time.LocalDate
 
 class PresentationTest {
+    @Test fun fiveCharacterTitleShrinksFromTwoCharacterCapacityToBalancedLines() {
+        val result = fitCjkTitle("人体解剖学", 14f, 11.5f, 3) { size -> (35f / size).toInt() }
+        assertEquals("人体解\n剖学", result.text)
+        assertEquals(11.5f, result.fontSize, 0.001f)
+    }
+
+    @Test fun titleFittingRespectsFloorAndLeavesOtherTitlesUnchanged() {
+        val floorReached = fitCjkTitle("人体解剖学", 14f, 12f, 3) { size -> (28f / size).toInt() }
+        assertEquals("人体\n解剖\n学", floorReached.text)
+        assertEquals(12f, floorReached.fontSize, 0.001f)
+        assertEquals(FittedCourseTitle("基础\n化学", 14f), fitCjkTitle("基础化学", 14f, 12f, 3) { 2 })
+        listOf("", "Medical English", "医学Ⅱ").forEach { title ->
+            assertEquals(FittedCourseTitle(title, 14f), fitCjkTitle(title, 14f, 12f, 3) { error("must not measure") })
+        }
+        assertEquals(FittedCourseTitle("人体解剖学", 14f), fitCjkTitle("人体解剖学", 14f, 12f, 1) { error("must not measure") })
+        assertEquals(10f, fitCjkTitle("人体解剖学", 10f, 12f, 3) { 2 }.fontSize, 0.001f)
+        assertTrue(runCatching { fitCjkTitle("人体解剖学", Float.NaN, 12f, 3) { 2 } }.isFailure)
+        assertTrue(runCatching { fitCjkTitle("人体解剖学", 14f, 0f, 3) { 2 } }.isFailure)
+    }
     @Test fun cjkTitlesBalanceWithoutSingleCharacterOrphansWhenTwoLinesFit() {
         assertEquals("人体解\n剖学", balancedCjkTitle("人体解剖学", 4, 3))
         assertEquals("人体解\n剖学", balancedCjkTitle("人体解剖学", 3, 3))
