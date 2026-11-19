@@ -294,6 +294,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
     }
     fun logout() {
         val wasDemo = demo
+        val returnView = cacheReturnView.takeIf { wasDemo }
         if (!wasDemo && runCatching { timetableCache.clear() }.isFailure) { error = "无法清除本机课表，请重试。"; return }
         if (!wasDemo) cachedTimetables = null
         clearRequests()
@@ -301,9 +302,11 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         clearCacheReturnView()
         saved["demo"] = false; saved["hadSession"] = false
         session = ""; expires = ""; liveOwner = ""; loginDestination = null; loggedIn = false; demo = false; cachedMode = false; courses = emptyList(); grades = null; semesters = emptyList(); semester = ""; gradesLoading = false; error = ""
+        if (returnView != null && restoreCachedTimetable(returnView)) return
         if (!wasDemo) { password = ""; captcha = null; captchaText = ""; api.clear(); launch(silent = true) { fetchCaptcha() } } else if (captcha == null) launch(silent = true) { fetchCaptcha() } else checkCaptcha()
     }
     fun startDemo() {
+        if (cachedMode) rememberCacheView()
         if (loginInFlight) { captcha = null; captchaText = "" }
         clearRequests()
         saved["demo"] = true; saved["hadSession"] = false
