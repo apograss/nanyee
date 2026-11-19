@@ -111,6 +111,13 @@ internal fun grabStartAt(time: String, offset: Long, now: Instant): Instant {
     val target = now.atZone(cabinZone).toLocalDate().atTime(LocalTime.parse(time)).atZone(cabinZone).toInstant().minusMillis(offset).minusMillis(50)
     return if (target <= now) target.plusSeconds(86400) else target
 }
+internal fun grabCountdown(millis: Long): String {
+    val bounded = millis.coerceAtLeast(0)
+    val seconds = bounded / 1000 + if (bounded % 1000 > 0) 1 else 0
+    val minutes = seconds / 60
+    val parts = if (minutes >= 60) listOf(minutes / 60, minutes % 60, seconds % 60) else listOf(minutes, seconds % 60)
+    return parts.joinToString(":") { it.toString().padStart(2, '0') }
+}
 
 internal interface CourseGrabListing {
     suspend fun categories(): List<GrabCategory>

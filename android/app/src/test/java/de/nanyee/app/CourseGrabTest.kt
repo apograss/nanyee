@@ -160,6 +160,22 @@ class CourseGrabTest {
         assertEquals(7000L, grabRetryMillis("7", now)); assertEquals(60000L, grabRetryMillis("garbage", now))
         assertEquals(10000L, grabRetryMillis("Tue, 1 Jan 2030 00:00:10 GMT", now))
     }
+    @Test fun countdownFormattingClampsExpiredTimesAndRoundsUpPartialSeconds() {
+        for ((millis, expected) in listOf(-1L to "00:00", 0L to "00:00", 1L to "00:01", 1000L to "00:01", 1001L to "00:02", 135000L to "02:15", 3599999L to "01:00:00", 86399000L to "23:59:59"))
+            assertEquals(expected, grabCountdown(millis))
+    }
+    @Test fun countdownTicksAlongsideTargetTimeUsingServerOffset() = runBlocking {
+        var now = Instant.parse("2030-01-01T00:00:00Z")
+        val statuses = mutableListOf<String>()
+        lateinit var waiting: CourseGrabRun
+        waiting = CourseGrabRun(now = { now }, pause = { millis -> statuses.add(waiting.status); now = now.plusMillis(millis) })
+        val fake = Fake { _, _ -> GrabReply(GrabOutcome.ENROLLED, "成功") }
+        val source = object : CourseGrabSource by fake { override suspend fun clock() = 60000L }
+        waiting.execute(source, plan().copy(scheduled = "08:01:03"))
+        assertEquals(listOf("00:03", "00:02", "00:01"), statuses.map { it.substringAfter("距开始 ").substringBefore("，") })
+        assertTrue(statuses.all { "08:01:03" in it }); assertEquals(1, fake.calls.size)
+        assertFalse(waiting.status.contains("距开始")); assertTrue(waiting.outcome.contains("成功"))
+    }
     @Test fun demoScenariosAreNetworkFree() = runBlocking {
         for (scenario in GrabDemoScenario.entries) {
             val source = DemoCourseGrabSource(scenario)

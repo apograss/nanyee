@@ -40,7 +40,11 @@ internal class CourseGrabRun(
             if (plan.scheduled.isNotBlank()) {
                 val target = grabStartAt(plan.scheduled, offset, now())
                 log("等待学校时间 ${plan.scheduled}，请保持前台")
-                while (now() < target) pause(java.time.Duration.between(now(), target).toMillis().coerceIn(1, 1000))
+                while (now() < target) {
+                    val remaining = java.time.Duration.between(now(), target).toMillis()
+                    status = "等待学校时间 ${plan.scheduled} · 距开始 ${grabCountdown(remaining)}，请保持前台"
+                    pause(remaining.coerceIn(1, 1000))
+                }
             }
             while (attempt < plan.attempts) {
                 coroutineContext.ensureActive()
