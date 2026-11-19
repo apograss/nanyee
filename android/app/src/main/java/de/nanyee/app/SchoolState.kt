@@ -8,6 +8,8 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.*
 import java.time.Instant
 
@@ -23,6 +25,9 @@ class SchoolState(app: Application) : AndroidViewModel(app) {
     var captchaText by mutableStateOf("")
     var captcha by mutableStateOf<JsonObject?>(null)
     private var session = ""
+    var sessionGeneration by mutableIntStateOf(0)
+        private set
+    private val jobs = mutableMapOf<String, Job>()
     var expires by mutableStateOf("")
     var loggedIn by mutableStateOf(false)
     var demo by mutableStateOf(false)
@@ -41,52 +46,71 @@ class SchoolState(app: Application) : AndroidViewModel(app) {
         refreshCaptcha()
         viewModelScope.launch { while (true) { delay(1000); if (loggedIn && !demo && runCatching { Instant.now().isAfter(Instant.parse(expires)) }.getOrDefault(true)) { logout(); error = "学校会话已过期，请重新登录。" } } }
     }
-    private fun launch(block: suspend () -> Unit) {
-        if (busy) return
-        viewModelScope.launch {
-            busy = true; error = ""
+    private fun launch(key: String = "captcha", block: suspend () -> Unit) {
+        jobs.remove(key)?.cancel()
+        val generation = sessionGeneration
+        val job = viewModelScope.launch(start = kotlinx.coroutines.CoroutineStart.LAZY) {
+            error = ""
             try { block() } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                if (generation != sessionGeneration) return@launch
                 if (e is SchoolError && loggedIn && (e.status == 401 || e.status == 410)) logout()
                 error = if (e is SchoolError) e.message ?: "请求失败" else "操作失败，请稍后重试。"
-            } finally { busy = false }
+            } finally {
+                if (jobs[key] == coroutineContext[Job]) jobs.remove(key)
+                busy = jobs.isNotEmpty()
+            }
         }
+        jobs[key] = job; busy = true; job.start()
     }
     private suspend fun fetchCaptcha() { captcha = null; captchaText = ""; captcha = api.request("captcha") }
     fun refreshCaptcha() = launch { fetchCaptcha() }
     fun updateRemember(value: Boolean) { remember = value; if (!value) runCatching { secure.edit().clear().apply() } }
-    fun login() = launch {
+    fun login() = launch("login") {
         val flow = captcha?.text("flow_id") ?: return@launch
+        val submittedAccount = account.trim()
+        val submittedPassword = password
+        val submittedCaptcha = captchaText.trim()
         captcha = null
         try {
-            val response = api.request("session", payload("flow_id" to flow, "account" to account.trim(), "password" to password, "captcha" to captchaText.trim()))
+            val response = api.request("session", payload("flow_id" to flow, "account" to submittedAccount, "password" to submittedPassword, "captcha" to submittedCaptcha))
             session = response.text("academic_session_id"); expires = response.text("expires_at")
             if (session.isEmpty() || expires.isEmpty()) throw SchoolError(0, "INVALID_RESPONSE", "登录响应无效，请重试。")
-            if (remember) secure.edit().putString("account", account).putString("password", password).apply()
+            if (remember) secure.edit().putString("account", submittedAccount).putString("password", submittedPassword).apply()
             password = ""; captchaText = ""; loggedIn = true; demo = false; tab = 0
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             runCatching { fetchCaptcha() }
             throw e
         }
-        loadTimetable(); loadGrades()
+        launch("timetable") { loadTimetable() }
+        launch("grades") { loadGrades() }
     }
     private fun sessionBody() = payload("academic_session_id" to session)
     private suspend fun loadTimetable() {
         val response = api.request("timetable.semesters", sessionBody())
-        semesters = response.items("semesters"); semester = response.text("default_code")
+        semesters = response.items("semesters")
+        if (semesters.none { it.text("code") == semester }) semester = response.text("default_code")
         queryTimetable()
     }
     private suspend fun queryTimetable() {
         courses = api.request("timetable", buildJsonObject { put("academic_session_id", session); if (semester.isNotEmpty()) put("semester_code", semester); put("total_weeks", totalWeeks) }).items("courses")
     }
     private suspend fun loadGrades() { grades = api.request("grades", sessionBody()) }
-    fun reload() = launch { if (!demo) { if (tab == 0) queryTimetable() else loadGrades() } }
-    fun selectSemester(code: String) { semester = code; if (!demo) launch { queryTimetable() } }
-    fun setWeeks(value: Int) { totalWeeks = value.coerceIn(1, 30); week = week.coerceAtMost(totalWeeks); prefs.edit().putInt("weeks", totalWeeks).apply(); if (!demo) launch { queryTimetable() } }
+    fun reload() { if (!demo && loggedIn) { if (tab == 0) launch("timetable") { if (semesters.isEmpty()) loadTimetable() else queryTimetable() } else launch("grades") { loadGrades() } } }
+    fun selectSemester(code: String) { semester = code; if (!demo && loggedIn) launch("timetable") { queryTimetable() } }
+    fun setWeeks(value: Int) { totalWeeks = value.coerceIn(1, 30); week = week.coerceAtMost(totalWeeks); prefs.edit().putInt("weeks", totalWeeks).apply(); if (!demo && loggedIn) launch("timetable") { queryTimetable() } }
+    private fun clearRequests() {
+        sessionGeneration++
+        jobs.values.toList().forEach { it.cancel() }; jobs.clear(); busy = false
+    }
     fun logout() {
+        clearRequests()
         session = ""; expires = ""; loggedIn = false; demo = false; courses = emptyList(); grades = null; semesters = emptyList(); semester = ""; password = ""; captcha = null; captchaText = ""; api.clear()
         if (!busy) refreshCaptcha()
     }
     fun startDemo() {
+        clearRequests()
         session = ""; expires = ""; password = ""; captchaText = ""; captcha = null; demo = true; loggedIn = true; tab = 0; error = ""; week = 1
         semesters = listOf(payload("code" to "202501", "label" to "2025-2026-1")); semester = "202501"
         courses = listOf("人体解剖学", "大学英语", "医用高等数学", "基础化学", "医学导论", "体育").mapIndexed { i, name -> buildJsonObject {

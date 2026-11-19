@@ -8,6 +8,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -19,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -43,7 +45,7 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Nanyee(state: SchoolState) {
-    var detail by remember { mutableStateOf<Pair<String, JsonObject>?>(null) }
+    var detail by remember(state.sessionGeneration) { mutableStateOf<Pair<String, JsonObject>?>(null) }
     Scaffold(
         topBar = { if (state.loggedIn) TopAppBar(title = { Text(listOf("课表", "成绩", "我的")[state.tab], fontWeight = FontWeight.Bold) }, actions = { if (state.tab < 2) IconButton(onClick = { state.reload() }, enabled = !state.busy) { Icon(Icons.Outlined.Refresh, "刷新") } }) },
         bottomBar = { if (state.loggedIn) NavigationBar { listOf("课表", "成绩", "我的").forEachIndexed { i, label -> NavigationBarItem(selected = state.tab == i, onClick = { state.tab = i }, icon = { Icon(listOf(Icons.Outlined.CalendarMonth, Icons.Outlined.BarChart, Icons.Outlined.Person)[i], null) }, label = { Text(label) }) } } }
@@ -103,7 +105,7 @@ fun Login(state: SchoolState) {
         Text("学校登录", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
         Text("连接校园，让学业一目了然。", color = MaterialTheme.colorScheme.onSurfaceVariant)
         OutlinedTextField(value = state.account, onValueChange = { state.account = it }, label = { Text("学号") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(value = state.password, onValueChange = { state.password = it }, label = { Text("学校密码") }, visualTransformation = PasswordVisualTransformation(), singleLine = true, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(value = state.password, onValueChange = { state.password = it }, label = { Text("学校密码") }, visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false), singleLine = true, modifier = Modifier.fillMaxWidth())
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedTextField(value = state.captchaText, onValueChange = { state.captchaText = it }, label = { Text("验证码") }, singleLine = true, modifier = Modifier.weight(1f))
             val bitmap = remember(state.captcha) { runCatching { val bytes = Base64.decode(state.captcha?.text("image_base64") ?: "", Base64.DEFAULT); BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap() }.getOrNull() }
