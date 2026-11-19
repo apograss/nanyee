@@ -8,6 +8,10 @@ import java.time.Instant
 import java.time.LocalTime
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
+import java.util.UUID
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 
 internal data class GrabCategory(val code: String, val title: String)
 internal data class GrabCourse(val code: String, val name: String, val teacher: String = "", val selected: Int = 0, val capacity: Int = 0, val time: String = "", val place: String = "")
@@ -115,4 +119,19 @@ internal interface CourseGrabListing {
 internal interface CourseGrabSource : CourseGrabListing {
     suspend fun clock(): Long
     suspend fun select(category: String, course: GrabCourse, conflict: Boolean): GrabReply
+}
+internal class GrabSessionOwner {
+    private var account = ""
+    var identity by mutableStateOf(UUID.randomUUID().toString()); private set
+    fun login(value: String) {
+        if (account.isNotEmpty() && account != value) identity = UUID.randomUUID().toString()
+        account = value
+    }
+    fun logout() { account = ""; identity = UUID.randomUUID().toString() }
+}
+internal class ReacquiringCourseGrabSource(private val acquire: suspend () -> CourseGrabSource) : CourseGrabSource {
+    override suspend fun categories() = acquire().categories()
+    override suspend fun courses(category: String, page: Int) = acquire().courses(category, page)
+    override suspend fun clock() = acquire().clock()
+    override suspend fun select(category: String, course: GrabCourse, conflict: Boolean) = acquire().select(category, course, conflict)
 }

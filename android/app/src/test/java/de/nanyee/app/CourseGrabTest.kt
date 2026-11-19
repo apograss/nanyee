@@ -243,6 +243,46 @@ class CourseGrabTest {
         for (secret in listOf("张三", "李四", "2026123456", "123456", "secret", "example.com")) assertFalse(diagnostic.toString().contains(secret))
         assertEquals("", grabDiscoveryDiagnostics(null, emptyList(), "").notice)
     }
+    @Test fun scheduledRunSurvivesLocalExpiryAndReacquiresBeforeEveryAttempt() = runBlocking {
+        val state = CourseGrabState()
+        state.onSessionChanged("old")
+        var now = Instant.parse("2030-01-01T00:00:00Z")
+        var expires = now.plusSeconds(1800)
+        var acquisitions = 0
+        var renewals = 0
+        val fake = Fake { n, _ ->
+            assertTrue(now < expires)
+            if (n == 1) { expires = now; GrabReply(GrabOutcome.REJECTED, "满") } else GrabReply(GrabOutcome.ENROLLED, "成功")
+        }
+        val source = ReacquiringCourseGrabSource {
+            acquisitions++
+            if (now >= expires) { renewals++; expires = now.plusSeconds(1800) }
+            fake
+        }
+        val waiting = CourseGrabRun(pause = { ms -> now = now.plusMillis(ms); state.onSessionChanged("") }, now = { now }, jitter = { a, _ -> a })
+        waiting.execute(source, plan(attempts = 2, primary = 1).copy(scheduled = "08:31:00"))
+        assertEquals(2, renewals); assertEquals(3, acquisitions); assertEquals(2, fake.calls.size)
+        assertTrue(waiting.outcome.contains("成功"))
+    }
+    @Test fun sessionExpiryDoesNotClearRunningStateAndOwnerChangesAreExplicit() = runBlocking {
+        val owner = GrabSessionOwner()
+        val initial = owner.identity
+        owner.login("account-a"); assertEquals(initial, owner.identity)
+        owner.login("account-a"); assertEquals(initial, owner.identity)
+        owner.login("account-b"); assertNotEquals(initial, owner.identity)
+        val switched = owner.identity
+        owner.logout(); assertNotEquals(switched, owner.identity)
+        val state = CourseGrabState()
+        state.onSessionChanged("old")
+        val entered = CompletableDeferred<Unit>()
+        val fake = Fake { _, _ -> entered.complete(Unit); awaitCancellation() }
+        val task = launch { state.run.execute(fake, plan()) }
+        entered.await()
+        state.onSessionChanged(""); state.onSessionChanged("fresh")
+        assertTrue(state.run.active); assertTrue(task.isActive)
+        task.cancelAndJoin()
+        assertTrue(state.run.outcome.contains("结果未知"))
+    }
     private class Fixture(val respond: (Request) -> Response) : Call.Factory {
         override fun newCall(request: Request): Call = object : Call {
             override fun request() = request

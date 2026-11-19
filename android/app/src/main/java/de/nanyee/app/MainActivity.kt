@@ -66,6 +66,7 @@ fun Nanyee(state: SchoolState) {
         onDispose { view.keepScreenOn = false }
     }
     LaunchedEffect(state.evaluationSessionIdentity) { grab.onSessionChanged(state.evaluationSessionIdentity) }
+    LaunchedEffect(state.courseGrabOwnerIdentity) { grab.onOwnerChanged(state.courseGrabOwnerIdentity) }
     LaunchedEffect(state.evaluationSessionIdentity) { evaluation.onSessionChanged(state.evaluationSessionIdentity) }
     BackHandler(enabled = state.demo || state.loginInFlight || state.canReturnToCache) { if (state.demo) state.logout() else if (state.loginInFlight) state.cancelLogin() else state.returnToCache() }
     val lifecycle = LocalLifecycleOwner.current.lifecycle

@@ -139,13 +139,21 @@ internal class CourseGrabState : ViewModel() {
     var scenario by mutableStateOf(GrabDemoScenario.SUCCESS); private set
     private var source: CourseGrabSource? = null
     private var session: String? = null
+    private var owner: String? = null
     private var job: Job? = null
     val locked get() = busy || run.active
     fun onSessionChanged(identity: String) {
         if (identity == session) return
+        if (run.active) { session = identity; return }
         if (source != null || run.active || (session != null && identity.isEmpty())) job?.cancel()
         session = identity; source = null; categories = emptyList(); category = null; courses = emptyList(); preferences = emptyList(); confirmation = null
         discoveryNotice = ""
+    }
+    fun onOwnerChanged(identity: String) {
+        if (owner == identity) return
+        if (owner != null) job?.cancel()
+        owner = identity
+        source = null; categories = emptyList(); category = null; courses = emptyList(); preferences = emptyList(); confirmation = null; discoveryNotice = ""
     }
     private fun work(block: suspend () -> Unit) {
         if (locked) return
