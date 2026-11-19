@@ -72,15 +72,16 @@ fun Nanyee(state: SchoolState) {
     val detail = if (!state.homeVisible) null else selectedDetail(detailDataIdentity, dataIdentity, detailIndex, detailItems)?.let { detailKind to it }
     val landscape = LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp
     val iconSize = (24 * LocalDensity.current.fontScale.coerceIn(1f, 1.35f)).dp
-    val labels = listOf("今天", "课表", "成绩", "我的")
-    val icons = listOf(Icons.Outlined.Today, Icons.Outlined.CalendarMonth, Icons.Outlined.BarChart, Icons.Outlined.Person)
+    val appVisible = state.homeVisible || state.tab == 3
+    val labels = listOf("今天", "课表", "成绩", "工具", "我的")
+    val icons = listOf(Icons.Outlined.Today, Icons.Outlined.CalendarMonth, Icons.Outlined.BarChart, Icons.Outlined.Widgets, Icons.Outlined.Person)
     Scaffold(
         contentWindowInsets = WindowInsets.safeDrawing,
-        topBar = { if (state.homeVisible) TopAppBar(expandedHeight = if (landscape) 44.dp else 64.dp, title = { Text(labels[state.tab] + if (landscape && state.demo) " · 演示模式" else "", fontWeight = FontWeight.Bold, style = if (landscape) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge, maxLines = 1) }, actions = { if (state.tab < 3 && !state.demo) IconButton(onClick = { state.reload() }, enabled = !state.busy) { Icon(Icons.Outlined.Refresh, "刷新", Modifier.size(iconSize)) } }) },
-        bottomBar = { if (state.homeVisible && !landscape) NavigationBar { labels.forEachIndexed { i, label -> NavigationBarItem(selected = state.tab == i, onClick = { state.selectTab(i) }, icon = { Icon(icons[i], null) }, label = { Text(label) }) } } }
+        topBar = { if (appVisible) TopAppBar(expandedHeight = if (landscape) 44.dp else 64.dp, title = { Text(labels[state.tab] + if (landscape && state.demo) " · 演示模式" else "", fontWeight = FontWeight.Bold, style = if (landscape) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge, maxLines = 1) }, actions = { if (state.tab < 3 && !state.demo) IconButton(onClick = { state.reload() }, enabled = !state.busy) { Icon(Icons.Outlined.Refresh, "刷新", Modifier.size(iconSize)) } }) },
+        bottomBar = { if (appVisible && !landscape) NavigationBar { labels.forEachIndexed { i, label -> NavigationBarItem(selected = state.tab == i, onClick = { state.selectTab(i) }, icon = { Icon(icons[i], null) }, label = { Text(label) }) } } }
     ) { padding ->
         Row(Modifier.padding(padding).consumeWindowInsets(padding).fillMaxSize()) {
-            if (landscape && state.homeVisible) NavigationRail(windowInsets = WindowInsets(0)) { labels.forEachIndexed { i, label -> NavigationRailItem(selected = state.tab == i, onClick = { state.selectTab(i) }, icon = { Icon(icons[i], label) }) } }
+            if (landscape && appVisible) NavigationRail(windowInsets = WindowInsets(0)) { labels.forEachIndexed { i, label -> NavigationRailItem(selected = state.tab == i, onClick = { state.selectTab(i) }, icon = { Icon(icons[i], label) }) } }
         Column(Modifier.weight(1f).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
             if (state.autoLoggingIn) Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("正在自动登录…", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
@@ -94,10 +95,11 @@ fun Nanyee(state: SchoolState) {
                     Text(state.error)
                     Button(onClick = { state.logout() }) { Text("重试退出并清除课表") }
                 }
-                !state.homeVisible -> Login(state)
+                !state.homeVisible && state.tab != 3 -> Login(state)
                 state.tab == 0 -> TodayScreen(state) { detailKind = "course"; detailIndex = state.courses.indexOf(it); detailDataIdentity = state.courseDataIdentity }
                 state.tab == 1 -> Timetable(state) { detailKind = "course"; detailIndex = state.courses.indexOf(it); detailDataIdentity = state.courseDataIdentity }
                 state.tab == 2 -> Grades(state) { detailKind = "grade"; detailIndex = state.grades?.items("grades")?.indexOf(it) ?: -1; detailDataIdentity = state.gradeDataIdentity }
+                state.tab == 3 -> CabinToolsScreen(state)
                 else -> Column(Modifier.widthIn(max = 520.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                     Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.primaryContainer) { Icon(Icons.Outlined.School, null, Modifier.padding(20.dp).size(36.dp)) }
                     Text("学校登录", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
@@ -167,6 +169,7 @@ fun Login(state: SchoolState) {
         if (state.hint.isNotEmpty() && state.captchaText.isBlank()) Text(state.hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
         if (state.loginInFlight) TextButton(onClick = { state.cancelLogin() }) { Text("取消登录") }
         OutlinedButton(onClick = { state.startDemo() }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("演示模式") }
+        TextButton(onClick = { state.selectTab(3) }, modifier = Modifier.fillMaxWidth()) { Text("工具 · 学习舱预约（独立平台账号）") }
         Text("学校登录可能使其他设备的教务会话下线。会话仅存于内存；勾选后，学号和密码将在本机加密保存。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

@@ -117,12 +117,12 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
             val restoreUserPickedWeek = userPickedWeek
             startDemo()
             if (semesters.any { it.text("code") == restoreSemester }) selectSemester(restoreSemester)
-            tab = restoreTab.coerceIn(0, 3); week = restoreWeek.coerceIn(1, totalWeeks)
+            tab = restoreTab.coerceIn(0, 4); week = restoreWeek.coerceIn(1, totalWeeks)
             userPickedWeek = restoreUserPickedWeek; saved["userPickedWeek"] = userPickedWeek
         } else {
             clearCacheReturnView()
             if (saved.get<Boolean>("hadSession") == true) hint = "会话已过期，请重新登录"
-            if (!restoreCachedTimetable()) launch(silent = true) { fetchCaptcha() }
+            if (!restoreCachedTimetable() && tab != 3) launch(silent = true) { fetchCaptcha() }
         }
         updateDate()
         viewModelScope.launch { while (true) { delay(1000); updateDate(); checkCaptcha(); if (loggedIn && !demo && runCatching { Instant.now().isAfter(Instant.parse(expires)) }.getOrDefault(true)) expireSession(reauthenticate = false) } }
@@ -162,7 +162,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
     }
     private suspend fun fetchCaptcha() { captchaAttemptAt = Instant.now(); captchaText = ""; captcha = api.request("captcha") }
     fun checkCaptcha() {
-        if (homeVisible || busy || captcha == null || Instant.now().isBefore(captchaAttemptAt.plusSeconds(60))) return
+        if (homeVisible || tab == 3 || busy || captcha == null || Instant.now().isBefore(captchaAttemptAt.plusSeconds(60))) return
         if (captchaNeedsRefresh(captcha?.text("expires_at") ?: "", Instant.now())) {
             hint = "验证码已更新，请重新输入"
             launch(silent = true) { fetchCaptcha() }
@@ -248,7 +248,19 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
             else launch("grades") { loadGrades() }
         }
     }
-    fun selectTab(value: Int) { if (cachedMode && value == 2) { reauthAttempted = false; requireSchoolLogin(2) } else tab = value.coerceIn(0, 3) }
+    fun selectTab(value: Int) {
+        if (value == 3 && !homeVisible) { jobs.remove("captcha")?.cancel(); busy = jobs.isNotEmpty() }
+        if (cachedMode && value == 2) { reauthAttempted = false; requireSchoolLogin(2) } else tab = value.coerceIn(0, 4)
+        if (value != 3 && !homeVisible && captcha == null && !busy) refreshCaptcha()
+    }
+
+    internal suspend fun hostedSchoolPrefill(): Pair<String, String>? = withContext(Dispatchers.IO) {
+        if (!remember) null else {
+            val savedAccount = secure.getString("account", "").orEmpty()
+            val savedPassword = secure.getString("password", "").orEmpty()
+            if (savedAccount.isBlank() || savedPassword.isEmpty()) null else savedAccount to savedPassword
+        }
+    }
     fun selectSemester(code: String) {
         reauthAttempted = false
         if (cachedMode && cachedTimetables?.tables?.containsKey(code) != true) rememberCacheView()
@@ -357,6 +369,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         val destination = tab
         clearRequests(); session = ""; expires = ""; liveOwner = ""; loggedIn = false; grades = null; api.clear()
         val restored = restoreCachedTimetable()
+        if (destination == 3) { tab = 3; hint = "学校会话已过期，需要更新时请重新登录。"; return }
         if (reauthenticate) requireSchoolLogin(destination, allowSilent = !reauthAttempted)
         else {
             hint = "学校会话已过期，需要更新时请重新登录。"
