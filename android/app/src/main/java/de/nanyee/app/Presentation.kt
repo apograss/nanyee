@@ -11,6 +11,26 @@ import kotlinx.serialization.json.*
 
 internal fun captchaNeedsRefresh(expires: String, now: Instant): Boolean = runCatching { !now.plusSeconds(15).isBefore(Instant.parse(expires)) }.getOrDefault(false)
 
+internal fun currentTeachingWeek(semesterStart: String, today: LocalDate, totalWeeks: Int): Int? {
+    val start = runCatching { LocalDate.parse(semesterStart).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)) }.getOrNull() ?: return null
+    val week = Math.floorDiv(ChronoUnit.DAYS.between(start, today), 7) + 1
+    return week.takeIf { it in 1..totalWeeks.toLong() }?.toInt()
+}
+
+internal fun semesterStartFromMetadata(metadata: JsonObject, today: LocalDate): String? {
+    listOf("semester_monday", "semester_start", "start_date", "startDate").forEach { key ->
+        runCatching { LocalDate.parse(metadata.text(key)) }.getOrNull()?.let { return it.toString() }
+    }
+    return metadata.number("current_week").takeIf { it in 1..30 }?.let { week ->
+        today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).minusWeeks((week - 1).toLong()).toString()
+    }
+}
+
+internal fun semesterStartFromExport(content: String): String = content.lineSequence().mapNotNull { line ->
+    val metadata = runCatching { Json.parseToJsonElement(line) as? JsonObject }.getOrNull()
+    metadata?.text("startDate")?.let { runCatching { LocalDate.parse(it).toString() }.getOrNull() }
+}.firstOrNull() ?: throw SchoolError(0, "INVALID_RESPONSE", "暂未取得校历，可手动选择周次。")
+
 internal fun selectedDetail(savedIdentity: String, dataIdentity: String, index: Int, items: List<JsonObject>): JsonObject? =
     if (savedIdentity.isNotEmpty() && savedIdentity == dataIdentity) items.getOrNull(index) else null
 

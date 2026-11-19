@@ -45,6 +45,10 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
     val homeVisible get() = loggedIn || cachedMode
     val canReturnToCache get() = !homeVisible && loginDestination != null
     val timetableUpdatedAt get() = cachedTimetables?.tables?.get(semester)?.updatedAt ?: ""
+    var semesterStart by mutableStateOf("")
+        private set
+    val currentWeek get() = currentTeachingWeek(semesterStart, today, totalWeeks)
+    val calendarHint get() = if (semesterStart.isBlank()) "暂未取得校历，可手动选周" else if (currentWeek == null) "当前日期不在本学期教学周内" else ""
     var busy by mutableStateOf(false)
     var loginInFlight by mutableStateOf(false)
         private set
@@ -103,8 +107,8 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
     private fun updateDate() {
         val now = LocalDate.now(ZoneId.of("Asia/Shanghai"))
         if (now != today) {
-            if (homeVisible) week = weekAfterDateChange(week, totalWeeks, today, now, userPickedWeek)
             today = now
+            if (homeVisible) followCurrentWeek()
         }
         saved["date"] = now.toString()
     }
@@ -112,6 +116,8 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
     fun selectWeek(value: Int) {
         week = value.coerceIn(1, totalWeeks); userPickedWeek = true; saved["userPickedWeek"] = true
     }
+    fun returnToCurrentWeek() { userPickedWeek = false; saved["userPickedWeek"] = false; followCurrentWeek() }
+    private fun followCurrentWeek() { if (!userPickedWeek) currentWeek?.let { week = it } }
     private fun launch(key: String = "captcha", silent: Boolean = false, block: suspend () -> Unit) {
         jobs.remove(key)?.cancel()
         val generation = sessionGeneration
@@ -183,7 +189,22 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         if (response["courses"] !is JsonArray) throw SchoolError(0, "INVALID_RESPONSE", "课表响应无效，请重试。")
         semester = response.text("semester_code").ifEmpty { semester }
         courses = response.items("courses")
-        saveTimetable(CachedTimetable(courses, Instant.now().toString(), totalWeeks))
+        val previous = cachedTimetables?.takeIf { it.owner == liveOwner }?.tables?.get(semester)
+        semesterStart = semesterStartFromMetadata(response, today)
+            ?: semesters.firstOrNull { it.text("code") == semester }?.let { semesterStartFromMetadata(it, today) }
+            ?: previous?.semesterStart.orEmpty()
+        followCurrentWeek()
+        val table = CachedTimetable(courses, Instant.now().toString(), totalWeeks, semesterStart)
+        saveTimetable(table)
+        if (semesterStart.isEmpty()) {
+            try {
+                semesterStart = api.timetableSemesterStart(buildJsonObject { put("academic_session_id", session); put("semester_code", semester); put("total_weeks", totalWeeks); put("campus", "main") })
+                followCurrentWeek()
+                saveTimetable(table.copy(semesterStart = semesterStart))
+            } catch (e: Exception) {
+                if (e is CancellationException || e is SchoolError && e.status in listOf(401, 410)) throw e
+            }
+        }
     }
     private suspend fun loadGrades() {
         gradesLoading = true
@@ -196,10 +217,10 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         if (demo) courses = demoCourses(code)
         else if (cachedMode) {
             val table = cachedTimetables?.tables?.get(code)
-            if (table == null) requireSchoolLogin(0) else { courses = table.courses; totalWeeks = table.totalWeeks; week = week.coerceAtMost(totalWeeks) }
-        } else if (loggedIn) launch("timetable") { queryTimetable() }
+            if (table == null) requireSchoolLogin(0) else { courses = table.courses; totalWeeks = table.totalWeeks; semesterStart = table.semesterStart; week = week.coerceAtMost(totalWeeks); followCurrentWeek() }
+        } else if (loggedIn) { semesterStart = ""; courses = emptyList(); launch("timetable") { queryTimetable() } }
     }
-    fun setWeeks(value: Int) { totalWeeks = value.coerceIn(1, 30); week = week.coerceAtMost(totalWeeks); prefs.edit().putInt("weeks", totalWeeks).apply(); if (!demo && loggedIn) launch("timetable") { queryTimetable() } }
+    fun setWeeks(value: Int) { totalWeeks = value.coerceIn(1, 30); week = week.coerceAtMost(totalWeeks); followCurrentWeek(); prefs.edit().putInt("weeks", totalWeeks).apply(); if (!demo && loggedIn) launch("timetable") { queryTimetable() } }
     private fun clearRequests() {
         sessionGeneration++
         jobs.values.toList().forEach { it.cancel() }; jobs.clear(); busy = false; loginInFlight = false
@@ -211,7 +232,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         launch(silent = true) { fetchCaptcha() }
     }
     private fun resetTimetableSelection() {
-        userPickedWeek = false; saved["userPickedWeek"] = false; week = 1; semester = ""
+        userPickedWeek = false; saved["userPickedWeek"] = false; week = 1; semester = ""; semesterStart = ""
     }
     private fun saveTimetable(table: CachedTimetable) {
         if (!loggedIn || demo || !semester.matches(Regex("\\d{6}"))) return
@@ -224,7 +245,8 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         cachedTimetables = snapshot
         semesters = snapshot.semesters; semester = snapshot.selectedSemester
         val table = snapshot.tables.getValue(semester)
-        courses = table.courses; totalWeeks = table.totalWeeks
+        courses = table.courses; totalWeeks = table.totalWeeks; semesterStart = table.semesterStart
+        week = week.coerceIn(1, totalWeeks); followCurrentWeek()
         cachedMode = true; tab = 0
         return true
     }
@@ -257,6 +279,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         saved["demo"] = true; saved["hadSession"] = false
         resetTimetableSelection()
         session = ""; expires = ""; loginDestination = null; cachedMode = false; demo = true; loggedIn = true; tab = 0; error = ""; week = 1
+        semesterStart = today.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY)).toString()
         semesters = listOf(payload("code" to "202501", "label" to "2025-2026-1"), payload("code" to "202402", "label" to "2024-2025-2")); semester = "202501"
         courses = demoCourses(semester)
         grades = demoGrades()

@@ -45,7 +45,13 @@ class SchoolApi {
 
     fun clear() { synchronized(cookies) { cookies.clear() } }
 
-    suspend fun request(path: String, body: JsonObject? = null): JsonObject = withContext(Dispatchers.IO) {
+    suspend fun request(path: String, body: JsonObject? = null): JsonObject =
+        Json.parseToJsonElement(requestContent(path, body)).obj()
+
+    suspend fun timetableSemesterStart(body: JsonObject): String =
+        semesterStartFromExport(requestContent("timetable.wakeup", body))
+
+    private suspend fun requestContent(path: String, body: JsonObject?): String = withContext(Dispatchers.IO) {
         if (System.currentTimeMillis() < retryAt) throw SchoolError(429, "RATE_LIMITED", "请求过于频繁，请在 ${(retryAt - System.currentTimeMillis()) / 1000 + 1} 秒后重试。")
         val url = "https://nanyee.de/api/v1/smu/$path"
         val builder = Request.Builder().url(url)
@@ -55,8 +61,9 @@ class SchoolApi {
         }
         try {
             client.newCall(builder.build()).awaitResult { response ->
-                val data = runCatching { Json.parseToJsonElement(response.body?.string() ?: "{}").obj() }.getOrDefault(JsonObject(emptyMap()))
+                val content = response.body?.string() ?: "{}"
                 if (!response.isSuccessful) {
+                    val data = runCatching { Json.parseToJsonElement(content).obj() }.getOrDefault(JsonObject(emptyMap()))
                     val error = data["error"]?.obj() ?: JsonObject(emptyMap())
                     val code = error.text("code")
                     val retry = response.header("Retry-After")
@@ -72,7 +79,7 @@ class SchoolApi {
                     val id = error.text("request_id").ifEmpty { response.header("X-Request-ID") ?: "" }
                     throw SchoolError(response.code, code, message + advice + if (id.isNotEmpty()) "\n请求编号：$id" else "")
                 }
-                data
+                content
             }
         } catch (e: java.io.IOException) { throw SchoolError(0, "NETWORK", "网络连接失败，请检查网络后重试。") }
     }

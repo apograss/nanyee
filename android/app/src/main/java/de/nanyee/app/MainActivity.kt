@@ -196,6 +196,10 @@ fun Timetable(state: SchoolState, onCourse: (JsonObject) -> Unit) {
             "${if (state.cachedMode) "本机课表 · 未登录 · " else ""}更新于 ${runCatching { DateTimeFormatter.ofPattern("MM-dd HH:mm").withZone(ZoneId.of("Asia/Shanghai")).format(Instant.parse(state.timetableUpdatedAt)) }.getOrDefault("—")}",
             Modifier.padding(horizontal = 16.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(if (state.currentWeek != null) "${if (state.demo) "示例校历 · " else ""}本周：第 ${state.currentWeek} 周" else state.calendarHint, Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (state.currentWeek != null && state.week != state.currentWeek) TextButton(onClick = { state.returnToCurrentWeek() }) { Text("回到本周") }
+        }
         val active = state.courses.filter { (it["weeks"] as? JsonArray)?.any { w -> (w as? JsonPrimitive)?.intOrNull == state.week } == true }
         if (active.isEmpty()) Text(if (state.busy) "正在加载课表…" else "本周暂无课程", Modifier.padding(20.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
         val dark = isSystemInDarkTheme()

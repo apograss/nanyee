@@ -12,7 +12,7 @@ class TimetableCacheTest {
     }
 
     private fun snapshot() = TimetableSnapshot("student", listOf(payload("code" to "202601", "label" to "2026-2027-1")), "202601", mapOf(
-        "202601" to CachedTimetable(listOf(payload("name" to "人体解剖学", "start_node" to "1")), "2026-09-07T08:00:00Z", 20),
+        "202601" to CachedTimetable(listOf(payload("name" to "人体解剖学", "start_node" to "1")), "2026-09-07T08:00:00Z", 20, "2026-09-07"),
         "202502" to CachedTimetable(emptyList(), "2026-02-23T08:00:00Z", 18)
     ))
 
