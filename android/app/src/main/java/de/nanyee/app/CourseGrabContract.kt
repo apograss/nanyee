@@ -135,3 +135,13 @@ internal class ReacquiringCourseGrabSource(private val acquire: suspend () -> Co
     override suspend fun clock() = acquire().clock()
     override suspend fun select(category: String, course: GrabCourse, conflict: Boolean) = acquire().select(category, course, conflict)
 }
+internal class ExpiringCourseGrabSource(private val source: CourseGrabSource, private val expire: () -> Unit) : CourseGrabSource {
+    private suspend fun <T> guarded(block: suspend () -> T): T = try { block() } catch (e: SchoolError) {
+        if (e.status in setOf(401, 410)) expire()
+        throw e
+    }
+    override suspend fun categories() = guarded { source.categories() }
+    override suspend fun courses(category: String, page: Int) = guarded { source.courses(category, page) }
+    override suspend fun clock() = guarded { source.clock() }
+    override suspend fun select(category: String, course: GrabCourse, conflict: Boolean) = guarded { source.select(category, course, conflict) }
+}

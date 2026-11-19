@@ -283,6 +283,44 @@ class CourseGrabTest {
         task.cancelAndJoin()
         assertTrue(state.run.outcome.contains("结果未知"))
     }
+    @Test fun upstreamExpiryInvalidatesEveryOperationAndNextAccessReacquires() = runBlocking {
+        for (status in listOf(401, 410, 503)) {
+            var expired = 0
+            val failing = object : CourseGrabSource {
+                private fun fail(): Nothing = throw SchoolError(status, "fixture", "fixture")
+                override suspend fun categories(): List<GrabCategory> = fail()
+                override suspend fun courses(category: String, page: Int): GrabPage = fail()
+                override suspend fun clock(): Long = fail()
+                override suspend fun select(category: String, course: GrabCourse, conflict: Boolean): GrabReply = fail()
+            }
+            val guarded = ExpiringCourseGrabSource(failing) { expired++ }
+            assertEquals(status, (runCatching { guarded.categories() }.exceptionOrNull() as SchoolError).status)
+            assertEquals(status, (runCatching { guarded.courses("12", 1) }.exceptionOrNull() as SchoolError).status)
+            assertEquals(status, (runCatching { guarded.clock() }.exceptionOrNull() as SchoolError).status)
+            assertEquals(status, (runCatching { guarded.select("12", courses[0], false) }.exceptionOrNull() as SchoolError).status)
+            assertEquals(if (status in setOf(401, 410)) 4 else 0, expired)
+        }
+        var valid = true
+        var accesses = 0
+        var logins = 0
+        val fresh = Fake { _, _ -> GrabReply(GrabOutcome.ENROLLED, "成功") }
+        val access = ReacquiringCourseGrabSource {
+            accesses++
+            if (!valid) { logins++; valid = true }
+            if (accesses == 1) ExpiringCourseGrabSource(object : CourseGrabSource by fresh {
+                override suspend fun categories(): List<GrabCategory> = throw SchoolError(410, "SESSION_EXPIRED", "fixture")
+            }) { valid = false } else fresh
+        }
+        assertTrue(runCatching { access.categories() }.exceptionOrNull() is SchoolError)
+        assertFalse(valid)
+        assertTrue(access.categories().isEmpty()); assertEquals(1, logins)
+        var closedExpired = false
+        val closed = ExpiringCourseGrabSource(object : CourseGrabSource by fresh {
+            override suspend fun categories(): List<GrabCategory> = throw GrabSelectionClosed()
+        }) { closedExpired = true }
+        assertTrue(runCatching { closed.categories() }.exceptionOrNull() is GrabSelectionClosed)
+        assertFalse(closedExpired)
+    }
     private class Fixture(val respond: (Request) -> Response) : Call.Factory {
         override fun newCall(request: Request): Call = object : Call {
             override fun request() = request

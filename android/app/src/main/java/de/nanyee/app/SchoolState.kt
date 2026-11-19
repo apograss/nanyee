@@ -289,7 +289,10 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
             if (owner != grabOwner.identity) throw CancellationException("学校账号已更改")
             ensureToolSession()
             if (owner != grabOwner.identity) throw CancellationException("学校账号已更改")
-            (api as DirectSchoolApi).courseGrab(session)
+            val sourceSession = session
+            ExpiringCourseGrabSource((api as DirectSchoolApi).courseGrab(sourceSession)) {
+                if (session == sourceSession) expireSession(reauthenticate = false)
+            }
         }
     }
     internal suspend fun evaluationAccess(): EvaluationSource {
