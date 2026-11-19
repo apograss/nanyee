@@ -16,9 +16,9 @@ internal fun platformUser(value: JsonElement): JsonObject {
     return (response["user"] as? JsonObject)?.takeIf { it.isNotEmpty() } ?: error("平台账号响应缺少用户")
 }
 
-internal fun cabinCredentials(value: JsonElement): List<JsonObject> = value.objectList().filter {
-    it.text("purpose") == "study_cabin" && it.text("upstream") == "infospace" && it.text("status") == "active"
-}
+internal fun cabinCredentials(value: JsonElement, purpose: String = "study_cabin"): List<JsonObject> = value.objectList().filter {
+    it.text("purpose") == purpose && it.text("upstream") == (if (purpose == "evaluation") "academic" else "infospace")
+}.filter { it.text("status") == "active" }
 
 internal fun cabinJobs(value: JsonElement): List<JsonObject> = value.objectList().filter { it.text("tool_id") == "study_cabin" }
 
@@ -68,11 +68,11 @@ internal fun cabinJob(draft: CabinDraft, credentialId: String): JsonObject = bui
     }
 }
 
-internal fun cabinSecret(account: String, password: String, create: Boolean): JsonObject = buildJsonObject {
+internal fun cabinSecret(account: String, password: String, create: Boolean, purpose: String = "study_cabin"): JsonObject = buildJsonObject {
     put("secret", payload("account" to account, "password" to password).toString())
     putJsonObject("metadata") { put("account_hint", "尾号 ${if (account.length > 4) account.takeLast(4) else "*".repeat(account.length.coerceAtLeast(1))}") }
     if (create) {
-        put("upstream", "infospace"); put("purpose", "study_cabin"); put("consent_version", "credential-hosting-v1")
+        put("upstream", if (purpose == "evaluation") "academic" else "infospace"); put("purpose", purpose); put("consent_version", "credential-hosting-v1")
     }
 }
 
@@ -96,7 +96,7 @@ internal class CabinSubmission(val body: JsonObject, val key: String = UUID.rand
             val updated = runCatching { Instant.parse(it.text("updated_at")) }.getOrNull()
             created != null && !created.isBefore(earliest) &&
                 (!terminal || (updated != null && !updated.isBefore(earliest))) &&
-                sameCabinPayload(it["payload"], body["payload"]) && it["credential_id"] == body["credential_id"] && it["operation"] == body["operation"]
+                (if (body.text("tool_id") == "evaluation") it["payload"] == body["payload"] else sameCabinPayload(it["payload"], body["payload"])) && it["credential_id"] == body["credential_id"] && it["operation"] == body["operation"]
         }
     }
 }
@@ -109,11 +109,11 @@ private fun sameCabinPayload(first: JsonElement?, second: JsonElement?): Boolean
         OffsetDateTime.parse(a.text("attempt_until")).toInstant() == OffsetDateTime.parse(b.text("attempt_until")).toInstant()
 }.getOrDefault(false)
 
-internal class CabinCredentialRecovery {
+internal class CabinCredentialRecovery(private val purpose: String = "study_cabin") {
     private var baseline: Set<String>? = null
 
     suspend fun save(backend: PlatformBackend, body: JsonObject): JsonObject {
-        val current = cabinCredentials(backend.call("GET", "/credentials"))
+        val current = cabinCredentials(backend.call("GET", "/credentials"), purpose)
         if (baseline != null) current.firstOrNull { it.text("id") !in baseline!! }?.let {
             baseline = null
             return it
@@ -136,7 +136,7 @@ internal suspend fun updateCabinPassword(backend: PlatformBackend, id: String, a
 }
 
 internal fun platformRequest(method: String, path: String, body: JsonObject?, csrf: String?, key: String? = null): Request {
-    require(path.matches(Regex("/(auth/(login|me|logout)|study-cabin/cabins|credentials(/[a-zA-Z0-9-]+(/secret)?)?|jobs(/[a-zA-Z0-9-]+/cancel)?)")))
+    require(path.matches(Regex("/(notices|auth/(login|me|logout)|study-cabin/cabins|credentials(/[a-zA-Z0-9-]+(/secret)?)?|jobs(/[a-zA-Z0-9-]+/cancel)?)")))
     val builder = Request.Builder().url("https://nanyee.de/api/v1$path")
     if (method != "GET") {
         if (path != "/auth/login") {

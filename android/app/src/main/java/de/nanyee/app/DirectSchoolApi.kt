@@ -33,6 +33,7 @@ internal class DirectSchoolApi(private val transport: Call.Factory? = null) : Sc
             }
             override fun loadForRequest(url: HttpUrl) = synchronized(cookies) { cookies.filter { it.matches(url) && it.expiresAt > System.currentTimeMillis() } }
         }).build()
+    private val singleAttemptClient by lazy { client.newBuilder().retryOnConnectionFailure(false).build() }
 
     override fun clear() { flow = ""; session = ""; synchronized(cookies) { cookies.clear() } }
 
@@ -40,10 +41,10 @@ internal class DirectSchoolApi(private val transport: Call.Factory? = null) : Sc
         .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36")
         .header("Accept-Language", "zh-CN,zh;q=0.9")
 
-    private suspend fun <T> execute(request: Request, parse: (Response) -> T): T {
+    private suspend fun <T> execute(request: Request, singleAttempt: Boolean = false, parse: (Response) -> T): T {
         if (Instant.now().isBefore(retryAt)) throw SchoolError(429, "RATE_LIMITED", "请求过于频繁，请在 $retryAt 后重试。")
         try {
-            return (transport ?: client).newCall(request).awaitResult { response ->
+            return (transport ?: if (singleAttempt) singleAttemptClient else client).newCall(request).awaitResult { response ->
                 if (response.code == 429) {
                     val retry = response.header("Retry-After")
                     retryAt = retry?.toLongOrNull()?.let { Instant.now().plusSeconds(it.coerceAtLeast(0)) }
@@ -159,6 +160,41 @@ internal class DirectSchoolApi(private val transport: Call.Factory? = null) : Sc
 
     private fun checkSession(body: JsonObject?) {
         if (session.isEmpty() || body?.text("academic_session_id") != session) throw SchoolError(410, "SESSION_EXPIRED", "学校会话已过期，请重新登录。")
+    }
+
+    internal fun evaluations(sessionId: String): EvaluationSource = object : EvaluationSource {
+        private fun check() = checkSession(payload("academic_session_id" to sessionId))
+        private fun headers(request: Request) = request.newBuilder().header("User-Agent", requestBuilder(ACADEMIC).build().header("User-Agent")!!).header("Accept-Language", "zh-CN,zh;q=0.9").build()
+        override suspend fun pending(): List<EvaluationReference> = withContext(Dispatchers.IO) {
+            check()
+            val today = java.time.LocalDate.now(cabinZone)
+            listOf(today, today.minusDays(1)).flatMap { date ->
+                execute(headers(evaluationPendingRequest(date))) { pendingEvaluations(Json.parseToJsonElement(content(it))) }
+            }.distinctBy { it.key }
+        }
+        override suspend fun draft(reference: EvaluationReference): EvaluationDraft = withContext(Dispatchers.IO) {
+            check(); reference.validate()
+            execute(headers(evaluationDraftRequest(reference))) { evaluationDraft(content(it), reference) }
+        }
+        override suspend fun submit(preview: EvaluationPreview): Int = withContext(Dispatchers.IO) {
+            check()
+            val fields = evaluationSubmission(preview)
+            try {
+                execute(headers(evaluationSubmitRequest(preview)), singleAttempt = true) { response ->
+                    if (response.code != 200) throw SchoolError(502, "RESULT_UNKNOWN", "评课结果未知，请先到教务系统核验，不要重试。")
+                    val text = content(response)
+                    if (!evaluationResult(text)) {
+                        val obj = runCatching { Json.parseToJsonElement(text) as? JsonObject }.getOrNull()
+                        if (obj != null) throw SchoolError(422, "UPSTREAM_REJECTED", obj.text("message").ifEmpty { obj.text("msg") }.take(200).ifEmpty { "教务系统拒绝了本次评课。" })
+                        throw SchoolError(502, "RESULT_UNKNOWN", "评课结果未知，请先到教务系统核验，不要重试。")
+                    }
+                    fields.getValue("wtpf").toInt()
+                }
+            } catch (e: SchoolError) {
+                if (e.code in setOf("UPSTREAM_REJECTED", "RESULT_UNKNOWN")) throw e
+                throw SchoolError(502, "RESULT_UNKNOWN", "评课结果未知，请先到教务系统核验，不要重试。")
+            }
+        }
     }
 
     private suspend fun defaultSemester(): String = Regex("xnxqdm=(\\d{6})").find(page("$ACADEMIC/new/student/xsgrkb/main.page"))?.groupValues?.get(1)
