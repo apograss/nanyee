@@ -6,10 +6,10 @@ import org.junit.Test
 
 class TimetableCacheTest {
     private class Revocation : CacheRevocation {
-        var revoked = false
+        var revokedFlag = false
         var failWrite = false
-        override fun isRevoked() = revoked
-        override fun setRevoked(value: Boolean) { check(!failWrite); revoked = value }
+        override fun isRevoked() = revokedFlag
+        override fun setRevoked(value: Boolean) { check(!failWrite); revokedFlag = value }
     }
 
     @Test fun failedDeletionRemainsRevokedAcrossRestartAndRetriesWithoutReading() {
@@ -19,18 +19,18 @@ class TimetableCacheTest {
         var deletes = 0
         val storage = object : TimetableCacheStorage {
             override fun read(): String? { reads++; return TimetableCacheCodec.encode(snapshot()) }
-            override fun write(value: String?) { assertTrue(flag.revoked); deletes++; check(!failDelete) }
+            override fun write(value: String?) { assertTrue(flag.revokedFlag); deletes++; check(!failDelete) }
         }
         fun cache() = RevocableTimetableCache({ TimetableCacheStore(storage) }, flag)
         assertFalse(cache().clear())
-        assertTrue(flag.revoked)
+        assertTrue(flag.revokedFlag)
         val restarted = cache()
         assertNull(restarted.load())
-        assertTrue(flag.revoked)
+        assertTrue(flag.revokedFlag)
         assertEquals(0, reads)
         failDelete = false
         assertNull(restarted.load())
-        assertFalse(flag.revoked)
+        assertFalse(flag.revokedFlag)
         assertEquals(3, deletes)
         assertEquals(0, reads)
     }
@@ -55,7 +55,7 @@ class TimetableCacheTest {
         assertEquals(snapshot(), cache.load())
         assertTrue(cache.clear())
         assertNull(cache.load())
-        assertFalse(flag.revoked)
+        assertFalse(flag.revokedFlag)
         cache.save(snapshot())
         assertEquals(snapshot(), cache.load())
     }
