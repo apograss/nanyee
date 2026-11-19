@@ -6,13 +6,17 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.MoreHoriz
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.ArrowDropDown
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -43,6 +47,36 @@ internal fun NanyeeTheme(content: @Composable () -> Unit) {
 }
 
 internal enum class SectionAccent { BRAND, ACADEMIC, SERVICE }
+
+@Composable
+internal fun ScenarioPicker(label: String, choices: List<String>, enabled: Boolean = true, select: (Int) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        AssistChip(onClick = { expanded = true }, enabled = enabled, label = { Text("演示场景 · $label") }, trailingIcon = { Icon(Icons.Outlined.ArrowDropDown, null) })
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            choices.forEachIndexed { index, title -> DropdownMenuItem(text = { Text(title) }, onClick = { expanded = false; select(index) }, enabled = enabled) }
+        }
+    }
+}
+
+@Composable
+internal fun ClassroomAccountRow(name: String, platform: String, demo: Boolean, enabled: Boolean, signedIn: Boolean, logout: () -> Unit, toggleDemo: () -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.medium) {
+        Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            AccentIcon(Icons.Outlined.Person, SectionAccent.ACADEMIC)
+            Text(name, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.small) { Text(if (demo) "演示" else platform, Modifier.padding(horizontal = 6.dp, vertical = 3.dp), style = MaterialTheme.typography.labelSmall) }
+            Box {
+                IconButton(onClick = { expanded = true }, enabled = enabled) { Icon(Icons.Outlined.MoreHoriz, "$platform 账号操作") }
+                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                    if (signedIn) DropdownMenuItem(text = { Text("退出并清除${platform}数据") }, onClick = { expanded = false; logout() })
+                    DropdownMenuItem(text = { Text(if (demo) "返回真实$platform" else "无账号体验离线演示") }, onClick = { expanded = false; toggleDemo() })
+                }
+            }
+        }
+    }
+}
 
 @Composable
 internal fun AccentIcon(icon: ImageVector, accent: SectionAccent, description: String? = null) {

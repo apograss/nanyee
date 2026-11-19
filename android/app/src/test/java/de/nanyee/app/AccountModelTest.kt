@@ -8,6 +8,33 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class AccountModelTest {
+    @Test fun initialDemoShowsSignedInSuccessWithoutLoginOrVerification() = runBlocking {
+        val backend = DemoAccountBackend(initiallySignedIn = true)
+        val model = AccountModel(backend, AccountRecovery({ null }, { _, _ -> }))
+        model.refresh()
+        assertEquals(AccountDemoFailure.NONE, backend.failure)
+        assertEquals("demo", model.user?.text("username"))
+        assertEquals(3, model.credentials.size); assertEquals(2, model.jobs.size); assertEquals(2, model.notices.size)
+        assertEquals("", model.error)
+        model.review(AccountWrite.LOGOUT); model.confirm(); model.refresh()
+        assertNull(model.user)
+    }
+
+    @Test fun demoScenarioSelectionRestoresSuccessAfterExpiryOrWebChallengeAndSupportsEmpty() = runBlocking {
+        val backend = DemoAccountBackend(initiallySignedIn = true)
+        val model = AccountModel(backend, AccountRecovery({ null }, { _, _ -> }))
+        for (failure in listOf(AccountDemoFailure.SESSION, AccountDemoFailure.CHALLENGE, AccountDemoFailure.NETWORK)) {
+            backend.selectScenario(failure); model.refresh()
+            assertTrue(model.error.isNotEmpty())
+            assertEquals(failure == AccountDemoFailure.CHALLENGE, model.error.contains("请在网页完成验证"))
+            backend.selectScenario(AccountDemoFailure.NONE); model.refresh()
+            assertNotNull(model.user); assertEquals("", model.error); assertEquals(3, model.credentials.size)
+        }
+        backend.selectScenario(AccountDemoFailure.EMPTY); model.refresh()
+        assertNotNull(model.user); assertTrue(model.credentials.isEmpty()); assertTrue(model.jobs.isEmpty()); assertTrue(model.notices.isEmpty())
+        assertEquals("", model.error)
+    }
+
     private class Fixture {
         val backend = DemoAccountBackend()
         val saved = mutableMapOf<String, String>()

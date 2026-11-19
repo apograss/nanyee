@@ -14,8 +14,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoStories
-import androidx.compose.material.icons.outlined.School
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
@@ -49,6 +49,7 @@ internal fun XxtToolsScreen(onBack: () -> Unit) {
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 private fun XxtScreen(state: XxtState, onBack: () -> Unit, onToggleDemo: () -> Unit) {
     val context = LocalContext.current
     var account by remember { mutableStateOf("") }
@@ -73,9 +74,10 @@ private fun XxtScreen(state: XxtState, onBack: () -> Unit, onToggleDemo: () -> U
     LaunchedEffect(state.user) { if (state.user != null) password = "" }
     val back = { if (!state.busy) { if (state.course != null) state.back() else onBack() } }
     BackHandler { if (state.qrLogin != null) state.stopQrLogin() else back() }
-    Column(Modifier.widthIn(max = 720.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    PullToRefreshBox(isRefreshing = state.busy, onRefresh = { if (state.user != null && !state.busy) state.refresh() }, modifier = Modifier.widthIn(max = 720.dp).fillMaxSize()) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (state.course != null) TextButton(onClick = back, enabled = !state.busy) { Text(if (state.activity == null) "返回课程" else "返回活动") }
-        SectionHeading("学习通", if (state.demo) "离线演示 · 不上传，不会真实签到" else "独立加密会话 · 仅当前本人账号", Icons.Outlined.School, SectionAccent.ACADEMIC)
+        ClassroomAccountRow(state.user?.name ?: "未登录学习通", "学习通", state.demo, !state.busy, state.user != null, state::logout, onToggleDemo)
         if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         if (state.error.isNotBlank()) Text(state.error, color = MaterialTheme.colorScheme.error)
         if (deviceError.isNotBlank()) Text(deviceError, color = MaterialTheme.colorScheme.error)
@@ -84,7 +86,7 @@ private fun XxtScreen(state: XxtState, onBack: () -> Unit, onToggleDemo: () -> U
             Text("上次提交结果未知。在官方学习通核验前，所有写入均已阻止。")
             TextButton(onClick = state::acknowledgeUnknown, enabled = !state.busy) { Text("我已在官方学习通核验，解除写入阻止") }
         }
-        Card(Modifier.fillMaxWidth()) {
+        if (state.user == null || state.qrLogin != null) Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("学习通账号", style = MaterialTheme.typography.titleLarge)
                 val user = state.user
@@ -107,12 +109,11 @@ private fun XxtScreen(state: XxtState, onBack: () -> Unit, onToggleDemo: () -> U
                 }
             }
         }
-        TextButton(onClick = onToggleDemo, enabled = !state.busy) { Text(if (state.demo) "返回真实学习通" else "无账号体验离线演示") }
         if (state.user != null) {
-            TextButton(onClick = state::refresh, enabled = !state.busy) { Text("只读刷新课程 / 活动") }
             val course = state.course; val activity = state.activity; val detail = state.detail
             if (course == null) {
                 Text("我的课程", style = MaterialTheme.typography.titleLarge)
+                Text("下拉刷新 · 仅本人账号", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (state.loaded && state.courses.isEmpty()) Text("暂无学习通课程。")
                 state.courses.forEach { row ->
                     CompactEntry(row.name, row.teacher, Icons.Outlined.AutoStories, SectionAccent.ACADEMIC, enabled = !state.busy, onClick = { state.selectCourse(row) })
@@ -179,6 +180,7 @@ private fun XxtScreen(state: XxtState, onBack: () -> Unit, onToggleDemo: () -> U
                 }
             }
         }
+    }
     }
     state.confirmation?.let { plan ->
         AlertDialog(onDismissRequest = state::dismissConfirmation, title = { Text("确认本人签到") }, text = {

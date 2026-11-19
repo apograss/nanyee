@@ -16,7 +16,7 @@ internal class AccountState(app: Application, private val saved: SavedStateHandl
     var demo by mutableStateOf(saved.get<Boolean>("accountDemo") ?: false); private set
     var model by mutableStateOf<AccountModel?>(null); private set
     var initializationError by mutableStateOf(""); private set
-    val fixture = DemoAccountBackend()
+    val fixture = DemoAccountBackend(initiallySignedIn = true)
     private var work: Job? = null
     private val preferences = app.getSharedPreferences("account_ui", 0)
     private val models = mutableMapOf<Boolean, AccountModel>()
@@ -45,6 +45,7 @@ internal class AccountState(app: Application, private val saved: SavedStateHandl
         model?.clearTransient(); demo = !demo; saved["accountDemo"] = demo; model = null; open()
     }
     fun confirm() { val current = model ?: return; viewModelScope.launch { current.confirm() } }
+    fun selectScenario(value: AccountDemoFailure) { fixture.selectScenario(value); open() }
     fun job(id: String) { val current = model ?: return; viewModelScope.launch { current.openJob(id) } }
     fun clearTransient() { models.values.forEach { it.clearTransient() } }
     override fun onCleared() { clearTransient() }

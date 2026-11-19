@@ -6,9 +6,10 @@ import java.time.Instant
 
 internal enum class AccountDemoFailure(val label: String) { NONE("成功"), REJECTED("校验失败"), SESSION("登录过期"), CHALLENGE("网页验证"), NETWORK("网络失败"), EMPTY("空列表") }
 
-internal class DemoAccountBackend : PlatformBackend {
+internal class DemoAccountBackend(initiallySignedIn: Boolean = false) : PlatformBackend {
     var failure by mutableStateOf(AccountDemoFailure.NONE)
-    private var signedIn = false
+    private var signedIn = initiallySignedIn
+    fun selectScenario(value: AccountDemoFailure) { failure = value; signedIn = true }
     private var email: String? = "demo@example.invalid"
     private var requestedEmail = ""
     private var credentialRows = listOf(

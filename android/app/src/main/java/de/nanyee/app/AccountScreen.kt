@@ -12,10 +12,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.School
+import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
@@ -63,7 +64,6 @@ internal fun AccountSection(state: AccountState = viewModel(key = "platform-acco
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer); state.clearTransient() }
     }
-    var showScenarios by rememberSaveable { mutableStateOf(false) }
     SectionHeading("Nanyee 账号", "自习舱与自动评课共用的平台会话", Icons.Outlined.AccountCircle)
     if (state.initializationError.isNotBlank()) Text(state.initializationError, color = MaterialTheme.colorScheme.error)
     val model = state.model
@@ -74,17 +74,22 @@ internal fun AccountSection(state: AccountState = viewModel(key = "platform-acco
     if (model.message.isNotBlank()) Text(model.message, color = MaterialTheme.colorScheme.primary)
     if (state.demo) {
         Text("离线演示 · 验证码 123456 · 不改变真实账号", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        TextButton(onClick = { showScenarios = !showScenarios }) { Text("演示场景 · ${state.fixture.failure.label} ${if (showScenarios) "收起" else "展开"}") }
-        if (showScenarios) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            AccountDemoFailure.entries.forEach { value -> FilterChip(selected = state.fixture.failure == value, onClick = { state.fixture.failure = value }, enabled = !model.busy, label = { Text(value.label) }) }
-        }
     }
     val enabled = !model.busy && model.pending == null
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        TextButton(onClick = { state.open(demoOnly) }, enabled = enabled) { Text("刷新") }
-        if (!demoOnly) TextButton(onClick = state::switchDemo, enabled = enabled) { Text(if (state.demo) "返回真实平台" else "离线演示") }
-        TextButton(onClick = { uri.openUri("https://nanyee.de/account") }) { Text("在网页完成验证") }
+    var accountMenu by remember { mutableStateOf(false) }
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        if (state.demo) ScenarioPicker(state.fixture.failure.label, AccountDemoFailure.entries.map { it.label }, enabled) { state.selectScenario(AccountDemoFailure.entries[it]) }
+        Spacer(Modifier.weight(1f))
+        Box {
+            IconButton(onClick = { accountMenu = true }, enabled = enabled) { Icon(Icons.Outlined.MoreHoriz, "Nanyee 账号操作") }
+            DropdownMenu(expanded = accountMenu, onDismissRequest = { accountMenu = false }) {
+                DropdownMenuItem(text = { Text("刷新") }, onClick = { accountMenu = false; state.open(demoOnly) })
+                if (model.user != null) DropdownMenuItem(text = { Text("退出 Nanyee…") }, onClick = { accountMenu = false; model.review(AccountWrite.LOGOUT) })
+                if (!demoOnly) DropdownMenuItem(text = { Text(if (state.demo) "返回真实平台" else "离线演示") }, onClick = { accountMenu = false; state.switchDemo() })
+            }
+        }
     }
+    if (model.error.contains("请在网页完成验证")) AssistChip(onClick = { uri.openUri("https://nanyee.de/account") }, label = { Text("在网页完成验证") })
     if (model.route.isNotEmpty()) TextButton(onClick = { model.navigate("") }, enabled = enabled) { Text("返回 Nanyee 账号") }
     when {
         model.route == "reset" -> {
@@ -106,7 +111,6 @@ internal fun AccountSection(state: AccountState = viewModel(key = "platform-acco
             Text("@${profile.text("username")} · ${profile.text("nickname")}", style = MaterialTheme.typography.titleLarge)
             Text("邮箱：${profile.text("email").ifBlank { "未绑定" }} · ${if ((profile["email_verified"] as? JsonPrimitive)?.booleanOrNull == true) "已验证" else "未验证"}")
             Text("角色：${profile.text("role")}")
-            TextButton(onClick = { model.review(AccountWrite.LOGOUT) }, enabled = enabled) { Text("退出 Nanyee…") }
             when (model.route) {
                 "email" -> {
                     AccountChallengeFields(model, reset = false, enabled)
