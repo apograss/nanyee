@@ -6,6 +6,17 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class CabinRecoveryTest {
+    @Test fun pendingSubmissionMatchesPayloadNotState() {
+        val body = cabinJob(cabinDefaults().copy(cabins = listOf(1)), "fixture")
+        val pending = CabinSubmission(body)
+        val job = JsonObject(body + ("state" to JsonPrimitive("running")))
+        assertEquals(job, pending.matchingJob(listOf(job)))
+        val normalizedPayload = JsonObject(body["payload"]!!.jsonObject + mapOf("start_time" to JsonPrimitive("09:00:00"), "end_time" to JsonPrimitive("11:00:00")))
+        val normalizedJob = JsonObject(job + ("payload" to normalizedPayload))
+        assertEquals(normalizedJob, pending.matchingJob(listOf(normalizedJob)))
+        assertNull(pending.matchingJob(emptyList()))
+        assertNull(pending.matchingJob(listOf(JsonObject(job + ("payload" to JsonObject(emptyMap()))))))
+    }
     private class Backend : PlatformBackend {
         val calls = mutableListOf<String>()
         var failCreate = false

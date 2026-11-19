@@ -111,6 +111,8 @@ internal fun CabinToolsScreen(school: SchoolState, state: CabinState = viewModel
                     state.pending != null -> {
                         Text("上次提交尚未确认。请先刷新核对；网络重试将沿用同一确认内容与幂等键，不会另建一笔。")
                         Button(onClick = { state.sendPending() }, enabled = !state.busy) { Text("使用原确认重试") }
+                        OutlinedButton(onClick = { state.reconcilePending() }, enabled = !state.busy) { Text("刷新核对并放弃重试") }
+                        if (state.canDiscardPending) TextButton(onClick = { state.discardPending() }, enabled = !state.busy) { Text("确认放弃本机待确认请求") }
                     }
                     state.submitted -> {
                         Text("任务已创建，请在下方查看进度。")

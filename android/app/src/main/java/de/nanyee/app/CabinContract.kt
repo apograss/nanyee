@@ -78,7 +78,18 @@ internal fun cabinSecret(account: String, password: String, create: Boolean): Js
 
 internal class CabinSubmission(val body: JsonObject, val key: String = UUID.randomUUID().toString()) {
     suspend fun send(backend: PlatformBackend): JsonElement = backend.call("POST", "/jobs", body, key)
+    fun matchingJob(jobs: List<JsonObject>): JsonObject? = jobs.firstOrNull {
+        sameCabinPayload(it["payload"], body["payload"]) && it["credential_id"] == body["credential_id"] && it["operation"] == body["operation"]
+    }
 }
+
+private fun sameCabinPayload(first: JsonElement?, second: JsonElement?): Boolean = runCatching {
+    val a = first!!.jsonObject
+    val b = second!!.jsonObject
+    listOf("target_date", "title", "cabin_ids").all { a[it] == b[it] } &&
+        listOf("start_time", "end_time").all { LocalTime.parse(a.text(it)) == LocalTime.parse(b.text(it)) } &&
+        OffsetDateTime.parse(a.text("attempt_until")).toInstant() == OffsetDateTime.parse(b.text("attempt_until")).toInstant()
+}.getOrDefault(false)
 
 internal suspend fun createCabinCredential(backend: PlatformBackend, body: JsonObject, replaced: String?): JsonObject {
     val created = backend.call("POST", "/credentials", body).obj()

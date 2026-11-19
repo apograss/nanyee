@@ -31,6 +31,7 @@ internal class CabinState(app: Application) : AndroidViewModel(app) {
     var draft by mutableStateOf(cabinDefaults())
     var confirmation by mutableStateOf<CabinSubmission?>(null); private set
     var pending by mutableStateOf<CabinSubmission?>(null); private set
+    var canDiscardPending by mutableStateOf(false); private set
     var submitted by mutableStateOf(false); private set
 
     private suspend fun api(): PlatformBackend = backend ?: withContext(Dispatchers.IO) {
@@ -62,7 +63,7 @@ internal class CabinState(app: Application) : AndroidViewModel(app) {
     private fun clearSensitive() {
         user = null; platformPassword = ""; account = ""; schoolPassword = ""; credentials = emptyList()
         selectedCredential = ""; jobs = emptyList(); cabins = emptyList(); consent = false; credentialEditor = false
-        editingId = null; confirmation = null; pending = null; submitted = false
+        editingId = null; confirmation = null; pending = null; submitted = false; canDiscardPending = false
         draft = cabinDefaults()
     }
 
@@ -127,6 +128,7 @@ internal class CabinState(app: Application) : AndroidViewModel(app) {
     }
     fun sendPending() {
         val value = pending ?: return
+        canDiscardPending = false
         run {
             try { value.send(api()) }
             catch (e: PlatformFailure) {
@@ -136,6 +138,20 @@ internal class CabinState(app: Application) : AndroidViewModel(app) {
             pending = null; submitted = true
             load(); message = "预约任务已创建，服务器将按计划尝试。"
         }
+    }
+    fun reconcilePending() = run {
+        val value = pending ?: return@run
+        jobs = cabinJobs(api().call("GET", "/jobs"))
+        if (value.matchingJob(jobs) != null) {
+            pending = null; submitted = true; canDiscardPending = false
+            message = "已找到相同预约，请在我的预约查看。"
+        } else {
+            canDiscardPending = true
+            message = "当前列表未找到相同预约。可以明确放弃本机待确认请求；服务器可能仍在处理，请留意后续任务。"
+        }
+    }
+    fun discardPending() {
+        if (!busy && canDiscardPending) { pending = null; canDiscardPending = false }
     }
     fun newBooking() { if (pending == null) { submitted = false; draft = cabinDefaults() } }
     fun cancelJob(id: String) = run { api().call("POST", "/jobs/$id/cancel"); load() }
