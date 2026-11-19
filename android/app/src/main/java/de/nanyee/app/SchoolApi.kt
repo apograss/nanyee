@@ -2,11 +2,13 @@ package de.nanyee.app
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.serialization.json.*
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
+import java.io.IOException
 
 fun JsonElement.obj() = this as? JsonObject ?: JsonObject(emptyMap())
 fun JsonObject.text(key: String) = (get(key) as? JsonPrimitive)?.contentOrNull ?: ""
@@ -15,6 +17,18 @@ fun JsonObject.items(key: String) = (get(key) as? JsonArray)?.map { it.obj() } ?
 fun payload(vararg fields: Pair<String, String>) = buildJsonObject { fields.forEach { put(it.first, it.second) } }
 
 class SchoolError(val status: Int, val code: String, message: String) : Exception(message)
+
+internal suspend fun <T> Call.awaitResult(parse: (Response) -> T): T = suspendCancellableCoroutine { continuation ->
+    continuation.invokeOnCancellation { cancel() }
+    enqueue(object : Callback {
+        override fun onFailure(call: Call, e: IOException) { continuation.resumeWith(Result.failure(e)) }
+        override fun onResponse(call: Call, response: Response) {
+            response.use {
+                if (continuation.isActive) continuation.resumeWith(runCatching { parse(it) })
+            }
+        }
+    })
+}
 
 class SchoolApi {
     private val cookies = mutableListOf<Cookie>()
@@ -40,7 +54,7 @@ class SchoolApi {
             synchronized(cookies) { cookies.lastOrNull { it.name == "nanyee_csrf" && it.expiresAt > System.currentTimeMillis() }?.let { builder.header("X-CSRF-Token", it.value) } }
         }
         try {
-            client.newCall(builder.build()).execute().use { response ->
+            client.newCall(builder.build()).awaitResult { response ->
                 val data = runCatching { Json.parseToJsonElement(response.body?.string() ?: "{}").obj() }.getOrDefault(JsonObject(emptyMap()))
                 if (!response.isSuccessful) {
                     val error = data["error"]?.obj() ?: JsonObject(emptyMap())
