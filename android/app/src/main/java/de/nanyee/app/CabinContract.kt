@@ -78,6 +78,11 @@ internal fun cabinSecret(account: String, password: String, create: Boolean): Js
 
 internal class CabinSubmission(val body: JsonObject, val key: String = UUID.randomUUID().toString()) {
     suspend fun send(backend: PlatformBackend): JsonElement = backend.call("POST", "/jobs", body, key)
+    fun validation(available: Set<Int>, now: Instant = Instant.now()): String? {
+        val p = body["payload"]!!.jsonObject
+        return validateCabin(CabinDraft(p.text("target_date"), p.text("start_time"), p.text("end_time"), p.text("title"),
+            p["cabin_ids"]!!.jsonArray.map { it.jsonPrimitive.int }, body.text("scheduled_for"), p.text("attempt_until")), available, now)
+    }
     fun matchingJob(jobs: List<JsonObject>): JsonObject? = jobs.firstOrNull {
         sameCabinPayload(it["payload"], body["payload"]) && it["credential_id"] == body["credential_id"] && it["operation"] == body["operation"]
     }

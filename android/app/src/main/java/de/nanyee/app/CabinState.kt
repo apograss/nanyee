@@ -125,7 +125,10 @@ internal class CabinState(app: Application) : AndroidViewModel(app) {
     }
     fun dismissConfirmation() { confirmation = null }
     fun confirm() {
+        if (busy) return
         val value = confirmation ?: return
+        val invalid = value.validation(cabins.map { it.number("dev_id") }.toSet())
+        if (invalid != null) { error = invalid; confirmation = null; return }
         confirmation = null; pending = value; sendPending()
     }
     fun sendPending() {

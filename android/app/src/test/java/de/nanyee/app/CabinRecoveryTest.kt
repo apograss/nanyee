@@ -4,8 +4,16 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import org.junit.Assert.*
 import org.junit.Test
+import java.time.Instant
 
 class CabinRecoveryTest {
+    @Test fun confirmationExpiresWhileDialogIsOpen() {
+        val draft = CabinDraft("2030-01-02", cabins = listOf(1), scheduled = "2030-01-01T10:00:00+08:00", until = "2030-01-02T08:50:00+08:00")
+        val submission = CabinSubmission(cabinJob(draft, "fixture"))
+        assertNull(submission.validation(setOf(1), Instant.parse("2030-01-01T02:00:00Z")))
+        assertNotNull(submission.validation(setOf(1), Instant.parse("2030-01-02T00:50:00Z")))
+        assertNotNull(submission.validation(emptySet(), Instant.parse("2030-01-01T02:00:00Z")))
+    }
     @Test fun lostCredentialResponseIsAdoptedWithoutSecondPost() = runBlocking {
         var posts = 0
         var stored = emptyList<JsonObject>()
