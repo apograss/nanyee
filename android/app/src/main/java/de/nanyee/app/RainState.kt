@@ -43,6 +43,7 @@ internal class RainState(application: Application) : AndroidViewModel(applicatio
     private lateinit var store: RainStore
     private lateinit var backend: RainBackend
     private val live = RainLiveOwner()
+    private val liveSlides = RainLiveSlides()
     private var foreground = false
     private var generation = 0
     private var initialized = false
@@ -131,12 +132,16 @@ internal class RainState(application: Application) : AndroidViewModel(applicatio
         }
         while (events.size > 500) events.removeAt(0)
         frame.unlock?.takeIf { it.problem.isNotBlank() && it.dt > 0 }?.let { unlocks[it.problem] = it; events.add(RainEvent("problem", "题目已开放，请手动作答", it.dt, presentation?.id.orEmpty(), currentSlide?.index ?: 0, it.problem, it.seconds)) }
-        if (frame.op in setOf("hello", "showpresentation") && frame.presentation.isNotBlank() && (follow || presentation == null)) loadPresentation(frame.presentation, frame.slide)
-        else if (follow && frame.op in setOf("slide", "slidenav")) selectSlideNumber(frame.slide)
+        if (liveSlides.accept(frame) && (follow || presentation == null)) followLiveSlides()
         if (frame.refreshLocation) refreshEligibility()
         liveStatus = "前台已连接 · ${frame.op}"
     }
-    fun updateFollow(value: Boolean) { follow = value }
+    fun updateFollow(value: Boolean) { follow = value; if (value) followLiveSlides() }
+    private fun followLiveSlides() {
+        val target = liveSlides.target ?: return
+        if (presentation?.id == target.first) selectSlideNumber(target.second)
+        else loadPresentation(target.first, target.second)
+    }
     fun loadPresentation(id: String = presentation?.id.orEmpty(), number: Int = slide + 1) {
         val joined = lesson ?: return
         if (id.isBlank()) return
@@ -255,7 +260,7 @@ internal class RainState(application: Application) : AndroidViewModel(applicatio
     fun cancelExport() { if (exporting) work?.cancel() }
     fun acknowledgeUnknown() = read { val journal = pendingJournal(); withContext(Dispatchers.IO) { journal.completed() }; unknownKey = ""; message = "已清除本地未知结果标记；下一次写入仍需重新预览确认。" }
     fun leaveLesson() {
-        stopVisibility(); deckWork?.cancel(); imageWork?.cancel(); eligibilityWork?.cancel(); lesson = null; position = null; eligibility = null; unlocks.clear()
+        stopVisibility(); deckWork?.cancel(); imageWork?.cancel(); eligibilityWork?.cancel(); lesson = null; position = null; eligibility = null; unlocks.clear(); liveSlides.clear()
     }
     fun backToCourses() { if (!busy) { leaveLesson(); presentation = null; image = null; events.clear(); drafts = emptyMap(); restartVisibility() } }
     fun selectScenario(value: RainDemoFailure) { if (demo && !busy) { scenario = value; (backend as? DemoRainBackend)?.failure = value; dismiss(); restartVisibility() } }

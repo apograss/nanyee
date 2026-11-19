@@ -9,6 +9,18 @@ internal class MemoryRainStore : RainStore {
     override fun write(key: String, value: String) { values[key] = value }
     override fun clear() { values.clear() }
 }
+internal class RainLiveSlides {
+    var target: Pair<String, Int>? = null; private set
+    fun accept(frame: RainFrame): Boolean {
+        if (frame.op !in setOf("hello", "showpresentation", "slide", "slidenav")) return false
+        val id = frame.presentation.ifBlank { target?.first.orEmpty() }
+        if (id.isBlank()) return false
+        val number = if (frame.slide > 0) frame.slide else if (id == target?.first) target?.second ?: 1 else 1
+        target = id to number
+        return true
+    }
+    fun clear() { target = null }
+}
 internal enum class RainDemoFailure(val label: String) {
     NONE("成功"), PROFILE("会话失效"), QR("获取码失败"), POLL("授权过期"), COURSES("课程失败"), ON_LESSON("开课检查失败"), EMPTY("空列表"), SCAN("课堂码失败"), JOIN("加入失败"), LOCATION("定位签到失败"), SLIDES("课件失败"), IMAGES("图片失败"), LIVE("直播断开"), ANSWER("作答失败"), RETRY("重试失败"), UNKNOWN("提交结果未知"), GALLERY("保存失败")
 }

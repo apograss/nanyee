@@ -37,4 +37,18 @@ class ClassroomStateRegressionTest {
         assertFalse(state.hasUnknownWrite)
         assertFalse(state.completed)
     }
+
+    @Test fun followingRestoresLatestPresentationAndNotTheHistoricalDeck() {
+        val slides = RainLiveSlides()
+        assertNull(slides.target)
+        assertFalse(slides.accept(RainFrame("slidenav", slide = 3)))
+        slides.accept(RainFrame("hello", "first", 1))
+        slides.accept(RainFrame("showpresentation", "live", 2))
+        slides.accept(RainFrame("slidenav", slide = 4))
+        assertEquals("live" to 4, slides.target)
+        assertFalse(slides.accept(RainFrame("unlockproblem", "historical", 1)))
+        assertEquals("live" to 4, slides.target)
+        slides.clear()
+        assertNull(slides.target)
+    }
 }
