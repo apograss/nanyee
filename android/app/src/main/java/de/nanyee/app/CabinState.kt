@@ -13,6 +13,11 @@ internal class CabinState(app: Application) : AndroidViewModel(app) {
     private var initialized = false
     private var generation = 0
     private var credentialRecovery = CabinCredentialRecovery()
+    var evaluationMode by mutableStateOf(false); private set
+    private val purpose get() = if (evaluationMode) "evaluation" else "study_cabin"
+    var maxCourses by mutableStateOf("60")
+    var retryUntil by mutableStateOf("")
+    var notices by mutableStateOf(emptyList<JsonObject>()); private set
     var demo by mutableStateOf(false); private set
     var busy by mutableStateOf(false); private set
     var user by mutableStateOf<JsonObject?>(null); private set
@@ -54,15 +59,19 @@ internal class CabinState(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun open(demoMode: Boolean) {
-        if (initialized && demo == demoMode) return
+    fun open(demoMode: Boolean, evaluation: Boolean = false) {
+        if (initialized && demo == demoMode && evaluationMode == evaluation) {
+            run { user = platformUser(api().call("GET", "/auth/me")); load() }
+            return
+        }
+        evaluationMode = evaluation
         generation++; work?.cancel(); busy = false; clearSensitive(); backend = null; username = ""
         demo = demoMode; initialized = true; draft = cabinDefaults(); error = ""; message = ""
         run { user = platformUser(api().call("GET", "/auth/me")); load() }
     }
 
     private fun clearSensitive() {
-        credentialRecovery = CabinCredentialRecovery()
+        credentialRecovery = CabinCredentialRecovery(purpose); notices = emptyList()
         user = null; platformPassword = ""; account = ""; schoolPassword = ""; credentials = emptyList()
         selectedCredential = ""; jobs = emptyList(); cabins = emptyList(); consent = false; credentialEditor = false
         editingId = null; confirmation = null; pending = null; submitted = false; canDiscardPending = false
@@ -85,10 +94,11 @@ internal class CabinState(app: Application) : AndroidViewModel(app) {
     }
 
     private suspend fun load() {
-        credentials = cabinCredentials(api().call("GET", "/credentials"))
+        credentials = cabinCredentials(api().call("GET", "/credentials"), purpose)
         if (credentials.none { it.text("id") == selectedCredential }) selectedCredential = credentials.firstOrNull()?.text("id").orEmpty()
-        cabins = api().call("GET", "/study-cabin/cabins").objectList()
-        jobs = cabinJobs(api().call("GET", "/jobs"))
+        cabins = if (evaluationMode) emptyList() else api().call("GET", "/study-cabin/cabins").objectList()
+        jobs = api().call("GET", "/jobs").objectList().filter { it.text("tool_id") == purpose }
+        notices = if (evaluationMode) api().call("GET", "/notices").objectList() else emptyList()
     }
 
     fun refresh() = run { user = platformUser(api().call("GET", "/auth/me")); load() }
@@ -115,7 +125,7 @@ internal class CabinState(app: Application) : AndroidViewModel(app) {
             return
         }
         val password = schoolPassword
-        val body = if (id == null) cabinSecret(account.trim(), password, true) else null
+        val body = if (id == null) cabinSecret(account.trim(), password, true, purpose) else null
         schoolPassword = ""
         run {
             if (id == null) selectedCredential = credentialRecovery.save(api(), body!!).text("id")
@@ -132,10 +142,21 @@ internal class CabinState(app: Application) : AndroidViewModel(app) {
         if (error.isEmpty()) confirmation = CabinSubmission(cabinJob(draft, selectedCredential))
     }
     fun dismissConfirmation() { confirmation = null }
+    fun reviewEvaluation() {
+        if (busy || pending != null) return
+        error = ""
+        try {
+            require(selectedCredential.isNotEmpty())
+            confirmation = CabinSubmission(evaluationJob(selectedCredential, maxCourses.toInt(), retryUntil.trim()))
+        } catch (_: Exception) { error = "请选择评课凭据；每轮课程数为 1–60，截止时间留空或填写未来带时区时间。" }
+    }
     fun confirm() {
         if (busy) return
         val value = confirmation ?: return
-        val invalid = value.validation(cabins.map { it.number("dev_id") }.toSet())
+        val invalid = if (evaluationMode) runCatching {
+            val p = value.body["payload"]!!.jsonObject
+            evaluationJob(value.body.text("credential_id"), p.number("max_courses"), p.text("retry_until")); null
+        }.getOrElse { "评课截止时间已失效，请重新确认。" } else value.validation(cabins.map { it.number("dev_id") }.toSet())
         if (invalid != null) { error = invalid; confirmation = null; return }
         confirmation = null; pending = value; sendPending()
     }
@@ -148,13 +169,14 @@ internal class CabinState(app: Application) : AndroidViewModel(app) {
                 if (e.status in 400..499 && e.status !in listOf(409, 429) && e.code != "RATE_LIMIT_CHALLENGE_REQUIRED") pending = null
                 throw e
             }
+            val deduplicated = api().jobDeduplicated
             pending = null; submitted = true
-            load(); message = "预约任务已创建，服务器将按计划尝试。"
+            load(); message = if (evaluationMode) { if (deduplicated) "已沿用现有常驻评课任务，未重复创建。" else "常驻评课任务已创建。" } else "预约任务已创建，服务器将按计划尝试。"
         }
     }
     fun reconcilePending() = run {
         val value = pending ?: return@run
-        jobs = cabinJobs(api().call("GET", "/jobs"))
+        jobs = api().call("GET", "/jobs").objectList().filter { it.text("tool_id") == purpose }
         if (value.matchingJob(jobs) != null) {
             pending = null; submitted = true; canDiscardPending = false
             message = "已找到相同预约，请在我的预约查看。"

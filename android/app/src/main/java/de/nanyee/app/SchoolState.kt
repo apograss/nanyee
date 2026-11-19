@@ -46,7 +46,8 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
     var remember by mutableStateOf(prefs.getBoolean("remember", false))
     var captchaText by mutableStateOf("")
     var captcha by mutableStateOf<JsonObject?>(null)
-    private var session = ""
+    private var session by mutableStateOf("")
+    internal val evaluationSessionIdentity get() = session
     private var reauthAttempted = false
     var sessionGeneration by mutableIntStateOf(0)
         private set
@@ -259,6 +260,35 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
             val savedAccount = secure.getString("account", "").orEmpty()
             val savedPassword = secure.getString("password", "").orEmpty()
             if (savedAccount.isBlank() || savedPassword.isEmpty()) null else savedAccount to savedPassword
+        }
+    }
+    internal suspend fun evaluationAccess(): EvaluationSource {
+        if (demo) return DemoEvaluationSource()
+        if (!loggedIn || session.isEmpty() || runCatching { Instant.parse(expires) <= Instant.now() }.getOrDefault(true)) {
+            val credentials = hostedSchoolPrefill() ?: throw SchoolError(401, "LOGIN_REQUIRED", "请先在“我的”登录学校，或保存凭据后重试。")
+            autoLoggingIn = true
+            try {
+                when (val result = silentLogin(api, credentials.first, credentials.second, captchaOcr::recognize)) {
+                    is SilentLoginResult.Success -> {
+                        completeLogin(result.session, credentials.first, credentials.second, true, 3, semester)
+                        launch("timetable") { loadTimetable() }
+                        launch("grades") { loadGrades() }
+                    }
+                    is SilentLoginResult.Manual -> throw SchoolError(401, "LOGIN_REQUIRED", result.message + " 请在“我的”手动登录后返回。")
+                }
+            } finally { autoLoggingIn = false }
+        }
+        val sourceSession = session
+        val source = (api as DirectSchoolApi).evaluations(sourceSession)
+        return object : EvaluationSource by source {
+            override suspend fun draft(reference: EvaluationReference): EvaluationDraft = try { source.draft(reference) } catch (e: SchoolError) {
+                if (session == sourceSession && e.status in setOf(401, 410)) expireSession(reauthenticate = false)
+                throw e
+            }
+            override suspend fun pending(): List<EvaluationReference> = try { source.pending() } catch (e: SchoolError) {
+                if (session == sourceSession && e.status in setOf(401, 410)) expireSession(reauthenticate = false)
+                throw e
+            }
         }
     }
     fun selectSemester(code: String) {

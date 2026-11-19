@@ -42,6 +42,22 @@ Debug APK 使用 Android 默认开发密钥签名，可直接安装。发布正�
 - 响应按实际契约解析：`/auth/me` 为 `user` 包装对象，凭据/舱位/任务为顶层数组；任务状态字段为 `state`，收据舱位名为 `receipt.room_name`。`csrf_header` 是请求 Header 名（契约默认 `X-CSRF-Token`），不是 Token；只支持这个固定名称，Token 始终取自 CSRF Cookie。演示响应与类型夹具包含完整账号、凭据、任务字段及可空字段。
 - 原有全局演示模式和工具内“无账号体验演示”均使用内存假平台/凭据/任务后端，无学习舱网络请求、不存真实秘密。可模拟运行、重试、成功、失败和结果待核验。学习舱 UI 尚未在设备上进行大字体/平板/深色视觉验证。
 
+## 课程评价
+
+- 工具 → 课程评价提供两个独立模式：自动评课沿用 Nanyee 平台登录与明确托管同意（`academic` / `evaluation`），手动一键则完全直连学校、复用内存会话与静默登录，不使用 Nanyee 服务器。
+- 自动模式按 `evaluation:submit:v1` 确认，固定 `legacy_positive_random`，每轮 1–60 门，可选带时区的未来截止时间。未填时服务器默认运行 180 天；每日运行窗口由服务器配置。展示状态、下次运行、最近一轮日志/收据，识别 HTTP 200 + `X-Job-Deduplicated`，支持确认取消；凭据失效通知可进入更新表单。
+- 手动模式仅查询今天与昨天的待评课程，可全选/多选，加载表单并预览固定答案，二次明确确认后逐门提交。首个上游错误立即停止，结果未知不自动重放；再次操作前须只读刷新核验。无课程时提示可能尚未开放或已评完。
+- 学校端仅移植 `client.py` / `evaluation.py` 中的 `xsktpjData`、`showXsktpjwj.page`、`savePj`，不探测其他端点。策略与星级计分/星串答案按 Python 实现移植。演示模式的两条流程都用内存假后端，不联网、不提交真实评价。
+- 手动演示可切换正常评课、评教未开放、暂无待评和第二门提交失败；每门模拟提交等待约 1.5 秒，可演示旋转保留进度与首错停止。自动演示失败轮仅展示失败日志，终态或凭据失效时不展示下次运行。
+- JVM 普通测试仅构建请求、解析合成夹具并调用假后端，没有真实凭据/任务创建或评价提交。新增只读 opt-in 测试仅静默登录并查询待评列表（不加载草稿、不提交）；缺少任一凭据变量时 assume 跳过。只输出 OCR 次数、待评数量及标识形状是否完整；空列表合法。请仅由账号持有人显式运行：
+
+```sh
+cd android
+ANDROID_HOME=/home/ubuntu/android-sdk ./gradlew testDebugUnitTest --tests 'de.nanyee.app.EvaluationLiveListingTest' --rerun-tasks --info --max-workers=2
+```
+
+运行前在本地环境安全设置 `NANYEE_LIVE_ACCOUNT` 和 `NANYEE_LIVE_PASSWORD`，不要放入命令行或仓库。登录可能影响其他设备的学校会话。课程评价 UI 尚未设备视觉验证。
+
 ## 模拟器
 
 ```sh

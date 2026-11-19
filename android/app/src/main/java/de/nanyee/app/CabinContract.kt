@@ -16,9 +16,9 @@ internal fun platformUser(value: JsonElement): JsonObject {
     return (response["user"] as? JsonObject)?.takeIf { it.isNotEmpty() } ?: error("平台账号响应缺少用户")
 }
 
-internal fun cabinCredentials(value: JsonElement): List<JsonObject> = value.objectList().filter {
-    it.text("purpose") == "study_cabin" && it.text("upstream") == "infospace" && it.text("status") == "active"
-}
+internal fun cabinCredentials(value: JsonElement, purpose: String = "study_cabin"): List<JsonObject> = value.objectList().filter {
+    it.text("purpose") == purpose && it.text("upstream") == (if (purpose == "evaluation") "academic" else "infospace")
+}.filter { it.text("status") == "active" }
 
 internal fun cabinJobs(value: JsonElement): List<JsonObject> = value.objectList().filter { it.text("tool_id") == "study_cabin" }
 
@@ -68,11 +68,11 @@ internal fun cabinJob(draft: CabinDraft, credentialId: String): JsonObject = bui
     }
 }
 
-internal fun cabinSecret(account: String, password: String, create: Boolean): JsonObject = buildJsonObject {
+internal fun cabinSecret(account: String, password: String, create: Boolean, purpose: String = "study_cabin"): JsonObject = buildJsonObject {
     put("secret", payload("account" to account, "password" to password).toString())
     putJsonObject("metadata") { put("account_hint", "尾号 ${if (account.length > 4) account.takeLast(4) else "*".repeat(account.length.coerceAtLeast(1))}") }
     if (create) {
-        put("upstream", "infospace"); put("purpose", "study_cabin"); put("consent_version", "credential-hosting-v1")
+        put("upstream", if (purpose == "evaluation") "academic" else "infospace"); put("purpose", purpose); put("consent_version", "credential-hosting-v1")
     }
 }
 
@@ -96,9 +96,15 @@ internal class CabinSubmission(val body: JsonObject, val key: String = UUID.rand
             val updated = runCatching { Instant.parse(it.text("updated_at")) }.getOrNull()
             created != null && !created.isBefore(earliest) &&
                 (!terminal || (updated != null && !updated.isBefore(earliest))) &&
-                sameCabinPayload(it["payload"], body["payload"]) && it["credential_id"] == body["credential_id"] && it["operation"] == body["operation"]
+                (if (body.text("tool_id") == "evaluation") sameEvaluationPayload(it["payload"], body["payload"]) else sameCabinPayload(it["payload"], body["payload"])) && it["credential_id"] == body["credential_id"] && it["operation"] == body["operation"] && it["tool_id"] == body["tool_id"]
         }
     }
+}
+
+private fun sameEvaluationPayload(actual: JsonElement?, sent: JsonElement?): Boolean {
+    val a = actual as? JsonObject ?: return false
+    val b = sent as? JsonObject ?: return false
+    return b.all { (key, value) -> (a[key] ?: JsonNull) == value }
 }
 
 private fun sameCabinPayload(first: JsonElement?, second: JsonElement?): Boolean = runCatching {
@@ -109,11 +115,11 @@ private fun sameCabinPayload(first: JsonElement?, second: JsonElement?): Boolean
         OffsetDateTime.parse(a.text("attempt_until")).toInstant() == OffsetDateTime.parse(b.text("attempt_until")).toInstant()
 }.getOrDefault(false)
 
-internal class CabinCredentialRecovery {
+internal class CabinCredentialRecovery(private val purpose: String = "study_cabin") {
     private var baseline: Set<String>? = null
 
     suspend fun save(backend: PlatformBackend, body: JsonObject): JsonObject {
-        val current = cabinCredentials(backend.call("GET", "/credentials"))
+        val current = cabinCredentials(backend.call("GET", "/credentials"), purpose)
         if (baseline != null) current.firstOrNull { it.text("id") !in baseline!! }?.let {
             baseline = null
             return it
@@ -136,7 +142,7 @@ internal suspend fun updateCabinPassword(backend: PlatformBackend, id: String, a
 }
 
 internal fun platformRequest(method: String, path: String, body: JsonObject?, csrf: String?, key: String? = null): Request {
-    require(path.matches(Regex("/(auth/(login|me|logout)|study-cabin/cabins|credentials(/[a-zA-Z0-9-]+(/secret)?)?|jobs(/[a-zA-Z0-9-]+/cancel)?)")))
+    require(path.matches(Regex("/(notices|auth/(login|me|logout)|study-cabin/cabins|credentials(/[a-zA-Z0-9-]+(/secret)?)?|jobs(/[a-zA-Z0-9-]+/cancel)?)")))
     val builder = Request.Builder().url("https://nanyee.de/api/v1$path")
     if (method != "GET") {
         if (path != "/auth/login") {
@@ -149,17 +155,40 @@ internal fun platformRequest(method: String, path: String, body: JsonObject?, cs
     return builder.build()
 }
 
-internal fun cabinStatus(state: String): String = when (state) {
+internal fun cabinStatus(state: String, toolId: String = "study_cabin"): String = if (toolId == "evaluation") when (state) {
+    "queued" -> "等待评课"; "running" -> "正在评课"; "retry_wait" -> "等待重试"
+    "succeeded" -> "评课成功"; "failed" -> "评课失败"; "cancelled" -> "已取消"
+    "verification_required" -> "需要核验"; else -> "未知状态"
+} else when (state) {
     "queued" -> "等待预约"; "running" -> "正在尝试"; "retry_wait" -> "等待重试"
     "succeeded" -> "预约成功"; "failed" -> "预约失败"; "cancelled" -> "已取消"
     "verification_required" -> "需要核验"; else -> "未知状态"
 }
 
-internal fun cabinNextAction(action: String): String = when (action) {
-    "verify_upstream" -> "结果不确定，请到学校预约网站核验；不要重复预约。"
+internal fun evaluationNextRun(job: JsonObject): String? = job.text("scheduled_for").takeIf {
+    it.isNotBlank() && job.text("state") in setOf("queued", "retry_wait") &&
+        !job.text("error_code").startsWith("CREDENTIAL_") && job.text("next_action") != "replace_credential"
+}
+
+internal fun evaluationFailure(job: JsonObject): String = when {
+    job.text("error_code").startsWith("CREDENTIAL_") || job.text("next_action") == "replace_credential" -> "学校托管凭据失效或不可用，请更新凭据后重试。"
+    job.text("error_code").isNotBlank() -> "评课未完成：${job.text("error_code")}"
+    job.text("state") == "failed" -> "评课失败，请到 nanyee.de 查看失败原因。"
+    else -> ""
+}
+
+internal fun evaluationRoundLogs(job: JsonObject): List<JsonObject> {
+    val receipt = job["receipt"] as? JsonObject ?: return emptyList()
+    return receipt.items("logs").filterNot {
+        evaluationFailure(job).isNotBlank() && receipt.number("submitted_count") == 0 && it.text("event") == "evaluation_completed"
+    }
+}
+
+internal fun cabinNextAction(action: String, toolId: String = "study_cabin"): String = when (action) {
+    "verify_upstream" -> if (toolId == "evaluation") "结果不确定，请到学校教务系统核验；不要重复评课。" else "结果不确定，请到学校预约网站核验；不要重复预约。"
     "replace_credential" -> "请更新托管的学校凭据。"
     "automatic_retry" -> "服务器将自动重试，请稍候。"
-    else -> "请到 nanyee.de 查看任务并核验预约结果。"
+    else -> if (toolId == "evaluation") "请到 nanyee.de 查看任务并核验评课结果。" else "请到 nanyee.de 查看任务并核验预约结果。"
 }
 
 internal fun JsonElement.objectList(): List<JsonObject> = (this as? JsonArray)?.map { it as? JsonObject ?: error("响应列表项格式无效") } ?: error("响应格式无效")

@@ -14,6 +14,7 @@ import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit
 
 internal interface PlatformBackend {
+    val jobDeduplicated: Boolean get() = false
     suspend fun call(method: String, path: String, body: JsonObject? = null, key: String? = null): JsonElement
     suspend fun clearLocal()
 }
@@ -44,6 +45,10 @@ internal class PlatformCookies(private val storage: PlatformCookieStorage) : Coo
         catch (e: Exception) { values.clear(); throw IOException("平台登录状态无法安全保存。", e) }
     }
     @Synchronized fun csrf(): String? = loadForRequest("https://nanyee.de/api/v1/jobs".toHttpUrl()).lastOrNull { it.name == "nanyee_csrf" }?.value
+    @Synchronized fun refresh() {
+        val stored = storage.read().lineSequence().mapNotNull { Cookie.parse(origin, it) }.filter { it.name in names && it.domain == origin.host }.toList()
+        values.clear(); values.addAll(stored)
+    }
     @Synchronized fun clear() { storage.write(""); values.clear() }
 }
 
@@ -63,18 +68,20 @@ internal fun platformErrorMessage(status: Int, code: String): String = when {
     else -> "平台请求失败，请稍后重试。"
 }
 
-internal class PlatformApi(storage: PlatformCookieStorage) : PlatformBackend {
+internal class PlatformApi(storage: PlatformCookieStorage, private val transport: Call.Factory? = null) : PlatformBackend {
+    override var jobDeduplicated = false; private set
     private val cookies = PlatformCookies(storage)
     private var retryAt = 0L
     private val client = OkHttpClient.Builder().cookieJar(cookies).retryOnConnectionFailure(false).followRedirects(false).followSslRedirects(false).callTimeout(45, TimeUnit.SECONDS).build()
     override suspend fun clearLocal() = withContext(Dispatchers.IO) { cookies.clear() }
     override suspend fun call(method: String, path: String, body: JsonObject?, key: String?): JsonElement = withContext(Dispatchers.IO) {
         if (System.currentTimeMillis() < retryAt) throw PlatformFailure(429, "RATE_LIMITED", "请求过于频繁，请在 ${(retryAt - System.currentTimeMillis()) / 1000 + 1} 秒后重试。")
+        cookies.refresh()
         val csrf = cookies.csrf()
         if (method != "GET" && path != "/auth/login" && csrf.isNullOrBlank()) throw PlatformFailure(401, "AUTHENTICATION_REQUIRED", platformErrorMessage(401, "AUTHENTICATION_REQUIRED"))
         val request = platformRequest(method, path, body, csrf, key)
         try {
-            client.newCall(request).awaitResult { response ->
+            (transport ?: client).newCall(request).awaitResult { response ->
                 val content = response.body?.string().orEmpty()
                 val data = runCatching { Json.parseToJsonElement(content) }.getOrNull()
                 if (!response.isSuccessful) {
@@ -82,6 +89,7 @@ internal class PlatformApi(storage: PlatformCookieStorage) : PlatformBackend {
                     if (response.code == 429) retryAt = platformRetryAt(response.header("Retry-After"), System.currentTimeMillis())
                     throw PlatformFailure(response.code, code, platformErrorMessage(response.code, code))
                 }
+                if (method == "POST" && path == "/jobs") jobDeduplicated = response.header("X-Job-Deduplicated").equals("true", ignoreCase = true)
                 if (response.code == 204) JsonNull else data ?: throw PlatformFailure(0, "INVALID_RESPONSE", "平台响应格式无效。")
             }
         } catch (_: IOException) { throw PlatformFailure(0, "NETWORK", "网络连接失败。任务提交可使用原确认重试，请勿重复创建。") }
