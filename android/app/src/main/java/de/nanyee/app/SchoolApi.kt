@@ -64,9 +64,8 @@ class SchoolApi {
                         retryAt = retry?.toLongOrNull()?.let { System.currentTimeMillis() + it * 1000 }
                             ?: runCatching { java.time.ZonedDateTime.parse(retry, java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME).toInstant().toEpochMilli() }.getOrDefault(System.currentTimeMillis() + 60000)
                     }
-                    val message = error.text("message").ifEmpty { "请求失败（${response.code}）" }
+                    val message = schoolErrorText(code, response.code, error["details"]?.obj() ?: JsonObject(emptyMap()), path == "session")
                     val advice = when (code) {
-                        "RATE_LIMIT_CHALLENGE_REQUIRED" -> "\n请稍后重试，或使用网站 nanyee.de 完成人机验证。"
                         "RATE_LIMITED" -> "\nRetry-After：${retry ?: "60"}"
                         else -> ""
                     }

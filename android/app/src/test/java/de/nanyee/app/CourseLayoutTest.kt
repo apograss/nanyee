@@ -17,6 +17,13 @@ class CourseLayoutTest {
         assertEquals(listOf(0, 0), result.map { it.lane })
     }
 
+    @Test fun conflictPickerGroupsOnlyConnectedOverlaps() {
+        assertTrue(courseGroups(emptyList()).isEmpty())
+        assertTrue(courseGroups(listOf(course(3, 1))).isEmpty())
+        val groups = courseGroups(listOf(course(1, 2), course(2, 4), course(4, 5), course(6, 7)))
+        assertEquals(listOf(3, 1), groups.map { it.size })
+    }
+
     @Test fun nestedAndChainedOverlapsUseDistinctLanes() {
         val result = layoutCourses(listOf(course(1, 4), course(2, 2), course(3, 5), course(5, 6)))
         assertEquals(listOf(2, 2, 2, 2), result.map { it.laneCount })

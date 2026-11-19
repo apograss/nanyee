@@ -5,6 +5,8 @@ import android.graphics.BitmapFactory
 import android.util.Base64
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.BackHandler
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,13 +20,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.serialization.json.*
 import java.time.Instant
 import java.time.ZoneId
@@ -33,9 +41,10 @@ import java.time.format.DateTimeFormatter
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         setContent {
             val dark = isSystemInDarkTheme()
-            MaterialTheme(colorScheme = if (dark) darkColorScheme(primary = Color(0xFF94D5C7), secondary = Color(0xFFBCCDC7)) else lightColorScheme(primary = Color(0xFF176B5B), secondary = Color(0xFF50655E), background = Color(0xFFF7FAF8), surface = Color(0xFFF7FAF8))) {
+            MaterialTheme(colorScheme = if (dark) darkColorScheme(primary = Color(0xFF94D5C7), onPrimary = Color(0xFF00382E), primaryContainer = Color(0xFF155044), onPrimaryContainer = Color(0xFFB0F1E2), secondary = Color(0xFFBCCDC7), secondaryContainer = Color(0xFF344C45), onSecondaryContainer = Color(0xFFD5E9E1), background = Color(0xFF101513), surface = Color(0xFF101513)) else lightColorScheme(primary = Color(0xFF176B5B), onPrimary = Color.White, primaryContainer = Color(0xFFB0F1E2), onPrimaryContainer = Color(0xFF002019), secondary = Color(0xFF50655E), secondaryContainer = Color(0xFFD2E8DF), onSecondaryContainer = Color(0xFF10251E), background = Color(0xFFF7FAF8), surface = Color(0xFFF7FAF8))) {
                 Surface(Modifier.fillMaxSize()) { Nanyee(viewModel()) }
             }
         }
@@ -45,27 +54,45 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Nanyee(state: SchoolState) {
+    BackHandler(enabled = state.demo) { state.logout() }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(lifecycle) {
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) state.checkCaptcha() }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
     var detail by remember(state.sessionGeneration) { mutableStateOf<Pair<String, JsonObject>?>(null) }
+    val landscape = LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp
+    val iconSize = (24 * LocalDensity.current.fontScale.coerceIn(1f, 1.35f)).dp
+    val labels = listOf("课表", "成绩", "我的")
+    val icons = listOf(Icons.Outlined.CalendarMonth, Icons.Outlined.BarChart, Icons.Outlined.Person)
     Scaffold(
-        topBar = { if (state.loggedIn) TopAppBar(title = { Text(listOf("课表", "成绩", "我的")[state.tab], fontWeight = FontWeight.Bold) }, actions = { if (state.tab < 2) IconButton(onClick = { state.reload() }, enabled = !state.busy) { Icon(Icons.Outlined.Refresh, "刷新") } }) },
-        bottomBar = { if (state.loggedIn) NavigationBar { listOf("课表", "成绩", "我的").forEachIndexed { i, label -> NavigationBarItem(selected = state.tab == i, onClick = { state.tab = i }, icon = { Icon(listOf(Icons.Outlined.CalendarMonth, Icons.Outlined.BarChart, Icons.Outlined.Person)[i], null) }, label = { Text(label) }) } } }
+        contentWindowInsets = WindowInsets.safeDrawing,
+        topBar = { if (state.loggedIn) TopAppBar(expandedHeight = if (landscape) 44.dp else 64.dp, title = { Text(labels[state.tab] + if (landscape && state.demo) " · 演示模式" else "", fontWeight = FontWeight.Bold, style = if (landscape) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge, maxLines = 1) }, actions = { if (state.tab < 2 && !state.demo) IconButton(onClick = { state.reload() }, enabled = !state.busy) { Icon(Icons.Outlined.Refresh, "刷新", Modifier.size(iconSize)) } }) },
+        bottomBar = { if (state.loggedIn && !landscape) NavigationBar { labels.forEachIndexed { i, label -> NavigationBarItem(selected = state.tab == i, onClick = { state.tab = i }, icon = { Icon(icons[i], null) }, label = { Text(label) }) } } }
     ) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize()) {
+        Row(Modifier.padding(padding).consumeWindowInsets(padding).fillMaxSize()) {
+            if (landscape && state.loggedIn) NavigationRail(windowInsets = WindowInsets(0)) { labels.forEachIndexed { i, label -> NavigationRailItem(selected = state.tab == i, onClick = { state.tab = i }, icon = { Icon(icons[i], label) }) } }
+        Column(Modifier.weight(1f).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
             if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-            if (state.demo) Surface(color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.fillMaxWidth()) { Text("演示模式 · 以下为示例数据，并非真实学业记录", Modifier.padding(horizontal = 20.dp, vertical = 10.dp), style = MaterialTheme.typography.labelMedium) }
-            if (state.error.isNotEmpty()) Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer), modifier = Modifier.padding(16.dp).fillMaxWidth()) { Text(state.error, Modifier.padding(16.dp), style = MaterialTheme.typography.bodySmall); TextButton(onClick = { state.error = "" }) { Text("关闭") } }
+            if (state.demo && !landscape) Surface(color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.fillMaxWidth()) { Text("演示模式 · 以下为示例数据，并非真实学业记录", Modifier.padding(horizontal = 20.dp, vertical = 8.dp), style = MaterialTheme.typography.labelMedium) }
+            if (state.loggedIn && state.error.isNotEmpty()) ErrorCard(state)
             when {
                 !state.loggedIn -> Login(state)
                 state.tab == 0 -> Timetable(state) { detail = "course" to it }
                 state.tab == 1 -> Grades(state) { detail = "grade" to it }
-                else -> Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                    Text("学校登录", style = MaterialTheme.typography.headlineSmall)
+                else -> Column(Modifier.widthIn(max = 520.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                    Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.primaryContainer) { Icon(Icons.Outlined.School, null, Modifier.padding(20.dp).size(36.dp)) }
+                    Text("学校登录", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) { Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(if (state.demo) "当前处于演示模式" else "已登录学校系统", color = MaterialTheme.colorScheme.primary)
                     if (!state.demo) Text("会话到期：${runCatching { DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.of("Asia/Shanghai")).format(Instant.parse(state.expires)) }.getOrDefault(state.expires)}（北京时间）")
                     Text("学校会话与学业数据仅保存在内存中。", style = MaterialTheme.typography.bodyMedium)
-                    OutlinedButton(onClick = { state.logout() }) { Text(if (state.demo) "退出演示模式" else "退出登录") }
+                    } }
+                    OutlinedButton(onClick = { state.logout() }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Outlined.Logout, null); Spacer(Modifier.width(8.dp)); Text(if (state.demo) "退出演示模式" else "退出登录") }
                 }
             }
+        }
         }
     }
     detail?.let { (kind, item) -> AlertDialog(onDismissRequest = { detail = null }, confirmButton = { TextButton(onClick = { detail = null }) { Text("关闭") } }, title = { Text(item.text("name")) }, text = {
@@ -75,10 +102,10 @@ fun Nanyee(state: SchoolState) {
                 Text("第 ${item.text("start_node")}–${item.text("end_node")} 节")
                 Text("地点：${item.text("location").ifEmpty { "未提供" }}")
                 Text("教师：${item.text("teachers").ifEmpty { "未提供" }}")
-                Text("周次：${(item["weeks"] as? JsonArray)?.joinToString("、") ?: "未提供"}")
+                Text(displayWeeks((item["weeks"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.intOrNull } ?: emptyList()))
             } else {
-                Text("${item.text("semester")} · ${item.text("credits")} 学分")
-                Text("成绩 ${item.text("raw_score")}    绩点 ${item.text("grade_point")}")
+                Text("${item.text("semester")} · ${displayNumber(item.text("credits"))} 学分")
+                Text("成绩 ${displayNumber(item.text("raw_score"))}    绩点 ${displayNumber(item.text("grade_point"))}")
                 val rank = item["ranking"] as? JsonObject
                 if (rank == null) Text("暂无排名与分布") else {
                     Text("课程排名 ${rank.text("course_rank")} / ${rank.text("course_total")}")
@@ -100,24 +127,39 @@ fun Nanyee(state: SchoolState) {
 
 @Composable
 fun Login(state: SchoolState) {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 28.dp, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(Modifier.widthIn(max = 480.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        if (state.error.isNotEmpty()) ErrorCard(state)
         Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.primaryContainer) { Icon(Icons.Outlined.School, null, Modifier.padding(18.dp).size(32.dp), tint = MaterialTheme.colorScheme.primary) }
         Text("学校登录", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
         Text("连接校园，让学业一目了然。", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        OutlinedTextField(value = state.account, onValueChange = { state.account = it }, label = { Text("学号") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(value = state.account, onValueChange = { state.updateAccount(it) }, label = { Text("学号") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(value = state.password, onValueChange = { state.password = it }, label = { Text("学校密码") }, visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false), singleLine = true, modifier = Modifier.fillMaxWidth())
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedTextField(value = state.captchaText, onValueChange = { state.captchaText = it }, label = { Text("验证码") }, singleLine = true, modifier = Modifier.weight(1f))
             val bitmap = remember(state.captcha) { runCatching { val bytes = Base64.decode(state.captcha?.text("image_base64") ?: "", Base64.DEFAULT); BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap() }.getOrNull() }
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(0.65f).clickable(enabled = !state.busy) { state.refreshCaptcha() }) {
-                if (bitmap != null) Image(bitmap, "验证码，点击刷新", Modifier.fillMaxWidth().height(40.dp).clip(RoundedCornerShape(8.dp)).background(Color.White)) else TextButton(onClick = { state.refreshCaptcha() }, enabled = !state.busy) { Text("加载验证码") }
-                Text("点击刷新", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.width(104.dp).clickable(enabled = !state.busy) { state.refreshCaptcha() }) {
+                Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceContainerHighest) { Box(Modifier.fillMaxWidth().height(48.dp).padding(6.dp), contentAlignment = Alignment.Center) {
+                    if (bitmap != null) Image(bitmap, "验证码，点击刷新", Modifier.fillMaxSize().clip(RoundedCornerShape(6.dp))) else Icon(Icons.Outlined.Refresh, "加载验证码")
+                } }
+                Text("点击刷新", fontSize = (11 / LocalDensity.current.fontScale.coerceAtLeast(1f)).sp, maxLines = 1, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(checked = state.remember, onCheckedChange = { state.updateRemember(it) }); Text("记住学号和密码", style = MaterialTheme.typography.bodyMedium) }
-        Button(onClick = { state.login() }, enabled = !state.busy && state.captcha != null && state.account.isNotBlank() && state.password.isNotEmpty() && state.captchaText.isNotBlank(), modifier = Modifier.fillMaxWidth().height(52.dp)) { Text("登录学校系统") }
-        OutlinedButton(onClick = { state.startDemo() }, enabled = !state.busy, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text("演示模式") }
+        Button(onClick = { state.login() }, enabled = !state.busy && state.captcha != null && state.account.isNotBlank() && state.password.isNotEmpty() && state.captchaText.isNotBlank(), modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("登录学校系统") }
+        Text(when { state.busy -> "正在连接学校系统…"; state.account.isBlank() -> "请输入学号"; state.password.isEmpty() -> "请输入学校密码"; state.captcha == null -> "验证码未加载，请点击刷新"; state.captchaText.isBlank() -> "请输入图中的验证码"; else -> state.hint.ifEmpty { "信息已填写，可以登录" } }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (state.hint.isNotEmpty() && state.captchaText.isBlank()) Text(state.hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+        OutlinedButton(onClick = { state.startDemo() }, enabled = !state.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("演示模式") }
         Text("学校登录可能使其他设备的教务会话下线。会话仅存于内存；勾选后，学号和密码将在本机加密保存。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+fun ErrorCard(state: SchoolState) {
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer), modifier = Modifier.widthIn(max = 720.dp).fillMaxWidth()) {
+        Row(Modifier.padding(start = 12.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(state.error, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+            IconButton(onClick = { state.error = "" }) { Icon(Icons.Outlined.Close, "关闭错误提示") }
+        }
     }
 }
 
@@ -134,11 +176,14 @@ fun Picker(label: String, options: List<Pair<String, String>>, selected: String,
 fun Timetable(state: SchoolState, onCourse: (JsonObject) -> Unit) {
     var weeksDialog by remember { mutableStateOf(false) }
     var weeksInput by remember { mutableStateOf(state.totalWeeks.toString()) }
-    Column(Modifier.fillMaxSize()) {
+    var conflicts by remember(state.sessionGeneration) { mutableStateOf<List<JsonObject>?>(null) }
+    val density = LocalDensity.current
+    CompositionLocalProvider(LocalDensity provides Density(density.density, density.fontScale.coerceAtMost(1.05f))) {
+    Column(Modifier.widthIn(max = 1000.dp).fillMaxSize()) {
         Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Picker("选择学期", state.semesters.map { it.text("code") to it.text("label") }, state.semester, { state.selectSemester(it) }, Modifier.weight(1.35f))
+            Picker("选择学期", state.semesters.map { it.text("code") to it.text("label") }, state.semester, { state.selectSemester(it) }, Modifier.weight(1.6f))
                 Picker("选择周次", (1..state.totalWeeks).map { it.toString() to "第 $it 周" }, state.week.toString(), { state.week = it.toInt() }, Modifier.weight(1f))
-                TextButton(onClick = { weeksInput = state.totalWeeks.toString(); weeksDialog = true }, contentPadding = PaddingValues(4.dp)) { Text("${state.totalWeeks}周", style = MaterialTheme.typography.labelMedium) }
+                TextButton(onClick = { weeksInput = state.totalWeeks.toString(); weeksDialog = true }, contentPadding = PaddingValues(2.dp)) { Text("共 ${state.totalWeeks} 周", fontSize = 11.sp, maxLines = 1) }
         }
         val active = state.courses.filter { (it["weeks"] as? JsonArray)?.any { w -> (w as? JsonPrimitive)?.intOrNull == state.week } == true }
         if (active.isEmpty()) Text(if (state.busy) "正在加载课表…" else "本周暂无课程", Modifier.padding(20.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -147,60 +192,71 @@ fun Timetable(state: SchoolState, onCourse: (JsonObject) -> Unit) {
         val nodeTimes = listOf("08:00", "08:55", "10:10", "11:05", "14:30", "15:25", "16:30", "19:00", "19:55")
         val nodes = maxOf(nodeTimes.size, active.maxOfOrNull { it.number("end_node") } ?: nodeTimes.size)
         val today = java.time.LocalDate.now(ZoneId.of("Asia/Shanghai")).dayOfWeek.value
+        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            Spacer(Modifier.width(30.dp))
+            (1..7).forEach { day ->
+                Box(Modifier.weight(1f).height(32.dp).clip(RoundedCornerShape(10.dp)).background(if (day == today) MaterialTheme.colorScheme.primaryContainer else Color.Transparent), contentAlignment = Alignment.Center) {
+                    Text("周${"一二三四五六日"[day - 1]}", fontSize = 11.sp, fontWeight = if (day == today) FontWeight.Bold else FontWeight.Normal, color = if (day == today) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+        Spacer(Modifier.height(4.dp))
         Row(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
             Column(Modifier.width(30.dp)) {
-                Spacer(Modifier.height(40.dp))
                 (1..nodes).forEach { node -> Column(Modifier.height(64.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("$node", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     val time = state.courses.firstOrNull { it.number("start_node") == node }?.text("start_time")
                     Text(time ?: nodeTimes.getOrNull(node - 1) ?: "—", fontSize = 7.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } }
             }
-            (1..7).forEach { day -> Column(Modifier.weight(1f)) {
-                Box(Modifier.fillMaxWidth().height(36.dp).clip(RoundedCornerShape(10.dp)).background(if (day == today) MaterialTheme.colorScheme.primaryContainer else Color.Transparent), contentAlignment = Alignment.Center) {
-                    Text("周${"一二三四五六日"[day - 1]}", fontSize = 11.sp, fontWeight = if (day == today) FontWeight.Bold else FontWeight.Normal, color = if (day == today) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Spacer(Modifier.height(4.dp))
-                BoxWithConstraints(Modifier.fillMaxWidth().height((nodes * 64).dp)) {
-                    layoutCourses(active.filter { it.number("weekday") == day }).forEach { placement ->
-                        val course = placement.course
-                        val laneWidth = maxWidth / placement.laneCount
-                        Surface(onClick = { onCourse(course) }, color = colors[state.courses.indexOf(course).coerceAtLeast(0) % colors.size], shape = RoundedCornerShape(8.dp), modifier = Modifier.offset(x = laneWidth * placement.lane, y = ((course.number("start_node") - 1) * 64).dp).width(laneWidth).padding(end = if (placement.laneCount > 1) 1.dp else 0.dp).height(((course.number("end_node") - course.number("start_node") + 1) * 64 - 4).dp)) {
-                            Column(Modifier.padding(horizontal = 3.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text(course.text("name"), fontWeight = FontWeight.Bold, fontSize = 11.sp, lineHeight = 15.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
-                                Text(course.text("location"), fontSize = 9.sp, lineHeight = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            }
-                        }
-                    }
-                }
-            } }
+            (1..7).forEach { day -> CourseDay(active.filter { it.number("weekday") == day }, state.courses, colors, nodes, onCourse, { conflicts = it }, Modifier.weight(1f)) }
         }
     }
+    }
+    conflicts?.let { entries -> AlertDialog(onDismissRequest = { conflicts = null }, title = { Text("重叠课程 · ${entries.size} 门") }, confirmButton = { TextButton(onClick = { conflicts = null }) { Text("关闭") } }, text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) { entries.forEach { course -> OutlinedCard(onClick = { conflicts = null; onCourse(course) }, modifier = Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp)) { Text(course.text("name"), fontWeight = FontWeight.Bold); Text("${course.text("start_time")}–${course.text("end_time")} · ${course.text("location")}", style = MaterialTheme.typography.bodySmall) } } } } }) }
     if (weeksDialog) AlertDialog(onDismissRequest = { weeksDialog = false }, title = { Text("学期周数") }, text = { OutlinedTextField(weeksInput, { weeksInput = it }, label = { Text("1–30 周") }, isError = weeksInput.toIntOrNull() !in 1..30) }, confirmButton = { TextButton(onClick = { state.setWeeks(weeksInput.toInt()); weeksDialog = false }, enabled = weeksInput.toIntOrNull() in 1..30) { Text("确定") } }, dismissButton = { TextButton(onClick = { weeksDialog = false }) { Text("取消") } })
 }
 
 @Composable
 fun Grades(state: SchoolState, onGrade: (JsonObject) -> Unit) {
-    val summary = state.grades?.get("summary")?.obj()
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    var selected by remember(state.sessionGeneration) { mutableStateOf("") }
+    val allGrades = state.grades?.items("grades") ?: emptyList()
+    val grades = allGrades.filter { selected.isEmpty() || it.text("semester") == selected }
+    val summary = if (selected.isEmpty()) state.grades?.get("summary")?.obj() else gradeSummary(grades)
+    val landscape = LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp
+    val largeFont = LocalDensity.current.fontScale > 1.3f
+    Column(Modifier.widthIn(max = 720.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = if (landscape) 8.dp else 20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            (listOf("") + allGrades.map { it.text("semester") }.filter { it.isNotEmpty() }.distinct().sortedDescending()).forEach { semester ->
+                FilterChip(selected = selected == semester, onClick = { selected = semester }, label = { Text(semester.ifEmpty { "全部" }) })
+            }
+        }
+        if (state.gradesLoading) Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp); Text("正在加载成绩…") }
+        if (grades.isEmpty()) {
+            if (!state.gradesLoading) {
+                Text(if (state.error.isNotEmpty()) "成绩加载失败，请重试" else "暂无成绩", style = MaterialTheme.typography.titleMedium)
+                if (!state.demo) OutlinedButton(onClick = { state.reload() }) { Text("重新加载") }
+            }
+            return@Column
+        }
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer), modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("学业概览", style = MaterialTheme.typography.titleMedium)
-                Text(summary?.text("weighted_gpa") ?: "—", style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.Bold)
-                Text("加权平均绩点", style = MaterialTheme.typography.labelLarge)
+                if (landscape) Text("加权平均绩点 ${displayNumber(summary?.text("weighted_gpa") ?: "")}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) else {
+                    Text(displayNumber(summary?.text("weighted_gpa") ?: ""), style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.Bold)
+                    Text("加权平均绩点", style = MaterialTheme.typography.labelLarge)
+                }
                 HorizontalDivider()
-                listOf("required_gpa" to "必修绩点", "average_score" to "平均分", "required_average_score" to "必修平均分", "total_credits" to "总学分", "total_courses" to "课程数", "failed_count" to "不及格").chunked(2).forEach { row -> Row(Modifier.fillMaxWidth()) { row.forEach { (key, label) -> Text("$label  ${summary?.text(key) ?: "—"}", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium) } } }
-            }
+                listOf("required_gpa" to "必修绩点", "average_score" to "平均分", "required_average_score" to "必修平均分", "total_credits" to "总学分", "total_courses" to "课程数", "failed_count" to "不及格").chunked(if (largeFont && !landscape) 1 else 2).forEach { row -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) { row.forEach { (key, label) -> Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) { Text(label, style = MaterialTheme.typography.labelMedium); Text(displayNumber(summary?.text(key) ?: ""), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) } } }
+            } }
         }
         Text("课程成绩", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        val grades = state.grades?.items("grades") ?: emptyList()
-        if (grades.isEmpty()) Text(if (state.busy) "正在加载成绩…" else "暂无成绩，点击右上角刷新重试。")
         grades.groupBy { it.text("semester") }.forEach { (semester, items) ->
             Text(semester.ifEmpty { "未指定学期" }, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelLarge)
             items.forEach { grade -> Card(onClick = { onGrade(grade) }, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow), modifier = Modifier.fillMaxWidth()) {
                 Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) { Text(grade.text("name"), fontWeight = FontWeight.SemiBold); Text("${grade.text("credits")} 学分 · 绩点 ${grade.text("grade_point")}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                    Text(grade.text("raw_score"), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) { Text(grade.text("name"), fontWeight = FontWeight.SemiBold); Text("${displayNumber(grade.text("credits"))} 学分 · 绩点 ${displayNumber(grade.text("grade_point"))}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    Text(displayNumber(grade.text("raw_score")), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
                     Icon(Icons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } }
