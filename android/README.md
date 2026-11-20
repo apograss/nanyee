@@ -95,7 +95,7 @@ emulator -avd nanyee
 
 ## 学习通 · 第一期
 
-课堂 → 学习通独立直连超星，不共享教务 UIS/zhjw 或 Nanyee 平台的会话。支持密码登录、二维码授权登录、课程和活动只读列表，以及仅当前本人账号的普通、拍照、签到码、手势、二维码和真实位置签到。拍照支持系统相机及相册；确认后才向 pan-yz 上传并提交签到。扫码使用 Apache-2.0 的 ZXing Android Embedded（无 Play Services）。每次提交前均显示课程、活动、当前账号和相关输入的确认摘要；拼图需要用户手动移动，不含自动解题器。要求人脸检查的活动直接显示不支持。
+课堂 → 学习通独立直连超星，不共享教务 UIS/zhjw 或 Nanyee 平台的会话。支持官方 APP 协议的密码/短信登录（AES-ECB logininfo、原生 UA/schild、完整 Android 设备资料），以及二维码授权登录、课程和活动只读列表。短信发送需确认，重发间隔 60 秒；验证码不持久化，演示验证码为 `123456`，不会发送真实短信。二维码每 3 秒轮询，失效或用尽 90 次轮询后自动更新，离开页面/后台停止。支持仅当前本人账号的普通、拍照、签到码、手势、二维码和真实位置签到。拍照支持系统相机及相册；确认后才向 pan-yz 上传并提交签到。扫码使用 Apache-2.0 的 ZXing Android Embedded（无 Play Services）。每次提交前均显示课程、活动、当前账号和相关输入的确认摘要；拼图需要用户手动移动，不含自动解题器。要求人脸检查的活动直接显示不支持。
 
 凭据仅在用户选择保存时存入独立 EncryptedSharedPreferences；Cookie 始终加密持久化。过期后的只读操作可用保存的密码重新登录，任何签到写入均不自动重放。没有保存密码的二维码会话过期后需要再次授权。退出登录清除学习通凭据、Cookie、草稿和照片。旋转使用保留 ViewModel；进程重建恢复加密的课程/活动及输入草稿，但不恢复提交动作、验证码、二维码内容或位置。被中断的提交显示“结果未知”，必须先在官方学习通核验。
 
@@ -119,7 +119,9 @@ ANDROID_HOME=/home/ubuntu/android-sdk ./gradlew testDebugUnitTest --tests 'de.na
 
 ## 雨课堂 · 第三期
 
-课堂 → 雨课堂使用独立的 `rain_classroom_private` 加密存储，不共享学校或学习通凭据。支持 www / pro / changjiang / huanghe 四个官方服务器；Cookie、当前身份和待核验标记按服务器隔离，即使 Cookie 声明 `.yuketang.cn` 也不会跨服务器发送。扫码登录使用官方 pre-info 的 qrContent/token 和 login 长轮询；仅在页面可见且 RESUMED 时等待授权。已授权 Cookie 加密保留，过期需重新扫码。**密码登录未移植**：参考客户端需要腾讯验证码 ticket/rand，本期未集成腾讯 SDK 或验证码 WebView，不绕过验证码；也未实现短信或微信 OAuth。
+课堂 → 雨课堂使用独立的 `rain_classroom_private` 加密存储，不共享学校或学习通凭据。支持 www / pro / changjiang / huanghe 四个官方服务器；Cookie、当前身份和待核验标记按服务器隔离，即使 Cookie 声明 `.yuketang.cn` 也不会跨服务器发送。扫码登录使用官方 pre-info 的 qrContent/token 和 login 长轮询；`50001` 超时后自动获取新二维码并继续，仅在页面可见且 RESUMED 时等待授权。已授权 Cookie 加密保留，过期需重新扫码。**密码和短信登录未移植**：参考客户端在发送短信前也需要腾讯验证码 ticket/rand，本期未集成腾讯 SDK 或验证码 WebView，不绕过验证码；也未实现微信 OAuth。
+
+两平台最多跟随 3 次重定向，逐跳保存/携带 Cookie，不重发原始 POST 密码/验证码。只允许 HTTPS 官方学习通域名或当前雨课堂服务器，保留跨服务器隔离；越界、缺陷或超限重定向不一概标为会话过期。请求构造、独立 OpenSSL ECB/schild/MD5 向量、二维码更新/取消、演示短信和重定向 Cookie/CSRF 均有离线测试。真实账号授权和 UI 仍需设备验证。
 
 课程列表只读；开课列表在课程页前台每 3 秒检查，离开或后台立即取消，读取失败暂停并要求手动刷新。不会自动签到。课堂签到会带 `joinIfNotIn: true`，确认摘要明确可能加入课堂。相机扫码只接受当前服务器的 HTTPS 课堂码，不接受任意网址、其他服务器或自定义 URL scheme；先确认提交 scan，再单独确认 checkin，不串联自动写入。
 

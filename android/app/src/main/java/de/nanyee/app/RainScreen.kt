@@ -97,7 +97,7 @@ private fun RainContent(state: RainState, onBack: () -> Unit, toggleDemo: () -> 
                         Text("${state.user?.name} · 仅本人账号")
                         TextButton(onClick = { localConfirm = "logout" }, enabled = !state.busy) { Text("退出并清除所有雨课堂本机数据…") }
                     } else {
-                        Text("密码登录暂未提供：官方流程需要腾讯验证码 SDK，未绕过验证码。未接入微信 OAuth。")
+                        Text("密码和短信登录暂未提供：官方流程在发送短信前也需要腾讯验证码 SDK，未绕过验证码。未接入微信 OAuth。")
                         Button(onClick = state::beginQr, enabled = !state.busy && state.qr == null) { Text("获取雨课堂登录二维码") }
                         Text("扫码授权后独立加密保留 Cookie；授权过期需重新扫码，不保存密码。请用另一台设备扫码。")
                         if (state.demo) OutlinedButton(onClick = state::refresh, enabled = !state.busy) { Text("直接载入离线演示账号") }
@@ -105,7 +105,7 @@ private fun RainContent(state: RainState, onBack: () -> Unit, toggleDemo: () -> 
                     state.qr?.let { qr ->
                         val bitmap = remember(qr) { runCatching { rainQrBitmap(qr.content) }.getOrNull() }
                         if (bitmap != null) Image(bitmap.asImageBitmap(), "雨课堂官方登录授权二维码", Modifier.fillMaxWidth().height(260.dp), contentScale = ContentScale.Fit)
-                        Text("前台等待扫码授权… 离开页面或切到后台即停止等待。")
+                        Text("前台等待扫码授权，超时自动刷新二维码；离开页面或切到后台即停止等待。")
                         TextButton(onClick = state::cancelQr) { Text("取消扫码登录") }
                     }
                 }

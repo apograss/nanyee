@@ -36,7 +36,7 @@ internal class XxtCookies(private val storage: XxtStorage) : CookieJar {
     } }
     @Synchronized override fun loadForRequest(url: HttpUrl): List<Cookie> = if (!enabled || !xxtHost(url)) emptyList() else values.map { it.second }.filter { it.matches(url) && it.expiresAt > System.currentTimeMillis() }
     @Synchronized override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
-        if (!enabled || !xxtHost(url)) return
+        if (!enabled || !xxtHost(url) || cookies.isEmpty()) return
         cookies.forEach { next ->
             if (next.domain != "chaoxing.com" && !next.domain.endsWith(".chaoxing.com")) return@forEach
             values.removeAll { (_, old) -> old.name == next.name && old.domain == next.domain && old.path == next.path }
@@ -51,17 +51,18 @@ private fun String.toHttpUrlOrNullSafe() = runCatching { toHttpUrl() }.getOrNull
 private fun xxtHost(url: HttpUrl) = url.isHttps && (url.host == "chaoxing.com" || url.host.endsWith(".chaoxing.com"))
 internal class XxtApi(private val storage: XxtStorage, private val transport: Call.Factory? = null, private val readOnly: Boolean = false) : XxtBackend {
     private val jar = XxtCookies(storage)
-    private val client = OkHttpClient.Builder().cookieJar(jar).retryOnConnectionFailure(false).followRedirects(false).followSslRedirects(false).callTimeout(30, TimeUnit.SECONDS).build()
+    private val client = OkHttpClient.Builder().retryOnConnectionFailure(false).followRedirects(false).followSslRedirects(false).callTimeout(30, TimeUnit.SECONDS).build()
     private val device = storage.read("device").ifBlank { UUID.randomUUID().toString().replace("-", "").also { storage.write("device", it) } }
     private var retryAt = 0L
     private suspend fun raw(request: Request, bytes: Boolean = false): ByteArray = withContext(Dispatchers.IO) {
         require(xxtHost(request.url))
-        if (readOnly) require(request.url.encodedPath in setOf("/fanyalogin", "/apis/login/userLogin4Uname.do", "/mycourse/backclazzdata", "/gas/clazzperson", "/ppt/activeAPI/taskactivelist", "/v2/apis/active/student/activelist")) { "Read-only 学习通 test blocked endpoint." }
+        fun allowed(url: HttpUrl) = url.isHttps && url.port == 443 && (url.host == "chaoxing.com" || url.host.endsWith(".chaoxing.com")) && (!readOnly || url.encodedPath in setOf("/v11/loginregister", "/apis/login/userLogin4Uname.do", "/mycourse/backclazzdata", "/gas/clazzperson", "/ppt/activeAPI/taskactivelist", "/v2/apis/active/student/activelist"))
+        require(allowed(request.url)) { "Read-only 学习通 test blocked endpoint." }
         if (System.currentTimeMillis() < retryAt) throw XxtFailure("RATE", "学习通限流，请等待后重试。")
         try {
-            (transport ?: client).newCall(request).awaitResult { response ->
+            classroomResponse(transport ?: client, request, jar, ::allowed, prepare = { it.newBuilder().header("User-Agent", xxtUserAgent(device)).header("Accept-Language", "zh_CN").build() }) { response ->
                 if (response.code == 429) { retryAt = platformRetryAt(response.header("Retry-After"), System.currentTimeMillis()); throw XxtFailure("RATE", "学习通限流，请稍后再试。") }
-                if (response.code in setOf(401, 403) || response.isRedirect) throw XxtFailure("SESSION", "学习通会话已过期，请重新登录。")
+                if (response.code in setOf(401, 403)) throw XxtFailure("SESSION", "学习通会话已过期，请重新登录。")
                 if (!response.isSuccessful) throw XxtFailure("UPSTREAM", "学习通响应异常，请稍后重试。")
                 val limit = if (bytes) 8 * 1024 * 1024L else 4 * 1024 * 1024L
                 val source = response.body?.source() ?: throw XxtFailure("FORMAT", "学习通响应为空。")
@@ -69,7 +70,8 @@ internal class XxtApi(private val storage: XxtStorage, private val transport: Ca
                 if (source.buffer.size > limit) throw XxtFailure("FORMAT", "学习通响应过大。")
                 source.readByteArray()
             }
-        } catch (_: IOException) { throw XxtFailure("NETWORK", "无法连接学习通，请检查网络。") }
+        } catch (_: ClassroomRedirectFailure) { throw XxtFailure("REDIRECT", "学习通重定向异常，请重新登录或使用官方客户端。") }
+        catch (_: IOException) { throw XxtFailure("NETWORK", "无法连接学习通，请检查网络。") }
     }
     private suspend fun json(request: Request): JsonObject {
         val text = raw(request).toString(Charsets.UTF_8)
@@ -77,12 +79,17 @@ internal class XxtApi(private val storage: XxtStorage, private val transport: Ca
         return runCatching { Json.parseToJsonElement(text).jsonObject }.getOrElse { throw XxtFailure("FORMAT", "学习通响应格式有变。") }
     }
     override suspend fun login(account: String, password: String): XxtUser {
-        val response = json(xxtLoginRequest(account, password))
-        if (response["status"]?.jsonPrimitive?.booleanOrNull != true) throw XxtFailure("LOGIN", "学习通登录失败，请核对账号密码；如需额外验证，请使用二维码。")
+        xxtLoginStatus(json(xxtLoginRequest(account, password, device = device)))
+        return user()
+    }
+    override suspend fun sendSms(phone: String) { xxtLoginStatus(json(xxtSmsRequest(phone, System.currentTimeMillis(), device))) }
+    override suspend fun loginSms(phone: String, code: String): XxtUser {
+        require(phone.matches(Regex("1[0-9]{10}")) && code.matches(Regex("[0-9]{4,8}")))
+        xxtLoginStatus(json(xxtLoginRequest(phone, code, sms = true, device = device)))
         return user()
     }
     override suspend fun user(): XxtUser {
-        val profile = buildJsonObject { put("app_name", "com.chaoxing.mobile"); put("app_ver", "6.7.4"); put("device_id", device); put("cdid", device); put("platform", "android"); put("time_stamp", System.currentTimeMillis()) }
+        val profile = xxtDeviceProfile(device, System.currentTimeMillis())
         val result = json(xxtRequest("https://sso.chaoxing.com/apis/login/userLogin4Uname.do", mapOf("data" to xxtRsa(profile.toString())), true))
         if (result.number("result") != 1) throw XxtFailure("SESSION", "学习通会话已过期，请重新登录。")
         val data = result["msg"] as? JsonObject ?: throw XxtFailure("FORMAT", "学习通用户响应格式有变。")
@@ -97,6 +104,7 @@ internal class XxtApi(private val storage: XxtStorage, private val transport: Ca
     }
     override suspend fun pollQr(qr: XxtQrLogin): XxtUser? {
         val result = json(xxtRequest("https://passport2.chaoxing.com/getauthstatus/v2", mapOf("uuid" to qr.uuid, "enc" to qr.enc, "doubleFactorLogin" to "0", "forbidotherlogin" to "0"), true))
+        if (result.text("type") == "2") throw XxtFailure("QR_EXPIRED", "二维码已失效，正在自动刷新。")
         return if (result["status"]?.jsonPrimitive?.booleanOrNull == true) user() else null
     }
     override suspend fun courses() = xxtCourses(json(xxtRequest("https://mooc1-api.chaoxing.com/mycourse/backclazzdata", mapOf("view" to "json", "getTchClazzType" to "1", "mcode" to ""))))

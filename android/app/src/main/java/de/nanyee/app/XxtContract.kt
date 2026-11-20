@@ -46,15 +46,37 @@ internal fun xxtSigned(fields: Map<String, String>, device: String, now: Long): 
     val values = fields + linkedMapOf("_c_0_" to device, "token" to "4faa8662c59590c6f43ae9fe5b002b42", "_time" to "$now")
     return values + ("inf_enc" to xxtMd5(values.entries.joinToString("&") { "${xxtEncode(it.key)}=${xxtEncode(it.value)}" } + "&DESKey=Z(AfY@XS"))
 }
-internal fun xxtRequest(url: String, fields: Map<String, String> = emptyMap(), post: Boolean = false): Request {
+internal fun xxtUserAgent(device: String): String {
+    val info = "(device:Pixel 9 Pro) Language/zh_CN com.chaoxing.mobile/ChaoXingStudy_3_6.7.4_android_phone_10940_314 (@Kalimdor)_$device"
+    return "Dalvik/2.1.0 (Linux; U; Android 16; Pixel 9 Pro Build/BP4A.260205.002) (schild:${xxtMd5("(schild:ipL\$TkeiEmfy1gTXb2XHrdLN0a@7c^vu) $info")}) $info"
+}
+internal fun xxtDeviceProfile(device: String, now: Long) = buildJsonObject {
+    put("app_name", "com.chaoxing.mobile"); put("app_ver", "6.7.4"); put("board", "caiman"); put("brand", "google")
+    put("cdid", device); put("cdtype", "Pixel 9 Pro"); put("cpu_ar", "arm64-v8a,armeabi-v7a,armeabi"); put("device_id", device)
+    put("dpi", "440"); put("hardware", "caiman"); put("mediaDrmId", ""); put("oaid", "1004"); put("os_lang", "")
+    put("os_name", "REL"); put("os_ver", "16"); put("platform", "android"); put("resolution", "1080*2243"); put("time_stamp", now)
+}
+internal fun xxtRequest(url: String, fields: Map<String, String> = emptyMap(), post: Boolean = false, device: String = ""): Request {
     val uri = url.toHttpUrl()
     require(uri.isHttps && (uri.host == "chaoxing.com" || uri.host.endsWith(".chaoxing.com")))
     val builder = Request.Builder().url(if (post) uri else uri.newBuilder().apply { fields.forEach { (k, v) -> addQueryParameter(k, v) } }.build())
-        .header("User-Agent", "Mozilla/5.0 (Linux; Android) AppleWebKit/537.36 Chrome/140 Mobile Safari/537.36")
+        .header("User-Agent", xxtUserAgent(device)).header("Accept-Language", "zh_CN")
     if (post) builder.post(FormBody.Builder().apply { fields.forEach { (k, v) -> add(k, v) } }.build())
     return builder.build()
 }
-internal fun xxtLoginRequest(account: String, password: String) = xxtRequest("https://passport2.chaoxing.com/fanyalogin", linkedMapOf("fid" to "-1", "uname" to xxtAes(account), "password" to xxtAes(password), "t" to "true", "forbidotherlogin" to "0", "validate" to ""), true)
+internal fun xxtLoginRequest(account: String, password: String, sms: Boolean = false, device: String = ""): Request {
+    val info = buildJsonObject { put("uname", account); put("code", password) }
+    val fields = linkedMapOf("logininfo" to xxtAes(info.toString(), "z4ok6lu^oWp4_AES", false), "loginType" to if (sms) "2" else "1", "roleSelect" to "true", "entype" to "1")
+    if (sms) fields["countrycode"] = "86"
+    return xxtRequest("https://passport2-api.chaoxing.com/v11/loginregister?cx_xxt_passport=json", fields, true, device)
+}
+internal fun xxtSmsRequest(phone: String, now: Long, device: String = ""): Request {
+    require(phone.matches(Regex("1[0-9]{10}"))) { "请输入有效的中国大陆手机号。" }
+    return xxtRequest("https://passport2-api.chaoxing.com/api/sendcaptcha", linkedMapOf("to" to phone, "countrycode" to "86", "time" to "$now", "enc" to xxtMd5(phone + "jsDyctOCnay7uotq" + now)), true, device)
+}
+internal fun xxtLoginStatus(response: JsonObject) {
+    if (response["status"]?.jsonPrimitive?.booleanOrNull != true) throw XxtFailure("LOGIN", xxtPlain(response.text("mes")).take(500).ifBlank { "学习通登录失败，请核对输入或使用二维码。" })
+}
 internal fun xxtCourses(json: JsonObject): List<XxtCourse> {
     if (json["result"]?.jsonPrimitive?.intOrNull != 1) throw XxtFailure("SESSION", "学习通会话已过期，请重新登录。")
     return (json["channelList"] as? JsonArray ?: throw XxtFailure("FORMAT", "学习通课程格式有变。 ")).mapNotNull { item ->
@@ -123,6 +145,8 @@ internal interface XxtListing {
     suspend fun activities(course: XxtCourse): List<XxtActivity>
 }
 internal interface XxtBackend : XxtListing, XxtClassroomBackend {
+    suspend fun sendSms(phone: String)
+    suspend fun loginSms(phone: String, code: String): XxtUser
     suspend fun qrLogin(): XxtQrLogin
     suspend fun pollQr(qr: XxtQrLogin): XxtUser?
     suspend fun detail(activity: XxtActivity): XxtSignDetail

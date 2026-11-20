@@ -121,10 +121,30 @@ class RainApiTest {
         val script = Script { if (it.url.encodedPath == "/api/v3/lesson/checkin") Reply("""{"code":0,"data":{}}""") else fixture(it) }
         assertEquals("UNKNOWN", (runCatching { api(script).join(RainUser("1001", "示例同学"), "33") }.exceptionOrNull() as RainFailure).kind); assertEquals(1, script.requests.count { it.method == "POST" })
     }
-    @Test fun redirectsHtmlAndUnauthorizedReadsRequireNewLoginWithoutLeakingData() = runBlocking {
-        for (reply in listOf(Reply(code = 302, headers = mapOf("Location" to "https://private.example/account")), Reply("<html>PRIVATE-UPSTREAM-TEXT</html>"), Reply(code = 401))) {
+    @Test fun htmlAndUnauthorizedReadsRequireNewLoginWithoutLeakingData() = runBlocking {
+        for (reply in listOf(Reply("<html>PRIVATE-UPSTREAM-TEXT</html>"), Reply(code = 401))) {
             val script = Script { reply }; val error = runCatching { api(script).courses() }.exceptionOrNull() as RainFailure
             assertEquals("SESSION", error.kind); assertFalse(error.message!!.contains("PRIVATE-UPSTREAM-TEXT")); assertFalse(error.message!!.contains("private.example")); assertEquals(1, script.requests.size)
+        }
+    }
+    @Test fun redirectsCarryNewCookiesAndCsrfIntoRelativeHops() = runBlocking {
+        val script = Script { when (it.url.encodedPath) {
+            "/v/course_meta/learning_list/" -> Reply(code = 302, headers = mapOf("Location" to "/auth/continue", "Set-Cookie" to "csrftoken=new-csrf; Path=/; Secure"))
+            "/auth/continue" -> Reply(code = 303, headers = mapOf("Location" to "done", "Set-Cookie" to "sessionid=new-session; Path=/; Secure"))
+            "/auth/done" -> Reply(rainFixture("courses").toString())
+            else -> error("Unexpected redirect")
+        } }
+        assertEquals(1, api(script).courses().size)
+        assertEquals(3, script.requests.size)
+        assertEquals("new-csrf", script.requests[1].header("x-csrftoken")); assertTrue(script.requests[1].header("Cookie")!!.contains("csrftoken=new-csrf"))
+        assertEquals("new-session", script.requests[2].header("sessionid")); assertTrue(script.requests[2].header("Cookie")!!.contains("sessionid=new-session"))
+    }
+    @Test fun redirectBudgetAndHostIsolationAreNotSessionExpiry() = runBlocking {
+        for (location in listOf("/again", "https://private.example/account", "https://pro.yuketang.cn/account", "http://www.yuketang.cn/account")) {
+            val script = Script { Reply(code = 302, headers = mapOf("Location" to location)) }
+            val failure = runCatching { api(script).courses() }.exceptionOrNull() as RainFailure
+            assertEquals("REDIRECT", failure.kind); assertEquals(if (location == "/again") 4 else 1, script.requests.size)
+            assertFalse(failure.message.orEmpty().contains("private.example"))
         }
     }
     @Test fun rateLimitStopsFurtherCallsUntilRetryAfter() = runBlocking {

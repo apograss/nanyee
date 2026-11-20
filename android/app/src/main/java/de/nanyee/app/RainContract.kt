@@ -151,6 +151,8 @@ internal fun rainRequest(host: RainHost, path: String, body: JsonObject? = null,
     require(path.startsWith("/") && !path.startsWith("//"))
     val url = "https://${host.domain}$path".toHttpUrl(); require(url.host == host.domain && url.port == 443)
     return Request.Builder().url(url).header("User-Agent", "Android").header("Accept", "application/json").header("xtua", "client=app&tag=1.3.3&platform=Android").header("xtbz", "ykt").header("x-client", "app").apply {
+        header("brand", "google Pixel 9 Pro"); header("uuid", ""); header("buildnumber", "1610")
+        header("systemversion", "16"); header("incremental", "14624737"); header("isphysicaldevice", "true")
         if (uid.isNotBlank()) header("x-uid", uid)
         if (csrf.isNotBlank()) header("x-csrftoken", csrf)
         if (session.isNotBlank()) header("sessionid", session)

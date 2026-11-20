@@ -27,7 +27,7 @@ internal class RainCookies(private val store: RainStore, private val host: RainH
     private fun scoped(cookie: Cookie) = (if (cookie.hostOnly) cookie.domain == host.domain else host.domain == cookie.domain || host.domain.endsWith(".${cookie.domain}"))
     private val cookies = store.read(key).lineSequence().mapNotNull { Cookie.parse(origin, it) }.filter { scoped(it) }.toMutableList()
     @Synchronized override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
-        if (!enabled || url.host != host.domain || !url.isHttps) return
+        if (!enabled || url.host != host.domain || !url.isHttps || cookies.isEmpty()) return
         cookies.filter(::scoped).forEach { cookie ->
             this.cookies.removeAll { it.name == cookie.name && it.domain == cookie.domain && it.path == cookie.path }
             if (cookie.expiresAt > System.currentTimeMillis()) this.cookies.add(cookie)
@@ -35,15 +35,15 @@ internal class RainCookies(private val store: RainStore, private val host: RainH
         store.write(key, this.cookies.joinToString("\n"))
     }
     @Synchronized override fun loadForRequest(url: HttpUrl): List<Cookie> = if (!enabled || url.host != host.domain || !url.isHttps) emptyList() else cookies.filter { it.expiresAt > System.currentTimeMillis() && it.matches(url) }
-    fun value(name: String) = loadForRequest(origin).firstOrNull { it.name == name }?.value.orEmpty()
+    fun value(name: String, url: HttpUrl = origin) = loadForRequest(url).firstOrNull { it.name == name }?.value.orEmpty()
     @Synchronized fun disable() { enabled = false; cookies.clear() }
 }
 internal class RainApi(private val store: RainStore, private val host: RainHost, transport: Call.Factory? = null, assets: Call.Factory? = null, sockets: WebSocket.Factory? = null, private val clock: () -> Long = System::currentTimeMillis) : RainBackend {
     private val cookies = RainCookies(store, host)
-    private val client = OkHttpClient.Builder().cookieJar(cookies).followRedirects(false).followSslRedirects(false).retryOnConnectionFailure(false).connectTimeout(15, TimeUnit.SECONDS).readTimeout(35, TimeUnit.SECONDS).callTimeout(40, TimeUnit.SECONDS).build()
+    private val client = OkHttpClient.Builder().followRedirects(false).followSslRedirects(false).retryOnConnectionFailure(false).connectTimeout(15, TimeUnit.SECONDS).readTimeout(35, TimeUnit.SECONDS).callTimeout(40, TimeUnit.SECONDS).build()
     private val transport = transport ?: client
     private val assets = assets ?: rainAssetClient()
-    private val sockets = sockets ?: client
+    private val sockets = sockets ?: client.newBuilder().cookieJar(cookies).build()
     private var owner = store.read("owner.${host.name}")
     private var retryAt = 0L
     private fun request(path: String, body: JsonObject? = null, lesson: RainLesson? = null): Request {
@@ -54,9 +54,14 @@ internal class RainApi(private val store: RainStore, private val host: RainHost,
         if (clock() < retryAt) throw RainFailure("RATE", "雨课堂限流，请稍后手动重试。")
         try {
             return withContext(Dispatchers.IO) {
-                transport.newCall(request).awaitResult { response ->
+                classroomResponse(transport, request, cookies, allowed = { it.isHttps && it.host == host.domain && it.port == 443 }, prepare = { next ->
+                    next.newBuilder().removeHeader("x-csrftoken").removeHeader("sessionid").apply {
+                        cookies.value("csrftoken", next.url).takeIf { it.isNotBlank() }?.let { header("x-csrftoken", it) }
+                        cookies.value("sessionid", next.url).takeIf { it.isNotBlank() }?.let { header("sessionid", it) }
+                    }.build()
+                }) { response ->
                     if (response.code == 429) { retryAt = platformRetryAt(response.header("Retry-After"), clock()); throw RainFailure("RATE", "雨课堂限流，请稍后手动重试。") }
-                    if (response.code in setOf(401, 403) || response.isRedirect) throw RainFailure(if (write && response.isRedirect) "UNKNOWN" else "SESSION", "雨课堂会话失效，请扫码登录；提交不会自动重试。")
+                    if (response.code in setOf(401, 403)) throw RainFailure("SESSION", "雨课堂会话失效，请扫码登录；提交不会自动重试。")
                     if (!response.isSuccessful) throw RainFailure(if (write) "UNKNOWN" else "UPSTREAM", "雨课堂响应异常，请在官方客户端核验。")
                     val source = response.body?.source() ?: throw RainFailure(if (write) "UNKNOWN" else "FORMAT", "雨课堂响应为空。")
                     source.request(4 * 1024 * 1024L + 1)
@@ -67,7 +72,8 @@ internal class RainApi(private val store: RainStore, private val host: RainHost,
                     data to response.header("set-auth").orEmpty()
                 }
             }
-        } catch (_: IOException) { throw RainFailure(if (write) "UNKNOWN" else "NETWORK", "无法连接雨课堂；若刚提交，请先在官方客户端核验结果。") }
+        } catch (_: ClassroomRedirectFailure) { throw RainFailure(if (write) "UNKNOWN" else "REDIRECT", "雨课堂重定向异常，请使用官方客户端核验；提交不会自动重试。") }
+        catch (_: IOException) { throw RainFailure(if (write) "UNKNOWN" else "NETWORK", "无法连接雨课堂；若刚提交，请先在官方客户端核验结果。") }
     }
     private suspend fun read(path: String, lesson: RainLesson? = null) = readResponse(request(path, lesson = lesson)).first
     private suspend fun write(path: String, body: JsonObject, lesson: RainLesson? = null) = readResponse(request(path, body, lesson), write = true)
