@@ -1,8 +1,5 @@
 package de.nanyee.app
 
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,55 +13,57 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
 internal fun NanyeeTheme(content: @Composable () -> Unit) {
-    val colors = if (isSystemInDarkTheme()) darkColorScheme(
-        primary = Color(0xFFD97757), onPrimary = Color(0xFF1F1E1D), primaryContainer = Color(0xFF4A2C20), onPrimaryContainer = Color(0xFFF6E3DA),
-        secondary = Color(0xFF9CAB88), onSecondary = Color(0xFF1F2818), secondaryContainer = Color(0xFF343D2D), onSecondaryContainer = Color(0xFFE4E8D9),
-        tertiary = Color(0xFFD2AC65), onTertiary = Color(0xFF30230B), tertiaryContainer = Color(0xFF493F29), onTertiaryContainer = Color(0xFFF2E5C8),
-        background = Color(0xFF1F1E1D), onBackground = Color(0xFFECEAE3), surface = Color(0xFF2A2927), surfaceVariant = Color(0xFF34332F), onSurface = Color(0xFFECEAE3), onSurfaceVariant = Color(0xFFA09D94),
-        surfaceContainerLowest = Color(0xFF1F1E1D), surfaceContainerLow = Color(0xFF2A2927), surfaceContainer = Color(0xFF2A2927), surfaceContainerHigh = Color(0xFF34332F), surfaceContainerHighest = Color(0xFF403E38), outline = Color(0xFF625E55), outlineVariant = Color(0xFF47443D), surfaceTint = Color(0xFFD97757)
-    ) else lightColorScheme(
-        primary = Color(0xFFC96442), onPrimary = Color.White, primaryContainer = Color(0xFFF6E3DA), onPrimaryContainer = Color(0xFF5A2A18),
-        secondary = Color(0xFF7D8F69), onSecondary = Color.White, secondaryContainer = Color(0xFFE4E8D9), onSecondaryContainer = Color(0xFF354329),
-        tertiary = Color(0xFFC99A3E), onTertiary = Color(0xFF332609), tertiaryContainer = Color(0xFFF2E5C8), onTertiaryContainer = Color(0xFF594416),
-        background = Color(0xFFFAF9F5), onBackground = Color(0xFF1F1E1D), surface = Color.White, surfaceVariant = Color(0xFFF0EEE6), onSurface = Color(0xFF1F1E1D), onSurfaceVariant = Color(0xFF6B6862),
-        surfaceContainerLowest = Color.White, surfaceContainerLow = Color.White, surfaceContainer = Color(0xFFF0EEE6), surfaceContainerHigh = Color(0xFFEAE7DE), surfaceContainerHighest = Color(0xFFE3DFD3), outline = Color(0xFFE3DFD3), outlineVariant = Color(0xFFE3DFD3), surfaceTint = Color(0xFFC96442)
-    )
-    MaterialTheme(colorScheme = colors, typography = Typography(
-        displayLarge = MaterialTheme.typography.displayLarge.copy(fontFamily = FontFamily.Serif),
-        displayMedium = MaterialTheme.typography.displayMedium.copy(fontFamily = FontFamily.Serif),
-        displaySmall = MaterialTheme.typography.displaySmall.copy(fontFamily = FontFamily.Serif),
-        headlineLarge = MaterialTheme.typography.headlineLarge.copy(fontFamily = FontFamily.Serif, fontSize = 28.sp, lineHeight = 34.sp, fontWeight = FontWeight.Bold),
-        headlineMedium = MaterialTheme.typography.headlineMedium.copy(fontFamily = FontFamily.Serif, fontSize = 25.sp, lineHeight = 32.sp, fontWeight = FontWeight.Bold),
-        headlineSmall = MaterialTheme.typography.headlineSmall.copy(fontFamily = FontFamily.Serif, fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold),
-        titleLarge = MaterialTheme.typography.titleLarge.copy(fontFamily = FontFamily.Serif, fontSize = 20.sp, lineHeight = 26.sp, fontWeight = FontWeight.SemiBold),
-        titleMedium = MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Serif, fontWeight = FontWeight.SemiBold),
-        titleSmall = MaterialTheme.typography.titleSmall.copy(fontFamily = FontFamily.Serif),
-        bodyLarge = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.sp, lineHeight = 22.sp),
-        bodyMedium = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp, lineHeight = 20.sp)
+    MaterialTheme(colorScheme = appColors, typography = Typography(
+        headlineLarge = MaterialTheme.typography.headlineLarge.copy(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Normal),
+        headlineMedium = MaterialTheme.typography.headlineMedium.copy(fontSize = 22.sp, fontWeight = FontWeight.Normal),
+        headlineSmall = MaterialTheme.typography.headlineSmall.copy(fontSize = 20.sp, fontWeight = FontWeight.Normal),
+        titleLarge = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, fontWeight = FontWeight.Normal),
+        titleMedium = MaterialTheme.typography.titleMedium.copy(fontSize = 16.sp, fontWeight = FontWeight.Normal),
+        bodyLarge = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.sp),
+        bodyMedium = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+        labelSmall = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.sp, fontSize = 11.sp)
     ), shapes = Shapes(small = RoundedCornerShape(10.dp), medium = RoundedCornerShape(14.dp), large = RoundedCornerShape(18.dp)), content = content)
 }
 
+internal val AppBackground = Color(0xFFF5F6FA)
+internal val AppSurface = Color.White
+internal val AppCard = Color.White
+internal val AppDivider = Color(0xFFE4E5EC)
+internal val AppText = Color(0xFF242630)
+internal val AppMuted = Color(0xFF696D7C)
+internal val AppPrimary = Color(0xFF53649A)
+internal val appColors = lightColorScheme(
+    primary = AppPrimary, onPrimary = Color.White, primaryContainer = Color(0xFFE6EAF7), onPrimaryContainer = AppText,
+    secondary = AppPrimary, onSecondary = AppBackground, secondaryContainer = Color(0xFFE6EAF7), onSecondaryContainer = AppText,
+    tertiary = Color(0xFF347F85), onTertiary = AppBackground, tertiaryContainer = Color(0xFFE2EFEE), onTertiaryContainer = AppText,
+    background = AppBackground, onBackground = AppText, surface = AppSurface, onSurface = AppText, surfaceVariant = AppBackground, onSurfaceVariant = AppMuted,
+    surfaceContainerLowest = AppBackground, surfaceContainerLow = AppSurface, surfaceContainer = AppCard, surfaceContainerHigh = AppCard,
+    surfaceContainerHighest = AppCard, outline = AppDivider, outlineVariant = AppDivider, surfaceTint = Color.Transparent,
+    inverseSurface = AppText, inverseOnSurface = AppBackground, inversePrimary = AppPrimary
+)
 internal enum class SectionAccent { BRAND, ACADEMIC, SERVICE, SAGE, PLUM }
 
-internal fun courseFill(name: String, dark: Boolean): Color {
-    val colors = if (dark) listOf(0xFF4A342B, 0xFF343D2D, 0xFF303947, 0xFF493F29, 0xFF443241, 0xFF42382F) else listOf(0xFFEEDACF, 0xFFE4E8D9, 0xFFE0E4ED, 0xFFF2E5C8, 0xFFEADFE8, 0xFFEEE1D4)
-    return Color(colors[coursePaletteIndex(name)])
-}
+internal val TimetableTop = Color(0xFFECECF6)
+internal val TimetableBottom = Color(0xFFCDDDEB)
+internal fun courseAccent(name: String) = Color(listOf(0xFFB95763, 0xFF7961AB, 0xFF478B9B, 0xFF568ABB, 0xFFA95182, 0xFFC36D5D, 0xFF44866D)[coursePaletteIndex(name)])
+internal fun courseFill(name: String) = courseAccent(name).copy(alpha = 0.85f)
+internal fun courseAvatarFill(name: String) = lerp(courseAccent(name), Color.Black, 0.2f)
+internal val CourseAvatarText = Color.White
+internal fun sectionColor(accent: SectionAccent) = when (accent) { SectionAccent.BRAND -> AppPrimary; SectionAccent.ACADEMIC -> Color(0xFF4878B4); SectionAccent.SERVICE -> Color(0xFF7961AB); SectionAccent.SAGE -> Color(0xFF347F85); SectionAccent.PLUM -> Color(0xFFA95182) }
 
 @Composable
 internal fun CourseHeading(name: String, teacher: String) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Surface(shape = RoundedCornerShape(12.dp), color = courseFill(name, isSystemInDarkTheme())) {
+        Surface(shape = RoundedCornerShape(12.dp), color = courseAvatarFill(name), contentColor = CourseAvatarText) {
             Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) { Text(name.take(1), style = MaterialTheme.typography.titleLarge) }
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -76,7 +75,7 @@ internal fun CourseHeading(name: String, teacher: String) {
 
 @Composable
 internal fun ProfileHero(name: String, subtitle: String, initial: String, badge: String) {
-    Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer) {
+    Surface(shape = MaterialTheme.shapes.large, color = AppCard, contentColor = AppText) {
         Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surface) {
                 Box(Modifier.size(52.dp), contentAlignment = Alignment.Center) { Text(initial, style = MaterialTheme.typography.headlineSmall) }
@@ -94,26 +93,17 @@ internal data class ToolTile(val title: String, val description: String, val ico
 
 @Composable
 internal fun ToolGrid(tiles: List<ToolTile>) {
-    val scale = LocalDensity.current.fontScale
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val columns = toolColumnCount(maxWidth.value, scale).coerceAtMost(tiles.size.coerceAtLeast(1))
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            tiles.chunked(columns).forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    row.forEach { tile ->
-                        val interactions = remember { MutableInteractionSource() }
-                        val pressed by interactions.collectIsPressedAsState()
-                        Card(onClick = tile.onClick, modifier = Modifier.weight(1f), interactionSource = interactions,
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), elevation = CardDefaults.cardElevation(defaultElevation = if (pressed) 3.dp else 0.dp, pressedElevation = 3.dp)) {
-                            Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                AccentIcon(tile.icon, tile.accent)
-                                Text(tile.title, style = MaterialTheme.typography.titleLarge)
-                                Text(tile.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                if (tile.status.isNotBlank()) Text(tile.status, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                            }
-                        }
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        tiles.forEach { tile ->
+            Card(onClick = tile.onClick, modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(tile.icon, null, Modifier.size(24.dp), tint = sectionColor(tile.accent))
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(tile.title, style = MaterialTheme.typography.titleMedium)
+                        Text(tile.description, style = MaterialTheme.typography.bodySmall, color = AppMuted)
+                        if (tile.status.startsWith("GPA ")) Text(tile.status, style = MaterialTheme.typography.bodySmall, color = AppMuted)
                     }
-                    repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
+                    Icon(Icons.Outlined.ChevronRight, null, Modifier.size(18.dp), tint = AppMuted)
                 }
             }
         }
@@ -152,13 +142,8 @@ internal fun ClassroomAccountRow(name: String, platform: String, demo: Boolean, 
 
 @Composable
 internal fun AccentIcon(icon: ImageVector, accent: SectionAccent, description: String? = null) {
-    val colors = MaterialTheme.colorScheme
-    val dark = isSystemInDarkTheme()
-    val background = when (accent) { SectionAccent.BRAND -> colors.primaryContainer; SectionAccent.ACADEMIC -> if (dark) Color(0xFF303947) else Color(0xFFE0E4ED); SectionAccent.SERVICE -> colors.tertiaryContainer; SectionAccent.SAGE -> colors.secondaryContainer; SectionAccent.PLUM -> if (dark) Color(0xFF443241) else Color(0xFFEADFE8) }
-    val foreground = when (accent) { SectionAccent.BRAND -> colors.onPrimaryContainer; SectionAccent.ACADEMIC -> if (dark) Color(0xFFB5C3DE) else Color(0xFF6A7FA8); SectionAccent.SERVICE -> colors.onTertiaryContainer; SectionAccent.SAGE -> colors.onSecondaryContainer; SectionAccent.PLUM -> if (dark) Color(0xFFD8BCD5) else Color(0xFF8E6C8A) }
-    Surface(shape = RoundedCornerShape(12.dp), color = background, contentColor = foreground) {
-        Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) { Icon(icon, description, Modifier.size(23.dp)) }
-    }
+    val foreground = sectionColor(accent)
+    Icon(icon, description, Modifier.size(24.dp), tint = foreground)
 }
 
 @Composable

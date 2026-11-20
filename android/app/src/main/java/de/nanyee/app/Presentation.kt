@@ -43,7 +43,13 @@ internal fun nextCourseTitleFit(current: CourseTitleFit, minimumFontSize: Float,
 
 internal fun timetableFontScale(scale: Float): Float = if (scale.isFinite() && scale > 0) scale.coerceAtMost(1.4f) else 1f
 
-internal fun timetablePeriodHeight(scale: Float): Float = 88f * timetableFontScale(scale).coerceAtLeast(1f)
+internal fun timetablePeriodHeight(scale: Float): Float = 66f * timetableFontScale(scale).coerceAtLeast(1f)
+
+internal fun timetableCalendarStatus(semesterStart: String, week: Int?, hint: String): String = when {
+    runCatching { LocalDate.parse(semesterStart) }.isFailure -> "校历不可用"
+    week == null -> "当前日期不在本学期教学周内"
+    else -> hint.ifBlank { "本机课表" }
+}
 
 internal fun currentTeachingWeek(semesterStart: String, today: LocalDate, totalWeeks: Int): Int? {
     val start = runCatching { LocalDate.parse(semesterStart).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)) }.getOrNull() ?: return null
@@ -74,7 +80,7 @@ internal fun semesterStartFromExport(content: String): String = content.lineSequ
 internal fun selectedDetail(savedIdentity: String, dataIdentity: String, index: Int, items: List<JsonObject>): JsonObject? =
     if (savedIdentity.isNotEmpty() && savedIdentity == dataIdentity) items.getOrNull(index) else null
 
-internal fun coursePaletteIndex(name: String): Int = ((name.hashCode().toLong() and 0x7fffffffL) % 6).toInt()
+internal fun coursePaletteIndex(name: String): Int = ((name.hashCode().toLong() and 0x7fffffffL) % 7).toInt()
 internal fun teachingWeekMonday(semesterStart: String, week: Int): LocalDate? = runCatching {
     require(week > 0)
     LocalDate.parse(semesterStart).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).plusWeeks(week.toLong() - 1)

@@ -65,6 +65,95 @@ class RainApiTest {
         val script = Script { if (it.url.encodedPath == "/api/v3/user/login") Reply("""{"code":50001,"message":"PRIVATE-UPSTREAM-TEXT"}""") else fixture(it) }; val api = api(script)
         assertFalse(api.poll(api.qr())); assertEquals(2, script.requests.size)
     }
+    @Test fun allHostsUseIsolatedQrCookiesAndPromoteOnlyAfterProfile() = runBlocking {
+        RainHost.entries.forEach { host ->
+            val store = MemoryRainStore().also { it.write("cookies.${host.name}", "sessionid=old; Path=/; Secure"); it.write("owner.${host.name}", "old-owner") }
+            val script = Script { request ->
+                when (request.url.encodedPath) {
+                    "/api/v3/user/login/pre-info" -> fixture(request).copy(headers = mapOf("Set-Cookie" to "csrftoken=attempt-csrf; Path=/; Secure"))
+                    "/api/v3/user/login" -> Reply("""{"code":0}""", headers = mapOf("Set-Cookie" to "sessionid=new; Path=/; Secure"))
+                    else -> fixture(request)
+                }
+            }
+            val api = RainApi(store, host, script)
+            val qr = api.qr(); assertNull(script.requests.first().header("Cookie")); assertNull(script.requests.first().header("x-uid"))
+            assertTrue(api.poll(qr)); assertTrue(store.read("cookies.${host.name}").contains("old")); assertEquals("old-owner", store.read("owner.${host.name}"))
+            assertEquals("attempt-csrf", script.requests[1].header("x-csrftoken"))
+            api.user()
+            assertTrue(script.requests.last().header("Cookie").orEmpty().contains("sessionid=new")); assertFalse(store.read("cookies.${host.name}").contains("old")); assertTrue(store.read("cookies.${host.name}").contains("sessionid=new")); assertEquals("1001", store.read("owner.${host.name}"))
+            assertTrue(script.requests.all { it.url.host == host.domain })
+        }
+    }
+    @Test fun failedProfileAndCancelledAttemptNeverReplaceSavedAccount() = runBlocking {
+        for (cancel in listOf(false, true)) {
+            val store = MemoryRainStore().also { it.write("cookies.WWW", "sessionid=old; Path=/; Secure"); it.write("owner.WWW", "old") }
+            val script = Script { request -> when (request.url.encodedPath) {
+                "/api/v3/user/login/pre-info" -> fixture(request).copy(headers = mapOf("Set-Cookie" to "sessionid=attempt; Path=/; Secure"))
+                "/v/course_meta/user_info" -> Reply("""{"code":1,"msg":"未登录"}""")
+                else -> fixture(request)
+            } }
+            val api = RainApi(store, RainHost.WWW, script); api.qr()
+            if (cancel) api.cancelLogin() else assertTrue(runCatching { api.user() }.isFailure)
+            assertTrue(store.read("cookies.WWW").contains("sessionid=old")); assertEquals("old", store.read("owner.WWW"))
+            api.cancelLogin(); api.qr(); assertNull(script.requests.last().header("Cookie"))
+        }
+    }
+    @Test fun staleProfileResponseCannotPromoteCookiesAfterCancellation() = runBlocking {
+        val store = MemoryRainStore().also { it.write("cookies.WWW", "sessionid=old; Path=/; Secure") }
+        lateinit var api: RainApi
+        val script = Script { request ->
+            if (request.url.encodedPath == "/v/course_meta/user_info") api.cancelLogin()
+            fixture(request).copy(headers = mapOf("Set-Cookie" to "sessionid=attempt; Path=/; Secure"))
+        }
+        api = RainApi(store, RainHost.WWW, script); api.qr()
+        assertEquals("LOGIN", (runCatching { api.user() }.exceptionOrNull() as RainFailure).kind)
+        assertTrue(store.read("cookies.WWW").contains("sessionid=old")); assertEquals("", store.read("owner.WWW"))
+    }
+    @Test fun passwordAndSmsUseReferencePathsAndBodiesWithoutOldAccountCookies() = runBlocking {
+        val proof = RainCaptchaProof("fixture-ticket", "fixture-rand")
+        for (method in listOf(RainLoginMethod.PASSWORD, RainLoginMethod.SMS)) {
+            val store = MemoryRainStore().also { it.write("cookies.CHANGJIANG", "sessionid=old; Path=/; Secure") }
+            val script = Script { request -> if (request.url.encodedPath == "/v/course_meta/user_info") fixture(request) else Reply("""{"code":0}""", headers = mapOf("Set-Cookie" to "sessionid=login; Path=/; Secure")) }
+            val api = RainApi(store, RainHost.CHANGJIANG, script)
+            if (method == RainLoginMethod.SMS) api.sendSms("13800000000", proof)
+            api.login(method, "13800000000", if (method == RainLoginMethod.SMS) "123456" else "fixture-password", proof)
+            val expected = if (method == RainLoginMethod.SMS) listOf("/api/v3/user/code/send", "/api/v3/user/code/verify", "/api/v3/user/login/app") else listOf("/api/v3/user/login/app")
+            assertEquals(expected, script.requests.map { it.url.encodedPath }); assertNull(script.requests.first().header("Cookie"))
+            assertEquals(if (method == RainLoginMethod.SMS) 3 else 1, body(script.requests.last()).number("type")); assertEquals(proof.ticket, body(script.requests.last()).text("ticket"))
+            assertTrue(store.read("cookies.CHANGJIANG").contains("sessionid=old")); api.user(); assertTrue(store.read("cookies.CHANGJIANG").contains("sessionid=login"))
+            assertTrue(script.requests.all { it.url.host == RainHost.CHANGJIANG.domain }); assertFalse(store.read("device-id").isBlank())
+        }
+    }
+    @Test fun smsRequiresMatchingSendAndStopsAtVerifyFailureWithServerMessage() = runBlocking {
+        val proof = RainCaptchaProof("fixture-ticket", "fixture-rand")
+        val script = Script { request -> if (request.url.encodedPath.endsWith("/verify")) Reply("""{"code":17,"msg":"验证码不正确"}""") else Reply("""{"code":0}""") }
+        val api = RainApi(MemoryRainStore(), RainHost.CHANGJIANG, script)
+        assertTrue(runCatching { api.login(RainLoginMethod.SMS, "13800000000", "123456", proof) }.isFailure); assertTrue(script.requests.isEmpty())
+        api.sendSms("13800000000", proof)
+        assertTrue(runCatching { api.login(RainLoginMethod.SMS, "13900000000", "123456", proof) }.isFailure); assertEquals(1, script.requests.size)
+        assertEquals("验证码不正确", runCatching { api.login(RainLoginMethod.SMS, "13800000000", "123456", proof) }.exceptionOrNull()?.message)
+        assertFalse(script.requests.any { it.url.encodedPath.endsWith("/login/app") })
+        api.cancelLogin(); assertTrue(runCatching { api.login(RainLoginMethod.SMS, "13800000000", "123456", proof) }.isFailure)
+    }
+    @Test fun everyQrServerRejectionRenewsAndSurfacesMsg() = runBlocking {
+        for (code in listOf(50001, 1, 40003, -1)) {
+            var polls = 0
+            val script = Script { request -> if (request.url.encodedPath == "/api/v3/user/login") Reply("""{"code":${if (polls++ == 0) code else 0},"msg":"请重试扫码"}""") else fixture(request) }
+            val api = RainApi(MemoryRainStore(), RainHost.CHANGJIANG, script)
+            renewingClassroomQr(api.qr(), refresh = { api.qr() }, show = {}, attempts = 1, pause = {}) { current ->
+                if (api.poll(current)) ClassroomQrResult.Authorized(Unit) else { assertEquals("请重试扫码", api.loginMessage); ClassroomQrResult.Expired }
+            }
+            assertEquals(2, script.requests.count { it.url.encodedPath.endsWith("/pre-info") }); assertEquals(2, polls)
+        }
+    }
+    @Test fun passwordAndSmsSendSurfaceServerMsgWithoutPersistingProof() = runBlocking {
+        val store = MemoryRainStore(); val proof = RainCaptchaProof("fixture-ticket", "fixture-rand")
+        val script = Script { Reply("""{"code":1,"msg":"账号或验证信息不正确"}""") }; val api = RainApi(store, RainHost.CHANGJIANG, script)
+        assertEquals("账号或验证信息不正确", runCatching { api.login(RainLoginMethod.PASSWORD, "student@example.invalid", "fixture-password", proof) }.exceptionOrNull()?.message)
+        assertEquals(2, body(script.requests.first()).number("type")); assertEquals("", body(script.requests.first()).text("phoneNumber"))
+        assertEquals("账号或验证信息不正确", runCatching { api.sendSms("13800000000", proof) }.exceptionOrNull()?.message)
+        assertEquals("", store.read("cookies.CHANGJIANG")); assertEquals("", store.read("owner.CHANGJIANG"))
+    }
     @Test fun checkinHasItsOwnExplicitPostAndTokenResponse() = runBlocking {
         val script = Script(::fixture); val api = api(script, RainHost.PRO)
         assertEquals(rainTestLesson(RainHost.PRO), api.join(RainUser("1001", "示例同学"), "33"))

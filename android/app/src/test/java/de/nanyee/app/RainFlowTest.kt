@@ -7,6 +7,15 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class RainFlowTest {
+    @Test fun promotionReplacesOldCookiesAndPreservesAttemptCookiePaths() {
+        val store = MemoryRainStore(); val root = "https://changjiang.yuketang.cn/".toHttpUrl()
+        val account = RainCookies(store, RainHost.CHANGJIANG); val attempt = RainCookies(MemoryRainStore(), RainHost.CHANGJIANG)
+        account.saveFromResponse(root, listOf(requireNotNull(Cookie.parse(root, "sessionid=old; Path=/; Secure"))))
+        attempt.saveFromResponse(root, listOf(requireNotNull(Cookie.parse(root, "token=new; Path=/api; Secure"))))
+        account.replace(attempt); attempt.disable()
+        assertTrue(account.loadForRequest(root).isEmpty())
+        assertEquals("new", RainCookies(store, RainHost.CHANGJIANG).loadForRequest(root.resolve("/api/test")!!).single().value)
+    }
     @Test fun cookiesPersistEncryptedStoreValuesButNeverCrossSelectedHosts() {
         val store = MemoryRainStore(); val www = "https://www.yuketang.cn/".toHttpUrl(); val pro = "https://pro.yuketang.cn/".toHttpUrl()
         val jar = RainCookies(store, RainHost.WWW)

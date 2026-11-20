@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src https: data: blob:; script-src 'unsafe-inline' https://*.qcloud.com https://*.qq.com https://*.gtimg.com https://*.tencent.com https://*.tencentcloud.com; worker-src blob: data:; style-src 'unsafe-inline' https:; object-src 'none'; base-uri 'none'">
+<style>:root{color-scheme:light}html,body{margin:0;height:100%;background:#F5F6FA;font-family:sans-serif}#status{padding:16px;color:__TEXT__;font-size:14px}</style>
+<script defer src="https://turing.captcha.qcloud.com/TCaptcha.js"></script>
+</head><body><div id="status">正在连接腾讯安全验证…</div><script>
+window.addEventListener('load', () => {
+  const nonce = '__NONCE__';
+  const status = document.getElementById('status');
+  try {
+    const widget = new TencentCaptcha('2091064951', result => {
+      RainCaptcha.complete(nonce, JSON.stringify(result));
+    }, {bizState:'tencent-captcha',enableDarkMode:__DARK__});
+    widget.show();
+    status.textContent = '';
+    RainCaptcha.ready(nonce);
+  } catch (_) {
+    status.textContent = '腾讯验证码加载失败，请关闭后重试。';
+  }
+});
+</script></body></html>

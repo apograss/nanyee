@@ -58,8 +58,8 @@ class PresentationTest {
         assertEquals(1.4f, timetableFontScale(2f), 0.001f)
         assertEquals(1f, timetableFontScale(Float.NaN), 0.001f)
         assertEquals(1f, timetableFontScale(0f), 0.001f)
-        assertEquals(88f, timetablePeriodHeight(1f), 0.001f)
-        assertEquals(123.2f, timetablePeriodHeight(2f), 0.001f)
+        assertEquals(66f, timetablePeriodHeight(1f), 0.001f)
+        assertEquals(92.4f, timetablePeriodHeight(2f), 0.001f)
         assertTrue(timetablePeriodHeight(1.3f) > timetablePeriodHeight(1f))
     }
     @Test fun roomsDropOnlyTheGenericTeachingBuildingPrefix() {

@@ -48,7 +48,6 @@ internal fun ToolsScreen(school: SchoolState, grab: CourseGrabState, grabDemo: C
             }
         }
         else -> Column(Modifier.widthIn(max = 960.dp).fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant).verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("为校园生活，留一点从容。", Modifier.padding(vertical = 4.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             val gpa = school.grades?.get("summary")?.obj()?.text("weighted_gpa").orEmpty()
             ToolGrid(listOf(
                 ToolTile("成绩", "绩点、排名与分布", Icons.Outlined.Assessment, SectionAccent.ACADEMIC, if (gpa.isNotBlank()) "GPA ${displayNumber(gpa)}" else "学校直连", school::openGrades),
@@ -88,7 +87,7 @@ private fun ManualEvaluationScreen(school: SchoolState, evaluation: EvaluationSt
     BackHandler(!state.busy) { state.run.dismiss(); onBack() }
     Column(Modifier.widthIn(max = 720.dp).fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant).verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         TextButton(onClick = { state.run.dismiss(); onBack() }, enabled = !state.busy) { Text("返回课程评价") }
-        Text("手动一键评课", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text("手动一键评课", style = MaterialTheme.typography.headlineMedium)
         Text(if (demo) "演示模式 · 不联网，不会提交真实评价。" else "学校直连 · 不托管密码，不使用 Nanyee 服务器。只读加载不会提交评价。")
         if (state.error.isNotBlank()) Text(state.error, color = MaterialTheme.colorScheme.error)
         if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())

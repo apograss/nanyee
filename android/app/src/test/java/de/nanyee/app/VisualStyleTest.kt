@@ -1,6 +1,6 @@
 package de.nanyee.app
 
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
 import kotlinx.serialization.json.*
 import org.junit.Assert.*
@@ -17,18 +17,60 @@ class VisualStyleTest {
         assertEquals(1, toolColumnCount(0f, 1f))
     }
 
-    @Test fun courseColoursDependOnlyOnNameAndHaveReadableContrastInBothThemes() {
+    @Test fun courseColoursDependOnlyOnNameAndKeepWhiteTextReadable() {
         val names = listOf("人体解剖学", "大学英语", "基础化学", "", "Medical English")
         val first = names.associateWith { coursePaletteIndex(it) }
         assertEquals(first, names.reversed().associateWith { coursePaletteIndex(it) })
-        assertEquals((0..5).toSet(), (0..5).map { coursePaletteIndex(it.toString()) }.toSet())
-        (names + (0..5).map { it.toString() }).forEach { name ->
-            assertTrue(coursePaletteIndex(name) in 0..5)
-            listOf(false, true).forEach { dark ->
-                val foreground = if (dark) Color(0xFFECEAE3) else Color(0xFF1F1E1D)
-                val back = courseFill(name, dark).luminance()
-                val text = foreground.luminance()
-                assertTrue((maxOf(back, text) + 0.05f) / (minOf(back, text) + 0.05f) >= 7f)
+        assertEquals((0..6).toSet(), (0..6).map { coursePaletteIndex(it.toString()) }.toSet())
+        (names + (0..6).map { it.toString() }).forEach { name ->
+            assertTrue(coursePaletteIndex(name) in 0..6)
+            assertEquals(0.85f, courseFill(name).alpha, 0.001f)
+            assertEquals(1f, courseAccent(name).alpha, 0f)
+            listOf(TimetableTop, TimetableBottom).forEach { surface ->
+                val back = courseFill(name).compositeOver(surface).luminance()
+                val text = androidx.compose.ui.graphics.Color.White.luminance()
+                assertTrue((maxOf(back, text) + 0.05f) / (minOf(back, text) + 0.05f) >= 3f)
+            }
+        }
+    }
+
+    @Test fun courseAvatarInitialsHaveAccessibleContrastAcrossEveryPaletteColour() {
+        val names = (0..6).map { it.toString() } + listOf("", "人体解剖学", "Medical English")
+        assertEquals((0..6).toSet(), names.map { coursePaletteIndex(it) }.toSet())
+        names.forEach { name ->
+            val background = courseAvatarFill(name)
+            assertEquals(1f, background.alpha, 0f)
+            val back = background.luminance()
+            val text = CourseAvatarText.luminance()
+            assertTrue((maxOf(back, text) + 0.05f) / (minOf(back, text) + 0.05f) >= 4.5f)
+        }
+    }
+
+    @Test fun fixedPaletteKeepsTextReadableAcrossRaisedSurfaces() {
+        assertEquals(AppBackground, appColors.background)
+        assertEquals(AppPrimary, appColors.primary)
+        assertEquals(AppCard, appColors.surfaceContainerHighest)
+        listOf(AppBackground, AppSurface, AppCard).forEach { surface ->
+            assertTrue((surface.luminance() + 0.05f) / (AppText.luminance() + 0.05f) >= 7f)
+            assertTrue((surface.luminance() + 0.05f) / (AppMuted.luminance() + 0.05f) >= 4.5f)
+        }
+    }
+
+    @Test fun calendarUnavailableIsNotAnAllClearStatus() {
+        assertEquals("校历不可用", timetableCalendarStatus("", null, "加载失败"))
+        assertEquals("校历不可用", timetableCalendarStatus("", null, "离线课表"))
+        assertEquals("校历不可用", timetableCalendarStatus("invalid", null, ""))
+        assertEquals("本机课表", timetableCalendarStatus("2026-11-16", 1, ""))
+        assertEquals("本机 · 更新于 09:22", timetableCalendarStatus("2026-11-16", 1, "本机 · 更新于 09:22"))
+    }
+
+    @Test fun validCalendarOutsideTeachingWeeksIsNotUnavailable() {
+        val start = "2026-02-23"
+        listOf("2026-02-22", "2026-07-13", "2026-11-20").forEach { date ->
+            val week = currentTeachingWeek(start, LocalDate.parse(date), 20)
+            assertNull(week)
+            listOf("", "离线课表", "更新于 09:22").forEach { hint ->
+                assertEquals("当前日期不在本学期教学周内", timetableCalendarStatus(start, week, hint))
             }
         }
     }

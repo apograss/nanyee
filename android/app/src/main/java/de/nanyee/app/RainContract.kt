@@ -16,7 +16,7 @@ internal class RainFailure(val kind: String, message: String) : Exception(messag
 @Serializable internal data class RainUser(val id: String, val name: String)
 @Serializable internal data class RainCourse(val id: String, val classroom: String, val name: String, val teacher: String)
 @Serializable internal data class RainOnLesson(val courseId: String, val lessonId: String)
-internal data class RainQr(val token: String, val content: String)
+internal data class RainQr(val token: String, val content: String, val image: String = "")
 internal data class RainLesson(val host: RainHost, val uid: String, val id: String, val bearer: String, val token: String)
 @Serializable internal data class RainOption(val key: String, val text: String)
 @Serializable internal data class RainProblem(val id: String, val type: Int, val body: String, val options: List<RainOption> = emptyList(), val blanks: Int = 0, val maximum: Int = 1, val dt: Long = 0, val supported: Boolean = true)
@@ -30,6 +30,10 @@ internal data class RainFrame(val op: String, val presentation: String = "", val
 internal enum class RainResult { SUCCESS, REJECTED, UNKNOWN }
 internal interface RainLive { fun close() }
 internal interface RainBackend {
+    val loginMessage: String get() = ""
+    fun cancelLogin() {}
+    suspend fun sendSms(phone: String, proof: RainCaptchaProof) { error("Login unavailable") }
+    suspend fun login(method: RainLoginMethod, account: String, code: String, proof: RainCaptchaProof) { error("Login unavailable") }
     suspend fun user(): RainUser
     suspend fun qr(): RainQr
     suspend fun poll(qr: RainQr): Boolean
@@ -84,7 +88,7 @@ internal fun rainOnLesson(value: JsonObject): List<RainOnLesson> {
 }
 internal fun rainQr(value: JsonObject): RainQr {
     val data = rainData(value).jsonObject
-    return RainQr(data.text("token"), data.text("qrContent")).also { require(it.token.isNotBlank() && it.content.isNotBlank() && it.content.length <= 2000) }
+    return RainQr(data.text("token"), data.text("qrContent"), data.text("qrImage")).also { require(it.token.isNotBlank() && (it.content.isNotBlank() || it.image.isNotBlank()) && it.content.length <= 2000) }
 }
 internal fun rainProblem(row: JsonObject): RainProblem {
     val type = row.number("problemType")

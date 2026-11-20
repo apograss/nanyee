@@ -38,11 +38,11 @@ internal fun CabinToolsScreen(school: SchoolState, state: CabinState = viewModel
     BackHandler(opened) { state.cancelCredential(); if (onBack != null) onBack() else opened = false }
     if (!opened) {
         Column(Modifier.widthIn(max = 720.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("校园工具", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text("校园工具", style = MaterialTheme.typography.headlineMedium)
             Text("按需开启，让日常更从容。", color = MaterialTheme.colorScheme.onSurfaceVariant)
             Card(onClick = { opened = true }, modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("学习舱预约", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text("学习舱预约", style = MaterialTheme.typography.titleLarge)
                     Text("选择舱位优先级，交给服务器按时尝试预约。")
                     Text("需要独立的 Nanyee 平台账号", style = MaterialTheme.typography.bodySmall)
                 }
@@ -77,7 +77,7 @@ internal fun CabinToolsScreen(school: SchoolState, state: CabinState = viewModel
                     TextButton(onClick = { state.refresh() }, enabled = !state.busy) { Text(if (evaluationMode) "刷新评课" else "刷新预约") }
                     TextButton(onClick = { action = "logout" to "" }, enabled = !state.busy) { Text("退出平台账号") }
                 }
-                Text("托管学校凭据", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text("托管学校凭据", style = MaterialTheme.typography.titleLarge)
                 if (evaluationMode) state.notices.filter { it.text("kind") == "credential_invalid" }.forEach { notice ->
                     Text(notice.text("title") + "\n" + notice.text("message"), color = MaterialTheme.colorScheme.error)
                     TextButton(onClick = { state.editCredential(notice.text("credential_id").takeIf { id -> state.credentials.any { it.text("id") == id } }) }, enabled = !state.busy) { Text("更新评课凭据") }
@@ -117,7 +117,7 @@ internal fun CabinToolsScreen(school: SchoolState, state: CabinState = viewModel
                     }
                 }
                 HorizontalDivider()
-                Text(if (evaluationMode) "常驻自动评课任务" else "新建预约", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(if (evaluationMode) "常驻自动评课任务" else "新建预约", style = MaterialTheme.typography.titleLarge)
                 when {
                     state.pending != null -> {
                         Text("上次提交尚未确认。请先刷新核对；网络重试将沿用同一确认内容与幂等键，不会另建一笔。")
@@ -137,7 +137,7 @@ internal fun CabinToolsScreen(school: SchoolState, state: CabinState = viewModel
                     } else CabinBookingForm(state)
                 }
                 HorizontalDivider()
-                Text(if (evaluationMode) "我的评课任务" else "我的预约", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(if (evaluationMode) "我的评课任务" else "我的预约", style = MaterialTheme.typography.titleLarge)
                 Text(if (evaluationMode) "下拉或点击刷新查看常驻任务与最近一轮收据。" else "下拉或点击刷新查看最新状态。最多展示最近 100 个任务中的学习舱预约。", style = MaterialTheme.typography.bodySmall)
                 if (state.jobs.isEmpty()) Text(if (evaluationMode) "还没有自动评课任务。" else "还没有学习舱预约。")
                 state.jobs.forEach { job ->
