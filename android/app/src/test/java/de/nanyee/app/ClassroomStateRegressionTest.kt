@@ -35,6 +35,46 @@ class ClassroomStateRegressionTest {
         store.put("unused-rain", RainState(application()))
         store.clear()
     }
+    @Test fun rainQrKeepsItsPendingPollInBackgroundButLeavingCancelsIt() = runBlocking<Unit> {
+        val state = RainState(application()); synchronousScope(state)
+        setState(state, "ready", true)
+        setState(state, "qr", RainQr("token", "content"))
+        val backend = object : RainBackend by DemoRainBackend(RainHost.CHANGJIANG) {
+            override suspend fun poll(qr: RainQr): Boolean = awaitCancellation()
+        }
+        RainState::class.java.getDeclaredField("backend").apply { isAccessible = true }.set(state, backend)
+        state.setVisible(true); state.setForeground(true)
+        val visible = RainState::class.java.getDeclaredField("visibleWork").apply { isAccessible = true }
+        val pending = visible.get(state) as Job
+        assertTrue(pending.isActive)
+        val before = System.currentTimeMillis()
+        state.setForeground(false)
+        assertSame(pending, visible.get(state)); assertTrue(pending.isActive)
+        val until = RainState::class.java.getDeclaredField("backgroundUntil").apply { isAccessible = true }.getLong(state)
+        assertTrue(until >= before + 60000)
+        state.setForeground(true); assertSame(pending, visible.get(state)); assertTrue(pending.isActive)
+        state.setVisible(false); assertTrue(pending.isCancelled); assertNull(state.qr)
+        ViewModelStore().also { it.put("rain", state); it.clear() }
+    }
+    @Test fun rainQrTimeoutAndOtherPollFailuresRenewBeforeFetchingProfile() = runBlocking<Unit> {
+        for (failure in listOf("NETWORK", "SESSION", "FORMAT", "UPSTREAM", "REDIRECT")) {
+        val state = RainState(application()); synchronousScope(state)
+        setState(state, "ready", true); setState(state, "qr", RainQr("initial", "content"))
+        var polls = 0; var refreshes = 0
+        val profile = CompletableDeferred<Unit>()
+        val backend = object : RainBackend by DemoRainBackend(RainHost.CHANGJIANG) {
+            override suspend fun qr(): RainQr { refreshes++; return RainQr("renewed", "content") }
+            override suspend fun poll(qr: RainQr): Boolean { if (polls++ == 0) throw RainFailure(failure, "扫码等待未完成"); return true }
+            override suspend fun user(): RainUser { profile.complete(Unit); return RainUser("1001", "demo") }
+        }
+        RainState::class.java.getDeclaredField("store").apply { isAccessible = true }.set(state, MemoryRainStore())
+        RainState::class.java.getDeclaredField("backend").apply { isAccessible = true }.set(state, backend)
+        state.setVisible(true); state.setForeground(true)
+        withTimeout(5000) { profile.await() }
+        assertEquals(1, refreshes); assertEquals(2, polls)
+        state.setVisible(false); ViewModelStore().also { it.put("rain", state); it.clear() }
+        }
+    }
 
     @Test fun resettingActivityPreservesUnknownWriteAndBlocksNewActivity() {
         val state = XxtState(application(), SavedStateHandle())

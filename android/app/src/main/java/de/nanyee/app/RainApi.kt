@@ -36,28 +36,40 @@ internal class RainCookies(private val store: RainStore, private val host: RainH
     }
     @Synchronized override fun loadForRequest(url: HttpUrl): List<Cookie> = if (!enabled || url.host != host.domain || !url.isHttps) emptyList() else cookies.filter { it.expiresAt > System.currentTimeMillis() && it.matches(url) }
     fun value(name: String, url: HttpUrl = origin) = loadForRequest(url).firstOrNull { it.name == name }?.value.orEmpty()
+    @Synchronized fun replace(other: RainCookies) {
+        cookies.clear()
+        store.write(key, "")
+        saveFromResponse(origin, other.snapshot())
+    }
+    @Synchronized private fun snapshot() = if (enabled) cookies.toList() else emptyList()
     @Synchronized fun disable() { enabled = false; cookies.clear() }
 }
 internal class RainApi(private val store: RainStore, private val host: RainHost, transport: Call.Factory? = null, assets: Call.Factory? = null, sockets: WebSocket.Factory? = null, private val clock: () -> Long = System::currentTimeMillis) : RainBackend {
-    private val cookies = RainCookies(store, host)
+    private val accountCookies = RainCookies(store, host)
+    private var loginCookies: RainCookies? = null
+    private val cookies get() = loginCookies ?: accountCookies
+    private var smsPhone = ""
+    private var smsProof: RainCaptchaProof? = null
+    override var loginMessage = ""; private set
     private val client = OkHttpClient.Builder().followRedirects(false).followSslRedirects(false).retryOnConnectionFailure(false).connectTimeout(15, TimeUnit.SECONDS).readTimeout(35, TimeUnit.SECONDS).callTimeout(40, TimeUnit.SECONDS).build()
     private val transport = transport ?: client
     private val assets = assets ?: rainAssetClient()
-    private val sockets = sockets ?: client.newBuilder().cookieJar(cookies).build()
+    private val sockets = sockets ?: client.newBuilder().cookieJar(accountCookies).build()
     private var owner = store.read("owner.${host.name}")
     private var retryAt = 0L
     private fun request(path: String, body: JsonObject? = null, lesson: RainLesson? = null): Request {
         if (lesson != null) require(lesson.host == host && lesson.uid == owner && lesson.bearer.isNotBlank())
-        return rainRequest(host, path, body, lesson?.bearer.orEmpty(), owner, cookies.value("csrftoken"), cookies.value("sessionid"))
+        return rainRequest(host, path, body, lesson?.bearer.orEmpty(), if (loginCookies != null) "" else owner, cookies.value("csrftoken"), cookies.value("sessionid"))
     }
     private suspend fun readResponse(request: Request, write: Boolean = false): Pair<JsonObject, String> {
         if (clock() < retryAt) throw RainFailure("RATE", "雨课堂限流，请稍后手动重试。")
+        val jar = cookies
         try {
             return withContext(Dispatchers.IO) {
-                classroomResponse(transport, request, cookies, allowed = { it.isHttps && it.host == host.domain && it.port == 443 }, prepare = { next ->
+                classroomResponse(transport, request, jar, allowed = { it.isHttps && it.host == host.domain && it.port == 443 }, prepare = { next ->
                     next.newBuilder().removeHeader("x-csrftoken").removeHeader("sessionid").apply {
-                        cookies.value("csrftoken", next.url).takeIf { it.isNotBlank() }?.let { header("x-csrftoken", it) }
-                        cookies.value("sessionid", next.url).takeIf { it.isNotBlank() }?.let { header("sessionid", it) }
+                        jar.value("csrftoken", next.url).takeIf { it.isNotBlank() }?.let { header("x-csrftoken", it) }
+                        jar.value("sessionid", next.url).takeIf { it.isNotBlank() }?.let { header("sessionid", it) }
                     }.build()
                 }) { response ->
                     if (response.code == 429) { retryAt = platformRetryAt(response.header("Retry-After"), clock()); throw RainFailure("RATE", "雨课堂限流，请稍后手动重试。") }
@@ -78,19 +90,51 @@ internal class RainApi(private val store: RainStore, private val host: RainHost,
     private suspend fun read(path: String, lesson: RainLesson? = null) = readResponse(request(path, lesson = lesson)).first
     private suspend fun write(path: String, body: JsonObject, lesson: RainLesson? = null) = readResponse(request(path, body, lesson), write = true)
     override suspend fun user(): RainUser {
+        val attempt = loginCookies
         val response = read("/v/course_meta/user_info")
+        requireAttempt(attempt)
         val profile = ((response["data"] as? JsonObject)?.get("user_profile") as? JsonObject) ?: throw RainFailure("SESSION", "雨课堂未登录或已过期，请扫码登录。")
         val id = profile.text("user_id")
         if (("code" in response && rainCode(response) != 0) || !id.matches(Regex("[0-9]+"))) throw RainFailure("SESSION", "雨课堂未登录或已过期，请扫码登录。")
+        loginCookies?.let { accountCookies.replace(it); it.disable(); loginCookies = null; smsPhone = ""; smsProof = null }
         owner = id; store.write("owner.${host.name}", id)
         return RainUser(id, xxtPlain(profile.text("name")).ifBlank { "本人账号" })
     }
     private suspend fun own(uid: String) { if (user().id != uid) throw RainFailure("SESSION", "雨课堂账号已变更，请重新加载并确认。") }
     private suspend fun own(lesson: RainLesson) { require(lesson.host == host); own(lesson.uid) }
-    override suspend fun qr(): RainQr { owner = ""; store.write("owner.${host.name}", ""); return rainQr(read("/api/v3/user/login/pre-info")) }
+    override fun cancelLogin() { loginCookies?.disable(); loginCookies = null; smsPhone = ""; smsProof = null }
+    private fun requireAttempt(attempt: RainCookies?) {
+        if (attempt !== loginCookies) throw RainFailure("LOGIN", "登录尝试已取消，请重试。")
+    }
+    private fun beginLogin() { cancelLogin(); loginCookies = RainCookies(MemoryRainStore(), host) }
+    private fun accepted(value: JsonObject) {
+        if (rainCode(value) != 0) throw RainFailure("LOGIN", rainLoginMessage(value, "登录未完成，请重试。"))
+    }
+    override suspend fun sendSms(phone: String, proof: RainCaptchaProof) {
+        val body = rainSmsBody(phone, proof)
+        beginLogin()
+        val attempt = loginCookies
+        accepted(readResponse(request("/api/v3/user/code/send", body)).first)
+        requireAttempt(attempt)
+        smsPhone = phone; smsProof = proof
+    }
+    override suspend fun login(method: RainLoginMethod, account: String, code: String, proof: RainCaptchaProof) {
+        val body = rainLoginBody(method, account, code, proof, rainDeviceId(store))
+        if (method == RainLoginMethod.SMS) {
+            if (loginCookies == null || smsPhone != account || proof != smsProof) throw RainFailure("LOGIN", "请先通过腾讯验证并发送当前手机号的短信验证码。")
+            val attempt = loginCookies
+            accepted(readResponse(request("/api/v3/user/code/verify", rainVerifyBody(account, code))).first)
+            requireAttempt(attempt)
+        } else beginLogin()
+        val attempt = loginCookies
+        accepted(readResponse(request("/api/v3/user/login/app", body)).first)
+        requireAttempt(attempt)
+    }
+    override suspend fun qr(): RainQr { beginLogin(); val value = read("/api/v3/user/login/pre-info"); accepted(value); return rainQr(value) }
     override suspend fun poll(qr: RainQr): Boolean {
         val result = readResponse(request("/api/v3/user/login", buildJsonObject { put("token", qr.token) })).first
-        return when (rainCode(result)) { 0 -> true; 50001 -> false; else -> throw RainFailure("LOGIN", "二维码授权未完成，请重新获取二维码。") }
+        loginMessage = if (rainCode(result) == 0) "" else rainLoginMessage(result, "二维码已过期，正在更新。")
+        return rainCode(result) == 0
     }
     override suspend fun courses() = rainCourses(read("/v/course_meta/learning_list/"))
     override suspend fun onLesson() = rainOnLesson(read("/api/v3/classroom/on-lesson"))
@@ -156,8 +200,8 @@ internal class RainApi(private val store: RainStore, private val host: RainHost,
         })
         return object : RainLive { override fun close() { if (stopped.compareAndSet(false, true)) { socket.send(rainLeave(lesson)); socket.close(1000, "Leaving") } } }
     }
-    fun disable() { cookies.disable() }
-    override suspend fun clear() { cookies.disable(); withContext(Dispatchers.IO) { store.clear() } }
+    fun disable() { cancelLogin(); accountCookies.disable() }
+    override suspend fun clear() { disable(); withContext(Dispatchers.IO) { store.clear() } }
 }
 internal fun rainPublicAddress(address: java.net.InetAddress): Boolean {
     if (address.isAnyLocalAddress || address.isLoopbackAddress || address.isLinkLocalAddress || address.isSiteLocalAddress || address.isMulticastAddress) return false

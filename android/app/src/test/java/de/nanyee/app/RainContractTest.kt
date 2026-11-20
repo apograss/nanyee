@@ -34,9 +34,11 @@ class RainContractTest {
         listOf("{}", """{"code":1,"data":[]}""", """{"code":"invalid","data":[]}""", """{"data":{}}""", """{"data":[{"course_name":"no id"}]}""").forEach { assertTrue(runCatching { rainCourses(Json.parseToJsonElement(it).jsonObject) }.isFailure) }
         assertTrue(runCatching { rainOnLesson(buildJsonObject { put("data", buildJsonObject {}) }) }.isFailure)
     }
-    @Test fun qrUsesContentAndTokenNotAnImageOrOAuthUrlFetch() {
-        assertEquals(RainQr("fixture-qr-token", "https://www.yuketang.cn/fixture/login"), rainQr(rainFixture("qr")))
-        assertTrue(runCatching { rainQr(Json.parseToJsonElement("""{"code":0,"data":{"token":"x","qrImage":"https://unused.example"}}""").jsonObject) }.isFailure)
+    @Test fun qrKeepsServerImageAlongsideContentFallbackAndToken() {
+        val qr = rainQr(rainFixture("qr"))
+        assertEquals("fixture-qr-token", qr.token); assertEquals("https://www.yuketang.cn/fixture/login", qr.content)
+        assertEquals(rainFixture("qr")["data"]!!.jsonObject.text("qrImage"), qr.image)
+        assertEquals("https://unused.example", rainQr(Json.parseToJsonElement("""{"code":0,"data":{"token":"x","qrImage":"https://unused.example"}}""").jsonObject).image)
     }
     @Test fun presentationDropsAnswersRemarksCorrectFlagsAndNotes() {
         val deck = rainPresentation("deck", rainFixture("presentation"))

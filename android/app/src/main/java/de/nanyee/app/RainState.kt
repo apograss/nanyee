@@ -12,7 +12,10 @@ import kotlinx.serialization.json.Json
 internal class RainState(application: Application) : AndroidViewModel(application) {
     var demo by mutableStateOf(false); private set
     var ready by mutableStateOf(false); private set
-    var host by mutableStateOf(RainHost.WWW); private set
+    var host by mutableStateOf(RainHost.CHANGJIANG); private set
+    var smsDeadline by mutableStateOf(0L); private set
+    private var smsProof: RainCaptchaProof? = null
+    private var smsPhone = ""
     var user by mutableStateOf<RainUser?>(null); private set
     var qr by mutableStateOf<RainQr?>(null); private set
     var courses by mutableStateOf<List<RainCourse>>(emptyList()); private set
@@ -45,6 +48,9 @@ internal class RainState(application: Application) : AndroidViewModel(applicatio
     private val live = RainLiveOwner()
     private val liveSlides = RainLiveSlides()
     private var foreground = false
+    private var screenVisible = false
+    private var backgroundUntil = 0L
+    private var backgroundJob: Job? = null
     private var generation = 0
     private var initialized = false
     private var work: Job? = null
@@ -65,7 +71,7 @@ internal class RainState(application: Application) : AndroidViewModel(applicatio
         work = viewModelScope.launch {
             try {
                 store = withContext(Dispatchers.IO) { if (demo) MemoryRainStore() else EncryptedRainStore(getApplication()) }
-                host = runCatching { RainHost.valueOf(store.read("host")) }.getOrDefault(RainHost.WWW)
+                host = rainInitialHost(store)
                 backend = if (demo) DemoRainBackend(host) else RainApi(store, host)
                 ready = true
                 if (demo || store.read("owner.${host.name}").isNotBlank()) loadAccount()
@@ -92,13 +98,60 @@ internal class RainState(application: Application) : AndroidViewModel(applicatio
         courses = backend.courses(); loaded = true
     }
     fun refresh() = read { loadAccount() }
-    fun beginQr() = read { require(lesson == null); qr = backend.qr(); message = "请扫码授权；仅在当前页面前台等待授权。" }
-    fun cancelQr() { qr = null; restartVisibility() }
-    fun setForeground(value: Boolean) { if (foreground != value) { foreground = value; restartVisibility() } }
+    fun cancelLogin() {
+        cancelQr(); smsProof = null; smsPhone = ""; smsDeadline = 0
+        if (::backend.isInitialized) backend.cancelLogin()
+    }
+    fun sendSms(phone: String, proof: RainCaptchaProof) = read {
+        require(System.currentTimeMillis() >= smsDeadline)
+        backend.sendSms(phone, proof)
+        smsPhone = phone; smsProof = proof; smsDeadline = System.currentTimeMillis() + 60000
+        message = if (demo) "演示短信验证码为 123456，没有发出短信。" else "短信验证码已发送。"
+    }
+    fun login(method: RainLoginMethod, account: String, secret: String, proof: RainCaptchaProof? = null) = read {
+        val accepted = if (method == RainLoginMethod.SMS && account == smsPhone) smsProof else proof
+        if (accepted == null) throw RainFailure("LOGIN", "请先通过腾讯验证；短信登录需先为当前手机号发送验证码。")
+        backend.login(method, account, secret, accepted)
+        loadAccount(); smsProof = null; smsPhone = ""; smsDeadline = 0
+        message = "已登录当前本人账号。"
+    }
+    fun beginQr() = read {
+        require(lesson == null); qr = backend.qr()
+        if (!foreground && screenVisible) startBackgroundGrace()
+        message = "请扫码授权；切到微信后继续等待最多 60 秒。"
+    }
+    suspend fun qrBitmap(value: RainQr): Bitmap? {
+        if (demo || value.image.isBlank() || !rainQrImageAllowed(host, value.image)) return null
+        return withContext(Dispatchers.IO) { rainBitmap(backend.image(value.image)) }
+    }
+    fun cancelQr() { qr = null; backgroundJob?.cancel(); backgroundUntil = 0; if (::backend.isInitialized) backend.cancelLogin(); restartVisibility() }
+    fun setVisible(value: Boolean) {
+        screenVisible = value
+        if (!value) { foreground = false; if (busy && user == null) work?.cancel(); cancelLogin(); stopVisibility() }
+    }
+    fun setForeground(value: Boolean) {
+        if (foreground == value) return
+        foreground = value
+        backgroundJob?.cancel()
+        if (!value && qr != null && screenVisible) {
+            live.stop()
+            startBackgroundGrace()
+        } else {
+            backgroundUntil = 0
+            if (!(value && qr != null && visibleWork?.isActive == true)) restartVisibility()
+        }
+    }
+    private fun startBackgroundGrace() {
+        backgroundJob?.cancel(); backgroundUntil = System.currentTimeMillis() + 60000
+        backgroundJob = viewModelScope.launch {
+            delay(60000)
+            if (!foreground) { stopVisibility(); message = "后台扫码等待已暂停，返回页面后继续。" }
+        }
+    }
     private fun stopVisibility() { generation++; visibleWork?.cancel(); visibleWork = null; live.stop(); liveStatus = "已停止（离开页面 / 后台）" }
     private fun restartVisibility() {
         stopVisibility()
-        if (!foreground || !ready || busy) return
+        if (!rainQrPollingAllowed(screenVisible, foreground, qr != null, backgroundUntil, System.currentTimeMillis()) || !ready || busy) return
         val version = generation
         val joined = lesson
         if (joined != null) {
@@ -112,7 +165,15 @@ internal class RainState(application: Application) : AndroidViewModel(applicatio
                 val login = qr
                 if (login != null) {
                     renewingClassroomQr(login, refresh = { backend.qr() }, show = { qr = it }, attempts = 1, pause = {}) { current ->
-                        if (backend.poll(current)) ClassroomQrResult.Authorized(Unit) else ClassroomQrResult.Expired
+                        val authorized = try { backend.poll(current) } catch (e: RainFailure) {
+                            if (e.kind == "RATE") throw e
+                            message = e.message.orEmpty(); false
+                        }
+                        if (authorized) ClassroomQrResult.Authorized(Unit) else {
+                            if (backend.loginMessage.isNotBlank()) message = backend.loginMessage
+                            delay(1000)
+                            ClassroomQrResult.Expired
+                        }
                     }
                     ensureActive()
                     qr = null
@@ -269,18 +330,21 @@ internal class RainState(application: Application) : AndroidViewModel(applicatio
         if (!ready || busy || value == host) return
         read {
             cancelQr(); leaveLesson(); (backend as? RainApi)?.disable(); draftWork?.cancelAndJoin(); draftWork = null
-            host = value; withContext(Dispatchers.IO) { store.write("host", host.name) }
+            smsProof = null; smsPhone = ""; smsDeadline = 0
+            host = value; withContext(Dispatchers.IO) { store.write("host", host.name); store.write("host.explicit", host.name) }
             backend = if (demo) DemoRainBackend(host).also { it.failure = scenario } else RainApi(store, host)
             user = null; courses = emptyList(); onLesson = emptyList(); loaded = false; presentation = null; image = null; events.clear(); drafts = emptyMap(); resolvedLesson = ""; unknownKey = ""
             if (demo || store.read("owner.${host.name}").isNotBlank()) loadAccount()
         }
     }
     fun logout() = read {
+        smsProof = null; smsPhone = ""; smsDeadline = 0
         stopVisibility(); leaveLesson(); draftWork?.cancelAndJoin(); draftWork = null; qr = null
         backend.clear(); withContext(Dispatchers.IO) { store.clear() }
+        store.write("host", host.name); store.write("host.explicit", host.name); store.write("changjiang-default-v1", "1")
         backend = if (demo) DemoRainBackend(host).also { it.failure = scenario } else RainApi(store, host)
         user = null; courses = emptyList(); onLesson = emptyList(); presentation = null; image = null; events.clear(); drafts = emptyMap(); resolvedLesson = ""; unknownKey = ""; loaded = false
         message = "已清除本机所有雨课堂服务器的登录凭据、Cookie 与草稿；不影响教务或学习通。"
     }
-    override fun onCleared() { stopVisibility(); if (::backend.isInitialized) (backend as? RainApi)?.disable(); super.onCleared() }
+    override fun onCleared() { backgroundJob?.cancel(); stopVisibility(); if (::backend.isInitialized) (backend as? RainApi)?.disable(); super.onCleared() }
 }

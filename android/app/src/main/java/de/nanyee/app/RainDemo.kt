@@ -32,6 +32,12 @@ internal class DemoRainBackend(private val host: RainHost, private val clock: ()
     private fun check(part: RainDemoFailure) { if (failure == part) throw RainFailure(if (part == RainDemoFailure.PROFILE) "SESSION" else "DEMO", "演示：${part.label}，没有发出网络请求。") }
     private fun result(part: RainDemoFailure): RainResult { writes.add(part.name); return when (failure) { RainDemoFailure.UNKNOWN -> RainResult.UNKNOWN; part -> RainResult.REJECTED; else -> RainResult.SUCCESS } }
     override suspend fun user(): RainUser { check(RainDemoFailure.PROFILE); return RainUser("1001", "演示同学") }
+    override suspend fun sendSms(phone: String, proof: RainCaptchaProof) { rainSmsBody(phone, proof); check(RainDemoFailure.PROFILE) }
+    override suspend fun login(method: RainLoginMethod, account: String, code: String, proof: RainCaptchaProof) {
+        rainLoginBody(method, account, code, proof, "offline-device")
+        check(RainDemoFailure.PROFILE)
+        if (method == RainLoginMethod.SMS && code != "123456") throw RainFailure("LOGIN", "演示短信验证码为 123456。")
+    }
     override suspend fun qr(): RainQr { check(RainDemoFailure.QR); return RainQr("offline-token", "https://${host.domain}/demo/login") }
     override suspend fun poll(qr: RainQr) = failure != RainDemoFailure.POLL
     override suspend fun courses(): List<RainCourse> { check(RainDemoFailure.COURSES); return if (failure == RainDemoFailure.EMPTY) emptyList() else listOf(RainCourse("c1", "class1", "航海概论 · 雨课堂演示", "示例教师"), RainCourse("c2", "class2", "高等数学 · 尚未开课", "示例教师")) }

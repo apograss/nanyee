@@ -46,10 +46,11 @@ internal fun RainToolsScreen(state: RainState, demo: Boolean, onBack: () -> Unit
     LaunchedEffect(state) { state.initialize(demo) }
     val owner = LocalView.current.findViewTreeLifecycleOwner()
     DisposableEffect(owner, state) {
+        state.setVisible(true)
         fun sync() { state.setForeground(owner?.lifecycle?.currentState?.isAtLeast(Lifecycle.State.RESUMED) == true) }
         val observer = LifecycleEventObserver { _, _ -> sync() }
         owner?.lifecycle?.addObserver(observer); sync()
-        onDispose { owner?.lifecycle?.removeObserver(observer); state.setForeground(false) }
+        onDispose { owner?.lifecycle?.removeObserver(observer); state.setVisible(false) }
     }
     RainContent(state, onBack) { state.setForeground(false); toggleDemo() }
 }
@@ -99,16 +100,8 @@ private fun RainContent(state: RainState, onBack: () -> Unit, toggleDemo: () -> 
                         Text("${state.user?.name} · 仅本人账号")
                         TextButton(onClick = { localConfirm = "logout" }, enabled = !state.busy) { Text("退出并清除所有雨课堂本机数据…") }
                     } else {
-                        Text("密码和短信登录暂未提供：官方流程在发送短信前也需要腾讯验证码 SDK，未绕过验证码。未接入微信 OAuth。")
-                        Button(onClick = state::beginQr, enabled = !state.busy && state.qr == null) { Text("获取雨课堂登录二维码") }
-                        Text("扫码授权后独立加密保留 Cookie；授权过期需重新扫码，不保存密码。请用另一台设备扫码。")
+                        RainLoginPanel(state)
                         if (state.demo) OutlinedButton(onClick = state::refresh, enabled = !state.busy) { Text("直接载入离线演示账号") }
-                    }
-                    state.qr?.let { qr ->
-                        val bitmap = remember(qr) { runCatching { rainQrBitmap(qr.content) }.getOrNull() }
-                        if (bitmap != null) Image(bitmap.asImageBitmap(), "雨课堂官方登录授权二维码", Modifier.fillMaxWidth().height(260.dp), contentScale = ContentScale.Fit)
-                        Text("前台等待扫码授权，超时自动刷新二维码；离开页面或切到后台即停止等待。")
-                        TextButton(onClick = state::cancelQr) { Text("取消扫码登录") }
                     }
                 }
             }
@@ -254,7 +247,7 @@ internal fun rainConfirmation(action: RainAction): String = when (action) {
     is RainAction.Answer -> "${if (action.retry) "晚交 / 重试" else "正常"}作答：${action.problem.body}\n本人手写内容：${if (action.problem.type == 5) action.draft.text else action.draft.options.joinToString("；") { key -> action.problem.options.firstOrNull { it.key == key }?.let { "$key. ${it.text}" } ?: key }}"
     is RainAction.Export -> "将 ${action.slides.size} 页图片逐张保存到本机相册 Nanyee（Android 10+），超大图安全采样至最多约 400 万像素。保存中可停止，已保存图片不会撤回。不会向课堂提交信息。"
 }
-private fun rainQrBitmap(content: String): Bitmap {
+internal fun rainQrBitmap(content: String): Bitmap {
     val bits = QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, 480, 480)
     return Bitmap.createBitmap(480, 480, Bitmap.Config.ARGB_8888).also { bitmap ->
         val pixels = IntArray(480 * 480) { index -> if (bits[index % 480, index / 480]) android.graphics.Color.BLACK else android.graphics.Color.WHITE }
