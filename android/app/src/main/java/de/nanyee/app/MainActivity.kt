@@ -273,12 +273,13 @@ fun Timetable(state: SchoolState, onCourse: (JsonObject) -> Unit) {
         }
         Text(when { state.demo -> "DEMO · 本机离线示例"; state.timetableUpdatedAt.isNotBlank() -> "本机 · 更新于 ${runCatching { DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.of("Asia/Shanghai")).format(Instant.parse(state.timetableUpdatedAt)) }.getOrDefault("—")}${if (state.cachedMode) " · 未登录" else ""}"; else -> "学校直连 · ${state.calendarHint.ifBlank { "就绪" }}" }, Modifier.padding(start = 16.dp, bottom = 8.dp), style = MaterialTheme.typography.labelSmall, color = InkMuted)
         val signal = timetableSignal(state.courses, state.currentWeek, state.today, now)
+        val signalCopy = timetableSignalCopy(state.currentWeek, signal)
         Surface(color = InkRaised, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
             Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Box(Modifier.size(7.dp).clip(RoundedCornerShape(50)).background(if (signal?.current == true) InkLive else InkAccent))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(if (signal == null) "TODAY / 今日已就绪" else if (signal.current) "NOW / 正在上课" else "NEXT / 下一堂", style = MaterialTheme.typography.labelSmall, color = if (signal?.current == true) InkLive else InkMuted)
-                    Text(signal?.course?.text("name") ?: "今天没有待上的课，留点时间给自己。", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 2)
+                    Text(signalCopy.label, style = MaterialTheme.typography.labelSmall, color = if (signal?.current == true) InkLive else InkMuted)
+                    Text(signalCopy.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 2)
                     if (signal != null) Text("${signal.course.text("location")} · ${signal.minutes}分钟后${if (signal.current) "下课" else "开始"}", style = MaterialTheme.typography.bodySmall, color = InkMuted)
                 }
                 Icon(if (signal?.current == true) Icons.Outlined.GraphicEq else Icons.Outlined.NorthEast, null, tint = if (signal?.current == true) InkLive else InkAccent, modifier = Modifier.size(21.dp))

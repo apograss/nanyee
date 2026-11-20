@@ -5,6 +5,13 @@ import java.time.LocalTime
 import kotlinx.serialization.json.*
 
 internal data class TimetableSignal(val course: JsonObject, val current: Boolean, val minutes: Long)
+internal data class TimetableSignalCopy(val label: String, val title: String)
+
+internal fun timetableSignalCopy(week: Int?, signal: TimetableSignal?): TimetableSignalCopy = when {
+    week == null -> TimetableSignalCopy("TODAY / 校历不可用", "暂时无法判断今天的课程安排。")
+    signal == null -> TimetableSignalCopy("TODAY / 今日已就绪", "今天没有待上的课，留点时间给自己。")
+    else -> TimetableSignalCopy(if (signal.current) "NOW / 正在上课" else "NEXT / 下一堂", signal.course.text("name"))
+}
 
 internal fun timetableSignal(courses: List<JsonObject>, week: Int?, date: LocalDate, time: LocalTime): TimetableSignal? {
     if (week == null) return null

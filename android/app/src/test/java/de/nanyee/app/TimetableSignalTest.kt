@@ -37,6 +37,18 @@ class TimetableSignalTest {
         assertNull(signal("08:40", listOf(buildJsonObject {})))
     }
 
+    @Test fun unavailableCalendarIsNotPresentedAsAnEmptyOrFinishedDay() {
+        val unavailable = timetableSignalCopy(null, signal("08:40", week = null))
+        assertEquals("TODAY / 校历不可用", unavailable.label)
+        assertEquals("暂时无法判断今天的课程安排。", unavailable.title)
+        val finished = timetableSignalCopy(1, signal("20:00"))
+        assertEquals("TODAY / 今日已就绪", finished.label)
+        assertEquals("今天没有待上的课，留点时间给自己。", finished.title)
+        assertEquals(finished, timetableSignalCopy(1, signal("08:40", emptyList())))
+        assertEquals(TimetableSignalCopy("NOW / 正在上课", "人体解剖学"), timetableSignalCopy(1, signal("08:40")))
+        assertEquals(TimetableSignalCopy("NEXT / 下一堂", "人体解剖学"), timetableSignalCopy(1, signal("07:00")))
+    }
+
     @Test fun nowLineFollowsPeriodsAndRestsOnTheBoundaryDuringBreaks() {
         val starts = listOf("08:00", "08:45")
         val ends = listOf("08:40", "09:25")
