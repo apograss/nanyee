@@ -1,7 +1,7 @@
 package de.nanyee.app
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -36,14 +36,17 @@ fun CourseDay(courses: List<JsonObject>, nodes: Int, periodHeight: Dp, onCourse:
                 val span = if (collapse) requireNotNull(courseSpan(group)) else course.number("start_node")..course.number("end_node")
                 val name = course.text("name")
                 val maxTitleLines = if (span.first == span.last) 1 else 3
-                Surface(onClick = { if (collapse && group.size > 1) onConflicts(group) else onCourse(course) }, color = courseFill(name, isSystemInDarkTheme()), contentColor = MaterialTheme.colorScheme.onSurface, shape = RoundedCornerShape(8.dp), modifier = Modifier.offset(x = if (collapse) 0.dp else laneWidth * placement.lane, y = periodHeight * (span.first - 1)).width(laneWidth).padding(end = if (!collapse && placement.laneCount > 1) 2.dp else 0.dp).height(periodHeight * (span.last - span.first + 1) - 4.dp)) {
-                    Column(Modifier.padding(horizontal = 3.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Surface(onClick = { if (collapse && group.size > 1) onConflicts(group) else onCourse(course) }, color = courseFill(name), contentColor = InkText, shape = RoundedCornerShape(8.dp), modifier = Modifier.offset(x = if (collapse) 0.dp else laneWidth * placement.lane, y = periodHeight * (span.first - 1)).width(laneWidth).padding(end = if (!collapse && placement.laneCount > 1) 2.dp else 0.dp).height(periodHeight * (span.last - span.first + 1) - 4.dp)) {
+                    Box(Modifier.fillMaxSize()) {
+                    Box(Modifier.width(3.dp).fillMaxHeight().background(courseAccent(name)))
+                    Column(Modifier.padding(start = 7.dp, end = 3.dp, top = 6.dp, bottom = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Text(course.text("start_time"), Modifier.weight(1f), fontSize = 8.sp, lineHeight = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(course.text("start_time"), Modifier.weight(1f), style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum", letterSpacing = 0.sp), fontSize = 8.sp, lineHeight = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             if (collapse && group.size > 1) Text("+${group.size - 1}", fontSize = 10.sp, lineHeight = 10.sp, maxLines = 1, fontWeight = FontWeight.Bold)
                         }
                         CourseTitle(name, titleStyle, maxTitleLines, Modifier.weight(1f, fill = false).fillMaxWidth())
                         Text(compactRoom(course.text("location")), fontSize = 8.sp, lineHeight = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    }
                     }
                 }
             }

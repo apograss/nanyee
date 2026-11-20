@@ -74,7 +74,7 @@ internal fun semesterStartFromExport(content: String): String = content.lineSequ
 internal fun selectedDetail(savedIdentity: String, dataIdentity: String, index: Int, items: List<JsonObject>): JsonObject? =
     if (savedIdentity.isNotEmpty() && savedIdentity == dataIdentity) items.getOrNull(index) else null
 
-internal fun coursePaletteIndex(name: String): Int = ((name.hashCode().toLong() and 0x7fffffffL) % 6).toInt()
+internal fun coursePaletteIndex(name: String): Int = ((name.hashCode().toLong() and 0x7fffffffL) % 7).toInt()
 internal fun teachingWeekMonday(semesterStart: String, week: Int): LocalDate? = runCatching {
     require(week > 0)
     LocalDate.parse(semesterStart).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).plusWeeks(week.toLong() - 1)

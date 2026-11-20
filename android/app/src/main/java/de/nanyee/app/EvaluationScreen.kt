@@ -48,13 +48,13 @@ internal fun ToolsScreen(school: SchoolState, grab: CourseGrabState, grabDemo: C
             }
         }
         else -> Column(Modifier.widthIn(max = 960.dp).fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant).verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("为校园生活，留一点从容。", Modifier.padding(vertical = 4.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("CAMPUS / 随时就绪", Modifier.padding(vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             val gpa = school.grades?.get("summary")?.obj()?.text("weighted_gpa").orEmpty()
             ToolGrid(listOf(
                 ToolTile("成绩", "绩点、排名与分布", Icons.Outlined.Assessment, SectionAccent.ACADEMIC, if (gpa.isNotBlank()) "GPA ${displayNumber(gpa)}" else "学校直连", school::openGrades),
                 ToolTile("自习舱预约", "预约与我的预约", Icons.Outlined.EventSeat, SectionAccent.SAGE, "平台独立账号", { school.openTool("cabin") }),
                 ToolTile("抢课", "定时抢课与志愿", Icons.Outlined.Bolt, SectionAccent.SERVICE, if (grab.run.active || grabDemo.run.active) "本机任务运行中" else "按志愿依次尝试", { school.openTool("grab") })
-            ))
+            ), wideFirst = true)
         }
     }
 }

@@ -1,6 +1,6 @@
 # Nanyee Android
 
-原生 Kotlin / Jetpack Compose Material 3 客户端，最低 Android 8（API 26）。支持系统深色模式。
+原生 Kotlin / Jetpack Compose Material 3 客户端，最低 Android 8（API 26）。使用固定的 Ink & Signal 墨靛主题，不随系统深浅模式切换；系统栏、弹窗及腾讯验证码 WebView 使用同一深色设定。课表支持日期/周次底部选择器、今日 Now / Next 与实时线、确定性珠宝色课程块；工具采用 GPA 主卡与响应式 bento 网格。
 
 ## 构建和安装
 

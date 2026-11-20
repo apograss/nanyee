@@ -9,7 +9,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import androidx.compose.foundation.isSystemInDarkTheme
+import android.os.Build
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -31,7 +31,6 @@ internal class RainCaptchaBridge(private val loaded: (String) -> Unit, private v
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 internal fun RainCaptchaDialog(onDismiss: () -> Unit, onProof: (RainCaptchaProof) -> Unit) {
-    val dark = isSystemInDarkTheme()
     val nonce = remember { UUID.randomUUID().toString() }
     val closed = remember { AtomicBoolean(false) }
     val currentProof by rememberUpdatedState(onProof)
@@ -48,12 +47,13 @@ internal fun RainCaptchaDialog(onDismiss: () -> Unit, onProof: (RainCaptchaProof
                 AndroidView(modifier = Modifier.weight(1f).fillMaxWidth(), factory = { context ->
                     WebView(context).apply {
                         web = this
-                        setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                        setBackgroundColor(android.graphics.Color.rgb(18, 17, 28))
                         settings.apply {
                             javaScriptEnabled = true; domStorageEnabled = true
                             allowFileAccess = false; allowContentAccess = false
                             mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
                             cacheMode = WebSettings.LOAD_NO_CACHE
+                            if (Build.VERSION.SDK_INT >= 33) isAlgorithmicDarkeningAllowed = true
                         }
                         webViewClient = object : WebViewClient() {
                             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean =
@@ -75,7 +75,7 @@ internal fun RainCaptchaDialog(onDismiss: () -> Unit, onProof: (RainCaptchaProof
                             }
                         }), "RainCaptcha")
                         val html = context.assets.open("rain_captcha.html").bufferedReader().use { it.readText() }
-                            .replace("__NONCE__", nonce).replace("__DARK__", dark.toString()).replace("__TEXT__", if (dark) "#ECEAE3" else "#1F1E1D")
+                            .replace("__NONCE__", nonce).replace("__DARK__", "true").replace("__TEXT__", "#F3F1FA")
                         loadDataWithBaseURL(RAIN_CAPTCHA_ORIGIN, html, "text/html", "UTF-8", RAIN_CAPTCHA_ORIGIN)
                     }
                 })

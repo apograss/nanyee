@@ -1,6 +1,6 @@
 package de.nanyee.app
 
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
 import kotlinx.serialization.json.*
 import org.junit.Assert.*
@@ -17,19 +17,29 @@ class VisualStyleTest {
         assertEquals(1, toolColumnCount(0f, 1f))
     }
 
-    @Test fun courseColoursDependOnlyOnNameAndHaveReadableContrastInBothThemes() {
+    @Test fun jewelColoursDependOnlyOnNameAndHaveReadableContrastOnInk() {
         val names = listOf("人体解剖学", "大学英语", "基础化学", "", "Medical English")
         val first = names.associateWith { coursePaletteIndex(it) }
         assertEquals(first, names.reversed().associateWith { coursePaletteIndex(it) })
-        assertEquals((0..5).toSet(), (0..5).map { coursePaletteIndex(it.toString()) }.toSet())
-        (names + (0..5).map { it.toString() }).forEach { name ->
-            assertTrue(coursePaletteIndex(name) in 0..5)
-            listOf(false, true).forEach { dark ->
-                val foreground = if (dark) Color(0xFFECEAE3) else Color(0xFF1F1E1D)
-                val back = courseFill(name, dark).luminance()
-                val text = foreground.luminance()
+        assertEquals((0..6).toSet(), (0..6).map { coursePaletteIndex(it.toString()) }.toSet())
+        (names + (0..6).map { it.toString() }).forEach { name ->
+            assertTrue(coursePaletteIndex(name) in 0..6)
+            assertEquals(0.22f, courseFill(name).alpha, 0.001f)
+            assertEquals(1f, courseAccent(name).alpha, 0f)
+            listOf(InkBase, InkLive.copy(alpha = 0.035f).compositeOver(InkBase)).forEach { surface ->
+                val back = courseFill(name).compositeOver(surface).luminance()
+                val text = InkText.luminance()
                 assertTrue((maxOf(back, text) + 0.05f) / (minOf(back, text) + 0.05f) >= 7f)
             }
+        }
+    }
+
+    @Test fun fixedPaletteKeepsTextReadableAcrossRaisedSurfaces() {
+        assertEquals(InkBase, inkColors.background)
+        assertEquals(InkAccent, inkColors.primary)
+        listOf(InkBase, InkSurface, InkRaised).forEach { surface ->
+            assertTrue((InkText.luminance() + 0.05f) / (surface.luminance() + 0.05f) >= 7f)
+            assertTrue((InkMuted.luminance() + 0.05f) / (surface.luminance() + 0.05f) >= 4.5f)
         }
     }
 
