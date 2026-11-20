@@ -111,12 +111,12 @@ internal class RainState(application: Application) : AndroidViewModel(applicatio
             try {
                 val login = qr
                 if (login != null) {
-                    val success = backend.poll(login)
+                    renewingClassroomQr(login, refresh = { backend.qr() }, show = { qr = it }, attempts = 1, pause = {}) { current ->
+                        if (backend.poll(current)) ClassroomQrResult.Authorized(Unit) else ClassroomQrResult.Expired
+                    }
                     ensureActive()
-                    if (qr != login) return@launch
                     qr = null
-                    if (success) { loadAccount(); message = "已授权当前本人账号。"; restartVisibility() }
-                    else error = "二维码已超时，请重新获取。"
+                    loadAccount(); message = "已授权当前本人账号。"; restartVisibility()
                 } else if (user != null) {
                     while (isActive) { onLesson = backend.onLesson(); delay(3000) }
                 }

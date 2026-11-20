@@ -15,8 +15,12 @@ internal data class EvaluationReference(val teacher: String, val hour: String, v
     val key get() = listOf(teacher, hour, questionnaire).joinToString("|")
     fun validate() { require(listOf(teacher, hour, questionnaire).all { it.matches(Regex("[A-Za-z0-9_.:-]{1,128}")) }) }
 }
-internal data class EvaluationOption(val code: String, val score: Int, val label: String)
-internal data class EvaluationQuestion(val type: Int, val indicator: String, val title: String, val options: List<EvaluationOption>)
+internal enum class EvaluationScoreOrigin { EXPLICIT, MISSING, INVALID }
+internal data class EvaluationOption(val code: String, val score: Int, val label: String, val scoreOrigin: EvaluationScoreOrigin = EvaluationScoreOrigin.EXPLICIT, val explicitZero: Boolean = score == 0 && scoreOrigin == EvaluationScoreOrigin.EXPLICIT)
+internal data class EvaluationQuestion(val type: Int, val indicator: String, val title: String, val options: List<EvaluationOption>, val initialText: String = "", val textLimit: Int = 2000) {
+    val isText get() = type == 3
+    val nonScoring get() = options.isNotEmpty() && options.all { it.score == 0 && it.scoreOrigin == EvaluationScoreOrigin.EXPLICIT && it.explicitZero }
+}
 internal data class EvaluationDraft(val reference: EvaluationReference, val hidden: Map<String, String>, val questions: List<EvaluationQuestion>)
 internal data class EvaluationPreview(val draft: EvaluationDraft, val selections: Map<String, String>)
 
@@ -69,20 +73,27 @@ internal fun evaluationDraft(html: String, reference: EvaluationReference): Eval
         val indicator = boundedEvaluationText(node.attr("data-zbdm"), 128)
         val type = node.attr("data-txdm").toIntOrNull() ?: 0
         val raty = node.selectFirst("div.raty")
+        fun scoreOrigin(raw: String?) = when {
+            raw == null -> EvaluationScoreOrigin.MISSING
+            raw.toDoubleOrNull()?.isFinite() != true -> EvaluationScoreOrigin.INVALID
+            else -> EvaluationScoreOrigin.EXPLICIT
+        }
         val values = raty?.attr("data-wtxm")?.takeIf { it.length <= 20000 }?.let { runCatching { Json.parseToJsonElement(it) as? JsonArray }.getOrNull() }
         val options = if (!values.isNullOrEmpty()) {
             val full = raty!!.attr("data-fz").toDoubleOrNull()?.takeIf { it.isFinite() } ?: 0.0
             values.take(20).mapIndexedNotNull { index, raw ->
                 val item = raw as? JsonObject ?: return@mapIndexedNotNull null
                 val code = item.evaluationText("zbxmdm", 128)
-                if (code.isEmpty()) null else EvaluationOption(code, Math.rint(full * (index + 1) / values.size).toInt().coerceIn(0, 100), boundedEvaluationText(item.text("zbxmmc").ifEmpty { item.text("mc") }.ifEmpty { code }, 100))
+                if (code.isEmpty()) null else EvaluationOption(code, Math.rint(full * (index + 1) / values.size).toInt().coerceIn(0, 100), boundedEvaluationText(item.text("zbxmmc").ifEmpty { item.text("mc") }.ifEmpty { code }, 100), scoreOrigin(raty.attr("data-fz").takeIf { raty.hasAttr("data-fz") }), raty.attr("data-fz").toDoubleOrNull() == 0.0)
             }
         } else if (type == 3) emptyList() else node.select("input[type=radio]").take(20).mapNotNull { input ->
             val code = boundedEvaluationText(input.attr("value"), 128)
             val label = boundedEvaluationText(input.attr("data-mc"), 100).ifEmpty { boundedEvaluationText(input.parents().firstOrNull { it.tagName() == "label" }?.text().orEmpty(), 100) }.ifEmpty { code }
-            if (code.isEmpty()) null else EvaluationOption(code, Math.rint(input.attr("data-fz").toDoubleOrNull()?.takeIf { it.isFinite() } ?: 0.0).toInt().coerceIn(0, 100), label)
+            if (code.isEmpty()) null else EvaluationOption(code, Math.rint(input.attr("data-fz").toDoubleOrNull()?.takeIf { it.isFinite() } ?: 0.0).toInt().coerceIn(0, 100), label, scoreOrigin(input.attr("data-fz").takeIf { input.hasAttr("data-fz") }), input.attr("data-fz").toDoubleOrNull() == 0.0)
         }
-        options.distinctBy { it.code }.takeIf { indicator.isNotEmpty() && it.isNotEmpty() }?.let { EvaluationQuestion(type, indicator, boundedEvaluationText(node.selectFirst("h3")?.text().orEmpty(), 500), it) }
+        val text = node.selectFirst("textarea, input[type=text]")
+        val limit = text?.attr("maxlength")?.toIntOrNull()?.coerceIn(1, 2000) ?: 2000
+        options.distinctBy { it.code }.takeIf { indicator.isNotEmpty() && (type == 3 || it.isNotEmpty()) }?.let { EvaluationQuestion(type, indicator, boundedEvaluationText(node.selectFirst("h3")?.text().orEmpty(), 500), it, if (type == 3) text?.`val`().orEmpty().take(limit) else "", limit) }
     }.distinctBy { it.indicator }
     require(questions.isNotEmpty()) { "评课尚未开放或表单无法读取" }
     return EvaluationDraft(reference.copy(teacherName = fields.getValue("teaxm").take(100), courseName = fields["kcmc"].orEmpty().ifEmpty { fields.getValue("kcdm") }.take(200)), fields.filterKeys { it in required }, questions)
@@ -92,20 +103,46 @@ internal fun evaluationAnswers(draft: EvaluationDraft, random: Random = Random.D
     val profile = listOf(listOf(0, 0, 1, 1), listOf(0, 1, 1, 2), listOf(1, 1, 1, 1), listOf(0, 1, 1, 1)).random(random).shuffled(random)
     var index = 0
     return draft.questions.associate { question ->
+        if (question.isText) return@associate question.indicator to question.initialText
         val scored = question.options.filter { it.score > 0 }.sortedByDescending { it.score }
         val option = if (scored.isEmpty()) question.options.last() else scored[profile[index++ % profile.size].coerceAtMost(scored.lastIndex)]
         question.indicator to option.code
     }
 }
 
+internal fun validateEvaluationAnswer(question: EvaluationQuestion, value: String) {
+    if (question.isText) require(value.length <= question.textLimit && value.none { it < ' ' && it !in "\n\r\t" }) { "评课文字过长或包含无效字符" }
+    else require(question.options.any { it.code == value }) { "评课选项已失效" }
+}
+internal fun evaluationTotal(preview: EvaluationPreview): Int {
+    require(preview.selections.keys == preview.draft.questions.map { it.indicator }.toSet())
+    return preview.draft.questions.sumOf { question ->
+        val value = preview.selections.getValue(question.indicator)
+        validateEvaluationAnswer(question, value)
+        if (question.isText) 0 else question.options.first { it.code == value }.score
+    }
+}
+internal fun evaluationAnswerLabel(question: EvaluationQuestion, value: String): String {
+    validateEvaluationAnswer(question, value)
+    if (question.isText) return value
+    val option = question.options.first { it.code == value }
+    val score = when {
+        question.nonScoring -> "不计分"
+        option.scoreOrigin != EvaluationScoreOrigin.EXPLICIT -> "分值缺失或无效"
+        else -> "${option.score} 分"
+    }
+    return "${option.label} · $score"
+}
+
 internal fun evaluationSubmission(preview: EvaluationPreview): Map<String, String> {
     val draft = preview.draft
     draft.reference.validate()
-    require(preview.selections.keys == draft.questions.map { it.indicator }.toSet())
-    var total = 0
+    val total = evaluationTotal(preview)
     val answers = draft.questions.map { q ->
+        if (q.isText) return@map buildJsonObject {
+            put("txdm", q.type); put("zbdm", q.indicator); put("zbmc", q.title); put("zbxmdm", ""); put("fz", 0); put("dtjg", preview.selections.getValue(q.indicator))
+        }
         val option = q.options.firstOrNull { it.code == preview.selections[q.indicator] } ?: error("评课选项已失效")
-        total += option.score
         buildJsonObject {
             put("txdm", q.type); put("zbdm", q.indicator); put("zbmc", q.title); put("zbxmdm", option.code); put("fz", option.score)
             put("dtjg", if (q.type == 5) "★".repeat(q.options.indexOf(option) + 1) else option.label)

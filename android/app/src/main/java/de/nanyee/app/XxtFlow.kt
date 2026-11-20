@@ -45,6 +45,12 @@ internal class DemoXxtBackend : XxtBackend {
     private val classroomDemo = XxtClassroomDemo()
     private val current = XxtUser("12345", "演示同学")
     override suspend fun login(account: String, password: String) = current
+    override suspend fun sendSms(phone: String) { require(phone.matches(Regex("1[0-9]{10}"))) }
+    override suspend fun loginSms(phone: String, code: String): XxtUser {
+        require(phone.matches(Regex("1[0-9]{10}")))
+        if (code != "123456") throw XxtFailure("LOGIN", "演示：验证码错误，请输入 123456。")
+        return current
+    }
     override suspend fun user() = current
     override suspend fun courses() = listOf(XxtCourse("demo", "demo-class", "demo-cpi", "学习通课堂体验", "演示老师"))
     override suspend fun activities(course: XxtCourse): List<XxtActivity> {

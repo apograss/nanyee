@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.random.Random
 
 internal class ManualEvaluationRun {
     var preview by mutableStateOf(emptyList<EvaluationPreview>()); private set
@@ -16,14 +17,30 @@ internal class ManualEvaluationRun {
     suspend fun prepare(source: EvaluationSource, references: List<EvaluationReference>) {
         preview = emptyList(); results = emptyList(); progress = 0; confirmed = false; stale = false
         require(references.isNotEmpty())
+        require(references.distinctBy { it.key }.size == references.size)
         val drafts = references.map { source.draft(it) }
         preview = drafts.map { EvaluationPreview(it, evaluationAnswers(it)) }
     }
+    private fun updateCourse(key: String, change: (EvaluationPreview) -> EvaluationPreview) {
+        check(!confirmed && !stale) { "本轮预览已失效" }
+        val index = preview.indexOfFirst { it.draft.reference.key == key }
+        require(index >= 0) { "评课课程已失效" }
+        val updated = change(preview[index])
+        evaluationTotal(updated)
+        preview = preview.mapIndexed { i, value -> if (i == index) updated else value }
+    }
+    fun setAnswer(course: String, indicator: String, value: String) = updateCourse(course) { current ->
+        val question = requireNotNull(current.draft.questions.firstOrNull { it.indicator == indicator }) { "评课题目已失效" }
+        validateEvaluationAnswer(question, value)
+        current.copy(selections = current.selections + (indicator to value))
+    }
+    fun randomize(course: String, random: Random = Random.Default) = updateCourse(course) { current -> current.copy(selections = evaluationAnswers(current.draft, random)) }
     fun dismiss() { preview = emptyList() }
     fun reset() { dismiss(); results = emptyList(); progress = 0; confirmed = false; stale = false }
     fun markStale() { dismiss(); if (confirmed) stale = true }
     suspend fun submit(source: EvaluationSource) {
         check(!confirmed && preview.isNotEmpty())
+        preview.forEach { evaluationSubmission(it) }
         confirmed = true
         val values = preview
         preview = emptyList()
@@ -115,7 +132,8 @@ internal class DemoEvaluationSource(
     }
     override suspend fun draft(reference: EvaluationReference) = EvaluationDraft(reference, emptyMap(), listOf(
         EvaluationQuestion(5, "quality", "教学质量", (1..5).map { EvaluationOption("option-$it", it * 5, "满意度 $it") }),
-        EvaluationQuestion(1, "attendance", "是否迟到", listOf(EvaluationOption("yes", 0, "是"), EvaluationOption("no", 0, "否")))
+        EvaluationQuestion(1, "attendance", "是否迟到（不计分）", listOf(EvaluationOption("yes", 0, "是"), EvaluationOption("no", 0, "否"))),
+        EvaluationQuestion(3, "comment", "意见与建议", emptyList(), "演示：建议增加案例讨论。")
     ))
     override suspend fun submit(preview: EvaluationPreview): Int {
         pause()
@@ -123,6 +141,6 @@ internal class DemoEvaluationSource(
             throw SchoolError(502, "UPSTREAM_ERROR", "演示：第二门课程上游提交失败")
         evaluationSubmission(preview)
         remaining.removeAll { it.key == preview.draft.reference.key }
-        return preview.draft.questions.sumOf { q -> q.options.first { it.code == preview.selections[q.indicator] }.score }
+        return evaluationTotal(preview)
     }
 }

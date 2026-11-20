@@ -1,5 +1,7 @@
 package de.nanyee.app
 
+import androidx.compose.foundation.background
+
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -71,7 +73,7 @@ private fun RainContent(state: RainState, onBack: () -> Unit, toggleDemo: () -> 
         }
     }
     BackHandler(onBack = back)
-    PullToRefreshBox(isRefreshing = state.busy, onRefresh = { if (state.user != null && !state.busy && state.lesson == null) state.refresh() }, modifier = Modifier.widthIn(max = 920.dp).fillMaxSize()) {
+    PullToRefreshBox(isRefreshing = state.busy, onRefresh = { if (state.user != null && !state.busy && state.lesson == null) state.refresh() }, modifier = Modifier.widthIn(max = 920.dp).fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant)) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (state.lesson != null || state.qr != null) TextButton(onClick = back, enabled = !state.busy) { Text(if (state.lesson != null) "离开课堂并返回课程" else "取消二维码登录") }
         ClassroomAccountRow(state.user?.name ?: "未登录雨课堂", "雨课堂", state.demo, !state.busy, state.user != null, { localConfirm = "logout" }, toggleDemo)
@@ -97,7 +99,7 @@ private fun RainContent(state: RainState, onBack: () -> Unit, toggleDemo: () -> 
                         Text("${state.user?.name} · 仅本人账号")
                         TextButton(onClick = { localConfirm = "logout" }, enabled = !state.busy) { Text("退出并清除所有雨课堂本机数据…") }
                     } else {
-                        Text("密码登录暂未提供：官方流程需要腾讯验证码 SDK，未绕过验证码。未接入微信 OAuth。")
+                        Text("密码和短信登录暂未提供：官方流程在发送短信前也需要腾讯验证码 SDK，未绕过验证码。未接入微信 OAuth。")
                         Button(onClick = state::beginQr, enabled = !state.busy && state.qr == null) { Text("获取雨课堂登录二维码") }
                         Text("扫码授权后独立加密保留 Cookie；授权过期需重新扫码，不保存密码。请用另一台设备扫码。")
                         if (state.demo) OutlinedButton(onClick = state::refresh, enabled = !state.busy) { Text("直接载入离线演示账号") }
@@ -105,7 +107,7 @@ private fun RainContent(state: RainState, onBack: () -> Unit, toggleDemo: () -> 
                     state.qr?.let { qr ->
                         val bitmap = remember(qr) { runCatching { rainQrBitmap(qr.content) }.getOrNull() }
                         if (bitmap != null) Image(bitmap.asImageBitmap(), "雨课堂官方登录授权二维码", Modifier.fillMaxWidth().height(260.dp), contentScale = ContentScale.Fit)
-                        Text("前台等待扫码授权… 离开页面或切到后台即停止等待。")
+                        Text("前台等待扫码授权，超时自动刷新二维码；离开页面或切到后台即停止等待。")
                         TextButton(onClick = state::cancelQr) { Text("取消扫码登录") }
                     }
                 }
@@ -116,9 +118,9 @@ private fun RainContent(state: RainState, onBack: () -> Unit, toggleDemo: () -> 
                     Text("下拉刷新 · 每 3 秒前台检查开课 · 不自动加入", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (state.loaded && state.courses.isEmpty()) Text("暂无课程。")
                     state.courses.forEach { course ->
-                        Card(Modifier.fillMaxWidth()) {
+                        Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                SectionHeading(course.name, course.teacher, Icons.Outlined.AutoStories)
+                                CourseHeading(course.name, course.teacher)
                                 val lessons = state.onLesson.filter { it.courseId == course.id }
                                 if (lessons.isEmpty()) Text("当前未在上课")
                                 lessons.forEach { lesson -> Button(onClick = { state.previewJoin(lesson.lessonId, course.name) }, enabled = !state.busy && state.unknownKey.isBlank()) { Text("正在上课 · 预览课堂签到 / 加入") } }

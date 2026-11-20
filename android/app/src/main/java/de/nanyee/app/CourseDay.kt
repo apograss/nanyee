@@ -1,6 +1,7 @@
 package de.nanyee.app
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -10,7 +11,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -23,7 +23,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.serialization.json.JsonObject
 
 @Composable
-fun CourseDay(courses: List<JsonObject>, allCourses: List<JsonObject>, colors: List<Color>, nodes: Int, periodHeight: Dp, onCourse: (JsonObject) -> Unit, onConflicts: (List<JsonObject>) -> Unit, modifier: Modifier = Modifier) {
+fun CourseDay(courses: List<JsonObject>, nodes: Int, periodHeight: Dp, onCourse: (JsonObject) -> Unit, onConflicts: (List<JsonObject>) -> Unit, modifier: Modifier = Modifier) {
     val titleStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp, lineHeight = 14.sp, fontWeight = FontWeight.Bold, lineBreak = LineBreak.Heading, hyphens = Hyphens.None)
     BoxWithConstraints(modifier.height(periodHeight * nodes)) {
         courseGroups(courses).forEach { group ->
@@ -36,7 +36,7 @@ fun CourseDay(courses: List<JsonObject>, allCourses: List<JsonObject>, colors: L
                 val span = if (collapse) requireNotNull(courseSpan(group)) else course.number("start_node")..course.number("end_node")
                 val name = course.text("name")
                 val maxTitleLines = if (span.first == span.last) 1 else 3
-                Surface(onClick = { if (collapse && group.size > 1) onConflicts(group) else onCourse(course) }, color = colors[allCourses.indexOf(course).coerceAtLeast(0) % colors.size], shape = RoundedCornerShape(8.dp), modifier = Modifier.offset(x = if (collapse) 0.dp else laneWidth * placement.lane, y = periodHeight * (span.first - 1)).width(laneWidth).padding(end = if (!collapse && placement.laneCount > 1) 2.dp else 0.dp).height(periodHeight * (span.last - span.first + 1) - 4.dp)) {
+                Surface(onClick = { if (collapse && group.size > 1) onConflicts(group) else onCourse(course) }, color = courseFill(name, isSystemInDarkTheme()), contentColor = MaterialTheme.colorScheme.onSurface, shape = RoundedCornerShape(8.dp), modifier = Modifier.offset(x = if (collapse) 0.dp else laneWidth * placement.lane, y = periodHeight * (span.first - 1)).width(laneWidth).padding(end = if (!collapse && placement.laneCount > 1) 2.dp else 0.dp).height(periodHeight * (span.last - span.first + 1) - 4.dp)) {
                     Column(Modifier.padding(horizontal = 3.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Text(course.text("start_time"), Modifier.weight(1f), fontSize = 8.sp, lineHeight = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)

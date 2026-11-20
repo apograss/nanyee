@@ -49,15 +49,13 @@ class XxtTest {
         assertEquals(384, Base64.getDecoder().decode(xxtRsa("a".repeat(300))).size)
         assertThrows(Exception::class.java) { xxtRsa("not-base64", true) }
     }
-    @Test fun passwordRequestEncryptsBothFields() {
+    @Test fun passwordRequestUsesNativeAppEcbLoginInfo() {
         val request = xxtLoginRequest("student", "password123")
-        assertEquals("POST", request.method); assertEquals("/fanyalogin", request.url.encodedPath)
+        assertEquals("POST", request.method); assertEquals("passport2-api.chaoxing.com", request.url.host)
+        assertEquals("/v11/loginregister", request.url.encodedPath); assertEquals("json", request.url.queryParameter("cx_xxt_passport"))
         val body = request.body as FormBody
         val fields = (0 until body.size).associate { body.name(it) to body.value(it) }
-        assertEquals(setOf("fid", "uname", "password", "t", "forbidotherlogin", "validate"), fields.keys)
-        assertEquals("iX1+cDcgXWbkvMo7rBczPQ==", fields["uname"])
-        assertNotEquals("password123", fields["password"]); assertEquals("-1", fields["fid"])
-        assertEquals("u6MPgYD3sHFWBGcciuyB6w==", fields["password"])
+        assertEquals(mapOf("logininfo" to "IV+A4oy65pZSZvDzU1GZ5tZyjuAgEmu8VRjNJgvrVwSHIEi7r85mE+qfIADeymnD", "loginType" to "1", "roleSelect" to "true", "entype" to "1"), fields)
     }
     @Test fun signedQueriesPreserveSourceOrderAndUriEscaping() {
         val fields = linkedMapOf("courseId" to "101", "classId" to "201", "uid" to "12345", "cpi" to "301", "joinclasstime" to "a b&中")

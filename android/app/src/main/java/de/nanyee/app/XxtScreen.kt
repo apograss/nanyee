@@ -8,6 +8,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -29,6 +30,10 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.findViewTreeLifecycleOwner
+import androidx.compose.ui.platform.LocalView
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import java.io.File
@@ -45,15 +50,24 @@ internal fun XxtToolsScreen(onBack: () -> Unit) {
     val fake: XxtState = viewModel(key = "xuexitong-demo")
     val state = if (demo) fake else real
     LaunchedEffect(state) { state.initialize(demo) }
+    val owner = LocalView.current.findViewTreeLifecycleOwner()
+    DisposableEffect(owner, state) {
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_PAUSE) state.stopQrLogin() }
+        owner?.lifecycle?.addObserver(observer)
+        onDispose { owner?.lifecycle?.removeObserver(observer); state.stopQrLogin() }
+    }
     XxtScreen(state, onBack, onToggleDemo = { demo = !demo })
 }
 
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 private fun XxtScreen(state: XxtState, onBack: () -> Unit, onToggleDemo: () -> Unit) {
     val context = LocalContext.current
     var account by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var smsCode by remember { mutableStateOf("") }
+    var method by rememberSaveable { mutableStateOf("password") }
+    var confirmSms by remember { mutableStateOf(false) }
     var rememberPassword by rememberSaveable { mutableStateOf(false) }
     var cameraUri by rememberSaveable { mutableStateOf("") }
     var pendingPhoto by rememberSaveable { mutableStateOf("") }
@@ -71,10 +85,10 @@ private fun XxtScreen(state: XxtState, onBack: () -> Unit, onToggleDemo: () -> U
     }
     LaunchedEffect(pendingPhoto, state.busy) { if (pendingPhoto.isNotBlank() && !state.busy) { val uri = Uri.parse(pendingPhoto); pendingPhoto = ""; state.importPhoto(uri) } }
     LaunchedEffect(pendingScan, state.busy) { if (pendingScan.isNotBlank() && !state.busy) { state.scanned(pendingScan); pendingScan = "" } }
-    LaunchedEffect(state.user) { if (state.user != null) password = "" }
+    LaunchedEffect(state.user) { if (state.user != null) { password = ""; smsCode = "" } }
     val back = { if (!state.busy) { if (state.course != null) state.back() else onBack() } }
-    BackHandler { if (state.qrLogin != null) state.stopQrLogin() else back() }
-    PullToRefreshBox(isRefreshing = state.busy, onRefresh = { if (state.user != null && !state.busy) state.refresh() }, modifier = Modifier.widthIn(max = 720.dp).fillMaxSize()) {
+    BackHandler { if (state.qrLogin != null || (method == "qr" && state.busy)) state.stopQrLogin() else back() }
+    PullToRefreshBox(isRefreshing = state.busy, onRefresh = { if (state.user != null && !state.busy) state.refresh() }, modifier = Modifier.widthIn(max = 720.dp).fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant)) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (state.course != null) TextButton(onClick = back, enabled = !state.busy) { Text(if (state.activity == null) "返回课程" else "返回活动") }
         ClassroomAccountRow(state.user?.name ?: "未登录学习通", "学习通", state.demo, !state.busy, state.user != null, state::logout, onToggleDemo)
@@ -86,25 +100,42 @@ private fun XxtScreen(state: XxtState, onBack: () -> Unit, onToggleDemo: () -> U
             Text("上次提交结果未知。在官方学习通核验前，所有写入均已阻止。")
             TextButton(onClick = state::acknowledgeUnknown, enabled = !state.busy) { Text("我已在官方学习通核验，解除写入阻止") }
         }
-        if (state.user == null || state.qrLogin != null) Card(Modifier.fillMaxWidth()) {
+        if (state.user == null || state.qrLogin != null) Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("学习通账号", style = MaterialTheme.typography.titleLarge)
                 val user = state.user
                 if (user != null) {
                     Text("${user.name} · 仅本人账号")
                     TextButton(onClick = state::logout, enabled = !state.busy || state.qrLogin != null) { Text("退出并清除学习通数据") }
-                } else if (!state.demo) {
-                    OutlinedTextField(account, { account = it }, label = { Text("学习通账号") }, singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !state.busy)
-                    OutlinedTextField(password, { password = it }, label = { Text("学习通密码") }, visualTransformation = PasswordVisualTransformation(), singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !state.busy)
-                    Row { Checkbox(rememberPassword, { rememberPassword = it }, enabled = !state.busy); Text("加密保存凭据，过期时自动重新登录", Modifier.weight(1f).padding(top = 12.dp)) }
-                    Button(onClick = { state.login(account, password, rememberPassword) }, enabled = !state.busy && account.isNotBlank() && password.isNotBlank()) { Text("密码登录") }
-                    OutlinedButton(onClick = state::beginQrLogin, enabled = !state.busy) { Text("显示学习通登录二维码") }
-                    Text("二维码由官方学习通 App 授权；授权后加密保留 Cookie，不保存密码。")
-                } else Button(onClick = state::refresh, enabled = !state.busy) { Text("重新进入演示账号") }
+                } else {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("password" to "密码", "sms" to "短信", "qr" to "二维码").forEach { (key, label) ->
+                            FilterChip(selected = method == key, onClick = { state.stopQrLogin(); method = key; password = ""; smsCode = "" }, enabled = !state.busy || state.qrLogin != null, label = { Text(label) })
+                        }
+                    }
+                    if (method != "qr") OutlinedTextField(account, { account = it }, label = { Text(if (method == "sms") "中国大陆手机号" else "学习通账号") }, singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !state.busy)
+                    when (method) {
+                        "password" -> {
+                            OutlinedTextField(password, { password = it }, label = { Text("学习通密码") }, visualTransformation = PasswordVisualTransformation(), singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !state.busy)
+                            Row { Checkbox(rememberPassword, { rememberPassword = it }, enabled = !state.busy); Text("加密保存凭据，过期时自动重新登录", Modifier.weight(1f).padding(top = 12.dp)) }
+                            Button(onClick = { state.login(account, password, rememberPassword); password = "" }, enabled = !state.busy && account.isNotBlank() && password.isNotBlank()) { Text("密码登录") }
+                        }
+                        "sms" -> {
+                            OutlinedTextField(smsCode, { smsCode = it }, label = { Text("短信验证码") }, singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !state.busy)
+                            OutlinedButton(onClick = { confirmSms = true }, enabled = !state.busy && state.smsResendSeconds == 0 && account.matches(Regex("1[0-9]{10}"))) { Text(if (state.smsResendSeconds > 0) "${state.smsResendSeconds}s 后重发" else "发送验证码") }
+                            Button(onClick = { state.loginSms(account, smsCode); smsCode = "" }, enabled = !state.busy && account.matches(Regex("1[0-9]{10}")) && smsCode.matches(Regex("[0-9]{4,8}"))) { Text("短信登录") }
+                            Text(if (state.demo) "演示验证码：123456；不会发送短信。" else "验证码仅用于本次登录，不会保存。")
+                        }
+                        else -> {
+                            OutlinedButton(onClick = state::beginQrLogin, enabled = !state.busy) { Text("显示学习通登录二维码") }
+                            Text("二维码由官方学习通 App 授权；授权后加密保留 Cookie，不保存密码。")
+                        }
+                    }
+                }
                 state.qrLogin?.let { qr ->
                     val bitmap = remember(qr) { BitmapFactory.decodeByteArray(qr.image, 0, qr.image.size) }
                     if (bitmap != null) Image(bitmap.asImageBitmap(), "用官方学习通扫码授权登录", Modifier.fillMaxWidth().height(240.dp), contentScale = ContentScale.Fit)
-                    Text("等待授权中（最多 3 分钟）… 请用另一台设备显示或扫描此二维码。")
+                    Text("前台等待授权，失效后自动刷新；请用另一台设备扫码。")
                     TextButton(onClick = state::stopQrLogin) { Text("取消二维码登录") }
                 }
             }
@@ -116,7 +147,9 @@ private fun XxtScreen(state: XxtState, onBack: () -> Unit, onToggleDemo: () -> U
                 Text("下拉刷新 · 仅本人账号", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (state.loaded && state.courses.isEmpty()) Text("暂无学习通课程。")
                 state.courses.forEach { row ->
-                    CompactEntry(row.name, row.teacher, Icons.Outlined.AutoStories, SectionAccent.ACADEMIC, enabled = !state.busy, onClick = { state.selectCourse(row) })
+                    Card(onClick = { state.selectCourse(row) }, enabled = !state.busy, modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                        Row(Modifier.padding(12.dp)) { CourseHeading(row.name, row.teacher) }
+                    }
                 }
             } else if (activity == null) {
                 Text(course.name, style = MaterialTheme.typography.titleLarge)
@@ -181,6 +214,9 @@ private fun XxtScreen(state: XxtState, onBack: () -> Unit, onToggleDemo: () -> U
             }
         }
     }
+    if (confirmSms) AlertDialog(onDismissRequest = { confirmSms = false }, title = { Text("发送学习通验证码？") }, text = { Text(if (state.demo) "仅模拟发送，不会发送真实短信。" else "将向 $account 发送登录短信验证码。") }, confirmButton = {
+        TextButton(onClick = { confirmSms = false; state.sendSms(account) }) { Text("确认发送") }
+    }, dismissButton = { TextButton(onClick = { confirmSms = false }) { Text("取消") } })
     }
     state.confirmation?.let { plan ->
         AlertDialog(onDismissRequest = state::dismissConfirmation, title = { Text("确认本人签到") }, text = {

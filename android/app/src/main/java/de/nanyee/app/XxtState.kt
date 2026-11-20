@@ -18,6 +18,9 @@ internal class XxtState(app: Application, private val savedState: SavedStateHand
     private var backend: XxtBackend? = null
     private var work: Job? = null
     private var draftWork: Job? = null
+    private var smsCountdown: Job? = null
+    private var qrLoggingIn = false
+    var smsResendSeconds by mutableIntStateOf(classroomSmsResendSeconds(savedState.get<Long>("smsRetryAt") ?: 0, System.currentTimeMillis())); private set
     private var initialized = false
     private var generation = 0
     private var flow = XxtFlow()
@@ -89,6 +92,7 @@ internal class XxtState(app: Application, private val savedState: SavedStateHand
     fun initialize(asDemo: Boolean) {
         if (initialized) return
         initialized = true; demo = asDemo
+        resumeSmsCountdown()
         run {
                 val journal = if (demo) savedState.get<String>("draft").orEmpty() else withContext(Dispatchers.IO) { storage.read("journal") }
                 val restored = runCatching { Json.decodeFromString<XxtJournal>(journal) }.getOrNull()
@@ -107,26 +111,49 @@ internal class XxtState(app: Application, private val savedState: SavedStateHand
     fun login(account: String, password: String, remember: Boolean) = run {
         require(account.isNotBlank() && password.isNotBlank())
         acceptLogin(api().login(account, password))
-        withContext(Dispatchers.IO) { storage.write("account", if (remember) account else ""); storage.write("password", if (remember) password else ""); storage.write("active", "true") }
+        if (!demo) withContext(Dispatchers.IO) { storage.write("account", if (remember) account else ""); storage.write("password", if (remember) password else ""); storage.write("active", "true") }
+        courses = api().courses(); loaded = true
+    }
+    private fun resumeSmsCountdown() {
+        smsCountdown?.cancel()
+        smsCountdown = viewModelScope.launch {
+            do {
+                smsResendSeconds = classroomSmsResendSeconds(savedState.get<Long>("smsRetryAt") ?: 0, System.currentTimeMillis())
+                if (smsResendSeconds > 0) delay(1000)
+            } while (smsResendSeconds > 0)
+        }
+    }
+    fun sendSms(phone: String) = run {
+        require(phone.matches(Regex("1[0-9]{10}")) && classroomSmsResendSeconds(savedState.get<Long>("smsRetryAt") ?: 0, System.currentTimeMillis()) == 0)
+        savedState["smsRetryAt"] = System.currentTimeMillis() + 60000
+        resumeSmsCountdown()
+        api().sendSms(phone)
+        message = if (demo) "演示：未发送真实短信，验证码为 123456。" else "验证码已发送，请查看短信。"
+    }
+    fun loginSms(phone: String, value: String) = run {
+        require(phone.matches(Regex("1[0-9]{10}")) && value.matches(Regex("[0-9]{4,8}")))
+        acceptLogin(api().loginSms(phone, value))
+        if (!demo) withContext(Dispatchers.IO) { storage.write("account", ""); storage.write("password", ""); storage.write("active", "true") }
         courses = api().courses(); loaded = true
     }
     fun beginQrLogin() = run {
-        qrLogin = api().qrLogin()
+        qrLoggingIn = true
+        val token = generation
         try {
-            repeat(90) {
-                delay(2000)
-                val result = api().pollQr(qrLogin!!)
-                if (result != null) {
-                    acceptLogin(result)
-                    withContext(Dispatchers.IO) { storage.write("account", ""); storage.write("password", ""); storage.write("active", "true") }
-                    qrLogin = null; courses = api().courses(); loaded = true
-                    return@run
+            val backend = api()
+            val result = renewingClassroomQr(backend.qrLogin(), backend::qrLogin, { qrLogin = it }) { qr ->
+                try {
+                    backend.pollQr(qr)?.let { ClassroomQrResult.Authorized(it) } ?: ClassroomQrResult.Waiting
+                } catch (e: XxtFailure) {
+                    if (e.kind == "QR_EXPIRED") ClassroomQrResult.Expired else throw e
                 }
             }
-            error = "登录二维码已过期，请重新获取。"
-        } finally { qrLogin = null }
+            acceptLogin(result)
+            if (!demo) withContext(Dispatchers.IO) { storage.write("account", ""); storage.write("password", ""); storage.write("active", "true") }
+            qrLogin = null; courses = backend.courses(); loaded = true
+        } finally { if (token == generation) { qrLogin = null; qrLoggingIn = false } }
     }
-    fun stopQrLogin() { if (qrLogin != null) { work?.cancel(); qrLogin = null; busy = false } }
+    fun stopQrLogin() { if (qrLoggingIn) { generation++; work?.cancel(); qrLoggingIn = false; qrLogin = null; busy = false } }
     fun refresh() = run {
         user = read { api().user() }; courses = read { api().courses() }; loaded = true
         course?.let { activities = read { api().activities(it) } }

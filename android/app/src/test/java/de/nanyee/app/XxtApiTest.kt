@@ -78,12 +78,59 @@ class XxtApiTest {
         repeat(2) { assertEquals("RATE", (runCatching { api.courses() }.exceptionOrNull() as XxtFailure).kind) }
         assertEquals(1, script.requests.size)
     }
-    @Test fun redirectsAndHtmlAreExpiredSessionsNotEmptyCourses() = runBlocking {
-        for (reply in listOf(Reply(code = 302, headers = mapOf("Location" to "https://passport2.chaoxing.com/login")), Reply("<html>login private details</html>"))) {
+    @Test fun htmlAndUnauthorizedRepliesAreExpiredSessionsNotEmptyCourses() = runBlocking {
+        for (reply in listOf(Reply(code = 401), Reply("<html>login private details</html>"))) {
             val script = Script { reply }; val api = XxtApi(MemoryXxtStorage(), script)
             val failure = runCatching { api.courses() }.exceptionOrNull() as XxtFailure
             assertEquals("SESSION", failure.kind); assertFalse(failure.message!!.contains("private details")); assertEquals(1, script.requests.size)
         }
+    }
+    @Test fun loginRedirectsBecomeGetsAndCarryScopedCookiesAcrossChaoxingHosts() = runBlocking {
+        val script = Script { request -> when (request.url.encodedPath) {
+            "/v11/loginregister" -> Reply(code = 302, headers = mapOf("Location" to "https://sso.chaoxing.com/continue", "Set-Cookie" to "UID=fixture; Domain=chaoxing.com; Path=/; Secure"))
+            "/continue" -> Reply("""{"status":true}""")
+            else -> ordinaryFixture(request)
+        } }
+        val storage = MemoryXxtStorage().also { it.write("device", "fixture-device") }
+        assertEquals("12345", XxtApi(storage, script).login("student", "password123").uid)
+        assertEquals(listOf("POST", "GET", "POST"), script.requests.map { it.method })
+        assertNull(script.requests[1].body); assertEquals("UID=fixture", script.requests[1].header("Cookie"))
+        assertEquals("UID=fixture", script.requests[2].header("Cookie"))
+        assertTrue(script.requests.all { it.header("User-Agent") == xxtUserAgent("fixture-device") && it.header("Accept-Language") == "zh_CN" })
+        assertEquals("fixture", XxtCookies(storage).loadForRequest(script.requests[1].url).single().value)
+    }
+    @Test fun redirectsFollowAtMostThreeHopsAndNeverSendCookiesToForeignHosts() = runBlocking {
+        for (target in listOf("/next", "http://passport2.chaoxing.com/next", "https://private.example/next")) {
+            val script = Script { Reply(code = 302, headers = mapOf("Location" to target)) }
+            val failure = runCatching { XxtApi(MemoryXxtStorage(), script).courses() }.exceptionOrNull() as XxtFailure
+            assertEquals("REDIRECT", failure.kind); assertEquals(if (target == "/next") 4 else 1, script.requests.size)
+        }
+        val script = Script { request -> if (request.url.encodedPath == "/final") Reply("""{"result":1,"msg":{"puid":12345}}""") else Reply(code = 302, headers = mapOf("Location" to when (request.url.encodedPath) { "/apis/login/userLogin4Uname.do" -> "/one"; "/one" -> "two"; else -> "/final" })) }
+        assertEquals("12345", XxtApi(MemoryXxtStorage(), script).user().uid)
+        assertEquals(listOf("/apis/login/userLogin4Uname.do", "/one", "/two", "/final"), script.requests.map { it.url.encodedPath })
+    }
+    @Test fun smsAndPasswordRejectionsDisplayMesAndDoNotFetchProfile() = runBlocking {
+        val script = Script { Reply("""{"status":false,"mes":"账号或密码错误"}""") }
+        val api = XxtApi(MemoryXxtStorage(), script)
+        for (action in listOf<suspend () -> Unit>({ api.login("student", "bad") }, { api.sendSms("13800000000") }, { api.loginSms("13800000000", "123456") })) {
+            assertEquals("账号或密码错误", (runCatching { action() }.exceptionOrNull() as XxtFailure).message)
+        }
+        assertEquals(listOf("/v11/loginregister", "/api/sendcaptcha", "/v11/loginregister"), script.requests.map { it.url.encodedPath })
+    }
+    @Test fun smsSuccessUsesSendAndNativeLoginThenUserWhileExpiredQrIsDistinctFromWaiting() = runBlocking {
+        val script = Script { request -> when (request.url.encodedPath) {
+            "/api/sendcaptcha", "/v11/loginregister" -> Reply("""{"status":true}""")
+            else -> ordinaryFixture(request)
+        } }
+        val api = XxtApi(MemoryXxtStorage(), script)
+        api.sendSms("13800000000")
+        assertEquals("12345", api.loginSms("13800000000", "123456").uid)
+        assertEquals(3, script.requests.size)
+        val qr = XxtQrLogin("fixture", "fixture", byteArrayOf())
+        val expired = XxtApi(MemoryXxtStorage(), Script { Reply("""{"status":false,"type":2}""") })
+        assertEquals("QR_EXPIRED", (runCatching { expired.pollQr(qr) }.exceptionOrNull() as XxtFailure).kind)
+        assertNull(XxtApi(MemoryXxtStorage(), Script { Reply("""{"status":false,"type":"0"}""") }).pollQr(qr))
+        assertEquals("12345", XxtApi(MemoryXxtStorage(), Script { if (it.url.encodedPath.contains("getauthstatus")) Reply("""{"status":true}""") else ordinaryFixture(it) }).pollQr(qr)!!.uid)
     }
     @Test fun invalidLoginAndMalformedResponsesAreSanitized() = runBlocking {
         val denied = XxtApi(MemoryXxtStorage(), Script { Reply("""{"status":false,"msg":"private account data"}""") })
