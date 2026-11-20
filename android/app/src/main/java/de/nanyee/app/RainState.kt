@@ -99,6 +99,7 @@ internal class RainState(application: Application) : AndroidViewModel(applicatio
     }
     fun refresh() = read { loadAccount() }
     fun cancelLogin() {
+        loginAccount = ""; loginSecret = ""
         cancelQr(); smsProof = null; smsPhone = ""; smsDeadline = 0
         if (::backend.isInitialized) backend.cancelLogin()
     }
@@ -113,6 +114,7 @@ internal class RainState(application: Application) : AndroidViewModel(applicatio
         if (accepted == null) throw RainFailure("LOGIN", "请先通过腾讯验证；短信登录需先为当前手机号发送验证码。")
         backend.login(method, account, secret, accepted)
         loadAccount(); smsProof = null; smsPhone = ""; smsDeadline = 0
+        loginAccount = ""; loginSecret = ""
         message = "已登录当前本人账号。"
     }
     fun beginQr() = read {
@@ -125,11 +127,21 @@ internal class RainState(application: Application) : AndroidViewModel(applicatio
         return withContext(Dispatchers.IO) { rainBitmap(backend.image(value.image)) }
     }
     fun cancelQr() { qr = null; backgroundJob?.cancel(); backgroundUntil = 0; if (::backend.isInitialized) backend.cancelLogin(); restartVisibility() }
-    fun setVisible(value: Boolean) {
+    var loginMethod by mutableStateOf(RainLoginMethod.QR); private set
+    var loginAccount by mutableStateOf("")
+    var loginSecret by mutableStateOf("")
+    fun selectLoginMethod(value: RainLoginMethod) {
+        if (loginMethod == value) return
+        cancelLogin()
+        loginMethod = value
+    }
+    fun setVisible(value: Boolean, changingConfigurations: Boolean = false) {
+        if (!value && changingConfigurations) return
         screenVisible = value
         if (!value) { foreground = false; if (busy && user == null) work?.cancel(); cancelLogin(); stopVisibility() }
     }
-    fun setForeground(value: Boolean) {
+    fun setForeground(value: Boolean, changingConfigurations: Boolean = false) {
+        if (!value && changingConfigurations) return
         if (foreground == value) return
         foreground = value
         backgroundJob?.cancel()
@@ -331,6 +343,7 @@ internal class RainState(application: Application) : AndroidViewModel(applicatio
         read {
             cancelQr(); leaveLesson(); (backend as? RainApi)?.disable(); draftWork?.cancelAndJoin(); draftWork = null
             smsProof = null; smsPhone = ""; smsDeadline = 0
+            loginMethod = RainLoginMethod.QR; loginAccount = ""; loginSecret = ""
             host = value; withContext(Dispatchers.IO) { store.write("host", host.name); store.write("host.explicit", host.name) }
             backend = if (demo) DemoRainBackend(host).also { it.failure = scenario } else RainApi(store, host)
             user = null; courses = emptyList(); onLesson = emptyList(); loaded = false; presentation = null; image = null; events.clear(); drafts = emptyMap(); resolvedLesson = ""; unknownKey = ""

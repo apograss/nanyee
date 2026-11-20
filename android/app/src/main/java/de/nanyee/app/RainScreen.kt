@@ -3,6 +3,8 @@ package de.nanyee.app
 import androidx.compose.foundation.background
 
 import android.Manifest
+import android.app.Activity
+import android.content.ContextWrapper
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.os.Build
@@ -45,12 +47,17 @@ import java.time.format.DateTimeFormatter
 internal fun RainToolsScreen(state: RainState, demo: Boolean, onBack: () -> Unit, toggleDemo: () -> Unit) {
     LaunchedEffect(state) { state.initialize(demo) }
     val owner = LocalView.current.findViewTreeLifecycleOwner()
+    val context = LocalContext.current
+    val activity = remember(context) { generateSequence(context) { (it as? ContextWrapper)?.baseContext }.filterIsInstance<Activity>().firstOrNull() }
     DisposableEffect(owner, state) {
         state.setVisible(true)
-        fun sync() { state.setForeground(owner?.lifecycle?.currentState?.isAtLeast(Lifecycle.State.RESUMED) == true) }
-        val observer = LifecycleEventObserver { _, _ -> sync() }
-        owner?.lifecycle?.addObserver(observer); sync()
-        onDispose { owner?.lifecycle?.removeObserver(observer); state.setVisible(false) }
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) state.setForeground(true)
+            if (event == Lifecycle.Event.ON_PAUSE) state.setForeground(false, changingConfigurations = activity?.isChangingConfigurations == true)
+        }
+        owner?.lifecycle?.addObserver(observer)
+        if (owner?.lifecycle?.currentState?.isAtLeast(Lifecycle.State.RESUMED) == true) state.setForeground(true)
+        onDispose { owner?.lifecycle?.removeObserver(observer); state.setVisible(false, changingConfigurations = activity?.isChangingConfigurations == true) }
     }
     RainContent(state, onBack) { state.setForeground(false); toggleDemo() }
 }

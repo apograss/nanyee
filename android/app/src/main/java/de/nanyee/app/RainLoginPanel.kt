@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -19,20 +18,19 @@ import kotlinx.coroutines.delay
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
 internal fun RainLoginPanel(state: RainState) {
-    var method by rememberSaveable(state.host) { mutableStateOf(RainLoginMethod.QR) }
-    var account by remember(state.host, method) { mutableStateOf("") }
-    var secret by remember(state.host, method) { mutableStateOf("") }
+    val method = state.loginMethod
+    var account by state::loginAccount
+    var secret by state::loginSecret
     var challenge by remember(state.host, method) { mutableStateOf("") }
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(state.smsDeadline) { while (System.currentTimeMillis() < state.smsDeadline) { now = System.currentTimeMillis(); delay(500) }; now = System.currentTimeMillis() }
-    LaunchedEffect(state.host, method) { state.cancelLogin() }
     val remaining = classroomSmsResendSeconds(state.smsDeadline, now)
     val phoneValid = account.matches(Regex("1[0-9]{10}"))
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("${if (state.host == RainHost.CHANGJIANG) "长江雨课堂 · " else ""}${state.host.domain}", style = MaterialTheme.typography.bodySmall)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             RainLoginMethod.entries.forEach { option ->
-                FilterChip(selected = method == option, onClick = { method = option }, enabled = !state.busy, label = { Text(option.label) })
+                FilterChip(selected = method == option, onClick = { state.selectLoginMethod(option) }, enabled = !state.busy, label = { Text(option.label) })
             }
         }
         if (method == RainLoginMethod.QR) {
