@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -55,12 +56,14 @@ internal val TimetableTop = Color(0xFFECECF6)
 internal val TimetableBottom = Color(0xFFCDDDEB)
 internal fun courseAccent(name: String) = Color(listOf(0xFFB95763, 0xFF7961AB, 0xFF478B9B, 0xFF568ABB, 0xFFA95182, 0xFFC36D5D, 0xFF44866D)[coursePaletteIndex(name)])
 internal fun courseFill(name: String) = courseAccent(name).copy(alpha = 0.85f)
+internal fun courseAvatarFill(name: String) = lerp(courseAccent(name), Color.Black, 0.2f)
+internal val CourseAvatarText = Color.White
 internal fun sectionColor(accent: SectionAccent) = when (accent) { SectionAccent.BRAND -> AppPrimary; SectionAccent.ACADEMIC -> Color(0xFF4878B4); SectionAccent.SERVICE -> Color(0xFF7961AB); SectionAccent.SAGE -> Color(0xFF347F85); SectionAccent.PLUM -> Color(0xFFA95182) }
 
 @Composable
 internal fun CourseHeading(name: String, teacher: String) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Surface(shape = RoundedCornerShape(12.dp), color = courseFill(name), contentColor = courseAccent(name)) {
+        Surface(shape = RoundedCornerShape(12.dp), color = courseAvatarFill(name), contentColor = CourseAvatarText) {
             Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) { Text(name.take(1), style = MaterialTheme.typography.titleLarge) }
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
