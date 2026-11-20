@@ -233,11 +233,13 @@ class EvaluationTest {
         assertTrue(pendingEvaluations(buildJsonObject { put("rows", JsonArray(emptyList())) }).isEmpty())
         assertTrue(runCatching { pendingEvaluations(JsonArray(emptyList())) }.isFailure)
     }
-    @Test fun draftMirrorsStarsRadioHiddenAllowlistAndSkipsUnsupportedText() {
+    @Test fun draftMirrorsStarsRadioTextAndHiddenAllowlist() {
         val draft = evaluationDraft(evaluationFixture, evaluationReference)
-        assertEquals(2, draft.questions.size)
+        assertEquals(3, draft.questions.size)
         assertEquals(listOf(5, 10, 15, 20, 25), draft.questions.first().options.map { it.score })
-        assertEquals("否", draft.questions.last().options.last().label)
+        assertEquals("否", draft.questions[1].options.last().label)
+        assertTrue(draft.questions.last().isText)
+        assertEquals("", evaluationAnswers(draft)["comment"])
         assertEquals(setOf("xnxqdm", "pjlxdm", "teaxm", "kcrwdm", "kcptdm", "kcdm", "jxhjdm"), draft.hidden.keys)
         assertTrue(runCatching { evaluationDraft("<html>评课未开放</html>", evaluationReference) }.isFailure)
         assertTrue(runCatching { evaluationDraft(evaluationFixture.replace("teadm:'teacher-1'", "teadm:'other'"), evaluationReference) }.isFailure)
@@ -247,13 +249,13 @@ class EvaluationTest {
     @Test fun duplicateIndicatorsOptionsAndPythonBankersRoundingArePreserved() {
         val html = evaluationFixture.replace("25.0", "12.5") + "<div class='question' data-txdm='1' data-zbdm='quality'><input type='radio' value='extra'></div>"
         val draft = evaluationDraft(html, evaluationReference)
-        assertEquals(2, draft.questions.size)
+        assertEquals(3, draft.questions.size)
         assertEquals(listOf(2, 5, 8, 10, 12), draft.questions.first().options.map { it.score })
     }
     @Test fun legacyProfilesProduceValidPositiveTiersAndFallbackToLastUnscoredOption() {
         val original = evaluationDraft(evaluationFixture, evaluationReference)
         val rating = original.questions.first()
-        val expanded = original.copy(questions = (0..7).map { rating.copy(indicator = "q$it") } + original.questions.last())
+        val expanded = original.copy(questions = (0..7).map { rating.copy(indicator = "q$it") } + original.questions.first { it.indicator == "attendance" })
         val validProfiles = setOf(listOf(0, 0, 1, 1), listOf(0, 1, 1, 2), listOf(1, 1, 1, 1), listOf(0, 1, 1, 1))
         repeat(100) { seed ->
             val answers = evaluationAnswers(expanded, Random(seed))
@@ -266,11 +268,12 @@ class EvaluationTest {
     }
     @Test fun exactSubmissionFieldsStarsTotalAndCompleteSelectionValidation() {
         val draft = evaluationDraft(evaluationFixture, evaluationReference)
-        val preview = EvaluationPreview(draft, mapOf("quality" to "excellent", "attendance" to "no"))
+        val preview = EvaluationPreview(draft, mapOf("quality" to "excellent", "attendance" to "no", "comment" to ""))
         val fields = evaluationSubmission(preview)
         assertEquals("25", fields["wtpf"]); assertEquals("teacher-1", fields["teabh"]); assertEquals("", fields["pfsm"])
         val answers = Json.parseToJsonElement(fields.getValue("dt")).jsonArray
-        assertEquals("★★★★★", answers.first().jsonObject.text("dtjg")); assertEquals("否", answers.last().jsonObject.text("dtjg"))
+        assertEquals("★★★★★", answers.first().jsonObject.text("dtjg")); assertEquals("否", answers[1].jsonObject.text("dtjg"))
+        assertEquals("", answers.last().jsonObject.text("dtjg"))
         assertTrue(runCatching { evaluationSubmission(preview.copy(selections = emptyMap())) }.isFailure)
         assertTrue(runCatching { evaluationSubmission(preview.copy(selections = preview.selections + ("quality" to "not-an-option"))) }.isFailure)
     }

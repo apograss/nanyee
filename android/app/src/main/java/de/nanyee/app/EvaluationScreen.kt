@@ -2,6 +2,8 @@ package de.nanyee.app
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -12,10 +14,16 @@ import androidx.compose.material.icons.outlined.CloudQueue
 import androidx.compose.material.icons.outlined.EventSeat
 import androidx.compose.material.icons.outlined.RateReview
 import androidx.compose.material.icons.outlined.Widgets
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -103,15 +111,18 @@ private fun ManualEvaluationScreen(school: SchoolState, evaluation: EvaluationSt
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(value.draft.reference.courseName, fontWeight = FontWeight.Bold)
+                    Text("合计 ${evaluationTotal(value)} 分", style = MaterialTheme.typography.titleMedium)
+                    OutlinedButton(onClick = { state.run.randomize(value.draft.reference.key) }, enabled = !state.busy && !confirming) { Text("重新随机") }
                     value.draft.questions.forEach { question ->
-                        val chosen = question.options.first { it.code == value.selections[question.indicator] }
-                        Text("${question.title}\n${chosen.label} · ${chosen.score} 分")
+                        EvaluationAnswerEditor(question, value.selections.getValue(question.indicator), !state.busy && !confirming) { answer ->
+                            state.run.setAnswer(value.draft.reference.key, question.indicator, answer)
+                        }
                     }
                 }
             }
         }
         if (state.run.preview.isNotEmpty()) {
-            Text("使用旧工具偏高随机档位。此处显示的答案会原样提交，不会在确认时重新生成。")
+            Text("默认使用旧工具偏高随机档位，可逐题修改；此处显示的答案会原样提交，不会在确认时重新生成。")
             Button(onClick = { confirming = true }, enabled = !state.busy) { Text(if (demo) "确认演示提交" else "确认提交以上评价") }
         }
         if (state.run.progress > 0) Text(if (state.busy && state.run.confirmed) "正在提交第 ${state.run.progress} 门…" else "逐门进度：${state.run.progress}")
@@ -121,4 +132,37 @@ private fun ManualEvaluationScreen(school: SchoolState, evaluation: EvaluationSt
     if (confirming) AlertDialog(onDismissRequest = { confirming = false }, title = { Text("确认提交课程评价？") }, text = { Text(if (demo) "演示模式，不会真正评课。" else "将逐门向学校提交上方预览的评价；第一处错误后立即停止。真实提交不可撤回，请确认您同意这些答案。") }, confirmButton = {
         TextButton(onClick = { confirming = false; state.confirm() }, enabled = !state.busy) { Text("确认提交") }
     }, dismissButton = { TextButton(onClick = { confirming = false }) { Text("返回检查") } })
+}
+
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+private fun EvaluationAnswerEditor(question: EvaluationQuestion, value: String, enabled: Boolean, onChange: (String) -> Unit) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(question.title, style = MaterialTheme.typography.titleSmall)
+        when {
+            question.isText -> OutlinedTextField(value = value, onValueChange = { text ->
+                if (runCatching { validateEvaluationAnswer(question, text) }.isSuccess) onChange(text)
+            }, label = { Text("意见与建议") }, supportingText = { Text("${value.length}/${question.textLimit}") }, enabled = enabled, modifier = Modifier.fillMaxWidth(), minLines = 2)
+            question.type == 5 -> {
+                val selectedIndex = question.options.indexOfFirst { it.code == value }
+                FlowRow(Modifier.selectableGroup()) {
+                    question.options.forEachIndexed { index, option ->
+                        Box(Modifier.size(48.dp).selectable(selected = option.code == value, enabled = enabled, role = Role.RadioButton, onClick = { onChange(option.code) })
+                            .semantics { contentDescription = "${index + 1} 星：${option.label}" }, contentAlignment = Alignment.Center) {
+                            Icon(if (index <= selectedIndex) Icons.Filled.Star else Icons.Outlined.StarBorder, contentDescription = null, tint = if (index <= selectedIndex) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+                Text(evaluationAnswerLabel(question, value), style = MaterialTheme.typography.bodyMedium)
+            }
+            else -> {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    question.options.forEach { option ->
+                        FilterChip(selected = option.code == value, onClick = { onChange(option.code) }, enabled = enabled, label = { Text(option.label) })
+                    }
+                }
+                Text(evaluationAnswerLabel(question, value), style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+    }
 }
