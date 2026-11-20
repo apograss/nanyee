@@ -28,7 +28,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -44,20 +43,18 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.serialization.json.*
 import java.time.Instant
-import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
     override fun attachBaseContext(newBase: Context) {
-        val config = Configuration(newBase.resources.configuration).apply { uiMode = (uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or Configuration.UI_MODE_NIGHT_YES }
+        val config = Configuration(newBase.resources.configuration).apply { uiMode = (uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or Configuration.UI_MODE_NIGHT_NO }
         super.attachBaseContext(newBase.createConfigurationContext(config))
     }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge(statusBarStyle = SystemBarStyle.dark(android.graphics.Color.rgb(18, 17, 28)), navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.rgb(18, 17, 28)))
+        enableEdgeToEdge(statusBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT), navigationBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT))
         setContent {
             NanyeeTheme {
                 Surface(Modifier.fillMaxSize()) { Nanyee(viewModel()) }
@@ -102,20 +99,12 @@ fun Nanyee(state: SchoolState) {
     val iconSize = (24 * LocalDensity.current.fontScale.coerceIn(1f, 1.35f)).dp
     val icons = listOf(Icons.Outlined.CalendarMonth, Icons.Outlined.School, Icons.Outlined.RateReview, Icons.Outlined.Widgets, Icons.Outlined.Person)
     val selectedIcons = listOf(Icons.Filled.CalendarMonth, Icons.Filled.School, Icons.Filled.RateReview, Icons.Filled.Widgets, Icons.Filled.Person)
-    val subtitle = when (state.tab) {
-        MainTab.TIMETABLE -> "${if (state.homeVisible) "第 ${state.week} 周 · " else ""}${state.today.format(DateTimeFormatter.ofPattern("M月d日 E", Locale.SIMPLIFIED_CHINESE))}"
-        MainTab.CLASSROOM -> "CLASSROOM / 保持连接"
-        MainTab.EVALUATION -> "FEEDBACK / 让改变发生"
-        MainTab.TOOLS -> "TOOLKIT / 校园控制台"
-        MainTab.MY -> "IDENTITY / 你的校园坐标"
-    }
     val tabState = rememberSaveableStateHolder()
     var platformMenu by remember { mutableStateOf(false) }
     Scaffold(
         contentWindowInsets = WindowInsets.safeDrawing,
-        topBar = { if (state.tab != MainTab.TIMETABLE || !state.homeVisible) TopAppBar(expandedHeight = if (landscape) 56.dp else (64 * LocalDensity.current.fontScale.coerceIn(1f, 1.6f)).dp, colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background), title = { Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        topBar = { if (state.tab != MainTab.TIMETABLE || !state.homeVisible) TopAppBar(expandedHeight = if (landscape) 48.dp else 56.dp, colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background), title = { Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(state.tab.label, style = if (landscape) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineLarge, maxLines = 1)
-            Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         } }, actions = {
             if (state.tab == MainTab.CLASSROOM) Box {
                 IconButton(onClick = { platformMenu = true }) { Icon(Icons.Outlined.MoreHoriz, "课堂平台与服务器") }
@@ -129,19 +118,15 @@ fun Nanyee(state: SchoolState) {
             }
             if ((state.tab == MainTab.TIMETABLE || state.tab == MainTab.TOOLS && state.toolsRoute == "grades") && state.homeVisible && !state.demo) IconButton(onClick = { state.reload() }, enabled = !state.busy) { Icon(Icons.Outlined.Refresh, "刷新", Modifier.size(iconSize)) }
         }) },
-        bottomBar = { if (!landscape) Surface(color = InkRaised, shape = RoundedCornerShape(30.dp), modifier = Modifier.navigationBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp), shadowElevation = 10.dp) {
-            Row(Modifier.fillMaxWidth().padding(6.dp), horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
-                MainTab.entries.forEach { tab ->
-                    val active = state.tab == tab
-                    Surface(onClick = { state.selectTab(tab) }, shape = RoundedCornerShape(24.dp), color = if (active) InkAccent else Color.Transparent, contentColor = if (active) InkBase else InkMuted, modifier = Modifier.weight(if (active) 1.8f else 1f).heightIn(min = 48.dp)) {
-                        Row(Modifier.padding(horizontal = 6.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(if (active) selectedIcons[tab.ordinal] else icons[tab.ordinal], if (active) null else tab.label, Modifier.size(22.dp))
-                            if (active) Text(tab.label, style = MaterialTheme.typography.labelLarge, maxLines = 1)
-                        }
-                    }
-                }
+        bottomBar = { if (!landscape) NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
+            MainTab.entries.forEach { tab ->
+                NavigationBarItem(selected = state.tab == tab, onClick = { state.selectTab(tab) },
+                    icon = { Icon(icons[tab.ordinal], null, Modifier.size(22.dp)) },
+                    label = { Text(tab.label) },
+                    colors = NavigationBarItemDefaults.colors(indicatorColor = Color.Transparent, selectedIconColor = AppPrimary, selectedTextColor = AppPrimary))
             }
         } }
+
     ) { padding ->
         Row(Modifier.padding(padding).consumeWindowInsets(padding).fillMaxSize()) {
             if (landscape) NavigationRail(windowInsets = WindowInsets(0)) { MainTab.entries.forEach { tab -> NavigationRailItem(selected = state.tab == tab, onClick = { state.selectTab(tab) }, icon = { Icon(if (state.tab == tab) selectedIcons[tab.ordinal] else icons[tab.ordinal], tab.label) }) } }
@@ -150,7 +135,7 @@ fun Nanyee(state: SchoolState) {
                 Text("正在自动登录…", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                 TextButton(onClick = { state.returnToCache() }) { Text("取消") }
             } else if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-            if (state.demo && !landscape && state.tab != MainTab.TIMETABLE) Text("DEMO / 离线示例 · 非真实学业记录", Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = InkMuted)
+            if (state.demo && !landscape && state.tab != MainTab.TIMETABLE) Text("离线示例 · 非真实学业记录", Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = AppMuted)
             if (state.homeVisible && state.error.isNotEmpty()) ErrorCard(state)
             tabState.SaveableStateProvider(state.tab.ordinal) { when {
                 state.cacheRevocationFailed -> Column(Modifier.padding(12.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -203,9 +188,8 @@ fun Nanyee(state: SchoolState) {
 fun Login(state: SchoolState, embedded: Boolean = false) {
     Column(Modifier.widthIn(max = 480.dp).then(if (embedded) Modifier.fillMaxWidth() else Modifier.fillMaxSize().verticalScroll(rememberScrollState())).padding(horizontal = 12.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         if (state.error.isNotEmpty()) ErrorCard(state)
-        Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.primaryContainer) { Icon(Icons.Outlined.School, null, Modifier.padding(18.dp).size(32.dp), tint = MaterialTheme.colorScheme.primary) }
-        Text("学校登录", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
-        Text("连接校园，让学业一目了然。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("学校登录", style = MaterialTheme.typography.titleMedium)
+        Text("使用学校教务账号登录", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         OutlinedTextField(value = state.account, onValueChange = { state.updateAccount(it) }, label = { Text("学号") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(value = state.password, onValueChange = { state.password = it }, label = { Text("学校密码") }, visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false), singleLine = true, modifier = Modifier.fillMaxWidth())
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -255,38 +239,32 @@ fun Timetable(state: SchoolState, onCourse: (JsonObject) -> Unit) {
     var weeksInput by remember { mutableStateOf(state.totalWeeks.toString()) }
     var conflicts by remember(state.sessionGeneration) { mutableStateOf<List<JsonObject>?>(null) }
     var weekSheet by remember { mutableStateOf(false) }
-    var now by remember { mutableStateOf(LocalTime.now(ZoneId.of("Asia/Shanghai"))) }
-    LaunchedEffect(Unit) { while (true) { now = LocalTime.now(ZoneId.of("Asia/Shanghai")); delay(30000) } }
     val density = LocalDensity.current
     val fontScale = timetableFontScale(density.fontScale)
     val periodHeight = timetablePeriodHeight(fontScale).dp
-    val periodWidth = (29 * fontScale.coerceAtLeast(1f)).dp
+    val periodWidth = (28 * fontScale.coerceAtLeast(1f)).dp
+    val status = when {
+        state.demo -> "离线示例"
+        state.cachedMode -> "离线课表"
+        state.timetableUpdatedAt.isNotBlank() -> "更新于 ${runCatching { DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.of("Asia/Shanghai")).format(Instant.parse(state.timetableUpdatedAt)) }.getOrDefault("—")}"
+        else -> state.calendarHint
+    }
     CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
-    Column(Modifier.widthIn(max = 900.dp).fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().padding(start = 14.dp, end = 4.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Column(Modifier.weight(1f)) {
-                Text(state.today.format(DateTimeFormatter.ofPattern(if (fontScale > 1.2f) "M月d日" else "M月d日 E", Locale.SIMPLIFIED_CHINESE)), style = MaterialTheme.typography.headlineLarge.copy(fontSize = if (fontScale > 1.2f) 25.sp else 28.sp, fontFeatureSettings = "tnum"), maxLines = 1)
-                if (fontScale > 1.2f) Text(state.today.format(DateTimeFormatter.ofPattern("EEEE", Locale.SIMPLIFIED_CHINESE)), style = MaterialTheme.typography.labelSmall, color = InkMuted)
-            }
-            AssistChip(onClick = { weekSheet = true }, label = { Text("第${state.week}周", maxLines = 1) }, trailingIcon = { Icon(Icons.Outlined.ExpandMore, null, Modifier.size(16.dp)) })
-            IconButton(onClick = { if (state.demo) state.returnToCurrentWeek() else state.reload() }, enabled = !state.busy) { Icon(Icons.Outlined.Refresh, "刷新课表", Modifier.size(21.dp)) }
-        }
-        Text(when { state.demo -> "DEMO · 本机离线示例"; state.timetableUpdatedAt.isNotBlank() -> "本机 · 更新于 ${runCatching { DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.of("Asia/Shanghai")).format(Instant.parse(state.timetableUpdatedAt)) }.getOrDefault("—")}${if (state.cachedMode) " · 未登录" else ""}"; else -> "学校直连 · ${state.calendarHint.ifBlank { "就绪" }}" }, Modifier.padding(start = 16.dp, bottom = 8.dp), style = MaterialTheme.typography.labelSmall, color = InkMuted)
-        val signal = timetableSignal(state.courses, state.currentWeek, state.today, now)
-        val signalCopy = timetableSignalCopy(state.currentWeek, signal)
-        Surface(color = InkRaised, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
-            Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Box(Modifier.size(7.dp).clip(RoundedCornerShape(50)).background(if (signal?.current == true) InkLive else InkAccent))
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(signalCopy.label, style = MaterialTheme.typography.labelSmall, color = if (signal?.current == true) InkLive else InkMuted)
-                    Text(signalCopy.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 2)
-                    if (signal != null) Text("${signal.course.text("location")} · ${signal.minutes}分钟后${if (signal.current) "下课" else "开始"}", style = MaterialTheme.typography.bodySmall, color = InkMuted)
+    Column(Modifier.widthIn(max = 900.dp).fillMaxSize().background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(TimetableTop, TimetableBottom)))) {
+        Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f).clickable { weekSheet = true }) {
+                Text(state.today.format(DateTimeFormatter.ofPattern("M月d日", Locale.SIMPLIFIED_CHINESE)), fontSize = 20.sp, lineHeight = 25.sp, fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("第${state.week}周", fontSize = 13.sp, color = AppText)
+                    Icon(Icons.Outlined.ExpandMore, null, Modifier.size(16.dp))
+                    Text(timetableCalendarStatus(state.currentWeek, status), fontSize = 11.sp, color = AppMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                Icon(if (signal?.current == true) Icons.Outlined.GraphicEq else Icons.Outlined.NorthEast, null, tint = if (signal?.current == true) InkLive else InkAccent, modifier = Modifier.size(21.dp))
             }
+            IconButton(onClick = { if (state.demo) state.returnToCurrentWeek() else state.reload() }, enabled = !state.busy) { Icon(Icons.Outlined.Refresh, "刷新课表", Modifier.size(22.dp)) }
+            IconButton(onClick = { weekSheet = true }) { Icon(Icons.Outlined.MoreVert, "学期与周次", Modifier.size(22.dp)) }
         }
         val active = state.courses.filter { (it["weeks"] as? JsonArray)?.any { w -> (w as? JsonPrimitive)?.intOrNull == state.week } == true }
-        if (active.isEmpty()) Text(if (state.busy) "正在加载课表…" else "本周暂无课程", Modifier.padding(12.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (active.isEmpty()) Text(if (state.busy) "正在加载课表…" else "本周暂无课程", Modifier.padding(horizontal = 16.dp, vertical = 4.dp), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         val nodeTimes = periodStartTimes(state.courses)
         val endTimes = periodEndTimes(state.courses)
         val nodes = maxOf(nodeTimes.size, active.maxOfOrNull { it.number("end_node") } ?: nodeTimes.size)
@@ -298,8 +276,8 @@ fun Timetable(state: SchoolState, onCourse: (JsonObject) -> Unit) {
                 val today = date == state.today
                 Column(Modifier.weight(1f).padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("周${"一二三四五六日"[day - 1]}", fontSize = 10.sp, lineHeight = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Surface(shape = RoundedCornerShape(12.dp), color = if (today) InkLive else Color.Transparent, contentColor = if (today) InkBase else InkText) {
-                        Text(date?.dayOfMonth?.toString() ?: "—", Modifier.padding(horizontal = 7.dp, vertical = 3.dp), fontSize = 11.sp, lineHeight = 14.sp, fontWeight = if (today) FontWeight.Bold else FontWeight.Normal)
+                    Surface(shape = RoundedCornerShape(12.dp), color = if (today) Color.White.copy(alpha = 0.65f) else Color.Transparent, contentColor = if (today) AppPrimary else AppMuted) {
+                        Text(date?.let { "${it.monthValue}/${it.dayOfMonth}" } ?: "—", Modifier.padding(horizontal = 2.dp, vertical = 2.dp), fontSize = 11.sp, lineHeight = 14.sp, fontWeight = if (today) FontWeight.Bold else FontWeight.Normal)
                     }
                 }
             }
@@ -319,37 +297,30 @@ fun Timetable(state: SchoolState, onCourse: (JsonObject) -> Unit) {
         }.verticalScroll(rememberScrollState()).padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
             Column(Modifier.width(periodWidth)) {
                 (1..nodes).forEach { node -> Column(Modifier.height(periodHeight).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("$node", fontSize = 11.sp, lineHeight = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(nodeTimes.getOrNull(node - 1) ?: "—", style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum", letterSpacing = 0.sp), fontSize = 8.sp, lineHeight = 11.sp, maxLines = 1, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(endTimes.getOrNull(node - 1) ?: "—", style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum", letterSpacing = 0.sp), fontSize = 8.sp, lineHeight = 11.sp, maxLines = 1, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("$node", fontSize = 14.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(nodeTimes.getOrNull(node - 1) ?: "—", style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum", letterSpacing = 0.sp), fontSize = 10.sp, lineHeight = 13.sp, maxLines = 1, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(endTimes.getOrNull(node - 1) ?: "—", style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum", letterSpacing = 0.sp), fontSize = 10.sp, lineHeight = 13.sp, maxLines = 1, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } }
             }
             (1..7).forEach { day ->
-                val isToday = monday?.plusDays(day.toLong() - 1) == state.today
-                Box(Modifier.weight(1f).height(periodHeight * nodes).background(if (isToday) InkLive.copy(alpha = 0.035f) else Color.Transparent)) {
-                    Canvas(Modifier.fillMaxSize()) { (1..nodes).forEach { row -> val y = periodHeight.toPx() * row; drawLine(InkHairline.copy(alpha = 0.45f), Offset(0f, y), Offset(size.width, y), 1.dp.toPx()) } }
+                Box(Modifier.weight(1f).height(periodHeight * nodes)) {
                     CourseDay(active.filter { it.number("weekday") == day }, nodes, periodHeight, onCourse, { conflicts = it }, Modifier.fillMaxWidth())
-                    val position = if (isToday) timetableNowPosition(nodeTimes, endTimes, now) else null
-                    if (position != null) Box(Modifier.offset(y = periodHeight * position).fillMaxWidth()) {
-                        HorizontalDivider(thickness = 2.dp, color = InkLive)
-                        Text(now.format(DateTimeFormatter.ofPattern("HH:mm")), Modifier.offset(y = (-14).dp).background(InkBase).padding(horizontal = 2.dp), color = InkLive, style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum", fontSize = 8.sp, letterSpacing = 0.sp))
-                    }
                 }
             }
         }
     }
-    if (weekSheet) ModalBottomSheet(onDismissRequest = { weekSheet = false }, containerColor = InkSurface) {
+    if (weekSheet) ModalBottomSheet(onDismissRequest = { weekSheet = false }, containerColor = AppSurface) {
         Column(Modifier.fillMaxWidth().heightIn(max = 520.dp).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).navigationBarsPadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("学期与周次", style = MaterialTheme.typography.headlineSmall)
             Picker("选择学期", state.semesters.map { it.text("code") to it.text("label") }, state.semester, state::selectSemester)
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("TEACHING WEEK", Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = InkMuted)
+                Text("选择周次", Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = AppMuted)
                 if (state.currentWeek != null) TextButton(onClick = { state.returnToCurrentWeek(); weekSheet = false }) { Text("回到本周") }
             }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 (1..state.totalWeeks).forEach { week -> FilterChip(selected = state.week == week, onClick = { state.selectWeek(week); weekSheet = false }, label = { Text("第${week}周") }) }
             }
-            if (state.calendarHint.isNotBlank()) Text(state.calendarHint, style = MaterialTheme.typography.bodySmall, color = InkMuted)
+            if (state.calendarHint.isNotBlank()) Text(state.calendarHint, style = MaterialTheme.typography.bodySmall, color = AppMuted)
             TextButton(onClick = { weeksInput = state.totalWeeks.toString(); weeksDialog = true }, enabled = !state.cachedMode) { Text("学期长度 · ${state.totalWeeks} 周") }
             Spacer(Modifier.height(12.dp))
         }
@@ -385,7 +356,7 @@ fun Grades(state: SchoolState, onGrade: (JsonObject) -> Unit) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("学业概览", style = MaterialTheme.typography.titleMedium)
                 if (landscape) Text("加权平均绩点 ${displayNumber(summary?.text("weighted_gpa") ?: "")}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) else {
-                    Text(displayNumber(summary?.text("weighted_gpa") ?: ""), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Text(displayNumber(summary?.text("weighted_gpa") ?: ""), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.onPrimaryContainer)
                     Text("加权平均绩点", style = MaterialTheme.typography.labelLarge)
                 }
                 HorizontalDivider()

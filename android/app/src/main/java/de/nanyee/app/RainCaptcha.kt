@@ -47,13 +47,13 @@ internal fun RainCaptchaDialog(onDismiss: () -> Unit, onProof: (RainCaptchaProof
                 AndroidView(modifier = Modifier.weight(1f).fillMaxWidth(), factory = { context ->
                     WebView(context).apply {
                         web = this
-                        setBackgroundColor(android.graphics.Color.rgb(18, 17, 28))
+                        setBackgroundColor(android.graphics.Color.rgb(245, 246, 250))
                         settings.apply {
                             javaScriptEnabled = true; domStorageEnabled = true
                             allowFileAccess = false; allowContentAccess = false
                             mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
                             cacheMode = WebSettings.LOAD_NO_CACHE
-                            if (Build.VERSION.SDK_INT >= 33) isAlgorithmicDarkeningAllowed = true
+                            if (Build.VERSION.SDK_INT >= 33) isAlgorithmicDarkeningAllowed = false
                         }
                         webViewClient = object : WebViewClient() {
                             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean =
@@ -75,7 +75,7 @@ internal fun RainCaptchaDialog(onDismiss: () -> Unit, onProof: (RainCaptchaProof
                             }
                         }), "RainCaptcha")
                         val html = context.assets.open("rain_captcha.html").bufferedReader().use { it.readText() }
-                            .replace("__NONCE__", nonce).replace("__DARK__", "true").replace("__TEXT__", "#F3F1FA")
+                            .replace("__NONCE__", nonce).replace("__DARK__", "false").replace("__TEXT__", "#242630")
                         loadDataWithBaseURL(RAIN_CAPTCHA_ORIGIN, html, "text/html", "UTF-8", RAIN_CAPTCHA_ORIGIN)
                     }
                 })

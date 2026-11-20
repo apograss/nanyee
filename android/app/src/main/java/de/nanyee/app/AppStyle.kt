@@ -1,8 +1,5 @@
 package de.nanyee.app
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,53 +13,49 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
 internal fun NanyeeTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = inkColors, typography = Typography(
-        displayLarge = MaterialTheme.typography.displayLarge.copy(fontWeight = FontWeight.Black, letterSpacing = (-2).sp),
-        displayMedium = MaterialTheme.typography.displayMedium.copy(fontWeight = FontWeight.Black, letterSpacing = (-1.5).sp),
-        displaySmall = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.ExtraBold, letterSpacing = (-1).sp),
-        headlineLarge = MaterialTheme.typography.headlineLarge.copy(fontSize = 30.sp, lineHeight = 36.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-1).sp),
-        headlineMedium = MaterialTheme.typography.headlineMedium.copy(fontSize = 26.sp, lineHeight = 32.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.7).sp),
-        headlineSmall = MaterialTheme.typography.headlineSmall.copy(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.5).sp),
-        titleLarge = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, lineHeight = 26.sp, fontWeight = FontWeight.Bold),
-        titleMedium = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-        labelSmall = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.sp, fontSize = 10.sp),
-        bodyLarge = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.sp, lineHeight = 22.sp),
-        bodyMedium = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp, lineHeight = 20.sp)
+    MaterialTheme(colorScheme = appColors, typography = Typography(
+        headlineLarge = MaterialTheme.typography.headlineLarge.copy(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Normal),
+        headlineMedium = MaterialTheme.typography.headlineMedium.copy(fontSize = 22.sp, fontWeight = FontWeight.Normal),
+        headlineSmall = MaterialTheme.typography.headlineSmall.copy(fontSize = 20.sp, fontWeight = FontWeight.Normal),
+        titleLarge = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, fontWeight = FontWeight.Normal),
+        titleMedium = MaterialTheme.typography.titleMedium.copy(fontSize = 16.sp, fontWeight = FontWeight.Normal),
+        bodyLarge = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.sp),
+        bodyMedium = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+        labelSmall = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.sp, fontSize = 11.sp)
     ), shapes = Shapes(small = RoundedCornerShape(10.dp), medium = RoundedCornerShape(14.dp), large = RoundedCornerShape(18.dp)), content = content)
 }
 
-internal val InkBase = Color(0xFF12111C)
-internal val InkSurface = Color(0xFF1B1A29)
-internal val InkRaised = Color(0xFF24233A)
-internal val InkHairline = Color(0xFF2F2E48)
-internal val InkText = Color(0xFFF3F1FA)
-internal val InkMuted = Color(0xFF9A97B5)
-internal val InkAccent = Color(0xFFFF6B3D)
-internal val InkLive = Color(0xFFC8F560)
-internal val inkColors = darkColorScheme(
-    primary = InkAccent, onPrimary = InkBase, primaryContainer = Color(0xFF512A28), onPrimaryContainer = InkText,
-    secondary = Color(0xFFB39DFF), onSecondary = InkBase, secondaryContainer = InkRaised, onSecondaryContainer = InkText,
-    tertiary = Color(0xFF5ED6C9), onTertiary = InkBase, tertiaryContainer = InkRaised, onTertiaryContainer = InkText,
-    background = InkBase, onBackground = InkText, surface = InkSurface, onSurface = InkText, surfaceVariant = InkBase, onSurfaceVariant = InkMuted,
-    surfaceContainerLowest = InkBase, surfaceContainerLow = InkSurface, surfaceContainer = InkRaised, surfaceContainerHigh = InkRaised,
-    surfaceContainerHighest = InkHairline, outline = InkHairline, outlineVariant = InkHairline, surfaceTint = Color.Transparent,
-    inverseSurface = InkText, inverseOnSurface = InkBase, inversePrimary = InkAccent
+internal val AppBackground = Color(0xFFF5F6FA)
+internal val AppSurface = Color.White
+internal val AppCard = Color.White
+internal val AppDivider = Color(0xFFE4E5EC)
+internal val AppText = Color(0xFF242630)
+internal val AppMuted = Color(0xFF696D7C)
+internal val AppPrimary = Color(0xFF53649A)
+internal val appColors = lightColorScheme(
+    primary = AppPrimary, onPrimary = Color.White, primaryContainer = Color(0xFFE6EAF7), onPrimaryContainer = AppText,
+    secondary = AppPrimary, onSecondary = AppBackground, secondaryContainer = Color(0xFFE6EAF7), onSecondaryContainer = AppText,
+    tertiary = Color(0xFF347F85), onTertiary = AppBackground, tertiaryContainer = Color(0xFFE2EFEE), onTertiaryContainer = AppText,
+    background = AppBackground, onBackground = AppText, surface = AppSurface, onSurface = AppText, surfaceVariant = AppBackground, onSurfaceVariant = AppMuted,
+    surfaceContainerLowest = AppBackground, surfaceContainerLow = AppSurface, surfaceContainer = AppCard, surfaceContainerHigh = AppCard,
+    surfaceContainerHighest = AppCard, outline = AppDivider, outlineVariant = AppDivider, surfaceTint = Color.Transparent,
+    inverseSurface = AppText, inverseOnSurface = AppBackground, inversePrimary = AppPrimary
 )
 internal enum class SectionAccent { BRAND, ACADEMIC, SERVICE, SAGE, PLUM }
 
-internal fun courseAccent(name: String) = Color(listOf(0xFFFF8A65, 0xFFB39DFF, 0xFF5ED6C9, 0xFF6FB3FF, 0xFFFF7EB6, 0xFFF6C35B, 0xFF8EE6A0)[coursePaletteIndex(name)])
-internal fun courseFill(name: String) = courseAccent(name).copy(alpha = 0.22f)
-internal fun sectionColor(accent: SectionAccent) = when (accent) { SectionAccent.BRAND -> InkAccent; SectionAccent.ACADEMIC -> Color(0xFF6FB3FF); SectionAccent.SERVICE -> Color(0xFFB39DFF); SectionAccent.SAGE -> Color(0xFF5ED6C9); SectionAccent.PLUM -> Color(0xFFFF7EB6) }
+internal val TimetableTop = Color(0xFFECECF6)
+internal val TimetableBottom = Color(0xFFCDDDEB)
+internal fun courseAccent(name: String) = Color(listOf(0xFFB95763, 0xFF7961AB, 0xFF478B9B, 0xFF568ABB, 0xFFA95182, 0xFFC36D5D, 0xFF44866D)[coursePaletteIndex(name)])
+internal fun courseFill(name: String) = courseAccent(name).copy(alpha = 0.85f)
+internal fun sectionColor(accent: SectionAccent) = when (accent) { SectionAccent.BRAND -> AppPrimary; SectionAccent.ACADEMIC -> Color(0xFF4878B4); SectionAccent.SERVICE -> Color(0xFF7961AB); SectionAccent.SAGE -> Color(0xFF347F85); SectionAccent.PLUM -> Color(0xFFA95182) }
 
 @Composable
 internal fun CourseHeading(name: String, teacher: String) {
@@ -79,7 +72,7 @@ internal fun CourseHeading(name: String, teacher: String) {
 
 @Composable
 internal fun ProfileHero(name: String, subtitle: String, initial: String, badge: String) {
-    Surface(shape = MaterialTheme.shapes.large, color = InkRaised, contentColor = InkText) {
+    Surface(shape = MaterialTheme.shapes.large, color = AppCard, contentColor = AppText) {
         Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surface) {
                 Box(Modifier.size(52.dp), contentAlignment = Alignment.Center) { Text(initial, style = MaterialTheme.typography.headlineSmall) }
@@ -96,40 +89,20 @@ internal fun ProfileHero(name: String, subtitle: String, initial: String, badge:
 internal data class ToolTile(val title: String, val description: String, val icon: ImageVector, val accent: SectionAccent, val status: String = "", val onClick: () -> Unit)
 
 @Composable
-internal fun ToolGrid(tiles: List<ToolTile>, wideFirst: Boolean = false) {
-    val scale = LocalDensity.current.fontScale
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val columns = toolColumnCount(maxWidth.value, scale).coerceAtMost(tiles.size.coerceAtLeast(1))
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            if (wideFirst && tiles.isNotEmpty()) SignalToolTile(tiles.first(), Modifier.fillMaxWidth(), hero = true)
-            (if (wideFirst) tiles.drop(1) else tiles).chunked(columns).forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    row.forEach { tile ->
-                        SignalToolTile(tile, Modifier.weight(1f))
+internal fun ToolGrid(tiles: List<ToolTile>) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        tiles.forEach { tile ->
+            Card(onClick = tile.onClick, modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(tile.icon, null, Modifier.size(24.dp), tint = sectionColor(tile.accent))
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(tile.title, style = MaterialTheme.typography.titleMedium)
+                        Text(tile.description, style = MaterialTheme.typography.bodySmall, color = AppMuted)
+                        if (tile.status.startsWith("GPA ")) Text(tile.status, style = MaterialTheme.typography.bodySmall, color = AppMuted)
                     }
-                    repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
+                    Icon(Icons.Outlined.ChevronRight, null, Modifier.size(18.dp), tint = AppMuted)
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun SignalToolTile(tile: ToolTile, modifier: Modifier, hero: Boolean = false) {
-    val interactions = remember { MutableInteractionSource() }
-    val pressed by interactions.collectIsPressedAsState()
-    val accent = if (hero) InkAccent else sectionColor(tile.accent)
-    Card(onClick = tile.onClick, modifier = modifier, interactionSource = interactions, colors = CardDefaults.cardColors(containerColor = InkRaised), elevation = CardDefaults.cardElevation(defaultElevation = if (pressed) 4.dp else 0.dp)) {
-        Column(Modifier.fillMaxWidth().background(Brush.linearGradient(listOf(accent.copy(alpha = 0.18f), InkRaised))).padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Icon(tile.icon, null, Modifier.size(if (hero) 36.dp else 42.dp), tint = accent)
-                Icon(Icons.Outlined.ChevronRight, null, Modifier.size(20.dp), tint = InkMuted)
-            }
-            if (hero) Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(if (tile.status.startsWith("GPA ")) tile.status.removePrefix("GPA ") else "—", style = MaterialTheme.typography.displayMedium.copy(fontFeatureSettings = "tnum"))
-                Text("GPA / ${tile.title}", Modifier.padding(bottom = 8.dp), style = MaterialTheme.typography.labelMedium, color = InkMuted)
-            } else Text(tile.title, style = MaterialTheme.typography.titleLarge)
-            Text(if (hero) tile.description else tile.status.ifBlank { tile.description }, style = MaterialTheme.typography.bodySmall, color = InkMuted, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -167,9 +140,7 @@ internal fun ClassroomAccountRow(name: String, platform: String, demo: Boolean, 
 @Composable
 internal fun AccentIcon(icon: ImageVector, accent: SectionAccent, description: String? = null) {
     val foreground = sectionColor(accent)
-    Surface(shape = RoundedCornerShape(12.dp), color = foreground.copy(alpha = 0.16f), contentColor = foreground) {
-        Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) { Icon(icon, description, Modifier.size(23.dp)) }
-    }
+    Icon(icon, description, Modifier.size(24.dp), tint = foreground)
 }
 
 @Composable

@@ -11,6 +11,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -24,7 +25,7 @@ import kotlinx.serialization.json.JsonObject
 
 @Composable
 fun CourseDay(courses: List<JsonObject>, nodes: Int, periodHeight: Dp, onCourse: (JsonObject) -> Unit, onConflicts: (List<JsonObject>) -> Unit, modifier: Modifier = Modifier) {
-    val titleStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp, lineHeight = 14.sp, fontWeight = FontWeight.Bold, lineBreak = LineBreak.Heading, hyphens = Hyphens.None)
+    val titleStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.Medium, lineBreak = LineBreak.Heading, hyphens = Hyphens.None)
     BoxWithConstraints(modifier.height(periodHeight * nodes)) {
         courseGroups(courses).forEach { group ->
             val placements = layoutCourses(group)
@@ -35,17 +36,13 @@ fun CourseDay(courses: List<JsonObject>, nodes: Int, periodHeight: Dp, onCourse:
                 val laneWidth = if (collapse) maxWidth else maxWidth / placement.laneCount
                 val span = if (collapse) requireNotNull(courseSpan(group)) else course.number("start_node")..course.number("end_node")
                 val name = course.text("name")
-                val maxTitleLines = if (span.first == span.last) 1 else 3
-                Surface(onClick = { if (collapse && group.size > 1) onConflicts(group) else onCourse(course) }, color = courseFill(name), contentColor = InkText, shape = RoundedCornerShape(8.dp), modifier = Modifier.offset(x = if (collapse) 0.dp else laneWidth * placement.lane, y = periodHeight * (span.first - 1)).width(laneWidth).padding(end = if (!collapse && placement.laneCount > 1) 2.dp else 0.dp).height(periodHeight * (span.last - span.first + 1) - 4.dp)) {
+                val maxTitleLines = if (span.first == span.last) 2 else (span.last - span.first + 1) * 3
+                Surface(onClick = { if (collapse && group.size > 1) onConflicts(group) else onCourse(course) }, color = courseFill(name), contentColor = Color.White, shape = RoundedCornerShape(5.dp), modifier = Modifier.offset(x = if (collapse) 0.dp else laneWidth * placement.lane, y = periodHeight * (span.first - 1)).width(laneWidth).padding(end = if (!collapse && placement.laneCount > 1) 2.dp else 0.dp).height(periodHeight * (span.last - span.first + 1) - 3.dp)) {
                     Box(Modifier.fillMaxSize()) {
-                    Box(Modifier.width(3.dp).fillMaxHeight().background(courseAccent(name)))
-                    Column(Modifier.padding(start = 7.dp, end = 3.dp, top = 6.dp, bottom = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Text(course.text("start_time"), Modifier.weight(1f), style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum", letterSpacing = 0.sp), fontSize = 8.sp, lineHeight = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            if (collapse && group.size > 1) Text("+${group.size - 1}", fontSize = 10.sp, lineHeight = 10.sp, maxLines = 1, fontWeight = FontWeight.Bold)
-                        }
+                    Column(Modifier.padding(horizontal = 3.dp, vertical = 5.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        if (collapse && group.size > 1) Text("+${group.size - 1}", fontSize = 10.sp, lineHeight = 10.sp, maxLines = 1, fontWeight = FontWeight.Bold)
                         CourseTitle(name, titleStyle, maxTitleLines, Modifier.weight(1f, fill = false).fillMaxWidth())
-                        Text(compactRoom(course.text("location")), fontSize = 8.sp, lineHeight = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text(compactRoom(course.text("location")), fontSize = 10.sp, lineHeight = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                     }
                 }

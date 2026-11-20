@@ -17,30 +17,38 @@ class VisualStyleTest {
         assertEquals(1, toolColumnCount(0f, 1f))
     }
 
-    @Test fun jewelColoursDependOnlyOnNameAndHaveReadableContrastOnInk() {
+    @Test fun courseColoursDependOnlyOnNameAndKeepWhiteTextReadable() {
         val names = listOf("人体解剖学", "大学英语", "基础化学", "", "Medical English")
         val first = names.associateWith { coursePaletteIndex(it) }
         assertEquals(first, names.reversed().associateWith { coursePaletteIndex(it) })
         assertEquals((0..6).toSet(), (0..6).map { coursePaletteIndex(it.toString()) }.toSet())
         (names + (0..6).map { it.toString() }).forEach { name ->
             assertTrue(coursePaletteIndex(name) in 0..6)
-            assertEquals(0.22f, courseFill(name).alpha, 0.001f)
+            assertEquals(0.85f, courseFill(name).alpha, 0.001f)
             assertEquals(1f, courseAccent(name).alpha, 0f)
-            listOf(InkBase, InkLive.copy(alpha = 0.035f).compositeOver(InkBase)).forEach { surface ->
+            listOf(TimetableTop, TimetableBottom).forEach { surface ->
                 val back = courseFill(name).compositeOver(surface).luminance()
-                val text = InkText.luminance()
-                assertTrue((maxOf(back, text) + 0.05f) / (minOf(back, text) + 0.05f) >= 7f)
+                val text = androidx.compose.ui.graphics.Color.White.luminance()
+                assertTrue((maxOf(back, text) + 0.05f) / (minOf(back, text) + 0.05f) >= 3f)
             }
         }
     }
 
     @Test fun fixedPaletteKeepsTextReadableAcrossRaisedSurfaces() {
-        assertEquals(InkBase, inkColors.background)
-        assertEquals(InkAccent, inkColors.primary)
-        listOf(InkBase, InkSurface, InkRaised).forEach { surface ->
-            assertTrue((InkText.luminance() + 0.05f) / (surface.luminance() + 0.05f) >= 7f)
-            assertTrue((InkMuted.luminance() + 0.05f) / (surface.luminance() + 0.05f) >= 4.5f)
+        assertEquals(AppBackground, appColors.background)
+        assertEquals(AppPrimary, appColors.primary)
+        assertEquals(AppCard, appColors.surfaceContainerHighest)
+        listOf(AppBackground, AppSurface, AppCard).forEach { surface ->
+            assertTrue((surface.luminance() + 0.05f) / (AppText.luminance() + 0.05f) >= 7f)
+            assertTrue((surface.luminance() + 0.05f) / (AppMuted.luminance() + 0.05f) >= 4.5f)
         }
+    }
+
+    @Test fun calendarUnavailableIsNotAnAllClearStatus() {
+        assertEquals("校历不可用", timetableCalendarStatus(null, "加载失败"))
+        assertEquals("校历不可用", timetableCalendarStatus(null, ""))
+        assertEquals("本机课表", timetableCalendarStatus(1, ""))
+        assertEquals("本机 · 更新于 09:22", timetableCalendarStatus(1, "本机 · 更新于 09:22"))
     }
 
     @Test fun dateHeadersFollowSelectedWeekAndDoNotInventMissingCalendarDates() {

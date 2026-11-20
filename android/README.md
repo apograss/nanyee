@@ -1,6 +1,6 @@
 # Nanyee Android
 
-原生 Kotlin / Jetpack Compose Material 3 客户端，最低 Android 8（API 26）。使用固定的 Ink & Signal 墨靛主题，不随系统深浅模式切换；系统栏、弹窗及腾讯验证码 WebView 使用同一深色设定。课表支持日期/周次底部选择器、今日 Now / Next 与实时线、确定性珠宝色课程块；工具采用 GPA 主卡与响应式 bento 网格。
+原生 Kotlin / Jetpack Compose Material 3 客户端，最低 Android 8（API 26）。使用固定浅色主题，不随系统深浅模式切换；系统栏、弹窗及腾讯验证码 WebView 保持浅色。课表采用柔和渐变背景、紧凑日期/周次页头、窄时间栏和半透明课程块；点按日期或右上菜单选择学期与周次，左右滑动切周。校历缺失时明确显示“校历不可用”。其他页面使用白色分组卡片与简洁列表。
 
 ## 构建和安装
 

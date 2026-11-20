@@ -43,7 +43,10 @@ internal fun nextCourseTitleFit(current: CourseTitleFit, minimumFontSize: Float,
 
 internal fun timetableFontScale(scale: Float): Float = if (scale.isFinite() && scale > 0) scale.coerceAtMost(1.4f) else 1f
 
-internal fun timetablePeriodHeight(scale: Float): Float = 88f * timetableFontScale(scale).coerceAtLeast(1f)
+internal fun timetablePeriodHeight(scale: Float): Float = 66f * timetableFontScale(scale).coerceAtLeast(1f)
+
+internal fun timetableCalendarStatus(week: Int?, hint: String): String =
+    if (week == null) "校历不可用" else hint.ifBlank { "本机课表" }
 
 internal fun currentTeachingWeek(semesterStart: String, today: LocalDate, totalWeeks: Int): Int? {
     val start = runCatching { LocalDate.parse(semesterStart).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)) }.getOrNull() ?: return null
