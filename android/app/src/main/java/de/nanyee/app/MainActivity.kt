@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -41,6 +42,7 @@ import kotlinx.serialization.json.*
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -89,11 +91,22 @@ fun Nanyee(state: SchoolState) {
     val landscape = LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp
     val iconSize = (24 * LocalDensity.current.fontScale.coerceIn(1f, 1.35f)).dp
     val icons = listOf(Icons.Outlined.CalendarMonth, Icons.Outlined.School, Icons.Outlined.RateReview, Icons.Outlined.Widgets, Icons.Outlined.Person)
+    val selectedIcons = listOf(Icons.Filled.CalendarMonth, Icons.Filled.School, Icons.Filled.RateReview, Icons.Filled.Widgets, Icons.Filled.Person)
+    val subtitle = when (state.tab) {
+        MainTab.TIMETABLE -> "${if (state.homeVisible) "第 ${state.week} 周 · " else ""}${state.today.format(DateTimeFormatter.ofPattern("M月d日 E", Locale.SIMPLIFIED_CHINESE))}"
+        MainTab.CLASSROOM -> "连接课堂，专注当下"
+        MainTab.EVALUATION -> "每一份反馈，都有回响"
+        MainTab.TOOLS -> "校园日常，触手可及"
+        MainTab.MY -> "校园与生活，在这里相遇"
+    }
     val tabState = rememberSaveableStateHolder()
     var platformMenu by remember { mutableStateOf(false) }
     Scaffold(
         contentWindowInsets = WindowInsets.safeDrawing,
-        topBar = { TopAppBar(expandedHeight = if (landscape) 48.dp else 56.dp, colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow), title = { Text(state.tab.label + if (landscape && state.demo) " · 演示模式" else "", fontWeight = FontWeight.Bold, style = if (landscape) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge, maxLines = 1) }, actions = {
+        topBar = { TopAppBar(expandedHeight = if (landscape) 56.dp else (72 * LocalDensity.current.fontScale.coerceIn(1f, 1.6f)).dp, colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background), title = { Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(state.tab.label, style = if (landscape) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineLarge, maxLines = 1)
+            Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        } }, actions = {
             if (state.tab == MainTab.CLASSROOM) Box {
                 IconButton(onClick = { platformMenu = true }) { Icon(Icons.Outlined.MoreHoriz, "课堂平台与服务器") }
                 DropdownMenu(expanded = platformMenu, onDismissRequest = { platformMenu = false }) {
@@ -106,16 +119,21 @@ fun Nanyee(state: SchoolState) {
             }
             if ((state.tab == MainTab.TIMETABLE || state.tab == MainTab.TOOLS && state.toolsRoute == "grades") && state.homeVisible && !state.demo) IconButton(onClick = { state.reload() }, enabled = !state.busy) { Icon(Icons.Outlined.Refresh, "刷新", Modifier.size(iconSize)) }
         }) },
-        bottomBar = { if (!landscape) NavigationBar(modifier = Modifier.height((if (LocalDensity.current.fontScale > 1.2f) 88.dp else 72.dp) + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()), containerColor = MaterialTheme.colorScheme.surfaceContainerLow) { MainTab.entries.forEach { tab -> NavigationBarItem(selected = state.tab == tab, onClick = { state.selectTab(tab) }, icon = { Icon(icons[tab.ordinal], null) }, label = { Text(tab.label) }) } } }
+        bottomBar = { if (!landscape) Column {
+            HorizontalDivider(thickness = 0.5.dp)
+            NavigationBar(modifier = Modifier.height((if (LocalDensity.current.fontScale > 1.2f) 88.dp else 72.dp) + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()), containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
+                MainTab.entries.forEach { tab -> NavigationBarItem(selected = state.tab == tab, onClick = { state.selectTab(tab) }, icon = { Icon(if (state.tab == tab) selectedIcons[tab.ordinal] else icons[tab.ordinal], null) }, label = { Text(tab.label) }, colors = NavigationBarItemDefaults.colors(indicatorColor = MaterialTheme.colorScheme.primaryContainer, selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer)) }
+            }
+        } }
     ) { padding ->
         Row(Modifier.padding(padding).consumeWindowInsets(padding).fillMaxSize()) {
-            if (landscape) NavigationRail(windowInsets = WindowInsets(0)) { MainTab.entries.forEach { tab -> NavigationRailItem(selected = state.tab == tab, onClick = { state.selectTab(tab) }, icon = { Icon(icons[tab.ordinal], tab.label) }) } }
+            if (landscape) NavigationRail(windowInsets = WindowInsets(0)) { MainTab.entries.forEach { tab -> NavigationRailItem(selected = state.tab == tab, onClick = { state.selectTab(tab) }, icon = { Icon(if (state.tab == tab) selectedIcons[tab.ordinal] else icons[tab.ordinal], tab.label) }) } }
         Column(Modifier.weight(1f).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
             if (state.autoLoggingIn) Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("正在自动登录…", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                 TextButton(onClick = { state.returnToCache() }) { Text("取消") }
             } else if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-            if (state.demo && !landscape) Surface(color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.fillMaxWidth()) { Text("演示模式 · 以下为示例数据，并非真实学业记录", Modifier.padding(horizontal = 12.dp, vertical = 8.dp), style = MaterialTheme.typography.labelMedium) }
+            if (state.demo && !landscape) Surface(color = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.fillMaxWidth()) { Text("演示模式 · 以下为示例数据，并非真实学业记录", Modifier.padding(horizontal = 12.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall) }
             if (state.homeVisible && state.error.isNotEmpty()) ErrorCard(state)
             tabState.SaveableStateProvider(state.tab.ordinal) { when {
                 state.cacheRevocationFailed -> Column(Modifier.padding(12.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -239,16 +257,20 @@ fun Timetable(state: SchoolState, onCourse: (JsonObject) -> Unit) {
         }
         val active = state.courses.filter { (it["weeks"] as? JsonArray)?.any { w -> (w as? JsonPrimitive)?.intOrNull == state.week } == true }
         if (active.isEmpty()) Text(if (state.busy) "正在加载课表…" else "本周暂无课程", Modifier.padding(12.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        val dark = isSystemInDarkTheme()
-        val colors = if (dark) listOf(Color(0xFF244F47), Color(0xFF394563), Color(0xFF58452E), Color(0xFF503D55)) else listOf(Color(0xFFDCEFE7), Color(0xFFE4E9F9), Color(0xFFF8EBD4), Color(0xFFF1E3EF))
         val nodeTimes = periodStartTimes(state.courses)
+        val endTimes = periodEndTimes(state.courses)
         val nodes = maxOf(nodeTimes.size, active.maxOfOrNull { it.number("end_node") } ?: nodeTimes.size)
-        val today = state.today.dayOfWeek.value
+        val monday = teachingWeekMonday(state.semesterStart, state.week)
         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
             Spacer(Modifier.width(periodWidth))
             (1..7).forEach { day ->
-                Box(Modifier.weight(1f).height(32.dp).clip(RoundedCornerShape(10.dp)).background(if (day == today) MaterialTheme.colorScheme.primaryContainer else Color.Transparent), contentAlignment = Alignment.Center) {
-                    Text("周${"一二三四五六日"[day - 1]}", fontSize = 11.sp, fontWeight = if (day == today) FontWeight.Bold else FontWeight.Normal, color = if (day == today) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
+                val date = monday?.plusDays(day.toLong() - 1)
+                val today = date == state.today
+                Column(Modifier.weight(1f).padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("周${"一二三四五六日"[day - 1]}", fontSize = 10.sp, lineHeight = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Surface(shape = RoundedCornerShape(12.dp), color = if (today) MaterialTheme.colorScheme.primaryContainer else Color.Transparent, contentColor = if (today) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface) {
+                        Text(date?.dayOfMonth?.toString() ?: "—", Modifier.padding(horizontal = 7.dp, vertical = 3.dp), fontSize = 11.sp, lineHeight = 14.sp, fontWeight = if (today) FontWeight.Bold else FontWeight.Normal)
+                    }
                 }
             }
         }
@@ -267,11 +289,12 @@ fun Timetable(state: SchoolState, onCourse: (JsonObject) -> Unit) {
         }.verticalScroll(rememberScrollState()).padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
             Column(Modifier.width(periodWidth)) {
                 (1..nodes).forEach { node -> Column(Modifier.height(periodHeight).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("$node", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(nodeTimes.getOrNull(node - 1) ?: "—", fontSize = 8.sp, maxLines = 1, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("$node", fontSize = 11.sp, lineHeight = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(nodeTimes.getOrNull(node - 1) ?: "—", fontSize = 8.sp, lineHeight = 11.sp, maxLines = 1, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(endTimes.getOrNull(node - 1) ?: "—", fontSize = 8.sp, lineHeight = 11.sp, maxLines = 1, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } }
             }
-            (1..7).forEach { day -> CourseDay(active.filter { it.number("weekday") == day }, state.courses, colors, nodes, periodHeight, onCourse, { conflicts = it }, Modifier.weight(1f)) }
+            (1..7).forEach { day -> CourseDay(active.filter { it.number("weekday") == day }, nodes, periodHeight, onCourse, { conflicts = it }, Modifier.weight(1f).background(if (monday?.plusDays(day.toLong() - 1) == state.today) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else Color.Transparent)) }
         }
     }
     }

@@ -8,6 +8,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -87,7 +88,7 @@ private fun XxtScreen(state: XxtState, onBack: () -> Unit, onToggleDemo: () -> U
     LaunchedEffect(state.user) { if (state.user != null) { password = ""; smsCode = "" } }
     val back = { if (!state.busy) { if (state.course != null) state.back() else onBack() } }
     BackHandler { if (state.qrLogin != null || (method == "qr" && state.busy)) state.stopQrLogin() else back() }
-    PullToRefreshBox(isRefreshing = state.busy, onRefresh = { if (state.user != null && !state.busy) state.refresh() }, modifier = Modifier.widthIn(max = 720.dp).fillMaxSize()) {
+    PullToRefreshBox(isRefreshing = state.busy, onRefresh = { if (state.user != null && !state.busy) state.refresh() }, modifier = Modifier.widthIn(max = 720.dp).fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant)) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (state.course != null) TextButton(onClick = back, enabled = !state.busy) { Text(if (state.activity == null) "返回课程" else "返回活动") }
         ClassroomAccountRow(state.user?.name ?: "未登录学习通", "学习通", state.demo, !state.busy, state.user != null, state::logout, onToggleDemo)
@@ -99,7 +100,7 @@ private fun XxtScreen(state: XxtState, onBack: () -> Unit, onToggleDemo: () -> U
             Text("上次提交结果未知。在官方学习通核验前，所有写入均已阻止。")
             TextButton(onClick = state::acknowledgeUnknown, enabled = !state.busy) { Text("我已在官方学习通核验，解除写入阻止") }
         }
-        if (state.user == null || state.qrLogin != null) Card(Modifier.fillMaxWidth()) {
+        if (state.user == null || state.qrLogin != null) Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("学习通账号", style = MaterialTheme.typography.titleLarge)
                 val user = state.user
@@ -146,7 +147,9 @@ private fun XxtScreen(state: XxtState, onBack: () -> Unit, onToggleDemo: () -> U
                 Text("下拉刷新 · 仅本人账号", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (state.loaded && state.courses.isEmpty()) Text("暂无学习通课程。")
                 state.courses.forEach { row ->
-                    CompactEntry(row.name, row.teacher, Icons.Outlined.AutoStories, SectionAccent.ACADEMIC, enabled = !state.busy, onClick = { state.selectCourse(row) })
+                    Card(onClick = { state.selectCourse(row) }, enabled = !state.busy, modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                        Row(Modifier.padding(12.dp)) { CourseHeading(row.name, row.teacher) }
+                    }
                 }
             } else if (activity == null) {
                 Text(course.name, style = MaterialTheme.typography.titleLarge)

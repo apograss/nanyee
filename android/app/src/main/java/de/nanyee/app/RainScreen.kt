@@ -1,5 +1,7 @@
 package de.nanyee.app
 
+import androidx.compose.foundation.background
+
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -71,7 +73,7 @@ private fun RainContent(state: RainState, onBack: () -> Unit, toggleDemo: () -> 
         }
     }
     BackHandler(onBack = back)
-    PullToRefreshBox(isRefreshing = state.busy, onRefresh = { if (state.user != null && !state.busy && state.lesson == null) state.refresh() }, modifier = Modifier.widthIn(max = 920.dp).fillMaxSize()) {
+    PullToRefreshBox(isRefreshing = state.busy, onRefresh = { if (state.user != null && !state.busy && state.lesson == null) state.refresh() }, modifier = Modifier.widthIn(max = 920.dp).fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant)) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (state.lesson != null || state.qr != null) TextButton(onClick = back, enabled = !state.busy) { Text(if (state.lesson != null) "离开课堂并返回课程" else "取消二维码登录") }
         ClassroomAccountRow(state.user?.name ?: "未登录雨课堂", "雨课堂", state.demo, !state.busy, state.user != null, { localConfirm = "logout" }, toggleDemo)
@@ -116,9 +118,9 @@ private fun RainContent(state: RainState, onBack: () -> Unit, toggleDemo: () -> 
                     Text("下拉刷新 · 每 3 秒前台检查开课 · 不自动加入", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (state.loaded && state.courses.isEmpty()) Text("暂无课程。")
                     state.courses.forEach { course ->
-                        Card(Modifier.fillMaxWidth()) {
+                        Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                SectionHeading(course.name, course.teacher, Icons.Outlined.AutoStories)
+                                CourseHeading(course.name, course.teacher)
                                 val lessons = state.onLesson.filter { it.courseId == course.id }
                                 if (lessons.isEmpty()) Text("当前未在上课")
                                 lessons.forEach { lesson -> Button(onClick = { state.previewJoin(lesson.lessonId, course.name) }, enabled = !state.busy && state.unknownKey.isBlank()) { Text("正在上课 · 预览课堂签到 / 加入") } }

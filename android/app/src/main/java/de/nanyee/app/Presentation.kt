@@ -74,6 +74,20 @@ internal fun semesterStartFromExport(content: String): String = content.lineSequ
 internal fun selectedDetail(savedIdentity: String, dataIdentity: String, index: Int, items: List<JsonObject>): JsonObject? =
     if (savedIdentity.isNotEmpty() && savedIdentity == dataIdentity) items.getOrNull(index) else null
 
+internal fun coursePaletteIndex(name: String): Int = ((name.hashCode().toLong() and 0x7fffffffL) % 6).toInt()
+internal fun teachingWeekMonday(semesterStart: String, week: Int): LocalDate? = runCatching {
+    require(week > 0)
+    LocalDate.parse(semesterStart).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).plusWeeks(week.toLong() - 1)
+}.getOrNull()
+internal fun toolColumnCount(width: Float, fontScale: Float): Int = if (fontScale >= 1.3f || width < 320f) 1 else (width / (160f * fontScale.coerceAtLeast(1f))).toInt().coerceIn(2, 5)
+
+internal fun periodEndTimes(courses: List<JsonObject>): List<String> {
+    val observed = courses.filter { it.number("end_node") in 1..60 }.groupBy { it.number("end_node") }.mapValues { (_, items) -> items.mapNotNull { runCatching { LocalTime.parse(it.text("end_time")).toString() }.getOrNull() }.distinct() }
+    return periodStartTimes(courses).mapIndexed { index, start ->
+        if (index + 1 in observed) observed[index + 1]?.singleOrNull() ?: "—" else runCatching { LocalTime.parse(start).plusMinutes(40).toString() }.getOrDefault("—")
+    }
+}
+
 internal fun periodStartTimes(courses: List<JsonObject>): List<String> {
     val campusTimes = listOf(
         listOf("08:00", "08:45", "09:50", "10:35", "11:20", "14:30", "15:15", "16:15", "17:00", "19:30", "20:30"),
