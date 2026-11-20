@@ -257,7 +257,7 @@ fun Timetable(state: SchoolState, onCourse: (JsonObject) -> Unit) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("第${state.week}周", fontSize = 13.sp, color = AppText)
                     Icon(Icons.Outlined.ExpandMore, null, Modifier.size(16.dp))
-                    Text(timetableCalendarStatus(state.currentWeek, status), fontSize = 11.sp, color = AppMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(timetableCalendarStatus(state.semesterStart, state.currentWeek, status), fontSize = 11.sp, color = AppMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
             IconButton(onClick = { if (state.demo) state.returnToCurrentWeek() else state.reload() }, enabled = !state.busy) { Icon(Icons.Outlined.Refresh, "刷新课表", Modifier.size(22.dp)) }

@@ -45,10 +45,22 @@ class VisualStyleTest {
     }
 
     @Test fun calendarUnavailableIsNotAnAllClearStatus() {
-        assertEquals("校历不可用", timetableCalendarStatus(null, "加载失败"))
-        assertEquals("校历不可用", timetableCalendarStatus(null, ""))
-        assertEquals("本机课表", timetableCalendarStatus(1, ""))
-        assertEquals("本机 · 更新于 09:22", timetableCalendarStatus(1, "本机 · 更新于 09:22"))
+        assertEquals("校历不可用", timetableCalendarStatus("", null, "加载失败"))
+        assertEquals("校历不可用", timetableCalendarStatus("", null, "离线课表"))
+        assertEquals("校历不可用", timetableCalendarStatus("invalid", null, ""))
+        assertEquals("本机课表", timetableCalendarStatus("2026-11-16", 1, ""))
+        assertEquals("本机 · 更新于 09:22", timetableCalendarStatus("2026-11-16", 1, "本机 · 更新于 09:22"))
+    }
+
+    @Test fun validCalendarOutsideTeachingWeeksIsNotUnavailable() {
+        val start = "2026-02-23"
+        listOf("2026-02-22", "2026-07-13", "2026-11-20").forEach { date ->
+            val week = currentTeachingWeek(start, LocalDate.parse(date), 20)
+            assertNull(week)
+            listOf("", "离线课表", "更新于 09:22").forEach { hint ->
+                assertEquals("当前日期不在本学期教学周内", timetableCalendarStatus(start, week, hint))
+            }
+        }
     }
 
     @Test fun dateHeadersFollowSelectedWeekAndDoNotInventMissingCalendarDates() {
