@@ -1,0 +1,5 @@
+Offline OCR reference: captcha_0002.jpg from
+legacy/smu-tools/captcha-model/captchas/review.html.
+Four-digit annotation, manually checked: 7464.
+captcha-fixture.rgb is the JPEG decoded to 80x28 RGB bytes with Pillow;
+the JVM model test uses these pixels without depending on Android Bitmap.
