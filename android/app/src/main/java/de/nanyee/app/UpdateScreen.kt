@@ -87,9 +87,12 @@ private fun copyContact(context: Context) {
     Toast.makeText(context, "邮箱已复制", Toast.LENGTH_SHORT).show()
 }
 private fun sendFeedback(context: Context) {
-    val uri = Uri.parse("mailto:$CONTACT_EMAIL").buildUpon().appendQueryParameter("subject", "Nanyee 反馈")
-        .appendQueryParameter("body", "Nanyee ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})\nAndroid ${Build.VERSION.RELEASE}\n${Build.MANUFACTURER} ${Build.MODEL}\n\n").build()
-    try { context.startActivity(Intent(Intent.ACTION_SENDTO, uri)) } catch (_: ActivityNotFoundException) { copyContact(context) }
+    val subject = "Nanyee 反馈"
+    val body = "Nanyee ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})\nAndroid ${Build.VERSION.RELEASE}\n${Build.MANUFACTURER} ${Build.MODEL}\n\n"
+    val uri = Uri.parse(feedbackMailto(subject, body, Uri::encode))
+    val intent = Intent(Intent.ACTION_SENDTO, uri).putExtra(Intent.EXTRA_EMAIL, arrayOf(CONTACT_EMAIL))
+        .putExtra(Intent.EXTRA_SUBJECT, subject).putExtra(Intent.EXTRA_TEXT, body)
+    try { context.startActivity(intent) } catch (_: ActivityNotFoundException) { copyContact(context) }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
