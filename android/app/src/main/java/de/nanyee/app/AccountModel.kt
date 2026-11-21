@@ -74,7 +74,7 @@ internal class AccountModel(private val backend: PlatformBackend, private val re
                 val next = registrationChallenge(result); require(next.method == method || (method == RegistrationMethod.QUICK && next.method == RegistrationMethod.QUIZ))
                 registration = next; registrationVerified = false; answers = List(next.questions.size) { null }; code = ""
                 recovery.write("registration", result.toString()); recovery.write("registrationVerified", "")
-                message = if (next.method != RegistrationMethod.EMAIL) "答对 ${next.passScore}/${next.questions.size} 题即可设置账号。" else "验证码已发送至 ${next.maskedEmail.ifBlank { "你的邮箱" }}，请查收。"
+                message = if (next.method != RegistrationMethod.EMAIL) "答对 ${next.passScore}/${next.questions.size} 题即可设置账号。" else if (backend is DemoAccountBackend) "演示验证码为 123456，未发送邮件。" else "验证码已发送至 ${next.maskedEmail.ifBlank { "你的邮箱" }}，请查收。"
             } catch (e: PlatformFailure) { registrationFailed(e) }
         }
     }
@@ -121,7 +121,7 @@ internal class AccountModel(private val backend: PlatformBackend, private val re
                 clearAccount(); user = platformUser(result); hidden = dismissed(owner)
                 clearRegistration(); route = ""; recovery.write("route", ""); nickname = ""
                 load()
-                message = if (current.method != RegistrationMethod.EMAIL) "注册成功，已登录。建议在“邮箱”里绑定邮箱，便于找回密码。" else "注册成功，已登录 Nanyee。"
+                message = if (backend is DemoAccountBackend) "演示注册成功，未创建真实账号。可继续体验绑定邮箱，不会发送邮件。" else if (current.method != RegistrationMethod.EMAIL) "注册成功，已登录。建议在“邮箱”里绑定邮箱，便于找回密码。" else "注册成功，已登录 Nanyee。"
             } catch (e: PlatformFailure) {
                 if (user != null) throw e
                 registrationFailed(e)
@@ -241,16 +241,16 @@ internal class AccountModel(private val backend: PlatformBackend, private val re
             val result = backend.call(action.method, action.path, body)
             when (action.kind) {
                 AccountWrite.LOGIN -> { clearAccount(); user = platformUser(result); hidden = dismissed(owner); route = ""; recovery.write("route", ""); clearChallenge(); load() }
-                AccountWrite.LOGOUT -> { backend.clearLocal(); clearAccount(); route = ""; recovery.write("route", ""); clearChallenge(); message = "已退出 Nanyee；学校登录不受影响。" }
+                AccountWrite.LOGOUT -> { backend.clearLocal(); clearAccount(); route = ""; recovery.write("route", ""); clearChallenge(); message = if (backend is DemoAccountBackend) "已退出演示账号；真实账号不受影响。" else "已退出 Nanyee；学校登录不受影响。" }
                 AccountWrite.EMAIL_CODE, AccountWrite.RESET_CODE -> {
                     challenge = accountChallenge(result); challengeOwner = if (action.kind == AccountWrite.EMAIL_CODE) owner else ""
                     recovery.write("challenge", result.toString()); recovery.write("challengeOwner", challengeOwner)
-                    message = "验证码已发送（若邮箱已绑定对应账号）。请查收并留意有效期。"
+                    message = if (backend is DemoAccountBackend) "演示验证码为 123456，未发送邮件。" else "验证码已发送（若邮箱已绑定对应账号）。请查收并留意有效期。"
                 }
-                AccountWrite.EMAIL_CONFIRM, AccountWrite.EMAIL_UNBIND -> { user = platformUser(result); clearChallenge(); message = "邮箱设置已更新。" }
-                AccountWrite.RESET_CONFIRM -> { backend.clearLocal(); clearAccount(); clearChallenge(); route = ""; recovery.write("route", ""); message = "密码已重置，所有平台会话均已退出，请重新登录。" }
+                AccountWrite.EMAIL_CONFIRM, AccountWrite.EMAIL_UNBIND -> { user = platformUser(result); clearChallenge(); message = if (backend is DemoAccountBackend) "本次演示的模拟邮箱设置已更新。" else "邮箱设置已更新。" }
+                AccountWrite.RESET_CONFIRM -> { backend.clearLocal(); clearAccount(); clearChallenge(); route = ""; recovery.write("route", ""); message = if (backend is DemoAccountBackend) "本次演示已重置模拟密码，不影响真实账号。" else "密码已重置，所有平台会话均已退出，请重新登录。" }
                 AccountWrite.REVEAL -> { val value = (result as? JsonObject)?.text("secret").orEmpty(); require(value.isNotEmpty()); if (visible == visibility) revealed = value }
-                else -> { load(); message = "操作已提交，请核对更新后的状态。" }
+                else -> { load(); message = if (backend is DemoAccountBackend) "本次演示操作已完成，不会发送至服务器。" else "操作已提交，请核对更新后的状态。" }
             }
         }
     }

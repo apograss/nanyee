@@ -90,7 +90,7 @@ internal class CabinState(app: Application) : AndroidViewModel(app) {
         try { api().call("POST", "/auth/logout") } catch (e: CancellationException) { throw e } catch (_: Exception) { remoteFailed = true }
         api().clearLocal()
         clearSensitive()
-        message = if (remoteFailed) "已清除本机平台登录。服务器注销未确认，可到网站管理会话。" else "已退出平台账号并清除本机平台 Cookie。"
+        message = if (demo) "已退出本次演示账号。" else if (remoteFailed) "已清除本机平台登录。服务器注销未确认，可到网站管理会话。" else "已退出平台账号并清除本机平台 Cookie。"
     }
 
     private suspend fun load() {
@@ -130,10 +130,10 @@ internal class CabinState(app: Application) : AndroidViewModel(app) {
         run {
             if (id == null) selectedCredential = credentialRecovery.save(api(), body!!).text("id")
             else updateCabinPassword(api(), id, schoolAccount, password, hint)
-            cancelCredential(); load(); message = "凭据已安全提交给 nanyee.de。"
+            cancelCredential(); load(); message = cabinCredentialSavedMessage(demo)
         }
     }
-    fun revoke(id: String) = run { api().call("DELETE", "/credentials/$id"); load(); message = "已撤销托管凭据。" }
+    fun revoke(id: String) = run { api().call("DELETE", "/credentials/$id"); load(); message = if (demo) "已移除本次演示的模拟凭据。" else "已撤销托管凭据。" }
 
     fun review() {
         if (pending != null) { error = "上次提交尚未确认，请先使用原确认重试或刷新核对。"; return }
@@ -171,7 +171,7 @@ internal class CabinState(app: Application) : AndroidViewModel(app) {
             }
             val deduplicated = api().jobDeduplicated
             pending = null; submitted = true
-            load(); message = if (evaluationMode) { if (deduplicated) "已沿用现有常驻评课任务，未重复创建。" else "常驻评课任务已创建。" } else "预约任务已创建，服务器将按计划尝试。"
+            load(); message = if (demo) "已创建本次演示的模拟任务，不会发送至服务器执行。" else if (evaluationMode) { if (deduplicated) "已沿用现有常驻评课任务，未重复创建。" else "常驻评课任务已创建。" } else "预约任务已创建，服务器将按计划尝试。"
         }
     }
     fun reconcilePending() = run {

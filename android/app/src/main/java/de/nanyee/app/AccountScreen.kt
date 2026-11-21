@@ -216,7 +216,7 @@ private fun RegistrationFields(state: AccountState, model: AccountModel, enabled
             TextButton(onClick = { state.registration { startRegistration() } }, enabled = enabled) { Text("换一套题") }
         }
         RegistrationMethod.EMAIL -> {
-            Text("仅支持 .edu.cn 教育邮箱，验证码会发送到该邮箱。", style = MaterialTheme.typography.bodySmall, color = AppMuted)
+            Text(if (state.demo) "演示验证码为 123456，未发送邮件。" else "仅支持 .edu.cn 教育邮箱，验证码会发送到该邮箱。", style = MaterialTheme.typography.bodySmall, color = AppMuted)
             CabinField("教育邮箱", model.email, { model.email = it }, enabled)
             OutlinedButton(onClick = { state.registration { startRegistration() } }, enabled = enabled) { Text(if (challenge == null) "发送验证码" else "重新发送") }
             if (challenge != null) {
