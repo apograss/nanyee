@@ -81,6 +81,12 @@ class AccountRegistrationTest {
         assertEquals("student@smu.edu.cn", model.user?.text("email"))
     }
 
+    @Test fun signedOutRefreshKeepsRegistrationInProgress() = runBlocking {
+        val model = model()
+        model.navigate("register"); model.startRegistration(); model.refresh()
+        assertEquals("register", model.route); assertNotNull(model.registration)
+    }
+
     @Test fun leavingRegistrationOrSwitchingMethodDropsChallenge() = runBlocking {
         val model = model()
         model.navigate("register"); model.startRegistration(); assertNotNull(model.registration)
