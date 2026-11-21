@@ -13,7 +13,9 @@ data class CachedTimetable(
     val courses: List<JsonObject>,
     val updatedAt: String,
     val totalWeeks: Int,
-    val semesterStart: String = ""
+    val semesterStart: String = "",
+    val examNumbers: JsonObject = JsonObject(emptyMap()),
+    val examRows: List<JsonObject> = emptyList()
 )
 
 @Serializable
@@ -37,7 +39,7 @@ internal fun TimetableSnapshot.restoreView(view: CachedTimetableView?, savedView
 
 internal object TimetableCacheCodec {
     private val json = Json { ignoreUnknownKeys = true }
-    private val courseKeys = setOf("course_id", "name", "weekday", "start_node", "end_node", "start_time", "end_time", "location", "teachers", "weeks", "activity", "credit_hours")
+    private val courseKeys = setOf("course_id", "name", "weekday", "start_node", "end_node", "start_time", "end_time", "location", "teachers", "weeks", "activity", "credit_hours", "kcrwdm", "kcbh", "jxbdm", "is_exam", "date", "seat", "exam_number")
 
     fun encode(value: TimetableSnapshot): String {
         val clean = value.copy(

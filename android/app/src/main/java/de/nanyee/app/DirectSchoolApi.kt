@@ -134,7 +134,16 @@ internal class DirectSchoolApi(private val transport: Call.Factory? = null) : Sc
                                     schoolWeeklyRows(post("/new/student/xsgrkb/getCalendarWeekDatas", mapOf("xnxqdm" to code, "zc" to week.toString()), "$ACADEMIC/new/student/xsgrkb/main.page"))
                                 } } }.awaitAll().flatten()
                             }
-                            buildJsonObject { put("semester_code", code); put("courses", JsonArray(schoolTimetable(rows))) }
+                            val numbers = optionalExamData { schoolExamNumbers(schoolAllRows { page ->
+                                post("/new/student/xskcrw/skrwDatas", mapOf("xnxqdm" to code, "kcdldm" to "", "kcfldm" to "", "kcmc" to "", "page" to page.toString(), "rows" to "60", "sort" to "kcrwdm,xdfsdm", "order" to "asc"), "$ACADEMIC/new/student/xskcrw/list.page").obj()
+                            }) }
+                            val exams = optionalExamData { schoolExamRows(schoolAllRows { page ->
+                                post("/new/student/xsksrw/paginateXsksrw", mapOf("xnxqdm" to code, "ksaplxdm" to "", "kslbdm" to "", "page" to page.toString(), "rows" to "60", "sort" to "zc,xq,jcdm2", "order" to "asc"), "$ACADEMIC/new/student/xsksrw/list.page").obj()
+                            }) }
+                            buildJsonObject {
+                                put("semester_code", code); put("courses", JsonArray(schoolTimetable(rows)))
+                                numbers?.let { put("exam_numbers", it) }; exams?.let { put("exam_rows", JsonArray(it)) }
+                            }
                         }
                         "grades" -> {
                             page("$ACADEMIC/new/student/xskccj/kccjList.page")

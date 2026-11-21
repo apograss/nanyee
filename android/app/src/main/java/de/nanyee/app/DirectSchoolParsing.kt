@@ -52,9 +52,13 @@ internal fun schoolTimetable(rows: List<JsonObject>): List<JsonObject> {
             put("location", clean(row.text("jxcdmc"))); put("activity", clean(row.text("jxhjmc"))); put("teachers", clean(row.text("teaxms")))
             put("credit_hours", row.text("xs")); put("weekday", row.number("xq")); put("start_node", row.number("ps")); put("end_node", row.number("pe"))
             put("start_time", start); put("end_time", end); put("week", row.number("zc"))
+            listOf("kcrwdm", "kcbh", "jxbdm").forEach { put(it, row.text(it)) }
+            val exam = row.text("jxhjmc").startsWith("考试")
+            put("is_exam", exam)
+            if (exam) put("date", examDate(row.text("qsrq")))
         }
     }
-    return events.groupBy { row -> listOf("name", "location", "activity", "teachers", "start_node", "end_node", "weekday").map { row[it] } }.values.map { group ->
+    return events.groupBy { row -> listOf("name", "location", "activity", "teachers", "start_node", "end_node", "start_time", "end_time", "weekday", "kcrwdm", "kcbh", "jxbdm", "date").map { row[it] } }.values.map { group ->
         JsonObject(group.first().filterKeys { it != "week" } + ("weeks" to JsonArray(group.map { it.number("week") }.distinct().sorted().map(::JsonPrimitive))))
     }
 }

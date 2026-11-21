@@ -87,6 +87,14 @@ class DirectSchoolLiveIntegrationTest {
                             println("Courses: ${courses.size}")
                             assertTrue("No course models", courses.isNotEmpty())
                             assertTrue("Incomplete course models", courses.all { it.text("name").isNotBlank() && it.number("weekday") in 1..7 && (it["weeks"] as? JsonArray)?.isNotEmpty() == true })
+                            val numbers = timetable["exam_numbers"] as? JsonObject
+                            assertTrue("Task enrichment failed", numbers != null)
+                            assertTrue("Exam list enrichment failed", timetable["exam_rows"] is JsonArray)
+                            val exams = mergeExamCourses(courses, numbers!!, timetable.items("exam_rows")).filter(::isExam)
+                            val attached = exams.count { it.text("exam_number").isNotBlank() }
+                            println("Timetable exams: ${exams.size}; with exam number: $attached")
+                            assertTrue("No timetable exam components", exams.isNotEmpty())
+                            assertTrue("Exam number join incomplete", attached == exams.size)
 
                             stage = "calendar"
                             val startDate = source.timetableSemesterStart(body(currentSemester))

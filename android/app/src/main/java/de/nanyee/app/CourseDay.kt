@@ -41,6 +41,7 @@ fun CourseDay(courses: List<JsonObject>, nodes: Int, periodHeight: Dp, onCourse:
                     Box(Modifier.fillMaxSize()) {
                     Column(Modifier.padding(horizontal = 3.dp, vertical = 5.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         if (collapse && group.size > 1) Text("+${group.size - 1}", fontSize = 10.sp, lineHeight = 10.sp, maxLines = 1, fontWeight = FontWeight.Bold)
+                        if (isExam(course)) Text("考", fontSize = 10.sp, lineHeight = 12.sp, fontWeight = FontWeight.Bold)
                         CourseTitle(name, titleStyle, maxTitleLines, Modifier.weight(1f, fill = false).fillMaxWidth())
                         Text(compactRoom(course.text("location")), fontSize = 10.sp, lineHeight = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
