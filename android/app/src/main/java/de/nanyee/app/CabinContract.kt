@@ -142,7 +142,7 @@ internal suspend fun updateCabinPassword(backend: PlatformBackend, id: String, a
 }
 
 internal fun platformRequest(method: String, path: String, body: JsonObject?, csrf: String?, key: String? = null): Request {
-    require(path.matches(Regex("/(notices|auth/(login|me|logout)|account/(email/(challenges|confirm|unbind)|password-reset(/confirm)?)|study-cabin/cabins|credentials(/[a-zA-Z0-9-]+(/(secret|reveal|renew)|\\?hard=true)?)?|jobs(/[a-zA-Z0-9-]+(/cancel)?)?)")))
+    require(path.matches(Regex("/(notices|auth/(login|me|logout)|account/(email/(challenges|confirm|unbind)|password-reset(/confirm)?)|registration(/challenges(/[a-zA-Z0-9-]+/verify)?)?|study-cabin/cabins|credentials(/[a-zA-Z0-9-]+(/(secret|reveal|renew)|\\?hard=true)?)?|jobs(/[a-zA-Z0-9-]+(/cancel)?)?)")))
     val builder = Request.Builder().url("https://nanyee.de/api/v1$path")
     if (method != "GET") {
         if (!platformPublicWrite(path)) {

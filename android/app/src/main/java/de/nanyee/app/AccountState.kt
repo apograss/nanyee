@@ -45,6 +45,7 @@ internal class AccountState(app: Application, private val saved: SavedStateHandl
         if (model?.busy == true || work?.isActive == true) return
         model?.clearTransient(); demo = !demo; saved["accountDemo"] = demo; model = null; open()
     }
+    fun registration(step: suspend AccountModel.() -> Unit) { val current = model ?: return; viewModelScope.launch { current.step() } }
     fun confirm() { val current = model ?: return; viewModelScope.launch { current.confirm() } }
     fun selectScenario(value: AccountDemoFailure) { fixture.selectScenario(value); open() }
     fun job(id: String) { val current = model ?: return; viewModelScope.launch { current.openJob(id) } }

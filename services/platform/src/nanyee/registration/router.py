@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from nanyee.anti_abuse.gate import AntiAbuseGate
 from nanyee.anti_abuse.rate_limit import RateLimitPolicy
 from nanyee.client import client_subject_digest, get_client_context
+from nanyee.config import Settings
 from nanyee.db import get_db_session
 from nanyee.errors import AppError, ErrorCode
 from nanyee.identity.models import RegistrationTrustLevel, User
@@ -82,7 +83,7 @@ def is_reserved_username(normalized_username: str) -> bool:
 
 
 class ChallengeCreateRequest(BaseModel):
-    method: Literal["email", "quiz"]
+    method: Literal["email", "quiz", "quick"]
     email: str | None = Field(default=None, max_length=254)
     turnstile_token: str | None = Field(default=None, max_length=2048)
     anti_abuse_pass: str | None = Field(default=None, max_length=4096)
@@ -91,7 +92,7 @@ class ChallengeCreateRequest(BaseModel):
     def require_email_for_email_method(self) -> ChallengeCreateRequest:
         if self.method == "email" and not self.email:
             raise ValueError("email is required for email registration")
-        if self.method == "quiz" and self.email is not None:
+        if self.method != "email" and self.email is not None:
             raise ValueError("email is not accepted for quiz registration")
         return self
 
@@ -155,6 +156,12 @@ def normalize_edu_email(value: str, suffixes: list[str]) -> str:
     return normalized
 
 
+def quiz_requirements(settings: Settings, method: RegistrationMethod) -> tuple[int, int]:
+    if method == RegistrationMethod.QUICK:
+        return settings.quick_quiz_question_count, settings.quick_quiz_pass_score
+    return settings.quiz_question_count, settings.quiz_pass_score
+
+
 def mask_email(value: str) -> str:
     local, domain = value.split("@", maxsplit=1)
     visible = local[:2]
@@ -182,7 +189,8 @@ async def create_challenge(
     email = (
         normalize_edu_email(payload.email, settings.edu_email_suffixes) if payload.email else None
     )
-    action = f"registration_{payload.method}"
+    # quick 与 quiz 共用同一份限流额度，避免换方法绕过
+    action = "registration_email" if email else "registration_quiz"
     identity = email or "quiz"
     await AntiAbuseGate(settings).check(
         db,
@@ -249,10 +257,12 @@ async def create_challenge(
             masked_email=mask_email(email),
         )
 
-    question_ids = pick_question_ids(settings.quiz_question_count)
+    method = RegistrationMethod(payload.method)
+    question_count, pass_score = quiz_requirements(settings, method)
+    question_ids = pick_question_ids(question_count)
     challenge = RegistrationChallenge(
         id=challenge_id,
-        method=RegistrationMethod.QUIZ,
+        method=method,
         question_ids=question_ids,
         expires_at=expires_at,
         requester_digest=requester_digest,
@@ -272,8 +282,8 @@ async def create_challenge(
             )
             for index, question_id in enumerate(question_ids)
         ],
-        total_questions=settings.quiz_question_count,
-        pass_score=settings.quiz_pass_score,
+        total_questions=question_count,
+        pass_score=pass_score,
     )
 
 
@@ -319,6 +329,7 @@ async def verify_challenge(
 
     challenge.attempts += 1
     score: int | None = None
+    required_score: int | None = None
     if challenge.method == RegistrationMethod.EMAIL:
         if payload.code is None or challenge.code_digest is None:
             passed = False
@@ -333,7 +344,8 @@ async def verify_challenge(
     else:
         answers = payload.answers or []
         score = grade_answers(challenge.question_ids or [], answers)
-        passed = score >= settings.quiz_pass_score
+        required_score = quiz_requirements(settings, challenge.method)[1]
+        passed = score >= required_score
 
     if passed:
         challenge.verified_at = now
@@ -346,18 +358,14 @@ async def verify_challenge(
             status_code=422,
             details={
                 "attempts_remaining": remaining,
-                **(
-                    {"score": score, "required_score": settings.quiz_pass_score}
-                    if score is not None
-                    else {}
-                ),
+                **({"score": score, "required_score": required_score} if score is not None else {}),
             },
         )
     return ChallengeVerifyResponse(
         verified=True,
         attempts_remaining=remaining,
         score=score,
-        required_score=settings.quiz_pass_score if score is not None else None,
+        required_score=required_score if score is not None else None,
     )
 
 

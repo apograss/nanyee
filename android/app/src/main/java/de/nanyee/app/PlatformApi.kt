@@ -54,7 +54,7 @@ internal class PlatformCookies(private val storage: PlatformCookieStorage) : Coo
     @Synchronized fun clear() { storage.write(""); values.clear() }
 }
 
-internal class PlatformFailure(val status: Int, val code: String, message: String) : Exception(message)
+internal class PlatformFailure(val status: Int, val code: String, message: String, val serverMessage: String = "", val details: JsonObject = JsonObject(emptyMap())) : Exception(message)
 
 internal object PlatformSession {
     private var backend: PlatformApi? = null
@@ -64,7 +64,7 @@ internal object PlatformSession {
     fun changed() { changes.value += 1 }
 }
 
-internal fun platformPublicWrite(path: String) = path in setOf("/auth/login", "/account/password-reset", "/account/password-reset/confirm")
+internal fun platformPublicWrite(path: String) = path in setOf("/auth/login", "/account/password-reset", "/account/password-reset/confirm", "/registration", "/registration/challenges") || path.matches(Regex("/registration/challenges/[a-zA-Z0-9-]+/verify"))
 
 internal fun platformRetryAt(header: String?, now: Long): Long = header?.toLongOrNull()?.coerceAtLeast(0)?.let { seconds ->
     if (seconds > (Long.MAX_VALUE - now) / 1000) Long.MAX_VALUE else now + seconds * 1000
@@ -97,11 +97,12 @@ internal class PlatformApi(storage: PlatformCookieStorage, private val transport
                 val content = response.body?.string().orEmpty()
                 val data = runCatching { Json.parseToJsonElement(content) }.getOrNull()
                 if (!response.isSuccessful) {
-                    val code = data?.obj()?.get("error")?.obj()?.text("code").orEmpty()
-                    if (response.code == 429) retryAt = platformRetryAt(response.header("Retry-After"), System.currentTimeMillis())
-                    throw PlatformFailure(response.code, code, platformErrorMessage(response.code, code))
+                    val failure = data?.obj()?.get("error")?.obj()
+                    val code = failure?.text("code").orEmpty()
+                    if (response.code == 429 && !path.startsWith("/registration")) retryAt = platformRetryAt(response.header("Retry-After"), System.currentTimeMillis())
+                    throw PlatformFailure(response.code, code, platformErrorMessage(response.code, code), failure?.text("message").orEmpty().take(200), failure?.get("details") as? JsonObject ?: JsonObject(emptyMap()))
                 }
-                if (path in setOf("/auth/login", "/auth/logout", "/account/password-reset/confirm") && method == "POST") PlatformSession.changed()
+                if (path in setOf("/auth/login", "/auth/logout", "/account/password-reset/confirm", "/registration") && method == "POST") PlatformSession.changed()
                 if (method == "POST" && path == "/jobs") jobDeduplicated = response.header("X-Job-Deduplicated").equals("true", ignoreCase = true)
                 if (response.code == 204) JsonNull else data ?: throw PlatformFailure(0, "INVALID_RESPONSE", "平台响应格式无效。")
             }

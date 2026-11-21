@@ -93,6 +93,57 @@ async def test_registration_rejects_reserved_usernames(
 
 
 @pytest.mark.asyncio
+async def test_quick_registration_uses_short_quiz(api_client: httpx.AsyncClient) -> None:
+    created = await api_client.post("/api/v1/registration/challenges", json={"method": "quick"})
+    assert created.status_code == 200, created.text
+    challenge = created.json()
+    assert challenge["method"] == "quick"
+    assert len(challenge["questions"]) == challenge["total_questions"] == 3
+    assert challenge["pass_score"] == 2
+
+    bank_by_content = {question.content: question for question in load_quiz_bank()}
+    correct = [bank_by_content[item["question"]].correctAnswer for item in challenge["questions"]]
+    wrong = [
+        (answer + 1) % len(item["options"])
+        for answer, item in zip(correct, challenge["questions"], strict=True)
+    ]
+    rejected = await api_client.post(
+        f"/api/v1/registration/challenges/{challenge['challenge_id']}/verify",
+        json={"answers": [correct[0], *wrong[1:]]},
+    )
+    assert rejected.status_code == 422, rejected.text
+    assert rejected.json()["error"]["details"] == {
+        "attempts_remaining": 4,
+        "score": 1,
+        "required_score": 2,
+    }
+    verified = await api_client.post(
+        f"/api/v1/registration/challenges/{challenge['challenge_id']}/verify",
+        json={"answers": [*correct[:2], wrong[2]]},
+    )
+    assert verified.status_code == 200, verified.text
+    assert verified.json()["required_score"] == 2
+
+    registered = await api_client.post(
+        "/api/v1/registration",
+        json={
+            "challenge_id": challenge["challenge_id"],
+            "username": "quick_01",
+            "password": "一段好记的密码 2026",
+        },
+    )
+    assert registered.status_code == 201, registered.text
+    assert registered.json()["user"]["registration_trust_level"] == "community_quiz"
+    assert registered.json()["user"]["email"] is None
+
+    with_email = await api_client.post(
+        "/api/v1/registration/challenges",
+        json={"method": "quick", "email": "student@smu.edu.cn"},
+    )
+    assert with_email.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_quiz_registration_session_and_csrf_logout(
     api_client: httpx.AsyncClient,
 ) -> None:

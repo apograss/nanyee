@@ -13,14 +13,14 @@ internal enum class AccountWrite(val label: String) {
 
 internal class AccountAction(val kind: AccountWrite, val path: String, val method: String = "POST", val body: JsonObject? = null)
 internal data class AccountChallenge(val id: String, val expires: String, val resend: String, val maskedEmail: String) {
-    fun expired(now: Instant = Instant.now()) = runCatching { !now.isBefore(Instant.parse(expires)) }.getOrDefault(true)
-    fun canResend(now: Instant = Instant.now()) = runCatching { !now.isBefore(Instant.parse(resend)) }.getOrDefault(true)
+    fun expired(now: Instant = Instant.now()) = runCatching { !now.isBefore(platformInstant(expires)) }.getOrDefault(true)
+    fun canResend(now: Instant = Instant.now()) = runCatching { !now.isBefore(platformInstant(resend)) }.getOrDefault(true)
 }
 
 internal fun accountChallenge(value: JsonElement): AccountChallenge {
     val row = value as? JsonObject ?: error("响应格式无效")
     val id = row.text("challenge_id"); require(id.matches(Regex("[a-zA-Z0-9-]+")))
-    Instant.parse(row.text("expires_at")); Instant.parse(row.text("resend_at"))
+    platformInstant(row.text("expires_at")); platformInstant(row.text("resend_at"))
     return AccountChallenge(id, row.text("expires_at"), row.text("resend_at"), row.text("masked_email"))
 }
 

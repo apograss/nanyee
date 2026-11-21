@@ -8,6 +8,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
@@ -20,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -82,7 +84,7 @@ internal fun AccountSection(state: AccountState = viewModel(key = "platform-acco
     if (model.error.isNotBlank()) InlineError(model.error)
     if (model.message.isNotBlank()) Text(model.message, color = MaterialTheme.colorScheme.primary)
     if (state.demo) {
-        Text("演示验证码 123456", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("演示验证码 123456 · 演示注册题选每题第二项", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
     val enabled = !model.busy && model.pending == null
     var accountMenu by remember { mutableStateOf(false) }
@@ -98,20 +100,21 @@ internal fun AccountSection(state: AccountState = viewModel(key = "platform-acco
             }
         }
     }
-    if (model.error.contains("请在网页完成验证")) AssistChip(onClick = { uri.openUri("https://nanyee.de/account") }, label = { Text("在网页完成验证") })
+    if (model.error.contains("请在网页完成验证")) AssistChip(onClick = { uri.openUri(if (model.route == "register") "https://nanyee.de/auth/register" else "https://nanyee.de/account") }, label = { Text("在网页完成验证") })
     if (model.route.isNotEmpty()) TextButton(onClick = { model.navigate("") }, enabled = enabled) { Text("返回 Nanyee 账号") }
     when {
         model.route == "reset" -> {
             Text("忘记平台密码", style = MaterialTheme.typography.titleLarge)
             AccountChallengeFields(model, reset = true, enabled)
         }
+        model.route == "register" && model.user == null -> RegistrationFields(state, model, enabled)
         model.user == null -> {
             CabinField("平台用户名", model.username, { model.username = it }, enabled)
             CabinField("平台密码", model.password, { model.password = it }, enabled, password = true)
             Button(onClick = { model.review(AccountWrite.LOGIN) }, enabled = enabled) { Text("登录 Nanyee…") }
             FlowRow {
+                TextButton(onClick = { model.navigate("register") }, enabled = enabled) { Text("注册账号") }
                 TextButton(onClick = { model.navigate("reset") }, enabled = enabled) { Text("忘记密码") }
-                TextButton(onClick = { uri.openUri("https://nanyee.de/auth/register") }) { Text("去网站注册") }
             }
         }
         else -> {
@@ -159,6 +162,60 @@ internal fun AccountSection(state: AccountState = viewModel(key = "platform-acco
         onDispose { if (!wasSecure) window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
     }
     if (model.revealed.isNotEmpty()) AlertDialog(onDismissRequest = model::hideSecret, title = { Text("托管秘密 · 仅屏幕显示") }, text = { Text(model.revealed, Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) }, confirmButton = { TextButton(onClick = model::hideSecret) { Text("关闭并清空") } })
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun RegistrationFields(state: AccountState, model: AccountModel, enabled: Boolean) {
+    val challenge = model.registration
+    Text("注册 Nanyee 账号", style = MaterialTheme.typography.titleLarge)
+    if (challenge != null && model.registrationVerified) {
+        Text("已通过${challenge.method.label}验证，设置登录信息即可完成注册。", style = MaterialTheme.typography.bodyMedium, color = AppMuted)
+        CabinField("用户名（2–24 位字母、数字或下划线）", model.username, { model.username = it.trim() }, enabled)
+        CabinField("昵称（可选）", model.nickname, { model.nickname = it }, enabled)
+        CabinField("密码（8–128 字符）", model.password, { model.password = it }, enabled, password = true)
+        CabinField("再次输入密码", model.passwordAgain, { model.passwordAgain = it }, enabled, password = true)
+        Button(onClick = { state.registration { register() } }, enabled = enabled, modifier = Modifier.fillMaxWidth()) { Text("注册并登录") }
+        return
+    }
+    Text("答几道小题或用教育邮箱验证，然后设置用户名和密码。", style = MaterialTheme.typography.bodyMedium, color = AppMuted)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        RegistrationMethod.entries.filter { it.offered }.forEach { method -> FilterChip(selected = model.registerMethod == method, onClick = { model.chooseRegisterMethod(method) }, enabled = enabled, label = { Text(method.label) }) }
+    }
+    when (model.registerMethod) {
+        RegistrationMethod.QUICK, RegistrationMethod.QUIZ -> if (challenge == null) {
+            Text("答几道南医校园常识题即可注册，无需邮箱。", style = MaterialTheme.typography.bodySmall, color = AppMuted)
+            Button(onClick = { state.registration { startRegistration() } }, enabled = enabled, modifier = Modifier.fillMaxWidth()) { Text("开始答题") }
+        } else {
+            val answered = model.answers.count { it != null }
+            Text("已答 $answered/${challenge.questions.size} · 答对 ${challenge.passScore} 题即通过", style = MaterialTheme.typography.labelLarge)
+            challenge.questions.forEachIndexed { index, question ->
+                Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.medium) {
+                    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                        Text("${index + 1}. ${question.question}", Modifier.padding(horizontal = 16.dp, vertical = 4.dp), style = MaterialTheme.typography.titleSmall)
+                        question.options.forEachIndexed { option, label ->
+                            val selected = model.answers.getOrNull(index) == option
+                            Row(Modifier.fillMaxWidth().heightIn(min = 44.dp).selectable(selected = selected, enabled = enabled, role = Role.RadioButton) { model.answer(index, option) }.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                RadioButton(selected = selected, onClick = null, enabled = enabled)
+                                Text(label, Modifier.padding(start = 8.dp), style = MaterialTheme.typography.bodyMedium)
+                            }
+                        }
+                    }
+                }
+            }
+            Button(onClick = { state.registration { verifyRegistration() } }, enabled = enabled && answered == challenge.questions.size, modifier = Modifier.fillMaxWidth()) { Text("提交答案") }
+            TextButton(onClick = { state.registration { startRegistration() } }, enabled = enabled) { Text("换一套题") }
+        }
+        RegistrationMethod.EMAIL -> {
+            Text("仅支持 .edu.cn 教育邮箱，验证码会发送到该邮箱。", style = MaterialTheme.typography.bodySmall, color = AppMuted)
+            CabinField("教育邮箱", model.email, { model.email = it }, enabled)
+            OutlinedButton(onClick = { state.registration { startRegistration() } }, enabled = enabled) { Text(if (challenge == null) "发送验证码" else "重新发送") }
+            if (challenge != null) {
+                CabinField("六位验证码", model.code, { model.code = it.filter(Char::isDigit).take(6) }, enabled)
+                Button(onClick = { state.registration { verifyRegistration() } }, enabled = enabled, modifier = Modifier.fillMaxWidth()) { Text("验证") }
+            }
+        }
+    }
 }
 
 @Composable
