@@ -64,7 +64,8 @@ class Settings(BaseSettings):
     quiz_question_count: int = Field(default=20, ge=10, le=50)
     quiz_pass_score: int = Field(default=18, ge=1, le=50)
     quick_quiz_question_count: int = Field(default=3, ge=1, le=10)
-    quick_quiz_pass_score: int = Field(default=2, ge=1, le=10)
+    quick_quiz_pass_score: int = Field(default=3, ge=1, le=10)
+    quick_quiz_max_attempts: int = Field(default=3, ge=1, le=10)
     edu_email_suffixes: list[str] = Field(default_factory=lambda: [".edu.cn"])
 
     turnstile_enabled: bool = False

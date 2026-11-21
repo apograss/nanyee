@@ -8,8 +8,9 @@ from uuid import UUID, uuid4
 
 from email_validator import EmailNotValidError, validate_email
 from fastapi import APIRouter, Depends, Request, Response
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field, model_validator
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -74,6 +75,7 @@ RESERVED_USERNAMES = frozenset(
 EMAIL_POLICY = RateLimitPolicy(window_seconds=3600, soft_limit=3, hard_limit=8)
 QUIZ_POLICY = RateLimitPolicy(window_seconds=3600, soft_limit=5, hard_limit=15)
 REGISTER_POLICY = RateLimitPolicy(window_seconds=3600, soft_limit=5, hard_limit=12)
+REGISTER_CONFLICT_ALLOWANCE = 3
 
 
 def is_reserved_username(normalized_username: str) -> bool:
@@ -162,6 +164,12 @@ def quiz_requirements(settings: Settings, method: RegistrationMethod) -> tuple[i
     return settings.quiz_question_count, settings.quiz_pass_score
 
 
+def max_attempts(settings: Settings, method: RegistrationMethod) -> int:
+    if method == RegistrationMethod.QUICK:
+        return settings.quick_quiz_max_attempts
+    return settings.registration_challenge_max_attempts
+
+
 def mask_email(value: str) -> str:
     local, domain = value.split("@", maxsplit=1)
     visible = local[:2]
@@ -225,12 +233,16 @@ async def create_challenge(
             .first()
         )
         if recent is not None:
-            return ChallengeResponse(
-                challenge_id=recent.id,
-                method=recent.method,
-                expires_at=as_utc(recent.expires_at).isoformat(),
-                resend_at=(as_utc(recent.created_at) + timedelta(seconds=60)).isoformat(),
-                masked_email=mask_email(email),
+            # 不返回已有挑战的 ID：任何人都能提交同一邮箱，拿到 ID 就能抢先用受害者的验证码注册
+            retry_after = max(
+                1, int((as_utc(recent.created_at) + timedelta(seconds=60) - now).total_seconds())
+            )
+            raise AppError(
+                ErrorCode.RATE_LIMITED,
+                "验证码刚发送过，请查收邮件或稍后重试。",
+                status_code=429,
+                retryable=True,
+                headers={"Retry-After": str(retry_after)},
             )
         code = f"{secrets.randbelow(1_000_000):06d}"
         challenge = RegistrationChallenge(
@@ -317,10 +329,10 @@ async def verify_challenge(
         return ChallengeVerifyResponse(
             verified=True,
             attempts_remaining=max(
-                0, settings.registration_challenge_max_attempts - challenge.attempts
+                0, max_attempts(settings, challenge.method) - challenge.attempts
             ),
         )
-    if challenge.attempts >= settings.registration_challenge_max_attempts:
+    if challenge.attempts >= max_attempts(settings, challenge.method):
         raise AppError(
             ErrorCode.RATE_LIMITED,
             "验证次数已用完，请重新开始。",
@@ -350,7 +362,7 @@ async def verify_challenge(
     if passed:
         challenge.verified_at = now
     await db.commit()
-    remaining = max(0, settings.registration_challenge_max_attempts - challenge.attempts)
+    remaining = max(0, max_attempts(settings, challenge.method) - challenge.attempts)
     if not passed:
         raise AppError(
             ErrorCode.INVALID_REQUEST,
@@ -358,7 +370,12 @@ async def verify_challenge(
             status_code=422,
             details={
                 "attempts_remaining": remaining,
-                **({"score": score, "required_score": required_score} if score is not None else {}),
+                # quick 题少，返回分数等于告诉对方哪几道蒙对了
+                **(
+                    {"score": score, "required_score": required_score}
+                    if score is not None and challenge.method != RegistrationMethod.QUICK
+                    else {}
+                ),
             },
         )
     return ChallengeVerifyResponse(
@@ -401,7 +418,6 @@ async def register(
         turnstile_token=payload.turnstile_token,
         anti_abuse_pass=payload.anti_abuse_pass,
     )
-    password_hash = hash_password(payload.password)
     challenge = (
         await db.execute(
             select(RegistrationChallenge)
@@ -416,6 +432,11 @@ async def register(
         raise AppError(ErrorCode.CONFLICT, "注册验证已被使用。", status_code=409)
     if challenge.verified_at is None or as_utc(challenge.expires_at) <= now:
         raise AppError(ErrorCode.INVALID_REQUEST, "注册验证无效或已过期。", status_code=422)
+    # 用户名冲突也计入次数：防止一份验证反复探测哪些用户名已被注册
+    if challenge.attempts >= max_attempts(settings, challenge.method) + REGISTER_CONFLICT_ALLOWANCE:
+        raise AppError(ErrorCode.RATE_LIMITED, "尝试次数过多，请重新验证。", status_code=429)
+    # Argon2id 很重：校验挑战之后再算，并放到线程池里，不阻塞事件循环
+    password_hash = await run_in_threadpool(hash_password, payload.password)
 
     user = User(
         username=payload.username,
@@ -437,6 +458,12 @@ async def register(
         await db.commit()
     except IntegrityError as exc:
         await db.rollback()
+        await db.execute(
+            update(RegistrationChallenge)
+            .where(RegistrationChallenge.id == payload.challenge_id)
+            .values(attempts=RegistrationChallenge.attempts + 1)
+        )
+        await db.commit()
         raise AppError(
             ErrorCode.CONFLICT,
             "用户名或邮箱已被使用。",

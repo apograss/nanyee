@@ -796,6 +796,23 @@
         "title": "CredentialResponse",
         "type": "object"
       },
+      "CredentialRevealRequest": {
+        "properties": {
+          "password": {
+            "format": "password",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "password"
+        ],
+        "title": "CredentialRevealRequest",
+        "type": "object"
+      },
       "CredentialRevealResponse": {
         "properties": {
           "secret": {
@@ -4366,6 +4383,16 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CredentialRevealRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {

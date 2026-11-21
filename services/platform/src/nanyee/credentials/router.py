@@ -7,6 +7,7 @@ from typing import Annotated, Any, Literal, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Request, Response
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field, SecretStr, model_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,6 +19,7 @@ from nanyee.credentials.models import SCHOOL_ACCOUNT_PURPOSES, CredentialStatus,
 from nanyee.credentials.service import CredentialVaultService
 from nanyee.db import get_db_session
 from nanyee.errors import AppError, ErrorCode
+from nanyee.identity.passwords import verify_password
 from nanyee.identity.router import current_auth
 from nanyee.identity.sessions import AuthContext, settings_from_request, validate_csrf
 from nanyee.jobs.service import JobService
@@ -219,6 +221,10 @@ async def list_credentials(
     return [CredentialResponse.from_record(record) for record in records]
 
 
+class CredentialRevealRequest(BaseModel):
+    password: SecretStr = Field(min_length=1, max_length=128)
+
+
 class CredentialRevealResponse(BaseModel):
     secret: str
 
@@ -230,6 +236,7 @@ class CredentialRevealResponse(BaseModel):
 )
 async def reveal_credential(
     credential_id: UUID,
+    payload: CredentialRevealRequest,
     request: Request,
     db: Annotated[AsyncSession, Depends(get_db_session)],
     auth: Annotated[AuthContext, Depends(current_auth)],
@@ -244,6 +251,16 @@ async def reveal_credential(
         identity=str(auth.user.id),
         policy=CREDENTIAL_REVEAL_POLICY,
     )
+    # 明文学校密码只给知道 Nanyee 密码的人：被盗的会话不足以取走它
+    if not await run_in_threadpool(
+        verify_password, auth.user.password_hash, payload.password.get_secret_value()
+    ):
+        raise AppError(
+            ErrorCode.INVALID_CREDENTIALS,
+            "平台密码错误。",
+            status_code=401,
+            details={"field": "password"},
+        )
     service = CredentialVaultService(cipher, settings_from_request(request))
     secret = await service.reveal_for_owner(db, credential_id=credential_id, user_id=auth.user.id)
     logger.info(

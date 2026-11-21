@@ -153,7 +153,10 @@ internal fun AccountSection(state: AccountState = viewModel(key = "platform-acco
         }
     }
     model.pending?.let { action -> AlertDialog(onDismissRequest = model::dismissConfirmation, title = { Text("请确认") }, text = {
-        Text("确认${action.kind.label}？")
+        if (action.kind == AccountWrite.REVEAL) Column {
+            Text("查看明文前请输入 Nanyee 密码。")
+            CabinField("Nanyee 密码", model.password, { model.password = it }, true, password = true)
+        } else Text("确认${action.kind.label}？")
     }, confirmButton = { TextButton(onClick = state::confirm) { Text("确认") } }, dismissButton = { TextButton(onClick = model::dismissConfirmation) { Text("取消") } }) }
     val window = accountActivity(LocalContext.current)?.window
     DisposableEffect(window, model.revealed.isNotEmpty()) {

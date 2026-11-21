@@ -4,7 +4,7 @@ import { motion } from "motion/react";
 import { Image as ImageIcon, CheckCircle2, ArrowRight, KeyRound, MapPin, Send, Download, ExternalLink, Link2, CalendarClock } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Label, Badge, Alert, Table, EmptyState } from "@/components/ui.jsx";
 import AmapLocationPicker from "@/components/AmapLocationPicker.jsx";
-import { apiFetch, apiPost, listCredentials, createCredential, revealCredential, deleteCredential, createJob, isCredentialUsable, CONFIRMATION_VERSIONS } from "@/lib/api.jsx";
+import { apiFetch, apiPost, listCredentials, createCredential, updateCredentialSecret, createJob, isCredentialUsable, CONFIRMATION_VERSIONS } from "@/lib/api.jsx";
 
 // 默认打卡点：学校正中心。新表单首次打卡没有历史记录可复用，必须给出真实坐标，
 // 不能依赖输入框占位符（占位符不会进入提交数据）。
@@ -191,9 +191,9 @@ export default function Qun() {
     const list = await listCredentials();
     const existing = (Array.isArray(list) ? list : []).find((c) => c.purpose === "qun_checkin" && isCredentialUsable(c));
     if (existing) {
-      const { secret } = await revealCredential(existing.id);
-      if (secret === token.trim()) return { credential: existing, created: false };
-      await deleteCredential(existing.id);
+      // 原地写入当前 Token，不读回明文（查看明文需要平台密码）
+      await updateCredentialSecret(existing.id, { secret: token.trim() });
+      return { credential: existing, created: false };
     }
     const credential = await createCredential({
       upstream: "qun100",

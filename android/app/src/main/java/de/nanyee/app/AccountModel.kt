@@ -230,10 +230,14 @@ internal class AccountModel(private val backend: PlatformBackend, private val re
     suspend fun confirm() {
         val action = pending ?: return
         if (busy) return
+        val body = if (action.kind == AccountWrite.REVEAL) {
+            if (password.length !in 1..128) { error = "请输入 Nanyee 密码以查看秘密。"; return }
+            accountPayload("password" to password).also { password = "" }
+        } else action.body
         val visible = visibility
         pending = null
         run {
-            val result = backend.call(action.method, action.path, action.body)
+            val result = backend.call(action.method, action.path, body)
             when (action.kind) {
                 AccountWrite.LOGIN -> { clearAccount(); user = platformUser(result); hidden = dismissed(owner); route = ""; recovery.write("route", ""); clearChallenge(); load() }
                 AccountWrite.LOGOUT -> { backend.clearLocal(); clearAccount(); route = ""; recovery.write("route", ""); clearChallenge(); message = "已退出 Nanyee；学校登录不受影响。" }
