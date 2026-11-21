@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import secrets
 from dataclasses import dataclass
 from typing import Any
@@ -76,6 +77,10 @@ class EnvelopeCipher:
 def redact_credential_metadata(metadata: dict[str, Any]) -> dict[str, str | int | bool | None]:
     allowed = {"account_hint", "credential_kind", "region"}
     result: dict[str, str | int | bool | None] = {}
+    # 群报数 Token 的 SHA-256：网页据此复用同一凭据，无需读回明文
+    digest = metadata.get("token_digest")
+    if isinstance(digest, str) and re.fullmatch(r"[0-9a-f]{64}", digest):
+        result["token_digest"] = digest
     for key, value in metadata.items():
         if key not in allowed or not isinstance(value, (str, int, bool, type(None))):
             continue

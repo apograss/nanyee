@@ -365,3 +365,13 @@ async def test_school_credential_is_permanent_and_secret_updates_in_place() -> N
             )
         assert raised.value.status_code == 422
     await engine.dispose()
+
+
+def test_metadata_keeps_only_well_formed_token_digest() -> None:
+    from nanyee.credentials.envelope import redact_credential_metadata
+
+    digest = "a" * 64
+    assert redact_credential_metadata({"token_digest": digest, "token": "x"}) == {
+        "token_digest": digest
+    }
+    assert redact_credential_metadata({"token_digest": "raw-token"}) == {}
