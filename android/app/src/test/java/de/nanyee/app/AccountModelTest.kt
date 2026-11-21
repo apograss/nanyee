@@ -128,7 +128,8 @@ class AccountModelTest {
         val before = f.calls.size
         m.review(AccountWrite.REVEAL, "demo-school"); assertEquals("", m.revealed); assertEquals(before, f.calls.size)
         m.confirm(); assertEquals("", m.revealed); assertEquals(before, f.calls.size); assertNotNull(m.pending)
-        m.password = "fixture-password"
+        m.password = "typed-then-cancelled"; m.dismissConfirmation(); assertEquals("", m.password)
+        m.review(AccountWrite.REVEAL, "demo-school"); m.password = "fixture-password"
         m.confirm(); assertEquals("demo-only-secret-not-real", m.revealed); assertEquals("", m.password); assertFalse(f.saved.toString().contains(m.revealed))
         m.clearTransient(); assertEquals("", m.revealed)
         m.editCredential("demo-school"); m.schoolAccount = "fixture-account"; m.secret = "new-fixture"
