@@ -1,0 +1,27 @@
+Nanyee Android — GPL-3.0
+Copyright (c) 2026 Nanyee contributors
+Source: https://github.com/apograss/nanyee
+The full GNU General Public License version 3 is bundled in LICENSE.
+
+This Android client includes code ported and modified from course_helper
+by AneryCoft, licensed under GPL-3.0.
+Upstream: https://github.com/AneryCoft/course_helper
+Reference commit: 5344bef2146cb701abf57220d84a79d35daeaf45
+
+Ported/modified files (paths relative to app/src/main/java/de/nanyee/app):
+XxtContract.kt — modified 2026-11; lib/api and lib/models.
+XxtClassroom.kt — modified 2026-11; lib/api/{quiz,topic_discuss,evaluate,pick}.dart.
+XxtApi.kt — modified 2026-11; lib/api/{login,course,sign_in,image,captcha,quiz,topic_discuss,evaluate,pick}.dart.
+RainApi.kt — modified 2026-11; lib/api/{login,course,api_service}.dart and lib/session/cookie.dart.
+ClassroomLogin.kt — modified 2026-11; lib/api/api_service.dart and lib/pages/login.dart.
+RainContract.kt — modified 2026-11; lib/api/{login,course}.dart and lib/models/presentation.dart.
+
+The upstream Dart files contain no separate author copyright headers;
+their AneryCoft/course_helper attribution is retained here and in source.
+Modifications include Kotlin/Android ports and Nanyee integration.
+
+Corresponding release source archives are linked alongside each APK at
+https://nanyee.de/download and include the Gradle wrapper, build scripts,
+and the CAPTCHA model training/export materials under legacy/smu-tools/captcha-model.
+Android build instructions and dependency coordinates are in android/README.md
+and android/app/build.gradle.kts. Third-party notices are bundled separately.
