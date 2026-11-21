@@ -99,7 +99,7 @@ internal class PlatformApi(storage: PlatformCookieStorage, private val transport
                 if (!response.isSuccessful) {
                     val failure = data?.obj()?.get("error")?.obj()
                     val code = failure?.text("code").orEmpty()
-                    if (response.code == 429) retryAt = platformRetryAt(response.header("Retry-After"), System.currentTimeMillis())
+                    if (response.code == 429 && !path.startsWith("/registration")) retryAt = platformRetryAt(response.header("Retry-After"), System.currentTimeMillis())
                     throw PlatformFailure(response.code, code, platformErrorMessage(response.code, code), failure?.text("message").orEmpty().take(200), failure?.get("details") as? JsonObject ?: JsonObject(emptyMap()))
                 }
                 if (path in setOf("/auth/login", "/auth/logout", "/account/password-reset/confirm", "/registration") && method == "POST") PlatformSession.changed()
