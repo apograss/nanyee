@@ -189,8 +189,9 @@ async def create_challenge(
     email = (
         normalize_edu_email(payload.email, settings.edu_email_suffixes) if payload.email else None
     )
-    action = f"registration_{payload.method}"
-    identity = email or payload.method
+    # quick 与 quiz 共用同一份限流额度，避免换方法绕过
+    action = "registration_email" if email else "registration_quiz"
+    identity = email or "quiz"
     await AntiAbuseGate(settings).check(
         db,
         request,
