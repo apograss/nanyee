@@ -1,0 +1,10 @@
+{
+  "semester_start": "2026-11-16",
+  "timetable": [
+    {"kcmc":"示例考试","jxhjmc":"考试（理论）","jxcdmc":"旧地点","kcrwdm":"DEMO-task","kcbh":"DEMO-course","xq":5,"zc":2,"ps":7,"pe":8,"qssj":"14:00:00","jssj":"15:30:00"},
+    {"kcmc":"示例考试","jxhjmc":"考试（理论）","jxcdmc":"旧地点","kcrwdm":"DEMO-task","kcbh":"DEMO-course","xq":5,"zc":3,"ps":7,"pe":8,"qssj":"14:00:00","jssj":"15:30:00"}
+  ],
+  "exams": [
+    {"kcmc":"示例考试","ksrq":"2026-11-27","kssj":"15:00-17:00","kscdmc":"新地点","zwh":"21"}
+  ]
+}

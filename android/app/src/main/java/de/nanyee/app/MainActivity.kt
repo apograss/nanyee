@@ -100,7 +100,7 @@ fun Nanyee(state: SchoolState) {
     val icons = listOf(Icons.Outlined.CalendarMonth, Icons.Outlined.School, Icons.Outlined.RateReview, Icons.Outlined.Widgets, Icons.Outlined.Person)
     val selectedIcons = listOf(Icons.Filled.CalendarMonth, Icons.Filled.School, Icons.Filled.RateReview, Icons.Filled.Widgets, Icons.Filled.Person)
     val tabState = rememberSaveableStateHolder()
-    val pageTitle = if (state.tab == MainTab.TOOLS) when (state.toolsRoute) { "grades" -> "成绩"; "cabin" -> "自习舱"; "grab" -> "抢课"; else -> state.tab.label } else state.tab.label
+    val pageTitle = if (state.tab == MainTab.TOOLS) when (state.toolsRoute) { "grades" -> "成绩"; "exams" -> "考试"; "cabin" -> "自习舱"; "grab" -> "抢课"; else -> state.tab.label } else state.tab.label
     var platformMenu by remember { mutableStateOf(false) }
     Scaffold(
         contentWindowInsets = WindowInsets.safeDrawing,
@@ -117,7 +117,7 @@ fun Nanyee(state: SchoolState) {
                     }
                 }
             }
-            if ((state.tab == MainTab.TIMETABLE || state.tab == MainTab.TOOLS && state.toolsRoute == "grades") && state.homeVisible && !state.demo) IconButton(onClick = { state.reload() }, enabled = !state.busy) { Icon(Icons.Outlined.Refresh, "刷新", Modifier.size(iconSize)) }
+            if ((state.tab == MainTab.TIMETABLE || state.tab == MainTab.TOOLS && state.toolsRoute in setOf("grades", "exams")) && state.homeVisible && !state.demo) IconButton(onClick = { state.reload() }, enabled = !state.busy) { Icon(Icons.Outlined.Refresh, "刷新", Modifier.size(iconSize)) }
         }) },
         bottomBar = { if (!landscape) NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
             MainTab.entries.forEach { tab ->
@@ -154,7 +154,7 @@ fun Nanyee(state: SchoolState) {
         }
     }
     pendingRainHost?.let { host -> AlertDialog(onDismissRequest = { pendingRainHost = null }, title = { Text("请确认") }, text = { Text("切换到 ${host.domain}？") }, confirmButton = { TextButton(onClick = { rain.switchHost(host); pendingRainHost = null }) { Text("确认") } }, dismissButton = { TextButton(onClick = { pendingRainHost = null }) { Text("取消") } }) }
-    detail?.let { (kind, item) -> AlertDialog(onDismissRequest = { detailIndex = -1 }, confirmButton = { TextButton(onClick = { detailIndex = -1 }) { Text("关闭") } }, title = { Text(item.text("name")) }, text = {
+    detail?.let { (kind, item) -> if (kind == "course" && isExam(item)) ExamDetailSheet(item) { detailIndex = -1 } else AlertDialog(onDismissRequest = { detailIndex = -1 }, confirmButton = { TextButton(onClick = { detailIndex = -1 }) { Text("关闭") } }, title = { Text(item.text("name")) }, text = {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (kind == "course") {
                 Text("周${"一二三四五六日".getOrNull(item.number("weekday") - 1)} · ${item.text("start_time")}–${item.text("end_time")}")
@@ -272,6 +272,7 @@ fun Timetable(state: SchoolState, onCourse: (JsonObject) -> Unit) {
             IconButton(onClick = { if (state.demo) state.returnToCurrentWeek() else state.reload() }, enabled = !state.busy) { Icon(Icons.Outlined.Refresh, "刷新课表", Modifier.size(22.dp)) }
             IconButton(onClick = { weekSheet = true }) { Icon(Icons.Outlined.MoreVert, "学期与周次", Modifier.size(22.dp)) }
         }
+        ExamReminder(examsOnDate(state.courses, state.today), onCourse)
         TimetablePages(pager, state.courses, state.semesterStart, state.today, state.busy, periodHeight, periodWidth, onCourse) { conflicts = it }
     }
     if (weekSheet) ModalBottomSheet(onDismissRequest = { weekSheet = false }, containerColor = AppSurface) {

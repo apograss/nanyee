@@ -25,6 +25,7 @@ class AppNavigationTest {
         assertTrue(schoolLoginRequired(MainTab.TIMETABLE, ""))
         assertTrue(schoolLoginRequired(MainTab.MY, ""))
         assertTrue(schoolLoginRequired(MainTab.TOOLS, "grades"))
+        assertTrue(schoolLoginRequired(MainTab.TOOLS, "exams"))
         listOf("", "cabin", "grab").forEach { assertFalse(schoolLoginRequired(MainTab.TOOLS, it)) }
         listOf(MainTab.CLASSROOM, MainTab.EVALUATION).forEach { tab ->
             assertFalse(schoolLoginRequired(tab, ""))

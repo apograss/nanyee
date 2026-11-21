@@ -109,6 +109,10 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
     var courses: List<JsonObject>
         get() = loadedCourses
         set(value) { loadedCourses = value; courseDataIdentity = UUID.randomUUID().toString() }
+    private var examNumbers by mutableStateOf(JsonObject(emptyMap()))
+    private var examRows by mutableStateOf(emptyList<JsonObject>())
+    private var examMetadataSemester = ""
+    internal val exams get() = timetableExams(courses, examRows, examNumbers, semesterStart)
     private var loadedGrades by mutableStateOf<JsonObject?>(null)
     var grades: JsonObject?
         get() = loadedGrades
@@ -226,22 +230,30 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         queryTimetable()
     }
     private suspend fun queryTimetable() {
+        val retainMetadata = examMetadataSemester == semester
+        val retainedNumbers = examNumbers
+        val retainedRows = examRows
         val response = api.request("timetable", buildJsonObject { put("academic_session_id", session); if (semester.isNotEmpty()) put("semester_code", semester); put("total_weeks", totalWeeks) })
         if (response["courses"] !is JsonArray) throw SchoolError(0, "INVALID_RESPONSE", "课表响应无效，请重试。")
         semester = response.text("semester_code").ifEmpty { semester }
         courses = response.items("courses")
         val previous = cachedTimetables?.takeIf { it.owner == liveOwner }?.tables?.get(semester)
+        examNumbers = response["exam_numbers"] as? JsonObject ?: if (retainMetadata) retainedNumbers else previous?.examNumbers ?: JsonObject(emptyMap())
+        examRows = if (response["exam_rows"] is JsonArray) response.items("exam_rows") else if (retainMetadata) retainedRows else previous?.examRows.orEmpty()
+        examMetadataSemester = semester
         semesterStart = semesterStartFromMetadata(response, today)
             ?: semesters.firstOrNull { it.text("code") == semester }?.let { semesterStartFromMetadata(it, today) }
             ?: previous?.semesterStart.orEmpty()
+        courses = mergeExamCourses(courses, examNumbers, examRows, semesterStart)
         followCurrentWeek()
-        val table = CachedTimetable(courses, Instant.now().toString(), totalWeeks, semesterStart)
+        val table = CachedTimetable(courses, Instant.now().toString(), totalWeeks, semesterStart, examNumbers, examRows)
         saveTimetable(table)
         if (semesterStart.isEmpty()) {
             try {
                 semesterStart = api.timetableSemesterStart(buildJsonObject { put("academic_session_id", session); put("semester_code", semester); put("total_weeks", totalWeeks); put("campus", "main") })
+                courses = mergeExamCourses(courses, examNumbers, examRows, semesterStart)
                 followCurrentWeek()
-                saveTimetable(table.copy(semesterStart = semesterStart))
+                saveTimetable(table.copy(courses = courses, semesterStart = semesterStart))
             } catch (e: Exception) {
                 if (e is CancellationException || e is SchoolError && e.status in listOf(401, 410)) throw e
             }
@@ -253,9 +265,9 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
     }
     fun reload() {
         reauthAttempted = false
-        if (cachedMode) requireSchoolLogin(if (tab == MainTab.TOOLS && toolsRoute == "grades") MainTab.TOOLS else MainTab.TIMETABLE)
+        if (cachedMode) requireSchoolLogin(if (tab == MainTab.TOOLS && toolsRoute in setOf("grades", "exams")) MainTab.TOOLS else MainTab.TIMETABLE)
         else if (!demo && loggedIn) {
-            if (tab == MainTab.TIMETABLE) launch("timetable") { if (semesters.isEmpty()) loadTimetable() else queryTimetable() }
+            if (tab == MainTab.TIMETABLE || tab == MainTab.TOOLS && toolsRoute == "exams") launch("timetable") { if (semesters.isEmpty()) loadTimetable() else queryTimetable() }
             else if (tab == MainTab.TOOLS && toolsRoute == "grades") launch("grades") { loadGrades() }
         }
     }
@@ -268,6 +280,10 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
     fun openGrades() {
         openTool("grades"); tab = MainTab.TOOLS
         if (!homeVisible || cachedMode) { reauthAttempted = false; requireSchoolLogin(SchoolOperation.GRADES.tab) }
+    }
+    fun openExams() {
+        openTool("exams"); tab = MainTab.TOOLS
+        if (!homeVisible) requireSchoolLogin(MainTab.TOOLS)
     }
 
     internal suspend fun hostedSchoolPrefill(): Pair<String, String>? = withContext(Dispatchers.IO) {
@@ -327,10 +343,11 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         reauthAttempted = false
         if (cachedMode && cachedTimetables?.tables?.containsKey(code) != true) rememberCacheView()
         semester = code
-        if (demo) courses = demoCourses(code)
+        examNumbers = JsonObject(emptyMap()); examRows = emptyList(); examMetadataSemester = ""
+        if (demo) { courses = demoCourses(code) + demoExams(today, semesterStart); examNumbers = JsonObject(emptyMap()); examRows = emptyList() }
         else if (cachedMode) {
             val table = cachedTimetables?.tables?.get(code)
-            if (table == null) { courses = emptyList(); semesterStart = ""; requireSchoolLogin(SchoolOperation.TIMETABLE.tab, rememberView = false) } else { courses = table.courses; totalWeeks = table.totalWeeks; semesterStart = table.semesterStart; week = week.coerceAtMost(totalWeeks); followCurrentWeek() }
+            if (table == null) { courses = emptyList(); examNumbers = JsonObject(emptyMap()); examRows = emptyList(); semesterStart = ""; requireSchoolLogin(SchoolOperation.TIMETABLE.tab, rememberView = false) } else { courses = mergeExamCourses(table.courses, table.examNumbers, table.examRows, table.semesterStart); examNumbers = table.examNumbers; examRows = table.examRows; totalWeeks = table.totalWeeks; semesterStart = table.semesterStart; week = week.coerceAtMost(totalWeeks); followCurrentWeek() }
         } else if (loggedIn) { semesterStart = ""; courses = emptyList(); launch("timetable") { queryTimetable() } }
     }
     fun setWeeks(value: Int) {
@@ -351,6 +368,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         launch(silent = true) { fetchCaptcha() }
     }
     private fun resetTimetableSelection() {
+        examNumbers = JsonObject(emptyMap()); examRows = emptyList(); examMetadataSemester = ""
         userPickedWeek = false; saved["userPickedWeek"] = false; week = 1; semester = ""; semesterStart = ""
     }
     private fun saveTimetable(table: CachedTimetable) {
@@ -365,7 +383,9 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         val restored = snapshot.restoreView(view, CachedTimetableView(semester, week, userPickedWeek))
         semesters = snapshot.semesters; semester = restored.semester
         val table = snapshot.tables.getValue(semester)
-        courses = table.courses; totalWeeks = table.totalWeeks; semesterStart = table.semesterStart
+        courses = mergeExamCourses(table.courses, table.examNumbers, table.examRows, table.semesterStart); totalWeeks = table.totalWeeks; semesterStart = table.semesterStart
+        examNumbers = table.examNumbers; examRows = table.examRows
+        examMetadataSemester = semester
         week = restored.week; userPickedWeek = restored.userPickedWeek; saved["userPickedWeek"] = userPickedWeek
         if (view == null) followCurrentWeek()
         cachedMode = true; tab = MainTab.TIMETABLE
@@ -472,7 +492,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         session = ""; expires = ""; loginDestination = null; cachedMode = false; demo = true; loggedIn = true; tab = MainTab.TIMETABLE; error = ""; week = 1
         semesterStart = today.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY)).toString()
         semesters = listOf(payload("code" to "202501", "label" to "2025-2026-1"), payload("code" to "202402", "label" to "2024-2025-2")); semester = "202501"
-        courses = demoCourses(semester)
+        courses = demoCourses(semester) + demoExams(today, semesterStart)
         grades = demoGrades()
     }
 

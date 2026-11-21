@@ -18,4 +18,4 @@ internal enum class ClassroomPlatform(val label: String) {
 
 internal fun restoredMainTab(value: Int?) = MainTab.entries.getOrNull(value ?: -1) ?: MainTab.TIMETABLE
 internal fun schoolLoginRequired(tab: MainTab, toolsRoute: String) =
-    tab == MainTab.TIMETABLE || tab == MainTab.MY || (tab == MainTab.TOOLS && toolsRoute == "grades")
+    tab == MainTab.TIMETABLE || tab == MainTab.MY || (tab == MainTab.TOOLS && toolsRoute in setOf("grades", "exams"))

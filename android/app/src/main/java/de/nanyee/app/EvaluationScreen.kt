@@ -13,6 +13,7 @@ import androidx.compose.material.icons.outlined.Assessment
 import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.CloudQueue
 import androidx.compose.material.icons.outlined.EventSeat
+import androidx.compose.material.icons.automirrored.outlined.EventNote
 import androidx.compose.material.icons.outlined.RateReview
 import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.material.icons.filled.Star
@@ -34,6 +35,7 @@ import kotlinx.serialization.json.JsonObject
 internal fun ToolsScreen(school: SchoolState, grab: CourseGrabState, grabDemo: CourseGrabState, onGrade: (JsonObject) -> Unit) {
     val back = { if (school.canReturnToCache) school.returnToCache(); school.closeTool(); school.selectTab(MainTab.TOOLS) }
     when (school.toolsRoute) {
+        "exams" -> ExamsScreen(school, back)
         "cabin" -> CabinToolsScreen(school, onBack = back)
         "grab" -> CourseGrabScreen(school, grab, grabDemo, onBack = back)
         "grades" -> {
@@ -50,6 +52,7 @@ internal fun ToolsScreen(school: SchoolState, grab: CourseGrabState, grabDemo: C
             val gpa = school.grades?.get("summary")?.obj()?.text("weighted_gpa").orEmpty()
             ToolGrid(listOf(
                 ToolTile("成绩", Icons.Outlined.Assessment, SectionAccent.ACADEMIC, if (gpa.isNotBlank()) "GPA ${displayNumber(gpa)}" else "", school::openGrades),
+                ToolTile("考试", Icons.AutoMirrored.Outlined.EventNote, SectionAccent.ACADEMIC, onClick = school::openExams),
                 ToolTile("自习舱预约", Icons.Outlined.EventSeat, SectionAccent.SAGE, onClick = { school.openTool("cabin") }),
                 ToolTile("抢课", Icons.Outlined.Bolt, SectionAccent.SERVICE, if (grab.run.active || grabDemo.run.active) "运行中" else "", { school.openTool("grab") })
             ))
