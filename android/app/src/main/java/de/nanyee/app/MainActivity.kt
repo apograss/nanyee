@@ -72,7 +72,10 @@ internal fun Nanyee(state: SchoolState, preview: AppRelease? = null) {
     val evaluation: EvaluationState = viewModel(key = "manual-evaluation-live")
     val grab: CourseGrabState = viewModel(key = "course-grab-live")
     val grabDemo: CourseGrabState = viewModel(key = "course-grab-demo")
-    var rainDemo by rememberSaveable { mutableStateOf(false) }
+    var demoSelection by rememberSaveable(stateSaver = classroomDemoSaver) { mutableStateOf(ClassroomDemoSelection(state.demo)) }
+    val classroomDemo = demoSelection.forSchoolMode(state.demo)
+    SideEffect { demoSelection = classroomDemo }
+    val rainDemo = classroomDemo.demo(ClassroomPlatform.RAIN)
     val rainReal: RainState = viewModel(key = "rain-real")
     val rainFake: RainState = viewModel(key = "rain-demo")
     val rain = if (rainDemo) rainFake else rainReal
@@ -148,7 +151,10 @@ internal fun Nanyee(state: SchoolState, preview: AppRelease? = null) {
                 }
                 !state.homeVisible && state.tab == MainTab.TIMETABLE -> Login(state)
                 state.tab == MainTab.TIMETABLE -> Timetable(state) { detailKind = "course"; detailIndex = state.courses.indexOf(it); detailDataIdentity = state.courseDataIdentity }
-                state.tab == MainTab.CLASSROOM -> ClassroomScreen(state, rain, rainDemo) { rainDemo = !rainDemo }
+                state.tab == MainTab.CLASSROOM -> ClassroomScreen(state, rain, rainDemo,
+                    toggleRainDemo = { demoSelection = classroomDemo.toggle(ClassroomPlatform.RAIN) },
+                    xxtDemo = classroomDemo.demo(ClassroomPlatform.XUEXITONG),
+                    toggleXxtDemo = { demoSelection = classroomDemo.toggle(ClassroomPlatform.XUEXITONG) })
                 state.tab == MainTab.EVALUATION -> EvaluationToolsScreen(state, evaluation)
                 state.tab == MainTab.TOOLS -> ToolsScreen(state, grab, grabDemo) { detailKind = "grade"; detailIndex = state.grades?.items("grades")?.indexOf(it) ?: -1; detailDataIdentity = state.gradeDataIdentity }
                 else -> MyScreen(state)

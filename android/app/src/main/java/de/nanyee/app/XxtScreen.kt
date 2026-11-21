@@ -44,8 +44,9 @@ import kotlin.math.hypot
 import kotlin.math.roundToInt
 
 @Composable
-internal fun XxtToolsScreen(onBack: () -> Unit) {
-    var demo by rememberSaveable { mutableStateOf(false) }
+internal fun XxtToolsScreen(onBack: () -> Unit, demoOverride: Boolean? = null, toggleDemoOverride: (() -> Unit)? = null) {
+    var localDemo by rememberSaveable { mutableStateOf(false) }
+    val demo = demoOverride ?: localDemo
     val real: XxtState = viewModel(key = "xuexitong-real")
     val fake: XxtState = viewModel(key = "xuexitong-demo")
     val state = if (demo) fake else real
@@ -56,7 +57,7 @@ internal fun XxtToolsScreen(onBack: () -> Unit) {
         owner?.lifecycle?.addObserver(observer)
         onDispose { owner?.lifecycle?.removeObserver(observer); state.stopQrLogin() }
     }
-    XxtScreen(state, onBack, onToggleDemo = { demo = !demo })
+    XxtScreen(state, onBack, onToggleDemo = toggleDemoOverride ?: { localDemo = !localDemo })
 }
 
 @Composable
