@@ -34,16 +34,8 @@ class VisualStyleTest {
         }
     }
 
-    @Test fun courseAvatarInitialsHaveAccessibleContrastAcrossEveryPaletteColour() {
-        val names = (0..6).map { it.toString() } + listOf("", "人体解剖学", "Medical English")
-        assertEquals((0..6).toSet(), names.map { coursePaletteIndex(it) }.toSet())
-        names.forEach { name ->
-            val background = courseAvatarFill(name)
-            assertEquals(1f, background.alpha, 0f)
-            val back = background.luminance()
-            val text = CourseAvatarText.luminance()
-            assertTrue((maxOf(back, text) + 0.05f) / (minOf(back, text) + 0.05f) >= 4.5f)
-        }
+    @Test fun neutralCourseFallbackIconHasAccessibleContrast() {
+        assertTrue((AppBackground.luminance() + 0.05f) / (AppMuted.luminance() + 0.05f) >= 4.5f)
     }
 
     @Test fun fixedPaletteKeepsTextReadableAcrossRaisedSurfaces() {

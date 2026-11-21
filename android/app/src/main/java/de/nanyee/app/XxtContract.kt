@@ -20,7 +20,7 @@ internal class XxtFailure(val kind: String, message: String) : Exception(message
 internal fun xxtPhotoConfirmation(demo: Boolean): String =
     if (demo) "演示模式：仅模拟照片签到，不会上传照片或提交真实签到。" else "将向超星 pan-yz 上传上方预览照片，然后提交签到。"
 @Serializable internal data class XxtUser(val uid: String, val name: String, val cid: String = "", val sc: String = "")
-@Serializable internal data class XxtCourse(val id: String, val classId: String, val cpi: String, val name: String, val teacher: String)
+@Serializable internal data class XxtCourse(val id: String, val classId: String, val cpi: String, val name: String, val teacher: String, val image: String = "")
 @Serializable internal data class XxtActivity(val id: String, val name: String, val description: String, val type: Int, val ongoing: Boolean, val start: Long, val end: Long = 0, val signType: Int = -1, val topicId: String = "")
 @Serializable internal data class XxtSignDetail(val type: Int, val photo: Boolean = false, val face: Boolean = false, val captcha: Boolean = false, val address: String = "", val latitude: Double? = null, val longitude: Double? = null, val range: String = "", val codeLength: Int = 0, val signed: Boolean = false)
 @Serializable internal data class XxtPosition(val latitude: Double, val longitude: Double, val obtainedAt: Long, val accuracy: Float)
@@ -80,10 +80,11 @@ internal fun xxtLoginStatus(response: JsonObject) {
 internal fun xxtCourses(json: JsonObject): List<XxtCourse> {
     if (json["result"]?.jsonPrimitive?.intOrNull != 1) throw XxtFailure("SESSION", "学习通会话已过期，请重新登录。")
     return (json["channelList"] as? JsonArray ?: throw XxtFailure("FORMAT", "学习通课程格式有变。 ")).mapNotNull { item ->
-        val content = item.jsonObject["content"]?.jsonObject ?: return@mapNotNull null
-        val data = content["course"]?.jsonObject?.get("data")?.jsonArray?.firstOrNull()?.jsonObject ?: return@mapNotNull null
-        if (content.number("state") != 0) return@mapNotNull null
-        XxtCourse(data.text("id"), content.text("id"), content.text("cpi"), data.text("name"), data.text("teacherfactor"))
+        val content = (item as? JsonObject)?.get("content") as? JsonObject ?: return@mapNotNull null
+        val course = content["course"] as? JsonObject ?: return@mapNotNull null
+        val data = (course["data"] as? JsonArray)?.firstOrNull() as? JsonObject ?: return@mapNotNull null
+        if ((content["state"] as? JsonPrimitive)?.intOrNull != 0) return@mapNotNull null
+        XxtCourse(data.text("id"), content.text("id"), content.text("cpi"), data.text("name"), data.text("teacherfactor"), data.text("imageurl"))
     }
 }
 internal fun xxtActivities(app: JsonObject, web: JsonObject): List<XxtActivity> {

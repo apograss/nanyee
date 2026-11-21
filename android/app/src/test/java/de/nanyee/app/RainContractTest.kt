@@ -25,7 +25,7 @@ class RainContractTest {
     }
     @Test fun courseAndOnLessonContractsHaveNoImplicitJoin() {
         val courses = rainCourses(rainFixture("courses")); val active = rainOnLesson(rainFixture("onLesson"))
-        assertEquals(RainCourse("11", "22", "航海概论", "示例老师"), courses.single())
+        assertEquals(RainCourse("11", "22", "航海概论", "示例老师", "https://images.example.invalid/teacher.png", "航海一班"), courses.single())
         assertEquals(RainOnLesson("11", "33"), active.single())
         assertTrue(rainCourses(buildJsonObject { put("data", JsonArray(emptyList())) }).isEmpty())
         assertTrue(rainOnLesson(Json.parseToJsonElement("""{"code":0,"data":{"onLessonClassrooms":[]}}""").jsonObject).isEmpty())
@@ -33,6 +33,26 @@ class RainContractTest {
     @Test fun malformedAndRejectedListsAreNotTreatedAsEmpty() {
         listOf("{}", """{"code":1,"data":[]}""", """{"code":"invalid","data":[]}""", """{"data":{}}""", """{"data":[{"course_name":"no id"}]}""").forEach { assertTrue(runCatching { rainCourses(Json.parseToJsonElement(it).jsonObject) }.isFailure) }
         assertTrue(runCatching { rainOnLesson(buildJsonObject { put("data", buildJsonObject {}) }) }.isFailure)
+    }
+    @Test fun liveCoursesAreOnlyTheIntersectionAndChangeWithPolling() {
+        val first = rainCourses(rainFixture("courses")).single()
+        val second = first.copy(id = "other", name = "其他课程")
+        val courses = listOf(first, second)
+        val lists = rainCourseLists(courses, listOf(RainOnLesson(first.id, "lesson"), RainOnLesson("not-enrolled", "unknown")))
+        assertEquals(listOf(first), lists.live); assertEquals(listOf(second), lists.remaining)
+        val updated = rainCourseLists(courses, listOf(RainOnLesson(second.id, "new-lesson")))
+        assertEquals(listOf(second), updated.live); assertEquals(listOf(first), updated.remaining)
+        assertEquals(RainCourseLists(emptyList(), courses), rainCourseLists(courses, emptyList()))
+        assertEquals(RainCourseLists(emptyList(), emptyList()), rainCourseLists(emptyList(), listOf(RainOnLesson(first.id, "lesson"))))
+    }
+    @Test fun courseSecondaryLineKeepsTeacherAndClassWithoutEmptySeparators() {
+        val row = rainCourses(rainFixture("courses")).single()
+        assertEquals("示例老师 · 航海一班", rainCourseSubtitle(row))
+        assertEquals("示例老师", rainCourseSubtitle(row.copy(classroomName = "")))
+        assertEquals("航海一班", rainCourseSubtitle(row.copy(teacher = "")))
+        assertEquals("", rainCourseSubtitle(row.copy(teacher = "", classroomName = "")))
+        val missing = rainCourses(Json.parseToJsonElement("""{"data":[{"course_id":1,"teacher":null}]}""").jsonObject).single()
+        assertEquals("", missing.teacherAvatar); assertEquals("", missing.classroomName); assertEquals("", missing.teacher)
     }
     @Test fun qrKeepsServerImageAlongsideContentFallbackAndToken() {
         val qr = rainQr(rainFixture("qr"))

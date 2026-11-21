@@ -14,7 +14,14 @@ import org.jsoup.Jsoup
 @Serializable internal enum class RainHost(val domain: String) { WWW("www.yuketang.cn"), PRO("pro.yuketang.cn"), CHANGJIANG("changjiang.yuketang.cn"), HUANGHE("huanghe.yuketang.cn") }
 internal class RainFailure(val kind: String, message: String) : Exception(message)
 @Serializable internal data class RainUser(val id: String, val name: String)
-@Serializable internal data class RainCourse(val id: String, val classroom: String, val name: String, val teacher: String)
+@Serializable internal data class RainCourse(val id: String, val classroom: String, val name: String, val teacher: String, val teacherAvatar: String = "", val classroomName: String = "")
+internal data class RainCourseLists(val live: List<RainCourse>, val remaining: List<RainCourse>)
+internal fun rainCourseLists(courses: List<RainCourse>, lessons: List<RainOnLesson>): RainCourseLists {
+    val liveIds = lessons.map { it.courseId }.toSet()
+    val (live, remaining) = courses.partition { it.id in liveIds }
+    return RainCourseLists(live, remaining)
+}
+internal fun rainCourseSubtitle(course: RainCourse) = listOf(course.teacher, course.classroomName).filter { it.isNotBlank() }.joinToString(" · ")
 @Serializable internal data class RainOnLesson(val courseId: String, val lessonId: String)
 internal data class RainQr(val token: String, val content: String, val image: String = "")
 internal data class RainLesson(val host: RainHost, val uid: String, val id: String, val bearer: String, val token: String)
@@ -80,7 +87,10 @@ internal fun rainData(value: JsonObject): JsonElement {
 }
 internal fun rainCourses(value: JsonObject): List<RainCourse> {
     val rows = rainData(value) as? JsonArray ?: throw RainFailure("FORMAT", "雨课堂课程格式有变。")
-    return rows.map { val row = it.jsonObject; RainCourse(row.text("course_id"), row.text("classroom_id"), xxtPlain(row.text("course_name")), (row["teacher"] as? JsonObject)?.text("name").orEmpty()) }.also { require(it.all { row -> row.id.isNotBlank() }) }
+    return rows.map {
+        val row = it.jsonObject; val teacher = row["teacher"] as? JsonObject
+        RainCourse(row.text("course_id"), row.text("classroom_id"), xxtPlain(row.text("course_name")), teacher?.text("name").orEmpty(), teacher?.text("avatar").orEmpty(), row.text("classroom_name"))
+    }.also { require(it.all { row -> row.id.isNotBlank() }) }
 }
 internal fun rainOnLesson(value: JsonObject): List<RainOnLesson> {
     val rows = (rainData(value) as? JsonObject)?.get("onLessonClassrooms") as? JsonArray ?: throw RainFailure("FORMAT", "雨课堂上课列表格式有变。")

@@ -35,7 +35,7 @@ internal fun MyScreen(school: SchoolState) {
     val profile = account.model?.user
     val name = if (school.demo) "演示同学" else profile?.text("nickname").orEmpty().ifBlank { profile?.text("username").orEmpty() }.ifBlank { "你好，同学" }
     Column(Modifier.widthIn(max = 720.dp).fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant).verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        ProfileHero(name, if (school.demo) "学号 2026000001 · 示例" else if (school.loggedIn) "学号 ${school.account}" else "登录学校账号，连接校园生活", name.take(1), if (school.demo) "离线演示 · 数据不联网" else if (account.demo) "平台离线演示 · 学校会话独立" else if (school.cachedMode) "本机课表 · 学校会话未登录" else "学校与平台账号彼此独立")
+        ProfileHero(name, if (school.demo) "学号 2026000001 · 示例" else if (school.loggedIn) "学号 ${school.account}" else "登录学校账号，连接校园生活", Icons.Outlined.AccountCircle, if (school.demo) "离线演示 · 数据不联网" else if (account.demo) "平台离线演示 · 学校会话独立" else if (school.cachedMode) "本机课表 · 学校会话未登录" else "学校与平台账号彼此独立")
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
             Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { AccountSection(state = account, demoOnly = school.demo) }
         }

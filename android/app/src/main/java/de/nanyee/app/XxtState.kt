@@ -41,6 +41,7 @@ internal class XxtState(app: Application, private val savedState: SavedStateHand
     var busy by mutableStateOf(false); private set
     var user by mutableStateOf<XxtUser?>(null); private set
     var courses by mutableStateOf(emptyList<XxtCourse>()); private set
+    var courseError by mutableStateOf(""); private set
     var activities by mutableStateOf(emptyList<XxtActivity>()); private set
     var course by mutableStateOf<XxtCourse?>(null); private set
     var activity by mutableStateOf<XxtActivity?>(null); private set
@@ -81,14 +82,31 @@ internal class XxtState(app: Application, private val savedState: SavedStateHand
     private suspend fun <T> read(action: suspend () -> T): T = if (demo) action() else xxtReadRecover(
         credentials = { withContext(Dispatchers.IO) { storage.read("account") to storage.read("password") } },
         login = { account, password -> acceptLogin(api().login(account, password)) }, expired = { user = null }, action = action)
-    private suspend fun acceptLogin(value: XxtUser) {
+    private suspend fun acceptLogin(value: XxtUser, fresh: Boolean = false) {
+        var changed = user?.uid?.let { it != value.uid } == true
         if (!demo) {
             val previous = withContext(Dispatchers.IO) { storage.read("owner") }
-            if (previous.isNotBlank() && previous != value.uid) { course = null; activity = null; detail = null; activities = emptyList(); resetSign(); save() }
+            changed = changed || previous.isNotBlank() && previous != value.uid
             withContext(Dispatchers.IO) { storage.write("owner", value.uid) }
+        }
+        if (fresh || changed) {
+            course = null; activity = null; detail = null; activities = emptyList(); courses = emptyList(); loaded = false; courseError = ""
+            resetSign(); save()
         }
         user = value
     }
+    private suspend fun loadCourses(recover: Boolean = true) {
+        courseError = ""; loaded = false
+        try {
+            courses = if (recover) read { api().courses() } else api().courses()
+        } catch (e: CancellationException) { throw e }
+        catch (e: Exception) {
+            courses = emptyList()
+            courseError = if (e is XxtFailure) e.message.orEmpty().ifBlank { "课程加载失败，请重试。" } else "课程加载失败，请重试。"
+            if (user == null) error = courseError
+        } finally { loaded = true }
+    }
+    fun retryCourses() = run { loadCourses() }
     fun initialize(asDemo: Boolean) {
         if (initialized) return
         initialized = true; demo = asDemo
@@ -102,7 +120,7 @@ internal class XxtState(app: Application, private val savedState: SavedStateHand
                 if (pendingWrite) message = "上次操作被中断，结果未知，请先在官方学习通确认；不会恢复提交。"
                 else if (classroomResult == XxtClassResult.SUCCESS) message = "上次课堂活动提交成功。"
                 if (demo || withContext(Dispatchers.IO) { storage.read("active") } == "true") {
-                    user = read { api().user() }; courses = read { api().courses() }; loaded = true
+                    acceptLogin(read { api().user() }); loadCourses()
                     course?.let { activities = read { api().activities(it) } }
                     loadActivity()
                 }
@@ -110,9 +128,9 @@ internal class XxtState(app: Application, private val savedState: SavedStateHand
     }
     fun login(account: String, password: String, remember: Boolean) = run {
         require(account.isNotBlank() && password.isNotBlank())
-        acceptLogin(api().login(account, password))
+        acceptLogin(api().login(account, password), fresh = true)
         if (!demo) withContext(Dispatchers.IO) { storage.write("account", if (remember) account else ""); storage.write("password", if (remember) password else ""); storage.write("active", "true") }
-        courses = api().courses(); loaded = true
+        loadCourses(recover = false)
     }
     private fun resumeSmsCountdown() {
         smsCountdown?.cancel()
@@ -132,9 +150,9 @@ internal class XxtState(app: Application, private val savedState: SavedStateHand
     }
     fun loginSms(phone: String, value: String) = run {
         require(phone.matches(Regex("1[0-9]{10}")) && value.matches(Regex("[0-9]{4,8}")))
-        acceptLogin(api().loginSms(phone, value))
+        acceptLogin(api().loginSms(phone, value), fresh = true)
         if (!demo) withContext(Dispatchers.IO) { storage.write("account", ""); storage.write("password", ""); storage.write("active", "true") }
-        courses = api().courses(); loaded = true
+        loadCourses(recover = false)
     }
     fun beginQrLogin() = run {
         qrLoggingIn = true
@@ -148,14 +166,14 @@ internal class XxtState(app: Application, private val savedState: SavedStateHand
                     if (e.kind == "QR_EXPIRED") ClassroomQrResult.Expired else throw e
                 }
             }
-            acceptLogin(result)
+            acceptLogin(result, fresh = true)
             if (!demo) withContext(Dispatchers.IO) { storage.write("account", ""); storage.write("password", ""); storage.write("active", "true") }
-            qrLogin = null; courses = backend.courses(); loaded = true
+            qrLogin = null; loadCourses(recover = false)
         } finally { if (token == generation) { qrLogin = null; qrLoggingIn = false } }
     }
     fun stopQrLogin() { if (qrLoggingIn) { generation++; work?.cancel(); qrLoggingIn = false; qrLogin = null; busy = false } }
     fun refresh() = run {
-        user = read { api().user() }; courses = read { api().courses() }; loaded = true
+        acceptLogin(read { api().user() }); loadCourses()
         course?.let { activities = read { api().activities(it) } }
         loadActivity()
     }
@@ -315,7 +333,7 @@ internal class XxtState(app: Application, private val savedState: SavedStateHand
                 else backend?.clear()
                 withContext(Dispatchers.IO) { getApplication<Application>().filesDir.listFiles()?.filter { it.name.startsWith(if (demo) "xxt_demo_photo_" else "xxt_photo_") }?.forEach { it.delete() } }
                 withContext(Dispatchers.IO) { File(getApplication<Application>().cacheDir, "xxt_camera").deleteRecursively() }
-                backend = null; user = null; courses = emptyList(); activities = emptyList(); course = null; activity = null; detail = null; loaded = false; qrLogin = null; pendingWrite = false; resetSign(); error = ""
+                backend = null; user = null; courses = emptyList(); courseError = ""; activities = emptyList(); course = null; activity = null; detail = null; loaded = false; qrLogin = null; pendingWrite = false; resetSign(); error = ""
                 savedState.remove<String>("draft")
             } catch (_: Exception) { error = "本地学习通数据未能完全清除，请重试或在系统设置清除应用数据。" }
             finally { busy = false }

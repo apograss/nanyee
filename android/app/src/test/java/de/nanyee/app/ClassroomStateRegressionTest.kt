@@ -35,6 +35,68 @@ class ClassroomStateRegressionTest {
         store.put("unused-rain", RainState(application()))
         store.clear()
     }
+    @Test fun everyXxtLoginLandsOnCoursesAndExposesFetchFailureAndRetry() = runBlocking<Unit> {
+        for (method in 0..2) for (failure in listOf(XxtFailure("SESSION", "课程会话不可用"), IllegalStateException("bad row"))) {
+            val saved = SavedStateHandle()
+            val state = XxtState(application(), saved); synchronousScope(state)
+            setState(state, "demo", true)
+            var fail = true
+            var empty = false
+            val demo = DemoXxtBackend()
+            val backend = object : XxtBackend by demo {
+                override suspend fun courses(): List<XxtCourse> {
+                    if (fail) throw failure
+                    return if (empty) emptyList() else demo.courses()
+                }
+            }
+            XxtState::class.java.getDeclaredField("backend").apply { isAccessible = true }.set(state, backend)
+            val old = demo.courses().first()
+            setState(state, "user", demo.user())
+            setState(state, "course", old)
+            setState(state, "activity", demo.activities(old).first())
+            setState(state, "detail", XxtSignDetail(5))
+            when (method) {
+                0 -> state.login("account", "password", false)
+                1 -> state.loginSms("13800138000", "123456")
+                else -> state.beginQrLogin()
+            }
+            val work = XxtState::class.java.getDeclaredField("work").apply { isAccessible = true }
+            withTimeout(5000) { (work.get(state) as Job).join() }
+            assertEquals(demo.user(), state.user)
+            assertNull(state.course); assertNull(state.activity); assertNull(state.detail)
+            assertTrue(state.activities.isEmpty()); assertTrue(state.loaded); assertFalse(state.busy)
+            assertTrue(state.courses.isEmpty()); assertTrue(state.courseError.isNotBlank())
+            assertFalse(state.courseError.contains("活动")); assertEquals("", state.error)
+            assertNull(kotlinx.serialization.json.Json.decodeFromString<XxtJournal>(saved.get<String>("draft")!!).course)
+            fail = false; empty = true
+            state.retryCourses()
+            withTimeout(5000) { (work.get(state) as Job).join() }
+            assertEquals("", state.courseError); assertTrue(state.loaded); assertTrue(state.courses.isEmpty())
+            empty = false
+            state.retryCourses()
+            withTimeout(5000) { (work.get(state) as Job).join() }
+            assertEquals(demo.courses(), state.courses); assertEquals("", state.courseError)
+            assertNull(state.course); assertNull(state.activity)
+            ViewModelStore().apply { put("xxt", state); clear() }
+        }
+    }
+    @Test fun changingXxtAccountDuringRefreshClearsThePreviousCourseSubview() = runBlocking<Unit> {
+        val state = XxtState(application(), SavedStateHandle()); synchronousScope(state)
+        setState(state, "demo", true)
+        val demo = DemoXxtBackend()
+        val backend = object : XxtBackend by demo { override suspend fun user() = XxtUser("another-user", "另一同学") }
+        XxtState::class.java.getDeclaredField("backend").apply { isAccessible = true }.set(state, backend)
+        setState(state, "user", demo.user())
+        setState(state, "course", demo.courses().first())
+        setState(state, "activity", demo.activities(demo.courses().first()).first())
+        state.refresh()
+        val work = XxtState::class.java.getDeclaredField("work").apply { isAccessible = true }
+        withTimeout(5000) { (work.get(state) as Job).join() }
+        assertEquals("another-user", state.user?.uid)
+        assertNull(state.course); assertNull(state.activity); assertNull(state.detail)
+        assertTrue(state.activities.isEmpty()); assertEquals(demo.courses(), state.courses)
+        ViewModelStore().apply { put("xxt", state); clear() }
+    }
     @Test fun rainQrSurvivesRecreationAndBackgroundButLeavingCancelsIt() = runBlocking<Unit> {
         val state = RainState(application()); synchronousScope(state)
         setState(state, "ready", true)

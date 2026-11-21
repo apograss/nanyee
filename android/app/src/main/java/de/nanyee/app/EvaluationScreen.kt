@@ -68,7 +68,7 @@ internal fun EvaluationToolsScreen(school: SchoolState, evaluation: EvaluationSt
         "manual" -> ManualEvaluationScreen(school, evaluation, onBack = back)
         else -> {
             Column(Modifier.widthIn(max = 720.dp).fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant).verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                ProfileHero(if (summaryState.listed) "${summaryState.pending.size} 门待评" else "待评课程", if (summaryState.listed) "已选 ${summaryState.selected.size} 门" else "只读加载后显示数量", "评", "先预览，再确认 · 每个答案都由你决定")
+                ProfileHero(if (summaryState.listed) "${summaryState.pending.size} 门待评" else "待评课程", if (summaryState.listed) "已选 ${summaryState.selected.size} 门" else "只读加载后显示数量", Icons.AutoMirrored.Outlined.FactCheck, "先预览，再确认 · 每个答案都由你决定")
                 CompactEntry("自动评课 · 服务器", "同意托管学校凭据后，每天自动运行", Icons.Outlined.CloudQueue, SectionAccent.BRAND, onClick = { route = "automatic" })
                 CompactEntry("手动一键 · 本机", "学校直连 · 选择、预览、确认后逐门提交", Icons.AutoMirrored.Outlined.FactCheck, SectionAccent.ACADEMIC, onClick = { route = "manual" })
             }
@@ -112,7 +112,7 @@ private fun ManualEvaluationScreen(school: SchoolState, evaluation: EvaluationSt
         state.run.preview.forEach { value ->
             Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    CourseHeading(value.draft.reference.courseName, value.draft.reference.teacherName)
+                    CourseHeading(value.draft.reference.courseName, value.draft.reference.teacherName, showAvatar = false)
                     Text("合计 ${evaluationTotal(value)} 分", style = MaterialTheme.typography.titleLarge)
                     OutlinedButton(onClick = { state.run.randomize(value.draft.reference.key) }, enabled = !state.busy && !confirming) { Text("重新随机") }
                     value.draft.questions.forEach { question ->

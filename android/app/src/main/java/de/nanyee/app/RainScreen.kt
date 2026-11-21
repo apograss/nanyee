@@ -19,6 +19,8 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoStories
+import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -65,6 +67,7 @@ internal fun RainToolsScreen(state: RainState, demo: Boolean, onBack: () -> Unit
 @Composable
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 private fun RainContent(state: RainState, onBack: () -> Unit, toggleDemo: () -> Unit) {
+    var allCoursesExpanded by rememberSaveable(state.host, state.user?.id) { mutableStateOf(false) }
     val context = LocalContext.current
     var deviceError by remember { mutableStateOf("") }
     var localConfirm by remember { mutableStateOf("") }
@@ -116,19 +119,25 @@ private fun RainContent(state: RainState, onBack: () -> Unit, toggleDemo: () -> 
                 if (state.lesson == null) {
                     Text("我的课程", style = MaterialTheme.typography.titleLarge)
                     Text("下拉刷新 · 每 3 秒前台检查开课 · 不自动加入", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    if (state.loaded && state.courses.isEmpty()) Text("暂无课程。")
-                    state.courses.forEach { course ->
+                    val lists = rainCourseLists(state.courses, state.onLesson)
+                    if (state.loaded && lists.live.isEmpty()) Text("暂无正在上的课")
+                    lists.live.forEach { course ->
                         Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                CourseHeading(course.name, course.teacher)
+                                CourseHeading(course.name, rainCourseSubtitle(course), course.teacherAvatar)
                                 val lessons = state.onLesson.filter { it.courseId == course.id }
-                                if (lessons.isEmpty()) Text("当前未在上课")
                                 lessons.forEach { lesson -> Button(onClick = { state.previewJoin(lesson.lessonId, course.name) }, enabled = !state.busy && state.unknownKey.isBlank()) { Text("正在上课 · 预览课堂签到 / 加入") } }
                             }
                         }
                     }
-                    state.onLesson.filter { lesson -> state.courses.none { it.id == lesson.courseId } }.forEach { lesson ->
-                        OutlinedButton(onClick = { state.previewJoin(lesson.lessonId, "当前课堂（未返回课程详情）") }, enabled = !state.busy && state.unknownKey.isBlank()) { Text("当前课堂（未返回课程详情）· 预览加入") }
+                    TextButton(onClick = { allCoursesExpanded = !allCoursesExpanded }, modifier = Modifier.fillMaxWidth()) {
+                        Text("全部课程 (${state.courses.size})")
+                        Icon(if (allCoursesExpanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, contentDescription = if (allCoursesExpanded) "收起" else "展开")
+                    }
+                    if (allCoursesExpanded) lists.remaining.forEach { course ->
+                        Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                            Row(Modifier.padding(12.dp)) { CourseHeading(course.name, rainCourseSubtitle(course), course.teacherAvatar) }
+                        }
                     }
                     OutlinedButton(onClick = {
                         try { scanner.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setPrompt("扫描当前服务器的雨课堂课堂码").setBeepEnabled(false).setOrientationLocked(false)) }

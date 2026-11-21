@@ -145,10 +145,13 @@ private fun XxtScreen(state: XxtState, onBack: () -> Unit, onToggleDemo: () -> U
             if (course == null) {
                 Text("我的课程", style = MaterialTheme.typography.titleLarge)
                 Text("下拉刷新 · 仅本人账号", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (state.loaded && state.courses.isEmpty()) Text("暂无学习通课程。")
+                if (state.courseError.isNotBlank() || state.loaded && state.courses.isEmpty()) {
+                    Text(state.courseError.ifBlank { "暂无课程" }, color = if (state.courseError.isNotBlank()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                    OutlinedButton(onClick = state::retryCourses, enabled = !state.busy) { Text("重试") }
+                }
                 state.courses.forEach { row ->
                     Card(onClick = { state.selectCourse(row) }, enabled = !state.busy, modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                        Row(Modifier.padding(12.dp)) { CourseHeading(row.name, row.teacher) }
+                        Row(Modifier.padding(12.dp)) { CourseHeading(row.name, row.teacher, row.image) }
                     }
                 }
             } else if (activity == null) {

@@ -8,12 +8,15 @@ import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.ArrowDropDown
+import androidx.compose.material.icons.outlined.School
+import androidx.compose.foundation.Image
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -56,29 +59,31 @@ internal val TimetableTop = Color(0xFFECECF6)
 internal val TimetableBottom = Color(0xFFCDDDEB)
 internal fun courseAccent(name: String) = Color(listOf(0xFFB95763, 0xFF7961AB, 0xFF478B9B, 0xFF568ABB, 0xFFA95182, 0xFFC36D5D, 0xFF44866D)[coursePaletteIndex(name)])
 internal fun courseFill(name: String) = courseAccent(name).copy(alpha = 0.85f)
-internal fun courseAvatarFill(name: String) = lerp(courseAccent(name), Color.Black, 0.2f)
-internal val CourseAvatarText = Color.White
 internal fun sectionColor(accent: SectionAccent) = when (accent) { SectionAccent.BRAND -> AppPrimary; SectionAccent.ACADEMIC -> Color(0xFF4878B4); SectionAccent.SERVICE -> Color(0xFF7961AB); SectionAccent.SAGE -> Color(0xFF347F85); SectionAccent.PLUM -> Color(0xFFA95182) }
 
 @Composable
-internal fun CourseHeading(name: String, teacher: String) {
+internal fun CourseHeading(name: String, teacher: String, image: String = "", showAvatar: Boolean = true) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Surface(shape = RoundedCornerShape(12.dp), color = courseAvatarFill(name), contentColor = CourseAvatarText) {
-            Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) { Text(name.take(1), style = MaterialTheme.typography.titleLarge) }
+        if (showAvatar) Surface(shape = RoundedCornerShape(12.dp), color = AppBackground, contentColor = AppMuted) {
+            val bitmap = rememberCourseImage(image)
+            Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
+                if (bitmap != null) Image(bitmap.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                else Icon(Icons.Outlined.School, contentDescription = null)
+            }
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(name, style = MaterialTheme.typography.titleMedium)
-            Text(teacher.ifBlank { "教师信息暂未提供" }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(teacher.ifBlank { "教师信息暂未提供" }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
 
 @Composable
-internal fun ProfileHero(name: String, subtitle: String, initial: String, badge: String) {
+internal fun ProfileHero(name: String, subtitle: String, icon: ImageVector, badge: String) {
     Surface(shape = MaterialTheme.shapes.large, color = AppCard, contentColor = AppText) {
         Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surface) {
-                Box(Modifier.size(52.dp), contentAlignment = Alignment.Center) { Text(initial, style = MaterialTheme.typography.headlineSmall) }
+                Box(Modifier.size(52.dp), contentAlignment = Alignment.Center) { Icon(icon, contentDescription = null) }
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(name, style = MaterialTheme.typography.headlineSmall)

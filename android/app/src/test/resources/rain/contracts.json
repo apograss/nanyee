@@ -1,7 +1,7 @@
 {
   "profile": {"code":0,"data":{"user_profile":{"user_id":1001,"name":"示例同学","phone_number":"not-retained"}}},
   "qr": {"code":0,"data":{"token":"fixture-qr-token","qrContent":"https://www.yuketang.cn/fixture/login","qrImage":"https://unused.example/image"}},
-  "courses": {"data":[{"course_id":11,"classroom_id":22,"course_name":"航海概论","teacher":{"name":"示例老师"}}]},
+  "courses": {"data":[{"course_id":11,"classroom_id":22,"course_name":"航海概论","classroom_name":"航海一班","teacher":{"name":"示例老师","avatar":"https://images.example.invalid/teacher.png"}}]},
   "onLesson": {"code":0,"data":{"onLessonClassrooms":[{"courseId":"11","lessonId":"33"}]}},
   "checkin": {"code":0,"data":{"lessonToken":"fixture-lesson-token"}},
   "eligibility": {"needLocationSignIn":true,"signed":false,"address":"活动地址说明","lat":99,"lng":99},

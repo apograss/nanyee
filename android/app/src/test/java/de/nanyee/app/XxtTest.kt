@@ -73,6 +73,13 @@ class XxtTest {
         assertThrows(XxtFailure::class.java) { xxtCourses(Json.parseToJsonElement("""{"result":0}""").jsonObject) }
         assertThrows(XxtFailure::class.java) { xxtCourses(Json.parseToJsonElement("""{"result":1}""").jsonObject) }
     }
+    @Test fun malformedCourseRowsNeverHideTheValidRows() {
+        val rows = xxtCourses(fixture("courses-malformed"))
+        assertEquals(listOf(course.copy(image = "https://images.example.invalid/course.png")), rows)
+        val malformed = fixture("courses-malformed").let { it + ("channelList" to JsonArray(it["channelList"]!!.jsonArray.dropLast(1))) }
+        assertTrue(xxtCourses(JsonObject(malformed)).isEmpty())
+        assertTrue(xxtCourses(Json.parseToJsonElement("""{"result":1,"channelList":[]}""").jsonObject).isEmpty())
+    }
     @Test fun activitiesMergeTypesDescriptionsAndSortOngoingFirst() {
         val rows = xxtActivities(fixture("activities-app"), fixture("activities-web"))
         assertEquals(listOf("403", "402", "401"), rows.map { it.id })
