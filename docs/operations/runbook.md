@@ -54,7 +54,25 @@ docker compose --env-file .env.production -f infra/compose/compose.prod.yaml exe
 bash infra/scripts/publish-android.sh /path/to/app-release.apk 100 1.0.0 '首个公开版本'
 ```
 
-脚本先复制 `nanyee-<versionName>.apk`（临时文件 + 原子重命名），再原子写入 `version.json`：`versionCode`、`versionName`、`url`、`sha256`、`size`（字节）、`notes`、`publishedAt`（UTC）。同一版本名不可覆盖不同 APK；递增 versionCode 并使用新版本名。APK 长缓存，JSON 不缓存；Cloudflare 不要为 JSON 配置强制缓存。
+从构建 APK 的干净提交运行；可传第五个参数指定该提交/tag（默认为 HEAD，必须与当前检出一致）。设置 `APKSIGNER=$ANDROID_HOME/build-tools/35.0.0/apksigner`，脚本会验证签名并拒绝 `CN=Android Debug`。正式签名通过 Gradle 属性或环境变量 `NANYEE_KEYSTORE_FILE`、`NANYEE_KEYSTORE_PASSWORD`、`NANYEE_KEY_ALIAS`、`NANYEE_KEY_PASSWORD` 提供；不要提交密钥。
+
+长期发布密钥保存在 bot secrets：`NANYEE_RELEASE_KEYSTORE_B64`（base64 编码的 PKCS12）与 `NANYEE_RELEASE_KEY_PASSWORD`（store/key 共用密码），alias 为 `nanyee`。仅在私有构建环境注入，禁用 shell tracing；解码位置必须在仓库外：
+
+```bash
+set +x
+umask 077
+install -d -m 700 "$HOME/.nanyee-release"
+printf '%s' "$NANYEE_RELEASE_KEYSTORE_B64" | base64 --decode > "$HOME/.nanyee-release/release.p12"
+export NANYEE_KEYSTORE_FILE="$HOME/.nanyee-release/release.p12"
+export NANYEE_KEY_ALIAS=nanyee
+export NANYEE_KEYSTORE_PASSWORD="$NANYEE_RELEASE_KEY_PASSWORD"
+export NANYEE_KEY_PASSWORD="$NANYEE_RELEASE_KEY_PASSWORD"
+(cd android && ./gradlew assembleRelease --no-daemon --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process)
+```
+
+首次正式发布核验 `apksigner verify --print-certs` 的证书 SHA-256 为 `C1:B9:88:8F:DE:52:09:A0:B5:CB:F1:8B:2E:EC:52:9A:B8:AE:B3:92:9D:FF:22:9F:A8:66:F5:B0:6B:B6:11:13`，以后各版本必须沿用相同证书。缺少签名配置的本机构建会警告并回退到 debug；该产物不可发布。
+
+脚本先复制 `nanyee-<versionName>.apk`，再用 `git archive` 生成同一提交的 `nanyee-<versionName>-source.tar.gz`，最后原子写入 `version.json`：`versionCode`、`versionName`、`url`、`sha256`、`size`（字节）、`notes`、`publishedAt`（UTC）、`sourceUrl`、`sourceRef`。每个文件均临时写入后原子重命名。同一版本名不可覆盖不同 APK；递增 versionCode 并使用新版本名。APK 长缓存，JSON 不缓存；Cloudflare 不要为 JSON 配置强制缓存。
 
 验证 `/downloads/android/version.json` 和其 APK URL 均返回 200，APK 的 SHA-256 与 JSON 一致；不存在的下载返回 404 而非 SPA。APK 和清单不提交 git。
 
