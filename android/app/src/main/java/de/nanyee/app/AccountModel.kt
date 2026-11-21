@@ -137,7 +137,7 @@ internal class AccountModel(private val backend: PlatformBackend, private val re
         try { block() }
         catch (e: CancellationException) { throw e }
         catch (e: PlatformFailure) {
-            if (e.status == 401) { clearAccount(); if (route != "reset") { route = ""; recovery.write("route", ""); clearChallenge() } }
+            if (e.status == 401) { clearAccount(); if (route !in setOf("reset", "register")) { route = ""; recovery.write("route", ""); clearChallenge() } }
             error = accountFailureMessage(e)
         }
         catch (_: Exception) { error = "操作未完成，网络或响应可能异常。如已提交，请刷新核对后再操作，勿重复提交。" }
