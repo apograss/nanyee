@@ -29,6 +29,18 @@ if not re.search(r"Signer #\d+ certificate DN:", certificate):
     sys.exit("APK signer certificate missing")
 if re.search(r"\bCN\s*=\s*Android Debug\s*(?:,|$)", certificate, re.IGNORECASE | re.MULTILINE):
     sys.exit("Refusing Android Debug signed APK")
+aapt2 = os.environ.get("AAPT2", "aapt2")
+try:
+    badging = subprocess.run([aapt2, "dump", "badging", str(source)], check=True, capture_output=True, text=True).stdout
+except (OSError, subprocess.CalledProcessError):
+    sys.exit("APK metadata verification failed; set AAPT2 to the Android SDK build-tools executable")
+package = next((line for line in badging.splitlines() if line.startswith("package: ")), "")
+apk_code = re.search(r"\bversionCode='([0-9]+)'", package)
+apk_version = re.search(r"\bversionName='([^']*)'", package)
+if not apk_code or not apk_version:
+    sys.exit("APK version metadata missing")
+if int(code) != int(apk_code[1]) or version != apk_version[1]:
+    sys.exit("Version arguments do not match the APK versionCode/versionName")
 def git(*args):
     return subprocess.check_output(["git", "-C", repository, *args]).decode().strip()
 

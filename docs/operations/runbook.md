@@ -51,10 +51,10 @@ docker compose --env-file .env.production -f infra/compose/compose.prod.yaml exe
 首次创建 `/srv/nanyee/downloads/android`，授权给发布用户；gateway 将父目录只读挂载到 `/usr/share/nginx/html/downloads`。更新 Compose/nginx 配置后重新创建 gateway。
 
 ```bash
-bash infra/scripts/publish-android.sh /path/to/app-release.apk 100 1.0.0 '首个公开版本'
+AAPT2="$ANDROID_HOME/build-tools/35.0.0/aapt2" bash infra/scripts/publish-android.sh /path/to/app-release.apk 100 1.0.0 '首个公开版本'
 ```
 
-从构建 APK 的干净提交运行；可传第五个参数指定该提交/tag（默认为 HEAD，必须与当前检出一致）。设置 `APKSIGNER=$ANDROID_HOME/build-tools/35.0.0/apksigner`，脚本会验证签名并拒绝 `CN=Android Debug`。正式签名通过 Gradle 属性或环境变量 `NANYEE_KEYSTORE_FILE`、`NANYEE_KEYSTORE_PASSWORD`、`NANYEE_KEY_ALIAS`、`NANYEE_KEY_PASSWORD` 提供；不要提交密钥。
+从构建 APK 的干净提交运行；可传第五个参数指定该提交/tag（默认为 HEAD，必须与当前检出一致）。版本参数必须与 `aapt2 dump badging` 读取的 APK 内置 versionCode/versionName 一致，否则拒绝发布且不写入目标目录。设置 `AAPT2` 和 `APKSIGNER` 为 Android SDK build-tools 下的对应程序路径；脚本会验证签名并拒绝 `CN=Android Debug`。正式签名通过 Gradle 属性或环境变量 `NANYEE_KEYSTORE_FILE`、`NANYEE_KEYSTORE_PASSWORD`、`NANYEE_KEY_ALIAS`、`NANYEE_KEY_PASSWORD` 提供；不要提交密钥。
 
 长期发布密钥保存在 bot secrets：`NANYEE_RELEASE_KEYSTORE_B64`（base64 编码的 PKCS12）与 `NANYEE_RELEASE_KEY_PASSWORD`（store/key 共用密码），alias 为 `nanyee`。仅在私有构建环境注入，禁用 shell tracing；解码位置必须在仓库外：
 
