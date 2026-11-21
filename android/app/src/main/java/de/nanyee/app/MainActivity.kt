@@ -100,11 +100,12 @@ fun Nanyee(state: SchoolState) {
     val icons = listOf(Icons.Outlined.CalendarMonth, Icons.Outlined.School, Icons.Outlined.RateReview, Icons.Outlined.Widgets, Icons.Outlined.Person)
     val selectedIcons = listOf(Icons.Filled.CalendarMonth, Icons.Filled.School, Icons.Filled.RateReview, Icons.Filled.Widgets, Icons.Filled.Person)
     val tabState = rememberSaveableStateHolder()
+    val pageTitle = if (state.tab == MainTab.TOOLS) when (state.toolsRoute) { "grades" -> "成绩"; "cabin" -> "自习舱"; "grab" -> "抢课"; else -> state.tab.label } else state.tab.label
     var platformMenu by remember { mutableStateOf(false) }
     Scaffold(
         contentWindowInsets = WindowInsets.safeDrawing,
         topBar = { if (state.tab != MainTab.TIMETABLE || !state.homeVisible) TopAppBar(expandedHeight = if (landscape) 48.dp else 56.dp, colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background), title = { Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(state.tab.label, style = if (landscape) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineLarge, maxLines = 1)
+            Text(pageTitle, style = if (landscape) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineLarge, maxLines = 1)
         } }, actions = {
             if (state.tab == MainTab.CLASSROOM) Box {
                 IconButton(onClick = { platformMenu = true }) { Icon(Icons.Outlined.MoreHoriz, "课堂平台与服务器") }
@@ -197,7 +198,6 @@ fun Login(state: SchoolState, embedded: Boolean = false) {
                 Surface(shape = RoundedCornerShape(12.dp), color = Color(0xFFFAFAFA), contentColor = Color(0xFF333333)) { Box(Modifier.fillMaxWidth().height(48.dp).padding(6.dp), contentAlignment = Alignment.Center) {
                     if (bitmap != null) Image(bitmap, "验证码，点击刷新", Modifier.fillMaxSize().clip(RoundedCornerShape(6.dp))) else Icon(Icons.Outlined.Refresh, "加载验证码")
                 } }
-                Text("点击刷新", fontSize = (11 / LocalDensity.current.fontScale.coerceAtLeast(1f)).sp, maxLines = 1, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(checked = state.remember, onCheckedChange = { state.updateRemember(it) }); Text("记住学号和密码", style = MaterialTheme.typography.bodyMedium) }
@@ -303,7 +303,7 @@ fun Grades(state: SchoolState, onGrade: (JsonObject) -> Unit) {
     val summary = if (selected.isEmpty()) state.grades?.get("summary")?.obj() else gradeSummary(grades)
     val landscape = LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp
     val largeFont = LocalDensity.current.fontScale > 1.3f
-    Column(Modifier.widthIn(max = 720.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = if (landscape) 8.dp else 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(Modifier.widthIn(max = 720.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = if (landscape) 8.dp else 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             (listOf("") + allGrades.map { it.text("semester") }.filter { it.isNotEmpty() }.distinct().sortedDescending()).forEach { semester ->
                 FilterChip(selected = selected == semester, onClick = { selected = semester }, label = { Text(semester.ifEmpty { "全部" }) })
@@ -332,8 +332,8 @@ fun Grades(state: SchoolState, onGrade: (JsonObject) -> Unit) {
         grades.groupBy { it.text("semester") }.forEach { (semester, items) ->
             Text(semester.ifEmpty { "未指定学期" }, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelLarge)
             items.forEach { grade -> Card(onClick = { onGrade(grade) }, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow), modifier = Modifier.fillMaxWidth()) {
-                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) { Text(grade.text("name"), fontWeight = FontWeight.SemiBold); Text("${displayNumber(grade.text("credits"))} 学分 · 绩点 ${displayNumber(grade.text("grade_point"))}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) { Text(grade.text("name"), style = MaterialTheme.typography.titleMedium); Text("${displayNumber(grade.text("credits"))} 学分 · 绩点 ${displayNumber(grade.text("grade_point"))}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     Text(displayNumber(grade.text("raw_score")), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
                     Icon(Icons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }

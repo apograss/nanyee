@@ -121,10 +121,13 @@ private fun RainContent(state: RainState, onBack: () -> Unit, toggleDemo: () -> 
                     if (state.loaded && lists.live.isEmpty()) Text("暂无正在上的课")
                     lists.live.forEach { course ->
                         Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                CourseHeading(course.name, rainCourseSubtitle(course), course.teacherAvatar)
-                                val lessons = state.onLesson.filter { it.courseId == course.id }
-                                lessons.forEach { lesson -> Button(onClick = { state.previewJoin(lesson.lessonId, course.name) }, enabled = !state.busy && state.unknownKey.isBlank()) { Text("加入课堂") } }
+                            Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Box(Modifier.weight(1f)) { CourseHeading(course.name, rainCourseSubtitle(course), course.teacherAvatar) }
+                                Column {
+                                    state.onLesson.filter { it.courseId == course.id }.forEach { lesson ->
+                                        TextButton(onClick = { state.previewJoin(lesson.lessonId, course.name) }, enabled = !state.busy && state.unknownKey.isBlank()) { Text("加入") }
+                                    }
+                                }
                             }
                         }
                     }

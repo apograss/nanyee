@@ -135,17 +135,17 @@ internal fun AccountSection(state: AccountState = viewModel(key = "platform-acco
                 }
             }
             if (model.route.isEmpty()) {
-            SectionHeading("提醒", "", Icons.Outlined.NotificationsNone, SectionAccent.SERVICE)
-            if (model.notices.isEmpty()) Text("暂无提醒")
-            model.notices.forEach { notice -> Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(notice.text("title"), style = MaterialTheme.typography.titleSmall)
-                    Text(notice.text("message"))
-                    if ((notice["dismissible"] as? JsonPrimitive)?.booleanOrNull == true) TextButton(onClick = { model.dismissNotice(notice.text("id")) }) { Text("本机关闭") }
-                }
-            } }
+                SectionHeading("提醒", "", Icons.Outlined.NotificationsNone, SectionAccent.SERVICE)
+                if (model.notices.isEmpty()) Text("暂无提醒")
+                model.notices.forEach { notice -> Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(notice.text("title"), style = MaterialTheme.typography.titleSmall)
+                        Text(notice.text("message"))
+                        if ((notice["dismissible"] as? JsonPrimitive)?.booleanOrNull == true) TextButton(onClick = { model.dismissNotice(notice.text("id")) }) { Text("本机关闭") }
+                    }
+                } }
+            }
         }
-    }
     }
     model.pending?.let { action -> AlertDialog(onDismissRequest = model::dismissConfirmation, title = { Text("请确认") }, text = {
         Text("确认${action.kind.label}？")

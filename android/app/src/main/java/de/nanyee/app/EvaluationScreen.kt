@@ -86,12 +86,12 @@ private fun ManualEvaluationScreen(school: SchoolState, evaluation: EvaluationSt
     BackHandler(!state.busy) { state.run.dismiss(); onBack() }
     Column(Modifier.widthIn(max = 720.dp).fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         TextButton(onClick = { state.run.dismiss(); onBack() }, enabled = !state.busy) { Text("返回课程评价") }
-        Text("手动一键评课", style = MaterialTheme.typography.headlineMedium)
+        Text("手动评课", style = MaterialTheme.typography.titleMedium)
         if (state.error.isNotBlank()) InlineError(state.error)
         if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         if (demo) ScenarioPicker(state.demoScenario.label, DemoEvaluationScenario.entries.map { it.label }, enabled = !state.busy) { state.selectDemoScenario(DemoEvaluationScenario.entries[it]) }
         if (state.run.stale) Text("学校会话已变更", color = MaterialTheme.colorScheme.error)
-        Button(onClick = { state.load({ if (demo) "demo" else school.evaluationSessionIdentity }) { if (demo) state.demoSource else school.evaluationAccess() } }, enabled = !state.busy) { Text("只读加载待评课程") }
+        Button(onClick = { state.load({ if (demo) "demo" else school.evaluationSessionIdentity }) { if (demo) state.demoSource else school.evaluationAccess() } }, enabled = !state.busy) { Text("加载待评课程") }
         if (!school.demo) TextButton(onClick = { demoChoice = !demoChoice }, enabled = !state.busy) { Text(if (demoChoice) "返回真实学校数据" else "无账号体验演示") }
         if (state.listed && state.pending.isEmpty()) Text("暂无待评课程")
         if (state.pending.isNotEmpty() && state.run.preview.isEmpty()) {

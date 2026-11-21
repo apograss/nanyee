@@ -34,6 +34,12 @@ class VisualStyleTest {
         }
     }
 
+    @Test fun secondaryTypographyInheritsItsSurfaceColour() {
+        assertEquals(androidx.compose.ui.graphics.Color.Unspecified, AppSecondaryTextStyle.color)
+        assertEquals(13f, AppSecondaryTextStyle.fontSize.value, 0f)
+        assertEquals(16f, AppSecondaryTextStyle.lineHeight.value, 0f)
+    }
+
     @Test fun neutralCourseFallbackIconHasAccessibleContrast() {
         assertTrue((AppBackground.luminance() + 0.05f) / (AppMuted.luminance() + 0.05f) >= 4.5f)
     }
