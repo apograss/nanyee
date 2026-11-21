@@ -7,16 +7,28 @@ plugins {
 android {
     namespace = "de.nanyee.app"
     compileSdk = 35
-    defaultConfig { applicationId = "de.nanyee.app"; minSdk = 26; targetSdk = 35; versionCode = 1; versionName = "1.0" }
-    buildFeatures { compose = true }
+    defaultConfig { applicationId = "de.nanyee.app"; minSdk = 26; targetSdk = 35; versionCode = 100; versionName = "1.0.0" }
+    buildFeatures { compose = true; buildConfig = true }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
     sourceSets.getByName("test").resources.srcDir("src/main/assets")
+    val signing = listOf("NANYEE_KEYSTORE_FILE", "NANYEE_KEYSTORE_PASSWORD", "NANYEE_KEY_ALIAS", "NANYEE_KEY_PASSWORD")
+        .associateWith { providers.gradleProperty(it).orElse(providers.environmentVariable(it)).orNull?.takeIf(String::isNotBlank) }
+    val releaseKeyAvailable = signing.values.all { it != null }
+    signingConfigs.create("release") {
+        if (releaseKeyAvailable) {
+            storeFile = file(signing.getValue("NANYEE_KEYSTORE_FILE")!!)
+            storePassword = signing.getValue("NANYEE_KEYSTORE_PASSWORD")
+            keyAlias = signing.getValue("NANYEE_KEY_ALIAS")
+            keyPassword = signing.getValue("NANYEE_KEY_PASSWORD")
+        }
+    }
+    if (!releaseKeyAvailable) logger.warn("Nanyee: release signing credentials absent/incomplete; using debug signing. Do not publish this APK.")
     buildTypes {
         getByName("release") {
             isMinifyEnabled = true
             isShrinkResources = true
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName(if (releaseKeyAvailable) "release" else "debug")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             ndk { abiFilters += providers.gradleProperty("releaseAbis").orElse("arm64-v8a,armeabi-v7a").get().split(',') }
         }

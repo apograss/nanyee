@@ -57,7 +57,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge(statusBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT), navigationBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT))
         setContent {
             NanyeeTheme {
-                Surface(Modifier.fillMaxSize()) { Nanyee(viewModel()) }
+                Surface(Modifier.fillMaxSize()) { Nanyee(viewModel(), previewUpdate(this)) }
             }
         }
     }
@@ -65,7 +65,10 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun Nanyee(state: SchoolState) {
+internal fun Nanyee(state: SchoolState, preview: AppRelease? = null) {
+    val updates: UpdateState = viewModel()
+    LaunchedEffect(Unit) { updates.check(preview = preview) }
+    UpdateNotice(updates)
     val evaluation: EvaluationState = viewModel(key = "manual-evaluation-live")
     val grab: CourseGrabState = viewModel(key = "course-grab-live")
     val grabDemo: CourseGrabState = viewModel(key = "course-grab-demo")
