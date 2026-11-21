@@ -2,21 +2,24 @@ package de.nanyee.app
 
 import kotlinx.serialization.json.*
 import java.time.Instant
+import java.time.OffsetDateTime
+
+internal fun platformInstant(value: String): Instant = runCatching { Instant.parse(value) }.getOrElse { OffsetDateTime.parse(value).toInstant() }
 
 internal enum class RegistrationMethod(val wire: String, val label: String, val offered: Boolean = true) { QUICK("quick", "快速注册"), EMAIL("email", "教育邮箱"), QUIZ("quiz", "校内答题", offered = false) }
 
 internal data class RegistrationQuestion(val question: String, val options: List<String>)
 
 internal data class RegistrationChallenge(val id: String, val method: RegistrationMethod, val expires: String, val maskedEmail: String = "", val resend: String = "", val questions: List<RegistrationQuestion> = emptyList(), val passScore: Int = 0) {
-    fun expired(now: Instant = Instant.now()) = runCatching { !now.isBefore(Instant.parse(expires)) }.getOrDefault(true)
-    fun canResend(now: Instant = Instant.now()) = resend.isBlank() || runCatching { !now.isBefore(Instant.parse(resend)) }.getOrDefault(true)
+    fun expired(now: Instant = Instant.now()) = runCatching { !now.isBefore(platformInstant(expires)) }.getOrDefault(true)
+    fun canResend(now: Instant = Instant.now()) = resend.isBlank() || runCatching { !now.isBefore(platformInstant(resend)) }.getOrDefault(true)
 }
 
 internal fun registrationChallenge(value: JsonElement): RegistrationChallenge {
     val row = value as? JsonObject ?: error("响应格式无效")
     val id = row.text("challenge_id"); require(id.matches(Regex("[a-zA-Z0-9-]+")))
     val method = RegistrationMethod.entries.first { it.wire == row.text("method") }
-    Instant.parse(row.text("expires_at"))
+    platformInstant(row.text("expires_at"))
     val questions = (row["questions"] as? JsonArray).orEmpty().map { item ->
         val question = item as? JsonObject ?: error("题目格式无效")
         val options = (question["options"] as? JsonArray ?: error("题目缺少选项")).map { it.jsonPrimitive.content }

@@ -29,6 +29,7 @@ class AccountRegistrationTest {
             accountPayload("challenge_id" to "c-1", "method" to "sms", "expires_at" to expires),
             accountPayload("challenge_id" to "c-1", "method" to "email", "expires_at" to "bad"),
         ).forEach { assertTrue(runCatching { registrationChallenge(it) }.isFailure) }
+        assertEquals(Instant.parse("2026-11-21T02:30:00Z"), platformInstant("2026-11-21T02:30:00.123456+00:00").let { Instant.ofEpochSecond(it.epochSecond) })
         assertTrue(registrationChallenge(accountPayload("challenge_id" to "c-1", "method" to "email", "expires_at" to expires, "masked_email" to "d***@smu.edu.cn")).canResend())
     }
 
