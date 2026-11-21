@@ -10,7 +10,7 @@ from email_validator import EmailNotValidError, validate_email
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field, model_validator
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -458,24 +458,21 @@ async def register(
             else RegistrationTrustLevel.COMMUNITY_QUIZ
         ),
     )
-    challenge.consumed_at = now
-    db.add(user)
     try:
-        await db.flush()
-        await db.commit()
+        # 只回滚插入用户的保存点，挑战行锁一直持有到计数提交，并发请求看不到旧计数
+        async with db.begin_nested():
+            db.add(user)
+            await db.flush()
     except IntegrityError as exc:
-        await db.rollback()
-        await db.execute(
-            update(RegistrationChallenge)
-            .where(RegistrationChallenge.id == payload.challenge_id)
-            .values(attempts=RegistrationChallenge.attempts + 1)
-        )
+        challenge.attempts += 1
         await db.commit()
         raise AppError(
             ErrorCode.CONFLICT,
             "用户名或邮箱已被使用。",
             status_code=409,
         ) from exc
+    challenge.consumed_at = now
+    await db.commit()
 
     tokens = await create_session(
         db,
