@@ -1,5 +1,5 @@
 // Canvas design runtime editable source marker: credentials
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion } from "motion/react";
 import { KeyRound, Plus, Trash2, Armchair, Users, GraduationCap, ShieldCheck, Eye, EyeOff, Ban, RefreshCw, Pencil } from "lucide-react";
@@ -54,6 +54,8 @@ export default function Credentials() {
   const [revealError, setRevealError] = useState("");
   const [revealPassword, setRevealPassword] = useState("");
   const [revealing, setRevealing] = useState(false);
+  // 每次打开/关闭对话框递增；过期请求的结果不得写入新对话框
+  const revealSeq = useRef(0);
   const [deleteFor, setDeleteFor] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [editFor, setEditFor] = useState(null);
@@ -147,6 +149,8 @@ export default function Credentials() {
   };
 
   const openReveal = (cred) => {
+    revealSeq.current += 1;
+    setRevealing(false);
     setRevealFor(cred);
     setRevealData(null);
     setRevealVisible(false);
@@ -155,6 +159,8 @@ export default function Credentials() {
   };
 
   const closeReveal = () => {
+    revealSeq.current += 1;
+    setRevealing(false);
     setRevealFor(null);
     setRevealData(null);
     setRevealPassword("");
@@ -162,20 +168,24 @@ export default function Credentials() {
 
   const doReveal = async () => {
     if (!revealFor || !revealPassword) return;
+    const seq = ++revealSeq.current;
     setRevealing(true);
     setRevealError("");
     try {
       const result = await revealCredential(revealFor.id, revealPassword);
+      if (seq !== revealSeq.current) return;
       let parsed = null;
       try { parsed = JSON.parse(result.secret); } catch { /* 非 JSON 的是 token 类凭据 */ }
       setRevealData(parsed && typeof parsed === "object"
         ? { account: parsed.account || "", password: parsed.password || "" }
         : { account: "", password: result.secret });
     } catch (err) {
-      setRevealError(err?.message || "读取失败，请稍后重试。");
+      if (seq === revealSeq.current) setRevealError(err?.message || "读取失败，请稍后重试。");
     } finally {
-      setRevealPassword("");
-      setRevealing(false);
+      if (seq === revealSeq.current) {
+        setRevealPassword("");
+        setRevealing(false);
+      }
     }
   };
 
