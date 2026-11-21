@@ -42,6 +42,8 @@ async def api_client() -> AsyncIterator[httpx.AsyncClient]:
         allowed_hosts=["testserver"],
         cors_origins=["http://localhost:3000"],
         credential_local_master_key=SecretStr(b64encode(b"k" * 32).decode("ascii")),
+        registration_quiz_soft_limit=5,
+        registration_quiz_hard_limit=15,
     )
     app = create_app(settings)
     app.dependency_overrides[get_db_session] = override_db

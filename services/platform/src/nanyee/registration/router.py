@@ -73,7 +73,6 @@ RESERVED_USERNAMES = frozenset(
     }
 )
 EMAIL_POLICY = RateLimitPolicy(window_seconds=3600, soft_limit=3, hard_limit=8)
-QUIZ_POLICY = RateLimitPolicy(window_seconds=3600, soft_limit=5, hard_limit=15)
 REGISTER_POLICY = RateLimitPolicy(window_seconds=3600, soft_limit=5, hard_limit=12)
 REGISTER_CONFLICT_ALLOWANCE = 3
 
@@ -164,6 +163,14 @@ def quiz_requirements(settings: Settings, method: RegistrationMethod) -> tuple[i
     return settings.quiz_question_count, settings.quiz_pass_score
 
 
+def quiz_policy(settings: Settings) -> RateLimitPolicy:
+    return RateLimitPolicy(
+        window_seconds=3600,
+        soft_limit=settings.registration_quiz_soft_limit,
+        hard_limit=settings.registration_quiz_hard_limit,
+    )
+
+
 def max_attempts(settings: Settings, method: RegistrationMethod) -> int:
     if method == RegistrationMethod.QUICK:
         return settings.quick_quiz_max_attempts
@@ -205,7 +212,7 @@ async def create_challenge(
         request,
         action=action,
         identity=identity,
-        policy=EMAIL_POLICY if email else QUIZ_POLICY,
+        policy=EMAIL_POLICY if email else quiz_policy(settings),
         turnstile_token=payload.turnstile_token,
         anti_abuse_pass=payload.anti_abuse_pass,
     )
