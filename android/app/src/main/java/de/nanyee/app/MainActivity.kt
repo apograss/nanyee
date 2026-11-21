@@ -11,7 +11,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.SystemBarStyle
 import androidx.compose.foundation.*
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -24,7 +24,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -41,6 +40,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.*
 import java.time.Instant
 import java.time.ZoneId
@@ -212,7 +212,7 @@ fun Login(state: SchoolState, embedded: Boolean = false) {
 fun ErrorCard(state: SchoolState) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer), modifier = Modifier.widthIn(max = 720.dp).fillMaxWidth()) {
         Row(Modifier.padding(start = 12.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(state.error, maxLines = 1, overflow = TextOverflow.Ellipsis, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+            Text(state.error, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
             IconButton(onClick = { state.error = "" }) { Icon(Icons.Outlined.Close, "关闭错误提示") }
         }
     }
@@ -234,6 +234,20 @@ fun Timetable(state: SchoolState, onCourse: (JsonObject) -> Unit) {
     var weeksInput by remember { mutableStateOf(state.totalWeeks.toString()) }
     var conflicts by remember(state.sessionGeneration) { mutableStateOf<List<JsonObject>?>(null) }
     var weekSheet by remember { mutableStateOf(false) }
+    val pager = key(state.semester, state.sessionGeneration) {
+        rememberPagerState(initialPage = timetablePage(state.week, state.totalWeeks)) { state.totalWeeks.coerceAtLeast(1) }
+    }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(pager, state.week, state.totalWeeks) {
+        val page = timetablePage(state.week, state.totalWeeks)
+        if (pager.settledPage != page) pager.animateScrollToPage(page)
+    }
+    LaunchedEffect(pager) {
+        snapshotFlow { pager.isScrollInProgress to pager.settledPage }.collect { (scrolling, page) ->
+            val week = timetableWeek(page, state.totalWeeks)
+            if (!scrolling && state.week != week) state.selectWeek(week)
+        }
+    }
     val density = LocalDensity.current
     val fontScale = timetableFontScale(density.fontScale)
     val periodHeight = timetablePeriodHeight(fontScale).dp
@@ -250,7 +264,7 @@ fun Timetable(state: SchoolState, onCourse: (JsonObject) -> Unit) {
             Column(Modifier.weight(1f).clickable { weekSheet = true }) {
                 Text(state.today.format(DateTimeFormatter.ofPattern("M月d日", Locale.SIMPLIFIED_CHINESE)), fontSize = 20.sp, lineHeight = 25.sp, fontWeight = FontWeight.Bold)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("第${state.week}周", fontSize = 13.sp, color = AppText)
+                    Text("第${timetableWeek(pager.settledPage, state.totalWeeks)}周", fontSize = 13.sp, color = AppText)
                     Icon(Icons.Outlined.ExpandMore, null, Modifier.size(16.dp))
                     Text(timetableCalendarStatus(state.semesterStart, state.currentWeek, status), fontSize = 11.sp, color = AppMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
@@ -258,51 +272,7 @@ fun Timetable(state: SchoolState, onCourse: (JsonObject) -> Unit) {
             IconButton(onClick = { if (state.demo) state.returnToCurrentWeek() else state.reload() }, enabled = !state.busy) { Icon(Icons.Outlined.Refresh, "刷新课表", Modifier.size(22.dp)) }
             IconButton(onClick = { weekSheet = true }) { Icon(Icons.Outlined.MoreVert, "学期与周次", Modifier.size(22.dp)) }
         }
-        val active = state.courses.filter { (it["weeks"] as? JsonArray)?.any { w -> (w as? JsonPrimitive)?.intOrNull == state.week } == true }
-        if (active.isEmpty()) Text(if (state.busy) "正在加载课表…" else "本周暂无课程", Modifier.padding(horizontal = 16.dp, vertical = 4.dp), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-        val nodeTimes = periodStartTimes(state.courses)
-        val endTimes = periodEndTimes(state.courses)
-        val nodes = maxOf(nodeTimes.size, active.maxOfOrNull { it.number("end_node") } ?: nodeTimes.size)
-        val monday = teachingWeekMonday(state.semesterStart, state.week)
-        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-            Spacer(Modifier.width(periodWidth))
-            (1..7).forEach { day ->
-                val date = monday?.plusDays(day.toLong() - 1)
-                val today = date == state.today
-                Column(Modifier.weight(1f).padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("周${"一二三四五六日"[day - 1]}", fontSize = 10.sp, lineHeight = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Surface(shape = RoundedCornerShape(12.dp), color = if (today) Color.White.copy(alpha = 0.65f) else Color.Transparent, contentColor = if (today) AppPrimary else AppMuted) {
-                        Text(date?.let { "${it.monthValue}/${it.dayOfMonth}" } ?: "—", Modifier.padding(horizontal = 2.dp, vertical = 2.dp), fontSize = 11.sp, lineHeight = 14.sp, fontWeight = if (today) FontWeight.Bold else FontWeight.Normal)
-                    }
-                }
-            }
-        }
-        Spacer(Modifier.height(4.dp))
-        Row(Modifier.fillMaxSize().pointerInput(state.semester) {
-            var distance = 0f
-            detectHorizontalDragGestures(
-                onDragStart = { distance = 0f },
-                onDragCancel = { distance = 0f },
-                onHorizontalDrag = { change, amount -> change.consume(); distance += amount },
-                onDragEnd = {
-                    val selected = weekAfterSwipe(state.week, state.totalWeeks, distance, 64.dp.toPx())
-                    if (selected != state.week) state.selectWeek(selected)
-                }
-            )
-        }.verticalScroll(rememberScrollState()).padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-            Column(Modifier.width(periodWidth)) {
-                (1..nodes).forEach { node -> Column(Modifier.height(periodHeight).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("$node", fontSize = 14.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(nodeTimes.getOrNull(node - 1) ?: "—", style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum", letterSpacing = 0.sp), fontSize = 10.sp, lineHeight = 13.sp, maxLines = 1, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(endTimes.getOrNull(node - 1) ?: "—", style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum", letterSpacing = 0.sp), fontSize = 10.sp, lineHeight = 13.sp, maxLines = 1, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                } }
-            }
-            (1..7).forEach { day ->
-                Box(Modifier.weight(1f).height(periodHeight * nodes)) {
-                    CourseDay(active.filter { it.number("weekday") == day }, nodes, periodHeight, onCourse, { conflicts = it }, Modifier.fillMaxWidth())
-                }
-            }
-        }
+        TimetablePages(pager, state.courses, state.semesterStart, state.today, state.busy, periodHeight, periodWidth, onCourse) { conflicts = it }
     }
     if (weekSheet) ModalBottomSheet(onDismissRequest = { weekSheet = false }, containerColor = AppSurface) {
         Column(Modifier.fillMaxWidth().heightIn(max = 520.dp).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).navigationBarsPadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -313,7 +283,7 @@ fun Timetable(state: SchoolState, onCourse: (JsonObject) -> Unit) {
                 if (state.currentWeek != null) TextButton(onClick = { state.returnToCurrentWeek(); weekSheet = false }) { Text("回到本周") }
             }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                (1..state.totalWeeks).forEach { week -> FilterChip(selected = state.week == week, onClick = { state.selectWeek(week); weekSheet = false }, label = { Text("第${week}周") }) }
+                (1..state.totalWeeks).forEach { week -> FilterChip(selected = timetableWeek(pager.settledPage, state.totalWeeks) == week, onClick = { scope.launch { pager.animateScrollToPage(timetablePage(week, state.totalWeeks)); state.selectWeek(week) }; weekSheet = false }, label = { Text("第${week}周") }) }
             }
             if (state.calendarHint.isNotBlank()) Text(state.calendarHint, style = MaterialTheme.typography.bodySmall, color = AppMuted)
             TextButton(onClick = { weeksInput = state.totalWeeks.toString(); weeksDialog = true }, enabled = !state.cachedMode) { Text("学期长度 · ${state.totalWeeks} 周") }

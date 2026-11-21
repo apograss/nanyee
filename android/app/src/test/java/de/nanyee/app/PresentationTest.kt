@@ -70,16 +70,27 @@ class PresentationTest {
         assertEquals("教学楼", compactRoom("教学楼"))
         assertEquals("", compactRoom("  "))
     }
-    @Test fun horizontalSwipesChangeOneWeekAndRespectBounds() {
-        assertEquals(4, weekAfterSwipe(3, 20, -100f, 64f))
-        assertEquals(2, weekAfterSwipe(3, 20, 100f, 64f))
-        assertEquals(3, weekAfterSwipe(3, 20, 20f, 64f))
-        assertEquals(1, weekAfterSwipe(1, 20, 100f, 64f))
-        assertEquals(20, weekAfterSwipe(20, 20, -100f, 64f))
-        assertEquals(1, weekAfterSwipe(1, 1, -100f, 64f))
-        assertEquals(1, weekAfterSwipe(1, 0, -100f, 64f))
-        assertEquals(3, weekAfterSwipe(3, 20, Float.NaN, 64f))
-        assertEquals(3, weekAfterSwipe(3, 20, -100f, 0f))
+    @Test fun weekPagerMapsAllSemesterWeeksToPages() {
+        listOf(1, 20, 30).forEach { count ->
+            (1..count).forEach { week ->
+                assertEquals(week - 1, timetablePage(week, count))
+                assertEquals(week, timetableWeek(timetablePage(week, count), count))
+            }
+        }
+    }
+    @Test fun weekPagerClampsOldSelectionsWhenSemesterBoundsChange() {
+        assertEquals(0, timetablePage(Int.MIN_VALUE, 20))
+        assertEquals(19, timetablePage(Int.MAX_VALUE, 20))
+        assertEquals(1, timetableWeek(Int.MIN_VALUE, 20))
+        assertEquals(20, timetableWeek(Int.MAX_VALUE, 20))
+        assertEquals(9, timetablePage(20, 10))
+        assertEquals(10, timetableWeek(19, 10))
+    }
+    @Test fun weekPagerKeepsOneUsablePageWithoutSemesterBounds() {
+        listOf(0, -1, Int.MIN_VALUE).forEach { count ->
+            assertEquals(0, timetablePage(20, count))
+            assertEquals(1, timetableWeek(19, count))
+        }
     }
     @Test fun detailsRestoreOnlyForTheSameLoadedList() {
         val items = listOf(payload("name" to "示例课程"))
