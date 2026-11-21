@@ -63,6 +63,8 @@ class Settings(BaseSettings):
     registration_challenge_max_attempts: int = Field(default=5, ge=1, le=10)
     quiz_question_count: int = Field(default=20, ge=10, le=50)
     quiz_pass_score: int = Field(default=18, ge=1, le=50)
+    quick_quiz_question_count: int = Field(default=3, ge=1, le=10)
+    quick_quiz_pass_score: int = Field(default=2, ge=1, le=10)
     edu_email_suffixes: list[str] = Field(default_factory=lambda: [".edu.cn"])
 
     turnstile_enabled: bool = False
@@ -132,6 +134,8 @@ class Settings(BaseSettings):
     def validate_cross_field_security(self) -> Settings:
         if self.quiz_pass_score > self.quiz_question_count:
             raise ValueError("quiz_pass_score cannot exceed quiz_question_count")
+        if self.quick_quiz_pass_score > self.quick_quiz_question_count:
+            raise ValueError("quick_quiz_pass_score cannot exceed quick_quiz_question_count")
         if self.evaluation_daily_window_start > self.evaluation_daily_window_end:
             raise ValueError("evaluation_daily_window_start cannot be later than window end")
 

@@ -176,13 +176,13 @@ private fun RegistrationFields(state: AccountState, model: AccountModel, enabled
         Button(onClick = { state.registration { register() } }, enabled = enabled, modifier = Modifier.fillMaxWidth()) { Text("注册并登录") }
         return
     }
-    Text("选择一种方式验证校内身份，通过后设置用户名和密码。", style = MaterialTheme.typography.bodyMedium, color = AppMuted)
+    Text("答几道小题或用教育邮箱验证，然后设置用户名和密码。", style = MaterialTheme.typography.bodyMedium, color = AppMuted)
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        RegistrationMethod.entries.forEach { method -> FilterChip(selected = model.registerMethod == method, onClick = { model.chooseRegisterMethod(method) }, enabled = enabled, label = { Text(method.label) }) }
+        RegistrationMethod.entries.filter { it.offered }.forEach { method -> FilterChip(selected = model.registerMethod == method, onClick = { model.chooseRegisterMethod(method) }, enabled = enabled, label = { Text(method.label) }) }
     }
     when (model.registerMethod) {
-        RegistrationMethod.QUIZ -> if (challenge == null) {
-            Text("回答几道校园常识题，答对足够题数即可注册，无需邮箱。", style = MaterialTheme.typography.bodySmall, color = AppMuted)
+        RegistrationMethod.QUICK, RegistrationMethod.QUIZ -> if (challenge == null) {
+            Text("答几道南医校园常识题即可注册，无需邮箱。", style = MaterialTheme.typography.bodySmall, color = AppMuted)
             Button(onClick = { state.registration { startRegistration() } }, enabled = enabled, modifier = Modifier.fillMaxWidth()) { Text("开始答题") }
         } else {
             val answered = model.answers.count { it != null }

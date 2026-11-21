@@ -50,12 +50,12 @@ class AccountRegistrationTest {
         model.navigate("register"); model.startRegistration()
         val challenge = requireNotNull(model.registration)
         assertEquals(3, challenge.questions.size); assertTrue(store.getValue("registration").contains("demo-registration"))
-        model.verifyRegistration(); assertTrue(model.error.contains("答完")); assertFalse(model.registrationVerified)
+        model.verifyRegistration(); assertTrue(model.error, model.error.contains("答完")); assertFalse(model.registrationVerified)
         model.answer(0, 0); model.answer(1, 0); model.answer(2, 0); model.verifyRegistration()
         assertTrue(model.error, model.error.contains("答对 0 题")); assertNotNull(model.registration)
         model.answer(0, 1); model.answer(1, 1); model.answer(2, 9); model.verifyRegistration()
         assertTrue(model.registrationVerified); assertEquals("true", store["registrationVerified"])
-        assertEquals(RegistrationMethod.QUIZ, model(store).registration?.method)
+        assertEquals(RegistrationMethod.QUICK, model(store).registration?.method)
         model.username = "bad name"; model.password = "long-enough"; model.passwordAgain = "long-enough"; model.register()
         assertTrue(model.error.contains("用户名")); assertNull(model.user)
         model.username = "demo"; model.password = "long-enough"; model.passwordAgain = "different"; model.register()
@@ -84,7 +84,24 @@ class AccountRegistrationTest {
         val model = model()
         model.navigate("register"); model.startRegistration(); assertNotNull(model.registration)
         model.chooseRegisterMethod(RegistrationMethod.EMAIL); assertNull(model.registration)
-        model.chooseRegisterMethod(RegistrationMethod.QUIZ); model.startRegistration(); model.navigate(""); assertNull(model.registration)
+        model.chooseRegisterMethod(RegistrationMethod.QUICK); model.startRegistration(); model.navigate(""); assertNull(model.registration)
+    }
+
+    @Test fun quickRegistrationFallsBackToFullQuizOnOlderServer() = runBlocking {
+        val sent = mutableListOf<String>()
+        val backend = object : PlatformBackend {
+            override suspend fun clearLocal() = Unit
+            override suspend fun call(method: String, path: String, body: JsonObject?, key: String?): JsonElement {
+                sent += body?.text("method").orEmpty()
+                if (body?.text("method") == "quick") throw PlatformFailure(422, "INVALID_REQUEST", "x", "请求参数无效。")
+                return accountPayload("challenge_id" to "c-1", "method" to "quiz", "expires_at" to Instant.now().plusSeconds(600).toString(), "pass_score" to 1,
+                    "questions" to JsonArray(listOf(accountPayload("question" to "Q", "options" to JsonArray(listOf(JsonPrimitive("A"), JsonPrimitive("B")))))))
+            }
+        }
+        val model = model(backend = backend)
+        assertEquals(RegistrationMethod.QUICK, model.registerMethod)
+        model.navigate("register"); model.startRegistration()
+        assertEquals(listOf("quick", "quiz"), sent); assertEquals(RegistrationMethod.QUIZ, model.registration?.method); assertEquals("", model.error)
     }
 
     @Test fun expiredServerChallengeRestarts() = runBlocking {

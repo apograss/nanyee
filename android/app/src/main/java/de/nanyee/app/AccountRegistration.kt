@@ -3,7 +3,7 @@ package de.nanyee.app
 import kotlinx.serialization.json.*
 import java.time.Instant
 
-internal enum class RegistrationMethod(val wire: String, val label: String) { QUIZ("quiz", "校内答题"), EMAIL("email", "教育邮箱") }
+internal enum class RegistrationMethod(val wire: String, val label: String, val offered: Boolean = true) { QUICK("quick", "快速注册"), EMAIL("email", "教育邮箱"), QUIZ("quiz", "校内答题", offered = false) }
 
 internal data class RegistrationQuestion(val question: String, val options: List<String>)
 
@@ -23,7 +23,7 @@ internal fun registrationChallenge(value: JsonElement): RegistrationChallenge {
         require(question.text("question").isNotBlank() && options.size >= 2)
         RegistrationQuestion(question.text("question"), options)
     }
-    if (method == RegistrationMethod.QUIZ) require(questions.isNotEmpty())
+    if (method != RegistrationMethod.EMAIL) require(questions.isNotEmpty())
     val pass = (row["pass_score"] as? JsonPrimitive)?.intOrNull ?: questions.size
     return RegistrationChallenge(id, method, row.text("expires_at"), row.text("masked_email"), row.text("resend_at"), questions, pass)
 }

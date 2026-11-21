@@ -13,12 +13,15 @@ from nanyee.db.base import Base, TimestampMixin
 class RegistrationMethod(StrEnum):
     EMAIL = "email"
     QUIZ = "quiz"
+    QUICK = "quick"  # App 内快速注册：少量题目
     # 以下两种不用于注册：登录后绑定/换绑邮箱、凭邮箱找回密码
     EMAIL_BIND = "email_bind"
     PASSWORD_RESET = "password_reset"  # noqa: S105 - 枚举值，不是密码
 
 
-REGISTRATION_METHODS = frozenset({RegistrationMethod.EMAIL, RegistrationMethod.QUIZ})
+REGISTRATION_METHODS = frozenset(
+    {RegistrationMethod.EMAIL, RegistrationMethod.QUIZ, RegistrationMethod.QUICK}
+)
 
 
 class RegistrationChallenge(TimestampMixin, Base):

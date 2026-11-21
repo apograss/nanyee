@@ -29,10 +29,10 @@ internal class AccountModel(private val backend: PlatformBackend, private val re
     var editing by mutableStateOf(""); private set
     var route by mutableStateOf(recovery.read("route") ?: ""); private set
     var challenge by mutableStateOf(recovery.read("challenge")?.let { runCatching { accountChallenge(Json.parseToJsonElement(it)) }.getOrNull() }); private set
-    var registerMethod by mutableStateOf(RegistrationMethod.QUIZ); private set
     var registration by mutableStateOf(recovery.read("registration")?.let { runCatching { registrationChallenge(Json.parseToJsonElement(it)) }.getOrNull() }); private set
     var registrationVerified by mutableStateOf(registration != null && recovery.read("registrationVerified") == "true"); private set
     var answers by mutableStateOf(List<Int?>(registration?.questions?.size ?: 0) { null }); private set
+    var registerMethod by mutableStateOf(registration?.method?.takeIf { it.offered } ?: RegistrationMethod.QUICK); private set
     var nickname by mutableStateOf("")
     var passwordAgain by mutableStateOf("")
     private var challengeOwner = recovery.read("challengeOwner").orEmpty()
@@ -67,11 +67,14 @@ internal class AccountModel(private val backend: PlatformBackend, private val re
         run {
             val body = if (method == RegistrationMethod.EMAIL) accountPayload("method" to method.wire, "email" to email.trim()) else accountPayload("method" to method.wire)
             try {
-                val result = backend.call("POST", "/registration/challenges", body)
-                val next = registrationChallenge(result); require(next.method == method)
+                val result = try { backend.call("POST", "/registration/challenges", body) } catch (e: PlatformFailure) {
+                    if (method != RegistrationMethod.QUICK || e.status != 422) throw e
+                    backend.call("POST", "/registration/challenges", accountPayload("method" to RegistrationMethod.QUIZ.wire))
+                }
+                val next = registrationChallenge(result); require(next.method == method || (method == RegistrationMethod.QUICK && next.method == RegistrationMethod.QUIZ))
                 registration = next; registrationVerified = false; answers = List(next.questions.size) { null }; code = ""
                 recovery.write("registration", result.toString()); recovery.write("registrationVerified", "")
-                message = if (method == RegistrationMethod.QUIZ) "答对 ${next.passScore}/${next.questions.size} 题即可设置账号。" else "验证码已发送至 ${next.maskedEmail.ifBlank { "你的邮箱" }}，请查收。"
+                message = if (next.method != RegistrationMethod.EMAIL) "答对 ${next.passScore}/${next.questions.size} 题即可设置账号。" else "验证码已发送至 ${next.maskedEmail.ifBlank { "你的邮箱" }}，请查收。"
             } catch (e: PlatformFailure) { registrationFailed(e) }
         }
     }
@@ -79,7 +82,7 @@ internal class AccountModel(private val backend: PlatformBackend, private val re
         val current = registration ?: return
         if (registrationVerified) return
         if (current.expired()) { clearRegistration(); error = "注册验证已过期，请重新开始。"; return }
-        val body = if (current.method == RegistrationMethod.QUIZ) {
+        val body = if (current.method != RegistrationMethod.EMAIL) {
             if (answers.size != current.questions.size || answers.any { it == null }) { error = "请先答完全部 ${current.questions.size} 题。"; return }
             accountPayload("answers" to JsonArray(answers.map { JsonPrimitive(it!!) }))
         } else {
@@ -118,7 +121,7 @@ internal class AccountModel(private val backend: PlatformBackend, private val re
                 clearAccount(); user = platformUser(result); hidden = dismissed(owner)
                 clearRegistration(); route = ""; recovery.write("route", ""); nickname = ""
                 load()
-                message = if (current.method == RegistrationMethod.QUIZ) "注册成功，已登录。建议在“邮箱”里绑定邮箱，便于找回密码。" else "注册成功，已登录 Nanyee。"
+                message = if (current.method != RegistrationMethod.EMAIL) "注册成功，已登录。建议在“邮箱”里绑定邮箱，便于找回密码。" else "注册成功，已登录 Nanyee。"
             } catch (e: PlatformFailure) {
                 if (user != null) throw e
                 registrationFailed(e)

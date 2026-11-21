@@ -34,7 +34,7 @@ internal class DemoAccountBackend(initiallySignedIn: Boolean = false) : Platform
             return accountPayload("challenge_id" to "demo-registration", "method" to "email", expires, "resend_at" to Instant.now().plusSeconds(60).toString(), "masked_email" to "d***@smu.edu.cn")
         }
         val questions = listOf("演示题：南方医科大学位于哪个城市？" to listOf("北京", "广州", "上海"), "演示题：本 App 的课表来自？" to listOf("手动输入", "教务系统", "随机生成"), "演示题：答对几题可以注册？" to listOf("全部", "按页面提示", "不用答"))
-        return accountPayload("challenge_id" to "demo-registration", "method" to "quiz", expires, "questions" to JsonArray(questions.map { (q, options) -> accountPayload("question" to q, "options" to JsonArray(options.map(::JsonPrimitive))) }), "total_questions" to 3, "pass_score" to 2)
+        return accountPayload("challenge_id" to "demo-registration", "method" to (body?.text("method") ?: "quick"), expires, "questions" to JsonArray(questions.map { (q, options) -> accountPayload("question" to q, "options" to JsonArray(options.map(::JsonPrimitive))) }), "total_questions" to 3, "pass_score" to 2)
     }
     override suspend fun clearLocal() { signedIn = false }
     override suspend fun call(method: String, path: String, body: JsonObject?, key: String?): JsonElement {
@@ -50,7 +50,7 @@ internal class DemoAccountBackend(initiallySignedIn: Boolean = false) : Platform
         if (path.startsWith("/registration/challenges/") && path.endsWith("/verify")) {
             val current = registration ?: throw PlatformFailure(404, "NOT_FOUND", "演示", "注册验证不存在。")
             require(path == "/registration/challenges/${current.text("challenge_id")}/verify")
-            val passed = if (current.text("method") == "quiz") {
+            val passed = if (current.text("method") != "email") {
                 val score = (body?.get("answers") as? JsonArray).orEmpty().count { it.jsonPrimitive.intOrNull == 1 }
                 if (score < 2) throw PlatformFailure(422, "INVALID_REQUEST", "演示", "验证未通过。", accountPayload("attempts_remaining" to 4, "score" to score, "required_score" to 2))
                 true
