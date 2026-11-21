@@ -55,11 +55,29 @@ internal fun schoolExamRows(rows: List<JsonObject>): List<JsonObject> = rows.map
 internal fun examNumber(row: JsonObject, numbers: JsonObject): String =
     numbers.text("task:${row.text("kcrwdm")}").ifBlank { numbers.text("course:${row.text("kcbh")}") }
 
-internal fun mergeExamCourses(courses: List<JsonObject>, numbers: JsonObject, exams: List<JsonObject>): List<JsonObject> = courses.map { course ->
+internal fun resolveExamDates(courses: List<JsonObject>, semesterStart: String): List<JsonObject> = courses.flatMap { course ->
+    if (!isExam(course) || course.text("date").isNotBlank() || course.number("weekday") !in 1..7) listOf(course) else {
+        val dated = (course["weeks"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.intOrNull }
+            .filter { it in 1..30 }.distinct().mapNotNull { week ->
+                teachingWeekMonday(semesterStart, week)?.let { monday ->
+                    JsonObject(course + mapOf(
+                        "date" to JsonPrimitive(monday.plusDays(course.number("weekday").toLong() - 1).toString()),
+                        "weeks" to JsonArray(listOf(JsonPrimitive(week)))
+                    ))
+                }
+            }
+        dated.ifEmpty { listOf(course) }
+    }
+}
+
+internal fun examsOnDate(courses: List<JsonObject>, date: LocalDate): List<JsonObject> =
+    courses.filter { isExam(it) && it.text("date") == date.toString() }.sortedBy { it.text("start_time") }
+
+internal fun mergeExamCourses(courses: List<JsonObject>, numbers: JsonObject, exams: List<JsonObject>, semesterStart: String = ""): List<JsonObject> = resolveExamDates(courses, semesterStart).map { course ->
     if (!isExam(course)) course else {
         val matching = exams.firstOrNull { it.text("name") == course.text("name") && it.text("date") == course.text("date") }
         JsonObject(course + buildJsonObject {
-            put("exam_number", examNumber(course, numbers))
+            put("exam_number", examNumber(course, numbers).ifBlank { course.text("exam_number") })
             matching?.let { exam -> listOf("start_time", "end_time", "location", "seat").forEach { key ->
                 if (exam.text(key).isNotBlank()) put(key, exam.text(key))
             } }
@@ -68,14 +86,7 @@ internal fun mergeExamCourses(courses: List<JsonObject>, numbers: JsonObject, ex
 }
 
 internal fun timetableExams(courses: List<JsonObject>, extra: List<JsonObject>, numbers: JsonObject, semesterStart: String): List<JsonObject> {
-    val scheduled = courses.filter(::isExam).flatMap { course ->
-        if (course.text("date").isNotBlank()) listOf(course) else {
-            (course["weeks"] as? JsonArray).orEmpty().mapNotNull { week ->
-                val monday = (week as? JsonPrimitive)?.intOrNull?.let { teachingWeekMonday(semesterStart, it) }
-                monday?.let { JsonObject(course + ("date" to JsonPrimitive(it.plusDays(course.number("weekday").toLong() - 1).toString()))) }
-            }
-        }
-    }
+    val scheduled = mergeExamCourses(courses, numbers, extra, semesterStart).filter { isExam(it) && it.text("date").isNotBlank() }
     val unmatched = extra.filter { exam -> scheduled.none { it.text("name") == exam.text("name") && it.text("date") == exam.text("date") } }
         .map { JsonObject(it + ("exam_number" to JsonPrimitive(examNumber(it, numbers)))) }
     return (scheduled + unmatched).distinctBy { listOf(it.text("name"), it.text("date"), it.text("start_time"), it.text("kcrwdm")) }

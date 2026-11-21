@@ -241,18 +241,19 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         examNumbers = response["exam_numbers"] as? JsonObject ?: if (retainMetadata) retainedNumbers else previous?.examNumbers ?: JsonObject(emptyMap())
         examRows = if (response["exam_rows"] is JsonArray) response.items("exam_rows") else if (retainMetadata) retainedRows else previous?.examRows.orEmpty()
         examMetadataSemester = semester
-        courses = mergeExamCourses(courses, examNumbers, examRows)
         semesterStart = semesterStartFromMetadata(response, today)
             ?: semesters.firstOrNull { it.text("code") == semester }?.let { semesterStartFromMetadata(it, today) }
             ?: previous?.semesterStart.orEmpty()
+        courses = mergeExamCourses(courses, examNumbers, examRows, semesterStart)
         followCurrentWeek()
         val table = CachedTimetable(courses, Instant.now().toString(), totalWeeks, semesterStart, examNumbers, examRows)
         saveTimetable(table)
         if (semesterStart.isEmpty()) {
             try {
                 semesterStart = api.timetableSemesterStart(buildJsonObject { put("academic_session_id", session); put("semester_code", semester); put("total_weeks", totalWeeks); put("campus", "main") })
+                courses = mergeExamCourses(courses, examNumbers, examRows, semesterStart)
                 followCurrentWeek()
-                saveTimetable(table.copy(semesterStart = semesterStart))
+                saveTimetable(table.copy(courses = courses, semesterStart = semesterStart))
             } catch (e: Exception) {
                 if (e is CancellationException || e is SchoolError && e.status in listOf(401, 410)) throw e
             }
@@ -346,7 +347,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         if (demo) { courses = demoCourses(code) + demoExams(today, semesterStart); examNumbers = JsonObject(emptyMap()); examRows = emptyList() }
         else if (cachedMode) {
             val table = cachedTimetables?.tables?.get(code)
-            if (table == null) { courses = emptyList(); examNumbers = JsonObject(emptyMap()); examRows = emptyList(); semesterStart = ""; requireSchoolLogin(SchoolOperation.TIMETABLE.tab, rememberView = false) } else { courses = table.courses; examNumbers = table.examNumbers; examRows = table.examRows; totalWeeks = table.totalWeeks; semesterStart = table.semesterStart; week = week.coerceAtMost(totalWeeks); followCurrentWeek() }
+            if (table == null) { courses = emptyList(); examNumbers = JsonObject(emptyMap()); examRows = emptyList(); semesterStart = ""; requireSchoolLogin(SchoolOperation.TIMETABLE.tab, rememberView = false) } else { courses = mergeExamCourses(table.courses, table.examNumbers, table.examRows, table.semesterStart); examNumbers = table.examNumbers; examRows = table.examRows; totalWeeks = table.totalWeeks; semesterStart = table.semesterStart; week = week.coerceAtMost(totalWeeks); followCurrentWeek() }
         } else if (loggedIn) { semesterStart = ""; courses = emptyList(); launch("timetable") { queryTimetable() } }
     }
     fun setWeeks(value: Int) {
@@ -382,7 +383,7 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         val restored = snapshot.restoreView(view, CachedTimetableView(semester, week, userPickedWeek))
         semesters = snapshot.semesters; semester = restored.semester
         val table = snapshot.tables.getValue(semester)
-        courses = table.courses; totalWeeks = table.totalWeeks; semesterStart = table.semesterStart
+        courses = mergeExamCourses(table.courses, table.examNumbers, table.examRows, table.semesterStart); totalWeeks = table.totalWeeks; semesterStart = table.semesterStart
         examNumbers = table.examNumbers; examRows = table.examRows
         examMetadataSemester = semester
         week = restored.week; userPickedWeek = restored.userPickedWeek; saved["userPickedWeek"] = userPickedWeek

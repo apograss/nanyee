@@ -272,7 +272,7 @@ fun Timetable(state: SchoolState, onCourse: (JsonObject) -> Unit) {
             IconButton(onClick = { if (state.demo) state.returnToCurrentWeek() else state.reload() }, enabled = !state.busy) { Icon(Icons.Outlined.Refresh, "刷新课表", Modifier.size(22.dp)) }
             IconButton(onClick = { weekSheet = true }) { Icon(Icons.Outlined.MoreVert, "学期与周次", Modifier.size(22.dp)) }
         }
-        ExamReminder(state.courses.filter { isExam(it) && it.text("date") == state.today.toString() }.sortedBy { it.text("start_time") }, onCourse)
+        ExamReminder(examsOnDate(state.courses, state.today), onCourse)
         TimetablePages(pager, state.courses, state.semesterStart, state.today, state.busy, periodHeight, periodWidth, onCourse) { conflicts = it }
     }
     if (weekSheet) ModalBottomSheet(onDismissRequest = { weekSheet = false }, containerColor = AppSurface) {

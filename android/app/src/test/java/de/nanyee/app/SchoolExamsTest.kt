@@ -12,6 +12,38 @@ class SchoolExamsTest {
     private fun courses() = schoolTimetable(schoolWeeklyRows(fixture("timetable")))
     private fun numbers() = schoolExamNumbers(fixture("tasks").items("rows"))
 
+    @Test fun calendarResolvesEachUndatedOccurrenceBeforeMergeAndHeaderSelection() {
+        val data = fixture("undated")
+        val raw = schoolTimetable(data.items("timetable"))
+        val extra = schoolExamRows(data.items("exams"))
+        val numbers = payload("task:DEMO-task" to "DEMO-0042")
+        assertEquals(1, raw.size)
+        val pending = mergeExamCourses(raw, numbers, extra)
+        assertEquals("", pending.single().text("date"))
+        assertTrue(examsOnDate(pending, LocalDate.parse("2026-11-27")).isEmpty())
+        val merged = mergeExamCourses(pending, numbers, extra, data.text("semester_start"))
+        assertEquals(listOf("2026-11-27", "2026-12-04"), merged.map { it.text("date") })
+        assertEquals(listOf(JsonArray(listOf(JsonPrimitive(2))), JsonArray(listOf(JsonPrimitive(3)))), merged.map { it["weeks"] })
+        val reminder = examsOnDate(merged, LocalDate.parse("2026-11-27")).single()
+        assertEquals("21", reminder.text("seat")); assertEquals("新地点", reminder.text("location"))
+        assertEquals("15:00", reminder.text("start_time")); assertEquals("17:00", reminder.text("end_time"))
+        assertEquals("DEMO-0042", reminder.text("exam_number"))
+        assertEquals("", merged[1].text("seat")); assertEquals("14:00", merged[1].text("start_time"))
+        assertEquals(merged, timetableExams(raw, extra, numbers, data.text("semester_start")))
+        assertEquals(merged, mergeExamCourses(merged, numbers, extra, data.text("semester_start")))
+    }
+
+    @Test fun missingCalendarDoesNotInventDatesOrDropCoursesAndExplicitDatesWin() {
+        val raw = schoolTimetable(fixture("undated").items("timetable"))
+        assertEquals(raw, resolveExamDates(raw, "invalid"))
+        assertEquals(raw, resolveExamDates(raw, ""))
+        assertTrue(resolveExamDates(emptyList(), "2026-11-16").isEmpty())
+        val explicit = JsonObject(raw.single() + ("date" to JsonPrimitive("2027-01-08")))
+        assertEquals(listOf(explicit), resolveExamDates(listOf(explicit), "2026-11-16"))
+        val demo = demoExams(LocalDate.parse("2026-11-21"), "2026-11-16")
+        assertTrue(timetableExams(demo, emptyList(), payload(), "2026-11-16").all { it.text("exam_number").startsWith("DEMO-") })
+    }
+
     @Test fun demoExamsDoNotPlaceThePreviousSundayIntoTheFirstTeachingWeek() {
         val monday = LocalDate.parse("2026-11-16")
         val exams = demoExams(monday, monday.toString())
