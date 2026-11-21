@@ -6,7 +6,7 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.location" android:required="false" />
-    <application android:label="Nanyee" android:icon="@mipmap/ic_launcher" android:theme="@style/Nanyee" android:allowBackup="false" android:supportsRtl="true">
+    <application android:label="Nanyee" android:icon="@mipmap/ic_launcher" android:theme="@style/Nanyee" android:allowBackup="false" android:fullBackupContent="@xml/backup_rules" android:dataExtractionRules="@xml/data_extraction_rules" android:supportsRtl="true">
         <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.xxt.photos" android:exported="false" android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/xxt_photo_paths" />
         </provider>
