@@ -119,6 +119,8 @@ services:
     pull_policy: always
     ports:
       - "127.0.0.1:8080:8080"
+    volumes:
+      - /srv/nanyee/downloads:/usr/share/nginx/html/downloads:ro
     read_only: true
     tmpfs:
       - /var/cache/nginx:size=16m

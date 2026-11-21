@@ -56,7 +56,7 @@ internal fun CabinToolsScreen(school: SchoolState, state: CabinState = viewModel
             if (evaluationMode) SectionHeading("自动评课", icon = Icons.Outlined.CloudQueue)
             if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
             if (state.error.isNotBlank()) InlineError(state.error)
-            if (state.message.isNotBlank()) Text(state.message, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.primary)
+            if (state.message.isNotBlank()) Text(state.message, color = MaterialTheme.colorScheme.primary)
             if (state.user == null) {
                 Text("Nanyee 平台账号", style = MaterialTheme.typography.titleLarge)
                 if (state.demo) {
@@ -78,7 +78,7 @@ internal fun CabinToolsScreen(school: SchoolState, state: CabinState = viewModel
                     listOf("new" to "新建", "jobs" to "任务", "credentials" to "凭据").forEach { (key, label) -> FilterChip(pane == key, { state.cancelCredential(); pane = key }, label = { Text(label) }) }
                 }
                 if (pane == "credentials") {
-                    Text("托管学校凭据", style = MaterialTheme.typography.titleLarge)
+                    Text(if (state.demo) "模拟学校凭据" else "托管学校凭据", style = MaterialTheme.typography.titleLarge)
                     if (evaluationMode) state.notices.filter { it.text("kind") == "credential_invalid" }.forEach { notice ->
                         InlineError(notice.text("title"))
                         TextButton(onClick = { state.editCredential(notice.text("credential_id").takeIf { id -> state.credentials.any { it.text("id") == id } }) }, enabled = !state.busy) { Text("更新评课凭据") }
@@ -97,22 +97,22 @@ internal fun CabinToolsScreen(school: SchoolState, state: CabinState = viewModel
                                 }
                             }
                         }
-                        if (state.credentials.isEmpty()) Text("暂无托管凭据")
-                        OutlinedButton(onClick = { state.editCredential() }, enabled = !state.busy && state.pending == null) { Text("添加托管凭据") }
+                        if (state.credentials.isEmpty()) Text(if (state.demo) "暂无模拟凭据" else "暂无托管凭据")
+                        OutlinedButton(onClick = { state.editCredential() }, enabled = !state.busy && state.pending == null) { Text(if (state.demo) "添加模拟凭据" else "添加托管凭据") }
                     }
                     if (state.credentialEditor) {
                         Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
                             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Text(if (state.editingId == null) "同意托管学校密码" else "更新托管学校密码", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                Text(if (state.demo) "本次演示的模拟凭据" else if (state.editingId == null) "同意托管学校密码" else "更新托管学校密码", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                                 if (state.editingId != null) {
                                     Text(state.credentials.firstOrNull { it.text("id") == state.editingId }?.get("metadata")?.obj()?.text("account_hint").orEmpty().ifBlank { "已托管的学校账号" })
                                 }
-                                Text("同意将学校密码加密托管至 Nanyee，\n用于自动任务，可随时撤销。", style = MaterialTheme.typography.bodySmall)
-                                if (!state.consent) Button(onClick = { state.agree(school::hostedSchoolPrefill) }, enabled = !state.busy) { Text("同意并继续") }
+                                Text(if (state.demo) "仅在本次演示中使用模拟凭据，\n不会上传到 nanyee.de。" else "同意将学校密码加密托管至 Nanyee，\n用于自动任务，可随时撤销。", style = MaterialTheme.typography.bodySmall)
+                                if (!state.consent) Button(onClick = { state.agree(school::hostedSchoolPrefill) }, enabled = !state.busy) { Text(if (state.demo) "使用模拟凭据" else "同意并继续") }
                                 else {
-                                    CabinField("学校学号", state.account, { state.account = it }, !state.busy)
-                                    CabinField("学校密码", state.schoolPassword, { state.schoolPassword = it }, !state.busy, password = true)
-                                    Button(onClick = { state.saveCredential() }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { Text("提交托管凭据") }
+                                    CabinField(if (state.demo) "模拟学号" else "学校学号", state.account, { state.account = it }, !state.busy)
+                                    CabinField(if (state.demo) "模拟密码" else "学校密码", state.schoolPassword, { state.schoolPassword = it }, !state.busy, password = true)
+                                    Button(onClick = { state.saveCredential() }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { Text(if (state.demo) "添加模拟凭据" else "提交托管凭据") }
                                 }
                                 TextButton(onClick = { state.cancelCredential() }, enabled = !state.busy) { Text("取消并清空") }
                             }
@@ -131,7 +131,7 @@ internal fun CabinToolsScreen(school: SchoolState, state: CabinState = viewModel
                                 if (state.canDiscardPending) TextButton(onClick = { state.discardPending() }, enabled = !state.busy) { Text("确认放弃本机待确认请求") }
                             }
                             state.submitted -> {
-                                Text("任务已创建")
+                                Text(if (state.demo) "模拟任务已创建" else "任务已创建")
                                 OutlinedButton(onClick = { state.newBooking() }, enabled = !state.busy) { Text(if (evaluationMode) "返回任务设置" else "再预约一笔") }
                             }
                             else -> if (evaluationMode) {
@@ -183,7 +183,7 @@ internal fun CabinToolsScreen(school: SchoolState, state: CabinState = viewModel
         }, confirmButton = { TextButton(onClick = { state.confirm() }, enabled = !state.busy) { Text("确认并创建") } }, dismissButton = { TextButton(onClick = { state.dismissConfirmation() }) { Text("返回修改") } })
     }
     action?.let { (kind, id) ->
-        AlertDialog(onDismissRequest = { action = null }, title = { Text(when (kind) { "cancel" -> if (evaluationMode) "取消常驻评课任务？" else "取消预约任务？"; "revoke" -> "撤销托管凭据？"; else -> "退出平台账号？" }) }, text = { Text(when (kind) { "cancel" -> "正在执行的任务可能已提交，请刷新并核验收据。"; "revoke" -> "撤销后将取消关联的排队任务。"; else -> "清除本机平台 Cookie，不影响学校课表缓存。" }) }, confirmButton = {
+        AlertDialog(onDismissRequest = { action = null }, title = { Text(if (state.demo) "确认本次演示操作？" else when (kind) { "cancel" -> if (evaluationMode) "取消常驻评课任务？" else "取消预约任务？"; "revoke" -> "撤销托管凭据？"; else -> "退出平台账号？" }) }, text = { Text(if (state.demo) "仅更改本次演示数据，不会发送至服务器。" else when (kind) { "cancel" -> "正在执行的任务可能已提交，请刷新并核验收据。"; "revoke" -> "撤销后将取消关联的排队任务。"; else -> "清除本机平台 Cookie，不影响学校课表缓存。" }) }, confirmButton = {
             TextButton(onClick = { action = null; when (kind) { "cancel" -> state.cancelJob(id); "revoke" -> state.revoke(id); else -> state.logout() } }, enabled = !state.busy) { Text("确认") }
         }, dismissButton = { TextButton(onClick = { action = null }) { Text("返回") } })
     }

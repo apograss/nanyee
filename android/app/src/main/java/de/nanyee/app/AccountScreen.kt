@@ -15,6 +15,7 @@ import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.School
 import androidx.compose.material.icons.outlined.MoreHoriz
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -33,6 +34,7 @@ private fun accountActivity(context: Context): Activity? = when (context) { is A
 
 @Composable
 internal fun MyScreen(school: SchoolState) {
+    val updates: UpdateState = viewModel()
     val account: AccountState = viewModel(key = "platform-account")
     val revision by PlatformSession.revision.collectAsState()
     LaunchedEffect(account, revision, school.demo) { account.restoreOverview(school.demo) }
@@ -46,9 +48,13 @@ internal fun MyScreen(school: SchoolState) {
             Text("账号", style = MaterialTheme.typography.labelLarge, color = AppMuted)
             CompactEntry("学校账号", if (school.demo) "演示账号" else if (school.loggedIn) "已登录 · ${school.account}" else "未登录", Icons.Outlined.School, SectionAccent.ACADEMIC) { section = "school" }
             CompactEntry("Nanyee 账号", if (school.demo) "演示账号" else profile?.text("username").orEmpty().ifBlank { "未登录" }, Icons.Outlined.AccountCircle, SectionAccent.BRAND) { section = "platform" }
+            Text("应用", style = MaterialTheme.typography.labelLarge, color = AppMuted)
+            FeedbackRow()
+            CompactEntry("关于", BuildConfig.VERSION_NAME, Icons.Outlined.Info, SectionAccent.BRAND) { section = "about" }
         } else {
             TextButton(onClick = { section = "" }) { Text("返回我的") }
-            if (section == "platform") AccountSection(state = account, demoOnly = school.demo)
+            if (section == "about") AppAbout(updates)
+            else if (section == "platform") AccountSection(state = account, demoOnly = school.demo)
             else if (!school.homeVisible) Login(school, embedded = true)
             else {
                 Text("学校账号", style = MaterialTheme.typography.titleMedium)
@@ -210,7 +216,7 @@ private fun RegistrationFields(state: AccountState, model: AccountModel, enabled
             TextButton(onClick = { state.registration { startRegistration() } }, enabled = enabled) { Text("换一套题") }
         }
         RegistrationMethod.EMAIL -> {
-            Text("仅支持 .edu.cn 教育邮箱，验证码会发送到该邮箱。", style = MaterialTheme.typography.bodySmall, color = AppMuted)
+            Text(if (state.demo) "演示验证码为 123456，未发送邮件。" else "仅支持 .edu.cn 教育邮箱，验证码会发送到该邮箱。", style = MaterialTheme.typography.bodySmall, color = AppMuted)
             CabinField("教育邮箱", model.email, { model.email = it }, enabled)
             OutlinedButton(onClick = { state.registration { startRegistration() } }, enabled = enabled) { Text(if (challenge == null) "发送验证码" else "重新发送") }
             if (challenge != null) {

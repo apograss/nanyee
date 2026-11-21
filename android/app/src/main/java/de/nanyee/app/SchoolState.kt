@@ -472,10 +472,17 @@ class SchoolState(app: Application, private val saved: SavedStateHandle) : Andro
         if (returnView != null && restoreCachedTimetable(returnView)) return
         if (!wasDemo) {
             password = ""; captcha = null; captchaText = ""; api.clear()
+            remember = false
+            val loginDeletion = runCatching {
+                clearRememberedSchoolLogin(
+                    { check(prefs.edit().remove("remember").commit()) },
+                    { check(secure.edit().clear().commit()) }
+                )
+            }
             val deletion = runCatching { timetableCache.clear() }
-            cacheRevocationFailed = deletion.isFailure
+            cacheRevocationFailed = deletion.isFailure || loginDeletion.isFailure
             if (cacheRevocationFailed) {
-                error = "学校会话已退出，但无法保存课表撤销标记。请重试退出；如仍失败，请在系统设置中清除应用数据。"
+                error = "学校会话已退出，但本机数据清理失败，请重试退出。"
                 return
             }
             launch(silent = true) { fetchCaptcha() }

@@ -8,6 +8,16 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class AccountModelTest {
+    @Test fun demoEmailCodeConfirmationDoesNotClaimAnEmailWasSent() = runBlocking {
+        val model = AccountModel(DemoAccountBackend(initiallySignedIn = true), AccountRecovery({ null }, { _, _ -> }))
+        model.refresh(); model.email = "demo@example.edu.cn"; model.password = "fixture-password"
+        model.review(AccountWrite.EMAIL_CODE)
+        assertNotNull(model.pending)
+        model.confirm()
+        assertTrue(model.message.contains("演示验证码"))
+        assertTrue(model.message.contains("未发送邮件"))
+        assertFalse(model.message.contains("已发送"))
+    }
     @Test fun changingHostedSchoolAccountRefreshesHintWithoutDiscardingMetadata() = runBlocking {
         val f = Fixture(); f.login(); val model = f.model
         model.editCredential("demo-school"); model.schoolAccount = "202612345678"; model.secret = "fixture-password"

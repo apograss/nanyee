@@ -1,0 +1,5 @@
+<resources>
+    <style name="Nanyee" parent="NanyeeBase">
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+</resources>
