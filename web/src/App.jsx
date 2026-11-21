@@ -3,7 +3,7 @@ import React, { useEffect } from "react";
 import { Routes, Route, Navigate, Outlet, useLocation, useNavigate, Link } from "react-router-dom";
 import {
   Home, CalendarDays, GraduationCap, BookOpen, ClipboardCheck, Armchair,
-  Users, KeyRound, ListTodo, LogOut, LogIn, Bell, ShieldCheck, Compass, Info, UserCog,
+  Users, KeyRound, ListTodo, LogOut, LogIn, Bell, ShieldCheck, Compass, Info, UserCog, Download,
 } from "lucide-react";
 import { AuthProvider, useAuth, apiPost, listJobs } from "@/lib/api.jsx";
 import { ThemeProvider, ThemeToggle } from "@/lib/theme.jsx";
@@ -24,6 +24,7 @@ import Jobs from "@/pages/Jobs.jsx";
 import JobDetail from "@/pages/JobDetail.jsx";
 import Recommendations from "@/pages/Recommendations.jsx";
 import About from "@/pages/About.jsx";
+import DownloadPage from "@/pages/Download.jsx";
 import Account from "@/pages/Account.jsx";
 
 const NAV = [
@@ -39,6 +40,7 @@ const NAV = [
   { to: "/account", label: "账号设置", icon: UserCog },
   { to: "/recommendations", label: "其它推荐", icon: Compass, group: "更多" },
   { to: "/about", label: "关于", icon: Info },
+  { to: "/download", label: "下载", icon: Download },
 ];
 
 function NavItem({ item, onNavigate }) {
@@ -292,6 +294,7 @@ export default function App() {
               <Route path="/tools/qun" element={<Qun />} />
               <Route path="/recommendations" element={<Recommendations />} />
               <Route path="/about" element={<About />} />
+              <Route path="/download" element={<DownloadPage />} />
               {/* 平台账号页面：整页数据依赖登录态，访问时提醒并跳登录 */}
               <Route element={<ProtectedRoute />}>
                 <Route path="/credentials" element={<Credentials />} />

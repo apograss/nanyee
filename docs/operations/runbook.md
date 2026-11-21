@@ -46,6 +46,18 @@ docker compose --env-file .env.production -f infra/compose/compose.prod.yaml exe
 - 人为让评课和学习舱验证码识别失败，确认任务退避后进入 `retry_wait`，凭据没有被误判为永久无效；恢复 OCR 后可继续执行。
 - 模拟上游超时，确认写请求进入 `RESULT_UNKNOWN`/`verification_required`，不会自动重放。
 
+## Publish an Android release
+
+首次创建 `/srv/nanyee/downloads/android`，授权给发布用户；gateway 将父目录只读挂载到 `/usr/share/nginx/html/downloads`。更新 Compose/nginx 配置后重新创建 gateway。
+
+```bash
+bash infra/scripts/publish-android.sh /path/to/app-release.apk 100 1.0.0 '首个公开版本'
+```
+
+脚本先复制 `nanyee-<versionName>.apk`（临时文件 + 原子重命名），再原子写入 `version.json`：`versionCode`、`versionName`、`url`、`sha256`、`size`（字节）、`notes`、`publishedAt`（UTC）。同一版本名不可覆盖不同 APK；递增 versionCode 并使用新版本名。APK 长缓存，JSON 不缓存；Cloudflare 不要为 JSON 配置强制缓存。
+
+验证 `/downloads/android/version.json` 和其 APK URL 均返回 200，APK 的 SHA-256 与 JSON 一致；不存在的下载返回 404 而非 SPA。APK 和清单不提交 git。
+
 ## 回滚边界
 
 代码回滚不等于数据库回退。迁移应用后默认只回滚 API/Worker 镜像；数据库 downgrade 必须先确认迁移是否可逆并完成加密备份。旧站和新站不得同时接受写流量。远端 `main` 覆盖前必须建立可恢复标签并记录候选镜像摘要。
