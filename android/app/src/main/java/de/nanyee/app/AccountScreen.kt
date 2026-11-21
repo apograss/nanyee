@@ -33,7 +33,7 @@ private fun accountActivity(context: Context): Activity? = when (context) { is A
 internal fun MyScreen(school: SchoolState) {
     val account: AccountState = viewModel(key = "platform-account")
     val revision by PlatformSession.revision.collectAsState()
-    LaunchedEffect(account, revision, school.demo) { account.open(school.demo) }
+    LaunchedEffect(account, revision, school.demo) { account.restoreOverview() }
     var section by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
     BackHandler(section.isNotEmpty()) { section = "" }
     val profile = account.model?.user

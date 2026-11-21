@@ -21,22 +21,48 @@ class AccountStateTest {
             } as SharedPreferences
     }
 
+    private fun state(saved: SavedStateHandle): AccountState {
+        val unsafe = Class.forName("sun.misc.Unsafe")
+        val singleton = unsafe.getDeclaredField("theUnsafe").apply { isAccessible = true }.get(null)
+        val app = unsafe.getMethod("allocateInstance", Class::class.java).invoke(singleton, TestApplication::class.java) as Application
+        val state = AccountState(app, saved)
+        val scope = Class.forName("androidx.lifecycle.viewmodel.internal.CloseableCoroutineScope")
+            .getConstructor(CoroutineContext::class.java).newInstance(Dispatchers.Unconfined + Job()) as AutoCloseable
+        state.addCloseable("androidx.lifecycle.viewmodel.internal.ViewModelCoroutineScope.JOB_KEY", scope)
+        return state
+    }
+
+    @Test fun overviewRestoreDoesNotSelectOrPersistDemoMode() = runBlocking<Unit> {
+        for (explicitDemo in listOf(false, true)) {
+            val saved = SavedStateHandle(if (explicitDemo) mapOf("accountDemo" to true) else emptyMap())
+            val state = state(saved)
+            val model = AccountModel(DemoAccountBackend(initiallySignedIn = true), AccountRecovery({ null }, { _, _ -> }))
+            @Suppress("UNCHECKED_CAST")
+            val models = AccountState::class.java.getDeclaredField("models").apply { isAccessible = true }.get(state) as MutableMap<Boolean, AccountModel>
+            models[explicitDemo] = model
+            repeat(3) {
+                state.restoreOverview()
+                val job = AccountState::class.java.getDeclaredField("work").apply { isAccessible = true }.get(state) as Job
+                withTimeout(5000) { job.join() }
+                assertEquals(explicitDemo, state.demo)
+                assertEquals(if (explicitDemo) true else null, saved.get<Boolean>("accountDemo"))
+                assertSame(model, state.model)
+                assertNotNull(model.user)
+            }
+            ViewModelStore().apply { put("account", state); clear() }
+        }
+    }
+
     @Test fun overviewOpenRestoresAnExistingSessionWithoutOpeningAccountDetails() = runBlocking<Unit> {
         for (scenario in listOf(AccountDemoFailure.NONE, AccountDemoFailure.SESSION, AccountDemoFailure.NETWORK, AccountDemoFailure.EMPTY)) {
-            val unsafe = Class.forName("sun.misc.Unsafe")
-            val singleton = unsafe.getDeclaredField("theUnsafe").apply { isAccessible = true }.get(null)
-            val app = unsafe.getMethod("allocateInstance", Class::class.java).invoke(singleton, TestApplication::class.java) as Application
-            val state = AccountState(app, SavedStateHandle())
-            val scope = Class.forName("androidx.lifecycle.viewmodel.internal.CloseableCoroutineScope")
-                .getConstructor(CoroutineContext::class.java).newInstance(Dispatchers.Unconfined + Job()) as AutoCloseable
-            state.addCloseable("androidx.lifecycle.viewmodel.internal.ViewModelCoroutineScope.JOB_KEY", scope)
+            val state = state(SavedStateHandle())
             val backend = DemoAccountBackend(initiallySignedIn = true).apply { selectScenario(scenario) }
             val model = AccountModel(backend, AccountRecovery({ null }, { _, _ -> }))
             @Suppress("UNCHECKED_CAST")
             val models = AccountState::class.java.getDeclaredField("models").apply { isAccessible = true }.get(state) as MutableMap<Boolean, AccountModel>
             models[false] = model
             assertNull(state.model)
-            state.open()
+            state.restoreOverview()
             val job = AccountState::class.java.getDeclaredField("work").apply { isAccessible = true }.get(state) as Job
             withTimeout(5000) { job.join() }
             assertSame(model, state.model)
