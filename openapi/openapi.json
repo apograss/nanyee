@@ -231,7 +231,8 @@
           "method": {
             "enum": [
               "email",
-              "quiz"
+              "quiz",
+              "quick"
             ],
             "title": "Method",
             "type": "string"
@@ -2978,6 +2979,7 @@
         "enum": [
           "email",
           "quiz",
+          "quick",
           "email_bind",
           "password_reset"
         ],
