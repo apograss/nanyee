@@ -32,6 +32,8 @@ private fun accountActivity(context: Context): Activity? = when (context) { is A
 @Composable
 internal fun MyScreen(school: SchoolState) {
     val account: AccountState = viewModel(key = "platform-account")
+    val revision by PlatformSession.revision.collectAsState()
+    LaunchedEffect(account, revision, school.demo) { account.restoreOverview(school.demo) }
     var section by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
     BackHandler(section.isNotEmpty()) { section = "" }
     val profile = account.model?.user
@@ -41,7 +43,7 @@ internal fun MyScreen(school: SchoolState) {
         if (section.isEmpty()) {
             Text("账号", style = MaterialTheme.typography.labelLarge, color = AppMuted)
             CompactEntry("学校账号", if (school.demo) "演示账号" else if (school.loggedIn) "已登录 · ${school.account}" else "未登录", Icons.Outlined.School, SectionAccent.ACADEMIC) { section = "school" }
-            CompactEntry("Nanyee 账号", profile?.text("username").orEmpty().ifBlank { "未登录" }, Icons.Outlined.AccountCircle, SectionAccent.BRAND) { section = "platform" }
+            CompactEntry("Nanyee 账号", if (school.demo) "演示账号" else profile?.text("username").orEmpty().ifBlank { "未登录" }, Icons.Outlined.AccountCircle, SectionAccent.BRAND) { section = "platform" }
         } else {
             TextButton(onClick = { section = "" }) { Text("返回我的") }
             if (section == "platform") AccountSection(state = account, demoOnly = school.demo)

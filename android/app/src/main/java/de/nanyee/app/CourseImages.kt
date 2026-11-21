@@ -11,19 +11,21 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Call
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
-import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.net.InetAddress
 import java.util.concurrent.TimeUnit
 
 private const val CourseImageLimit = 2L * 1024 * 1024
-private val courseImageClient by lazy {
-    OkHttpClient.Builder().callTimeout(10, TimeUnit.SECONDS).followSslRedirects(false).build()
-}
+internal fun courseImageClient() = rainAssetClient().newBuilder().callTimeout(10, TimeUnit.SECONDS).build()
+private val defaultCourseImageClient by lazy { courseImageClient() }
 
-internal suspend fun courseImageBytes(url: String, transport: Call.Factory = courseImageClient): ByteArray? {
+internal suspend fun courseImageBytes(url: String, transport: Call.Factory = defaultCourseImageClient): ByteArray? {
     val parsed = url.toHttpUrlOrNull() ?: return null
     if (parsed.username.isNotBlank() || parsed.password.isNotBlank() || parsed.host.endsWith(".invalid")) return null
     val address = if (parsed.scheme == "http") parsed.newBuilder().scheme("https").build() else parsed
+    if (address.scheme != "https") return null
+    if ((address.host.contains(':') || address.host.matches(Regex("[0-9.]+"))) &&
+        !rainPublicAddress(InetAddress.getByName(address.host))) return null
     return transport.newCall(Request.Builder().url(address).build()).awaitResult { response ->
         val body = response.body
         if (!response.isSuccessful || body == null || body.contentLength() > CourseImageLimit) null
