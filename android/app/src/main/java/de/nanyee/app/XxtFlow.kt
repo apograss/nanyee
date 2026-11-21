@@ -52,7 +52,7 @@ internal class DemoXxtBackend : XxtBackend {
         return current
     }
     override suspend fun user() = current
-    override suspend fun courses() = listOf(XxtCourse("demo", "demo-class", "demo-cpi", "学习通课堂体验", "演示老师"))
+    override suspend fun courses() = listOf(XxtCourse("demo", "demo-class", "demo-cpi", "学习通课堂体验", "演示老师", "https://images.example.invalid/xxt-cover.png"))
     override suspend fun activities(course: XxtCourse): List<XxtActivity> {
         val names = listOf("普通签到", "拍照签到", "签到码签到", "手势签到", "二维码签到", "位置签到", "人脸签到 · 不支持", "服务器拒绝", "结果未知", "手动拼图验证")
         return names.mapIndexed { index, name -> XxtActivity("demo-$index", name, "演示活动 · 不联网", 2, true, 1795046400000L, signType = listOf(0, 0, 5, 3, 2, 4, 4, 0, 0, 0)[index]) } + XxtActivity("demo-ended", "已结束签到", "不可提交", 2, false, 1794960000000L) + classroomDemo.activities()
