@@ -30,9 +30,10 @@ internal fun NanyeeTheme(content: @Composable () -> Unit) {
         headlineMedium = MaterialTheme.typography.headlineMedium.copy(fontSize = 22.sp, fontWeight = FontWeight.Normal),
         headlineSmall = MaterialTheme.typography.headlineSmall.copy(fontSize = 20.sp, fontWeight = FontWeight.Normal),
         titleLarge = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, fontWeight = FontWeight.Normal),
-        titleMedium = MaterialTheme.typography.titleMedium.copy(fontSize = 16.sp, fontWeight = FontWeight.Normal),
+        titleMedium = MaterialTheme.typography.titleMedium.copy(fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.Normal),
         bodyLarge = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.sp),
-        bodyMedium = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+        bodyMedium = MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp),
+        bodySmall = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, lineHeight = 16.sp, color = AppMuted),
         labelSmall = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.sp, fontSize = 11.sp)
     ), shapes = Shapes(small = RoundedCornerShape(10.dp), medium = RoundedCornerShape(14.dp), large = RoundedCornerShape(18.dp)), content = content)
 }
@@ -66,47 +67,45 @@ internal fun CourseHeading(name: String, teacher: String, image: String = "", sh
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         if (showAvatar) Surface(shape = RoundedCornerShape(12.dp), color = AppBackground, contentColor = AppMuted) {
             val bitmap = rememberCourseImage(image)
-            Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) {
                 if (bitmap != null) Image(bitmap.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                 else Icon(Icons.Outlined.School, contentDescription = null)
             }
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(name, style = MaterialTheme.typography.titleMedium)
-            Text(teacher.ifBlank { "教师信息暂未提供" }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (teacher.isNotBlank()) Text(teacher, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
 
 @Composable
-internal fun ProfileHero(name: String, subtitle: String, icon: ImageVector, badge: String) {
+internal fun ProfileHero(name: String, subtitle: String = "", icon: ImageVector) {
     Surface(shape = MaterialTheme.shapes.large, color = AppCard, contentColor = AppText) {
-        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surface) {
-                Box(Modifier.size(52.dp), contentAlignment = Alignment.Center) { Icon(icon, contentDescription = null) }
+                Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) { Icon(icon, contentDescription = null) }
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(name, style = MaterialTheme.typography.headlineSmall)
-                Text(subtitle, style = MaterialTheme.typography.bodySmall)
-                Text(badge, style = MaterialTheme.typography.labelSmall)
+                Text(name, style = MaterialTheme.typography.titleMedium)
+                if (subtitle.isNotBlank()) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = AppMuted)
             }
         }
     }
 }
 
-internal data class ToolTile(val title: String, val description: String, val icon: ImageVector, val accent: SectionAccent, val status: String = "", val onClick: () -> Unit)
+internal data class ToolTile(val title: String, val icon: ImageVector, val accent: SectionAccent, val status: String = "", val onClick: () -> Unit)
 
 @Composable
 internal fun ToolGrid(tiles: List<ToolTile>) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         tiles.forEach { tile ->
             Card(onClick = tile.onClick, modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(tile.icon, null, Modifier.size(24.dp), tint = sectionColor(tile.accent))
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(tile.title, style = MaterialTheme.typography.titleMedium)
-                        Text(tile.description, style = MaterialTheme.typography.bodySmall, color = AppMuted)
-                        if (tile.status.startsWith("GPA ")) Text(tile.status, style = MaterialTheme.typography.bodySmall, color = AppMuted)
+                        if (tile.status.isNotBlank()) Text(tile.status, style = MaterialTheme.typography.bodySmall, color = AppMuted)
                     }
                     Icon(Icons.Outlined.ChevronRight, null, Modifier.size(18.dp), tint = AppMuted)
                 }
@@ -130,7 +129,7 @@ internal fun ScenarioPicker(label: String, choices: List<String>, enabled: Boole
 internal fun ClassroomAccountRow(name: String, platform: String, demo: Boolean, enabled: Boolean, signedIn: Boolean, logout: () -> Unit, toggleDemo: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.medium) {
-        Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             AccentIcon(Icons.Outlined.Person, SectionAccent.ACADEMIC)
             Text(name, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.small) { Text(if (demo) "演示" else platform, Modifier.padding(horizontal = 6.dp, vertical = 3.dp), style = MaterialTheme.typography.labelSmall) }
@@ -152,26 +151,34 @@ internal fun AccentIcon(icon: ImageVector, accent: SectionAccent, description: S
 }
 
 @Composable
-internal fun SectionHeading(title: String, subtitle: String, icon: ImageVector, accent: SectionAccent = SectionAccent.BRAND) {
+internal fun SectionHeading(title: String, subtitle: String = "", icon: ImageVector, accent: SectionAccent = SectionAccent.BRAND) {
     Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         AccentIcon(icon, accent)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(title, style = MaterialTheme.typography.titleLarge)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (subtitle.isNotBlank()) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = AppMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
 
 @Composable
-internal fun CompactEntry(title: String, subtitle: String, icon: ImageVector, accent: SectionAccent, enabled: Boolean = true, onClick: () -> Unit) {
-    Card(onClick = onClick, enabled = enabled, modifier = Modifier.fillMaxWidth().heightIn(min = 72.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+internal fun CompactEntry(title: String, subtitle: String = "", icon: ImageVector, accent: SectionAccent, enabled: Boolean = true, onClick: () -> Unit) {
+    Card(onClick = onClick, enabled = enabled, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             AccentIcon(icon, accent)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(title, style = MaterialTheme.typography.titleMedium)
-                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (subtitle.isNotBlank()) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = AppMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Icon(Icons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
         }
+    }
+}
+
+@Composable
+internal fun InlineError(message: String, retry: (() -> Unit)? = null) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(message, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (retry != null) TextButton(onClick = retry) { Text("重试") }
     }
 }

@@ -28,6 +28,7 @@ import java.time.format.DateTimeFormatter
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun CabinToolsScreen(school: SchoolState, state: CabinState = viewModel(), evaluationMode: Boolean = false, onBack: (() -> Unit)? = null) {
+    var pane by rememberSaveable { mutableStateOf("new") }
     var opened by rememberSaveable { mutableStateOf(onBack != null) }
     var demoChoice by rememberSaveable { mutableStateOf(false) }
     var action by remember { mutableStateOf<Pair<String, String>?>(null) }
@@ -37,30 +38,25 @@ internal fun CabinToolsScreen(school: SchoolState, state: CabinState = viewModel
     DisposableEffect(state) { onDispose { state.cancelCredential(); state.platformPassword = "" } }
     BackHandler(opened) { state.cancelCredential(); if (onBack != null) onBack() else opened = false }
     if (!opened) {
-        Column(Modifier.widthIn(max = 720.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.widthIn(max = 720.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("校园工具", style = MaterialTheme.typography.headlineMedium)
-            Text("按需开启，让日常更从容。", color = MaterialTheme.colorScheme.onSurfaceVariant)
             Card(onClick = { opened = true }, modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("学习舱预约", style = MaterialTheme.typography.titleLarge)
-                    Text("选择舱位优先级，交给服务器按时尝试预约。")
-                    Text("需要独立的 Nanyee 平台账号", style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
         return
     }
     PullToRefreshBox(isRefreshing = state.busy, onRefresh = { if (state.user != null) state.refresh() }, modifier = Modifier.widthIn(max = 720.dp).fillMaxSize()) {
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             TextButton(onClick = { state.cancelCredential(); if (onBack != null) onBack() else opened = false }) { Text(if (evaluationMode) "返回课程评价" else "返回工具") }
-            SectionHeading(if (evaluationMode) "自动评课" else "自习舱预约", "Nanyee 服务器 · 托管前需明确同意", if (evaluationMode) Icons.Outlined.CloudQueue else Icons.Outlined.EventSeat)
-            if (state.demo) Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) { Text("演示模式 · 不联网、不托管真实密码、不执行真实操作", Modifier.padding(12.dp)) }
+            SectionHeading(if (evaluationMode) "自动评课" else "自习舱预约", "", if (evaluationMode) Icons.Outlined.CloudQueue else Icons.Outlined.EventSeat)
             if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-            if (state.error.isNotBlank()) Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) { Text(state.error, Modifier.padding(12.dp)) }
-            if (state.message.isNotBlank()) Text(state.message, color = MaterialTheme.colorScheme.primary)
+            if (state.error.isNotBlank()) InlineError(state.error)
+            if (state.message.isNotBlank()) Text(state.message, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.primary)
             if (state.user == null) {
                 Text("Nanyee 平台账号", style = MaterialTheme.typography.titleLarge)
-                Text("与学校登录相互独立。学校密码只在您明确同意托管后发送给 nanyee.de。")
                 if (state.demo) {
                     Button(onClick = { state.username = "demo"; state.platformPassword = "demo-only"; state.login() }, enabled = !state.busy) { Text("进入演示账号") }
                 } else {
@@ -68,7 +64,6 @@ internal fun CabinToolsScreen(school: SchoolState, state: CabinState = viewModel
                     CabinField("平台密码", state.platformPassword, { state.platformPassword = it }, !state.busy, password = true)
                     Button(onClick = { state.login() }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { Text("登录 Nanyee") }
                     TextButton(onClick = { uri.openUri("https://nanyee.de") }) { Text("去 nanyee.de 注册") }
-                    Text("需要人机验证时，请稍后重试或前往网站操作。", style = MaterialTheme.typography.bodySmall)
                 }
                 if (!school.demo) OutlinedButton(onClick = { demoChoice = !state.demo; state.open(demoChoice, evaluationMode) }, enabled = !state.busy) { Text(if (state.demo) "返回真实平台登录" else "无账号体验演示") }
             } else {
@@ -77,14 +72,19 @@ internal fun CabinToolsScreen(school: SchoolState, state: CabinState = viewModel
                     TextButton(onClick = { state.refresh() }, enabled = !state.busy) { Text(if (evaluationMode) "刷新评课" else "刷新预约") }
                     TextButton(onClick = { action = "logout" to "" }, enabled = !state.busy) { Text("退出平台账号") }
                 }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("new" to "新建", "jobs" to "任务", "credentials" to "凭据").forEach { (key, label) -> FilterChip(pane == key, { state.cancelCredential(); pane = key }, label = { Text(label) }) }
+                }
+                if (pane == "credentials") {
                 Text("托管学校凭据", style = MaterialTheme.typography.titleLarge)
                 if (evaluationMode) state.notices.filter { it.text("kind") == "credential_invalid" }.forEach { notice ->
                     Text(notice.text("title") + "\n" + notice.text("message"), color = MaterialTheme.colorScheme.error)
                     TextButton(onClick = { state.editCredential(notice.text("credential_id").takeIf { id -> state.credentials.any { it.text("id") == id } }) }, enabled = !state.busy) { Text("更新评课凭据") }
                 }
+                if (!state.credentialEditor) {
                 state.credentials.forEach { credential ->
                     Card(Modifier.fillMaxWidth()) {
-                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(credential["metadata"]?.obj()?.text("account_hint").orEmpty().ifBlank { "已托管的学校账号" })
                             if (state.selectedCredential == credential.text("id")) Text("当前使用", color = MaterialTheme.colorScheme.primary)
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -95,17 +95,17 @@ internal fun CabinToolsScreen(school: SchoolState, state: CabinState = viewModel
                         }
                     }
                 }
-                if (state.credentials.isEmpty()) Text(if (evaluationMode) "尚无评课凭据。拒绝托管不会影响课表、成绩或手动评课。" else "尚无学习舱凭据。拒绝托管不会影响课表或成绩。")
+                if (state.credentials.isEmpty()) Text("暂无托管凭据")
                 OutlinedButton(onClick = { state.editCredential() }, enabled = !state.busy && state.pending == null) { Text("添加托管凭据") }
+                }
                 if (state.credentialEditor) {
                     Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
-                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Text(if (state.editingId == null) "同意托管学校密码" else "更新托管学校密码", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                             if (state.editingId != null) {
                                 Text(state.credentials.firstOrNull { it.text("id") == state.editingId }?.get("metadata")?.obj()?.text("account_hint").orEmpty().ifBlank { "已托管的学校账号" })
-                                Text("仅修改原账号密码。请填写与上方账号提示相符的学校学号；可从本机已记住的凭据预填，不读取服务器托管秘密。更换学校账号请先撤销原凭据，关联的排队任务将取消，再添加新凭据。")
                             }
-                            Text(if (evaluationMode) "学校账号与密码将加密存储在 nanyee.de，用于您离线时无人值守地提交课程评价。凭据长期保存，可随时撤销。撤销会影响引用它的任务。只有点击同意后，才读取本机已记住的学校凭据来预填。" else "学校账号与密码将加密存储在 nanyee.de，用于您离线时无人值守预约学习舱。凭据长期保存，可随时撤销。撤销会影响引用它的任务。只有点击同意后，才读取本机已记住的学校凭据来预填。")
+                            Text("同意将学校密码加密托管至 Nanyee，\n用于自动任务，可随时撤销。", style = MaterialTheme.typography.bodySmall)
                             if (!state.consent) Button(onClick = { state.agree(school::hostedSchoolPrefill) }, enabled = !state.busy) { Text("同意并继续") }
                             else {
                                 CabinField("学校学号", state.account, { state.account = it }, !state.busy)
@@ -116,33 +116,34 @@ internal fun CabinToolsScreen(school: SchoolState, state: CabinState = viewModel
                         }
                     }
                 }
-                HorizontalDivider()
-                Text(if (evaluationMode) "常驻自动评课任务" else "新建预约", style = MaterialTheme.typography.titleLarge)
+                }
+                if (pane == "new") {
+                if (state.selectedCredential.isBlank()) TextButton(onClick = { pane = "credentials"; state.editCredential() }) { Text("添加学校凭据") }
+                Text(if (evaluationMode) "自动评课设置" else "新建预约", style = MaterialTheme.typography.titleLarge)
                 when {
                     state.pending != null -> {
-                        Text("上次提交尚未确认。请先刷新核对；网络重试将沿用同一确认内容与幂等键，不会另建一笔。")
+                        Text("提交结果待确认")
                         Button(onClick = { state.sendPending() }, enabled = !state.busy) { Text("使用原确认重试") }
                         OutlinedButton(onClick = { state.reconcilePending() }, enabled = !state.busy) { Text("刷新核对并放弃重试") }
                         if (state.canDiscardPending) TextButton(onClick = { state.discardPending() }, enabled = !state.busy) { Text("确认放弃本机待确认请求") }
                     }
                     state.submitted -> {
-                        Text("任务已创建，请在下方查看进度。")
+                        Text("任务已创建")
                         OutlinedButton(onClick = { state.newBooking() }, enabled = !state.busy) { Text(if (evaluationMode) "返回任务设置" else "再预约一笔") }
                     }
                     else -> if (evaluationMode) {
-                        Text("按偏高随机档位逐门提交。首次立即执行，之后每日随机运行（服务器默认北京时间 21:10–23:30，可由管理员配置）。默认持续 180 天；服务器只保留一个常驻任务。")
                         CabinField("每轮最多课程数（1–60）", state.maxCourses, { state.maxCourses = it }, !state.busy)
                         CabinField("截止时间（可空，须带时区）", state.retryUntil, { state.retryUntil = it }, !state.busy)
                         Button(onClick = { state.reviewEvaluation() }, enabled = !state.busy && state.selectedCredential.isNotEmpty()) { Text("查看评课确认摘要") }
                     } else CabinBookingForm(state)
                 }
-                HorizontalDivider()
+                }
+                if (pane == "jobs") {
                 Text(if (evaluationMode) "我的评课任务" else "我的预约", style = MaterialTheme.typography.titleLarge)
-                Text(if (evaluationMode) "下拉或点击刷新查看常驻任务与最近一轮收据。" else "下拉或点击刷新查看最新状态。最多展示最近 100 个任务中的学习舱预约。", style = MaterialTheme.typography.bodySmall)
-                if (state.jobs.isEmpty()) Text(if (evaluationMode) "还没有自动评课任务。" else "还没有学习舱预约。")
+                if (state.jobs.isEmpty()) Text("暂无任务")
                 state.jobs.forEach { job ->
                     Card(Modifier.fillMaxWidth()) {
-                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Text(cabinStatus(job.text("state"), job.text("tool_id")), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                             val payload = job["payload"]?.obj() ?: JsonObject(emptyMap())
                             if (!evaluationMode) Text(payload.text("title"))
@@ -168,24 +169,17 @@ internal fun CabinToolsScreen(school: SchoolState, state: CabinState = viewModel
                         }
                     }
                 }
-                Text(if (evaluationMode) "自动评课由 nanyee.de 服务器执行；手机关闭后仍会继续。取消任务不会撤回已提交的评价。" else "预约由 nanyee.de 服务器执行，手机不连接学校 infospace。服务器仍需校验实时可用性，创建任务不等于预约成功。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
+                }
     state.confirmation?.let { submission ->
-        val payload = submission.body["payload"]!!.obj()
         AlertDialog(onDismissRequest = { state.dismissConfirmation() }, title = { Text(if (evaluationMode) "确认自动评课" else "确认预约任务") }, text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                if (evaluationMode) Text("自动评课：偏高随机档位\n每轮最多 ${payload.number("max_courses")} 门\n截止：${payload.text("retry_until").ifBlank { "创建后 180 天" }}") else Text("${payload.text("title")}\n${payload.text("target_date")}\n${payload.text("start_time")}–${payload.text("end_time")}")
-                if (!evaluationMode) Text("优先级：\n" + state.draft.cabins.mapIndexed { index, id -> "${index + 1}. ${state.cabins.firstOrNull { it.number("dev_id") == id }?.text("name").orEmpty()}" }.joinToString("\n"))
-                Text("使用凭据：" + state.credentials.firstOrNull { it.text("id") == submission.body.text("credential_id") }?.get("metadata")?.obj()?.text("account_hint").orEmpty())
-                if (!evaluationMode) Text("首次尝试：${cabinDisplayMoment(submission.body.text("scheduled_for"))}\n停止尝试：${cabinDisplayMoment(payload.text("attempt_until"))}\n均为北京时间。")
-                Text(if (state.demo) "演示模式，不会真正预约或评课。确认后仅创建本机演示任务。" else if (evaluationMode) "确认后服务器将无人值守地提交真实课程评价，可随时取消常驻任务。请核对策略和凭据。" else "确认后服务器将使用托管凭据尝试真实预约，直到成功或停止时间。")
-            }
+            Text(if (state.demo) "创建演示任务？" else "确认授权服务器执行此任务？")
         }, confirmButton = { TextButton(onClick = { state.confirm() }, enabled = !state.busy) { Text("确认并创建") } }, dismissButton = { TextButton(onClick = { state.dismissConfirmation() }) { Text("返回修改") } })
     }
     action?.let { (kind, id) ->
-        AlertDialog(onDismissRequest = { action = null }, title = { Text(when (kind) { "cancel" -> if (evaluationMode) "取消常驻评课任务？" else "取消预约任务？"; "revoke" -> "撤销托管凭据？"; else -> "退出平台账号？" }) }, text = { Text(when (kind) { "cancel" -> "正在执行的任务可能已提交，请刷新并核验收据。"; "revoke" -> "撤销后无法继续使用，引用此凭据的排队或等待重试任务将取消。正在执行的操作请另行核验。"; else -> "清除本机平台 Cookie，不影响学校课表缓存。" }) }, confirmButton = {
+        AlertDialog(onDismissRequest = { action = null }, title = { Text(when (kind) { "cancel" -> if (evaluationMode) "取消常驻评课任务？" else "取消预约任务？"; "revoke" -> "撤销托管凭据？"; else -> "退出平台账号？" }) }, text = { Text(when (kind) { "cancel" -> "正在执行的任务可能已提交，请刷新并核验收据。"; "revoke" -> "撤销后将取消关联的排队任务。"; else -> "清除本机平台 Cookie，不影响学校课表缓存。" }) }, confirmButton = {
             TextButton(onClick = { action = null; when (kind) { "cancel" -> state.cancelJob(id); "revoke" -> state.revoke(id); else -> state.logout() } }, enabled = !state.busy) { Text("确认") }
         }, dismissButton = { TextButton(onClick = { action = null }) { Text("返回") } })
     }
@@ -198,13 +192,12 @@ private fun CabinBookingForm(state: CabinState) {
     CabinField("预约日期 yyyy-MM-dd", state.draft.date, { state.draft = state.draft.copy(date = it) }, enabled)
     CabinTime("开始", state.draft.start, { state.draft = state.draft.copy(start = it) }, enabled)
     CabinTime("结束", state.draft.end, { state.draft = state.draft.copy(end = it) }, enabled)
-    Text("08:00–22:50 · 10 分钟粒度 · 30–240 分钟", style = MaterialTheme.typography.bodySmall)
     CabinField("预约标题", state.draft.title, { state.draft = state.draft.copy(title = it) }, enabled)
     Text("舱位优先级", style = MaterialTheme.typography.titleMedium)
     if (state.cabins.isEmpty()) Text("暂无可选舱位，请刷新。")
     state.draft.cabins.forEachIndexed { index, id ->
         Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(12.dp)) {
+            Column(Modifier.padding(16.dp)) {
                 Text("${index + 1}. ${state.cabins.firstOrNull { it.number("dev_id") == id }?.text("name").orEmpty()}")
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(onClick = { val ids = state.draft.cabins.toMutableList(); java.util.Collections.swap(ids, index, index - 1); state.draft = state.draft.copy(cabins = ids) }, enabled = enabled && index > 0) { Text("上移") }
@@ -219,7 +212,6 @@ private fun CabinBookingForm(state: CabinState) {
     }
     CabinMoment("首次尝试", state.draft.scheduled, { state.draft = state.draft.copy(scheduled = it) }, enabled)
     CabinMoment("停止尝试", state.draft.until, { state.draft = state.draft.copy(until = it) }, enabled)
-    Text("全部使用北京时间。默认预约明天 09:00–11:00，从现在开始尝试，到明天 08:50 停止。未假定固定放号时间，可按学校公告修改。", style = MaterialTheme.typography.bodySmall)
     Button(onClick = { state.review() }, enabled = enabled && state.selectedCredential.isNotBlank(), modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("查看确认摘要") }
 }
 

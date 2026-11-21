@@ -27,17 +27,17 @@ internal fun XxtClassroomContent(state: XxtState) {
     val enabled = !state.busy && !state.completed && activity.ongoing && page?.writable == true && !page.submitted
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (activity.description.isNotBlank()) Text(activity.description)
-        if (page == null) Text(if (state.busy) "读取活动详情…" else "详情暂不可读取；当前仅可只读查看活动摘要。")
+        if (page == null) Text(if (state.busy) "读取活动详情…" else "活动详情不可用")
         else {
             if (page.title != activity.name) Text(page.title, style = MaterialTheme.typography.titleMedium)
             if (page.text.isNotBlank()) Text(page.text)
             if (page.notice.isNotBlank()) Text(page.notice)
-            if (!activity.ongoing) Text("活动已结束，仅供只读查看。")
+            if (!activity.ongoing) Text("活动已结束")
             page.questions.forEachIndexed { index, question ->
                 Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("${index + 1}. ${question.text}${if (question.required) "（必答）" else "（选答）"}")
-                        if (!question.supported) Text("此题型或媒体暂不支持，请使用官方学习通。")
+                        if (!question.supported) Text("暂不支持此题型")
                         if (question.options.isNotEmpty()) {
                             val selected = draft.answers[question.id].orEmpty()
                             question.options.forEach { option ->
@@ -69,9 +69,9 @@ internal fun XxtClassroomContent(state: XxtState) {
                 Text("讨论回复", style = MaterialTheme.typography.titleMedium)
                 if (page.replies.isEmpty()) Text("暂无回复。")
                 page.replies.forEach { reply ->
-                    Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) { Text("${reply.author} · ${reply.time}", style = MaterialTheme.typography.labelLarge); Text(reply.text) } }
+                    Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) { Text("${reply.author} · ${reply.time}", style = MaterialTheme.typography.labelLarge); Text(reply.text) } }
                 }
-                OutlinedTextField(draft.text, { state.updateClassroom(draft.copy(text = it.take(5000))) }, label = { Text("本人回复（部分讨论要求至少 10 字）") }, enabled = enabled, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(draft.text, { state.updateClassroom(draft.copy(text = it.take(5000))) }, label = { Text("回复") }, enabled = enabled, modifier = Modifier.fillMaxWidth())
             }
             if (activity.type == 23 && page.writable) {
                 if (page.norms.isEmpty()) OutlinedTextField(draft.total, { state.updateClassroom(draft.copy(total = it.filter(Char::isDigit).take(3))) }, label = { Text("总分（0–100）") }, enabled = enabled, modifier = Modifier.fillMaxWidth())
@@ -85,7 +85,6 @@ internal fun XxtClassroomContent(state: XxtState) {
             }
             if (activity.type in xxtClassroomWrites && page.writable && !page.submitted) {
                 Button(onClick = state::previewClassroom, enabled = enabled) { Text("预览并确认${if (activity.type == 5) "回复" else "提交"}") }
-                Text("仅为当前本人账号提交。结果未知时不会自动重试；请在官方学习通核验。")
             }
         }
         if (activity.type == 11) XxtPickMonitor(state)
@@ -103,13 +102,12 @@ private fun XxtPickMonitor(state: XxtState) {
         onDispose { owner?.lifecycle?.removeObserver(observer); state.monitorPick(false) }
     }
     Text(state.pickMessage, style = MaterialTheme.typography.titleMedium)
-    Text(if (state.pickMonitoring) "每 3 秒只读轮询；离开页面或切到后台即停止。" else "监测已暂停或停止。无后台服务。")
     if (state.pickAlert) {
         LaunchedEffect(Unit) {
             val tone = runCatching { ToneGenerator(AudioManager.STREAM_NOTIFICATION, 70) }.getOrNull()
             try { runCatching { tone?.startTone(ToneGenerator.TONE_PROP_BEEP, 300) }; delay(350) } finally { tone?.release() }
         }
-        AlertDialog(onDismissRequest = state::dismissPickAlert, title = { Text("你被选中了！") }, text = { Text("${state.activity?.name}\n仅提示当前登录的本人账号。") }, confirmButton = { TextButton(onClick = state::dismissPickAlert) { Text("知道了") } })
+        AlertDialog(onDismissRequest = state::dismissPickAlert, title = { Text("你被选中了！") }, text = { Text("${state.activity?.name}") }, confirmButton = { TextButton(onClick = state::dismissPickAlert) { Text("知道了") } })
     }
 }
 
@@ -117,18 +115,6 @@ private fun XxtPickMonitor(state: XxtState) {
 internal fun XxtClassroomConfirmation(state: XxtState) {
     val value = state.classroomConfirmation ?: return
     AlertDialog(onDismissRequest = state::dismissClassroomConfirmation, title = { Text("确认本人${if (value.activity.type == 5) "回复" else "提交"}") }, text = {
-        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("账号：${value.user.name}（仅当前本人）\n课程：${value.course.name}\n活动：${value.activity.name}")
-            value.page.questions.forEachIndexed { index, question ->
-                val answers = value.draft.answers[question.id].orEmpty()
-                Text("${index + 1}. ${question.text}")
-                Text(if (answers.isEmpty()) "未作答（选答题）" else answers.joinToString("\n") { answer -> question.options.firstOrNull { it.key == answer }?.let { "${it.key}. ${it.text}" } ?: answer })
-            }
-            value.page.norms.forEachIndexed { index, norm -> Text("${norm.text}：${value.draft.scores[index]} / ${norm.maximum}") }
-            if (value.activity.type == 23) Text("总分：${if (value.page.norms.isEmpty()) value.draft.total else value.draft.scores.sumOf { it.toInt() }.toString()}")
-            if (value.draft.text.isNotBlank()) Text("${if (value.activity.type == 5) "实名回复" else "评价内容"}：${value.draft.text}")
-            if (state.error.isNotBlank()) Text(state.error, color = MaterialTheme.colorScheme.error)
-            Text(if (state.demo) "离线演示，不会发送网络请求。" else "将提交以上手动填写的内容并改变当前账号的活动状态。不会自动发送群聊回执。")
-        }
+        Text(if (state.demo) "确认演示提交？" else "确认提交当前填写的内容？")
     }, confirmButton = { Button(onClick = state::submitClassroom, enabled = !state.busy) { Text("确认提交") } }, dismissButton = { TextButton(onClick = state::dismissClassroomConfirmation, enabled = !state.busy) { Text("返回修改") } })
 }

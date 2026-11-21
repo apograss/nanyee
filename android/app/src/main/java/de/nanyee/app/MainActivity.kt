@@ -135,10 +135,9 @@ fun Nanyee(state: SchoolState) {
                 Text("正在自动登录…", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                 TextButton(onClick = { state.returnToCache() }) { Text("取消") }
             } else if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-            if (state.demo && !landscape && state.tab != MainTab.TIMETABLE) Text("离线示例 · 非真实学业记录", Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = AppMuted)
             if (state.homeVisible && state.error.isNotEmpty()) ErrorCard(state)
             tabState.SaveableStateProvider(state.tab.ordinal) { when {
-                state.cacheRevocationFailed -> Column(Modifier.padding(12.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                state.cacheRevocationFailed -> Column(Modifier.padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("本机课表尚未安全清除", style = MaterialTheme.typography.titleLarge)
                     Text(state.error)
                     Button(onClick = { state.logout() }) { Text("重试退出并清除课表") }
@@ -153,7 +152,7 @@ fun Nanyee(state: SchoolState) {
         }
         }
     }
-    pendingRainHost?.let { host -> AlertDialog(onDismissRequest = { pendingRainHost = null }, title = { Text("请确认") }, text = { Text("切换到 ${host.domain}，将离开当前会话视图。不同服务器的加密 Cookie 与身份互不混用。") }, confirmButton = { TextButton(onClick = { rain.switchHost(host); pendingRainHost = null }) { Text("确认") } }, dismissButton = { TextButton(onClick = { pendingRainHost = null }) { Text("取消") } }) }
+    pendingRainHost?.let { host -> AlertDialog(onDismissRequest = { pendingRainHost = null }, title = { Text("请确认") }, text = { Text("切换到 ${host.domain}？") }, confirmButton = { TextButton(onClick = { rain.switchHost(host); pendingRainHost = null }) { Text("确认") } }, dismissButton = { TextButton(onClick = { pendingRainHost = null }) { Text("取消") } }) }
     detail?.let { (kind, item) -> AlertDialog(onDismissRequest = { detailIndex = -1 }, confirmButton = { TextButton(onClick = { detailIndex = -1 }) { Text("关闭") } }, title = { Text(item.text("name")) }, text = {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (kind == "course") {
@@ -186,10 +185,9 @@ fun Nanyee(state: SchoolState) {
 
 @Composable
 fun Login(state: SchoolState, embedded: Boolean = false) {
-    Column(Modifier.widthIn(max = 480.dp).then(if (embedded) Modifier.fillMaxWidth() else Modifier.fillMaxSize().verticalScroll(rememberScrollState())).padding(horizontal = 12.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(Modifier.widthIn(max = 480.dp).then(if (embedded) Modifier.fillMaxWidth() else Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         if (state.error.isNotEmpty()) ErrorCard(state)
         Text("学校登录", style = MaterialTheme.typography.titleMedium)
-        Text("使用学校教务账号登录", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         OutlinedTextField(value = state.account, onValueChange = { state.updateAccount(it) }, label = { Text("学号") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(value = state.password, onValueChange = { state.password = it }, label = { Text("学校密码") }, visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false), singleLine = true, modifier = Modifier.fillMaxWidth())
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -204,12 +202,9 @@ fun Login(state: SchoolState, embedded: Boolean = false) {
         }
         Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(checked = state.remember, onCheckedChange = { state.updateRemember(it) }); Text("记住学号和密码", style = MaterialTheme.typography.bodyMedium) }
         Button(onClick = { state.login() }, enabled = !state.busy && state.captcha != null && state.account.isNotBlank() && state.password.isNotEmpty() && state.captchaText.isNotBlank(), modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("登录学校系统") }
-        Text(when { state.busy -> "正在连接学校系统…"; state.account.isBlank() -> "请输入学号"; state.password.isEmpty() -> "请输入学校密码"; state.captcha == null -> "验证码未加载，请点击刷新"; state.captchaText.isBlank() -> "请输入图中的验证码"; else -> state.hint.ifEmpty { "信息已填写，可以登录" } }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (state.hint.isNotEmpty() && state.captchaText.isBlank()) Text(state.hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
         if (state.loginInFlight) TextButton(onClick = { state.cancelLogin() }) { Text("取消登录") }
         OutlinedButton(onClick = { state.startDemo() }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text("演示模式") }
-        TextButton(onClick = { state.selectTab(MainTab.TOOLS) }, modifier = Modifier.fillMaxWidth()) { Text("工具 · 学习舱预约（独立平台账号）") }
-        Text("学校登录可能使其他设备的教务会话下线。会话仅存于内存；勾选后，学号和密码将在本机加密保存。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        TextButton(onClick = { state.selectTab(MainTab.TOOLS) }, modifier = Modifier.fillMaxWidth()) { Text("工具") }
     }
 }
 
@@ -217,7 +212,7 @@ fun Login(state: SchoolState, embedded: Boolean = false) {
 fun ErrorCard(state: SchoolState) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer), modifier = Modifier.widthIn(max = 720.dp).fillMaxWidth()) {
         Row(Modifier.padding(start = 12.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(state.error, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+            Text(state.error, maxLines = 1, overflow = TextOverflow.Ellipsis, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
             IconButton(onClick = { state.error = "" }) { Icon(Icons.Outlined.Close, "关闭错误提示") }
         }
     }
@@ -326,7 +321,7 @@ fun Timetable(state: SchoolState, onCourse: (JsonObject) -> Unit) {
         }
     }
     }
-    conflicts?.let { entries -> AlertDialog(onDismissRequest = { conflicts = null }, title = { Text("重叠课程 · ${entries.size} 门") }, confirmButton = { TextButton(onClick = { conflicts = null }) { Text("关闭") } }, text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) { entries.forEach { course -> OutlinedCard(onClick = { conflicts = null; onCourse(course) }, modifier = Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp)) { Text(course.text("name"), fontWeight = FontWeight.Bold); Text("${course.text("start_time")}–${course.text("end_time")} · ${course.text("location")}", style = MaterialTheme.typography.bodySmall) } } } } }) }
+    conflicts?.let { entries -> AlertDialog(onDismissRequest = { conflicts = null }, title = { Text("重叠课程 · ${entries.size} 门") }, confirmButton = { TextButton(onClick = { conflicts = null }) { Text("关闭") } }, text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) { entries.forEach { course -> OutlinedCard(onClick = { conflicts = null; onCourse(course) }, modifier = Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp)) { Text(course.text("name"), fontWeight = FontWeight.Bold); Text("${course.text("start_time")}–${course.text("end_time")} · ${course.text("location")}", style = MaterialTheme.typography.bodySmall) } } } } }) }
     if (weeksDialog) AlertDialog(onDismissRequest = { weeksDialog = false }, title = { Text("学期周数") }, text = { OutlinedTextField(weeksInput, { weeksInput = it }, label = { Text("1–30 周") }, isError = weeksInput.toIntOrNull() !in 1..30) }, confirmButton = { TextButton(onClick = { state.setWeeks(weeksInput.toInt()); weeksDialog = false }, enabled = weeksInput.toIntOrNull() in 1..30) { Text("确定") } }, dismissButton = { TextButton(onClick = { weeksDialog = false }) { Text("取消") } })
 }
 
@@ -353,7 +348,7 @@ fun Grades(state: SchoolState, onGrade: (JsonObject) -> Unit) {
             return@Column
         }
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer), modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("学业概览", style = MaterialTheme.typography.titleMedium)
                 if (landscape) Text("加权平均绩点 ${displayNumber(summary?.text("weighted_gpa") ?: "")}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) else {
                     Text(displayNumber(summary?.text("weighted_gpa") ?: ""), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.onPrimaryContainer)
@@ -367,13 +362,12 @@ fun Grades(state: SchoolState, onGrade: (JsonObject) -> Unit) {
         grades.groupBy { it.text("semester") }.forEach { (semester, items) ->
             Text(semester.ifEmpty { "未指定学期" }, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelLarge)
             items.forEach { grade -> Card(onClick = { onGrade(grade) }, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow), modifier = Modifier.fillMaxWidth()) {
-                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) { Text(grade.text("name"), fontWeight = FontWeight.SemiBold); Text("${displayNumber(grade.text("credits"))} 学分 · 绩点 ${displayNumber(grade.text("grade_point"))}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     Text(displayNumber(grade.text("raw_score")), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
                     Icon(Icons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } }
         }
-        Text("成绩与排名仅存于内存，不存储、不上报。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

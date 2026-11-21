@@ -42,17 +42,16 @@ internal fun ToolsScreen(school: SchoolState, grab: CourseGrabState, grabDemo: C
                 TextButton(onClick = back) { Text("返回工具") }
                 if (!school.homeVisible) Login(school)
                 else if (school.cachedMode) {
-                    Text("成绩不会缓存在本机，请登录学校系统查看。", Modifier.padding(12.dp))
                     Button(onClick = school::openGrades, enabled = !school.busy) { Text("登录学校系统查看成绩") }
                 } else Grades(school, onGrade)
             }
         }
-        else -> Column(Modifier.widthIn(max = 960.dp).fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant).verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        else -> Column(Modifier.widthIn(max = 960.dp).fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             val gpa = school.grades?.get("summary")?.obj()?.text("weighted_gpa").orEmpty()
             ToolGrid(listOf(
-                ToolTile("成绩", "绩点、排名与分布", Icons.Outlined.Assessment, SectionAccent.ACADEMIC, if (gpa.isNotBlank()) "GPA ${displayNumber(gpa)}" else "学校直连", school::openGrades),
-                ToolTile("自习舱预约", "预约与我的预约", Icons.Outlined.EventSeat, SectionAccent.SAGE, "平台独立账号", { school.openTool("cabin") }),
-                ToolTile("抢课", "定时抢课与志愿", Icons.Outlined.Bolt, SectionAccent.SERVICE, if (grab.run.active || grabDemo.run.active) "本机任务运行中" else "按志愿依次尝试", { school.openTool("grab") })
+                ToolTile("成绩", Icons.Outlined.Assessment, SectionAccent.ACADEMIC, if (gpa.isNotBlank()) "GPA ${displayNumber(gpa)}" else "", school::openGrades),
+                ToolTile("自习舱预约", Icons.Outlined.EventSeat, SectionAccent.SAGE, onClick = { school.openTool("cabin") }),
+                ToolTile("抢课", Icons.Outlined.Bolt, SectionAccent.SERVICE, if (grab.run.active || grabDemo.run.active) "运行中" else "", { school.openTool("grab") })
             ))
         }
     }
@@ -67,10 +66,10 @@ internal fun EvaluationToolsScreen(school: SchoolState, evaluation: EvaluationSt
         "automatic" -> CabinToolsScreen(school, state = viewModel(key = "evaluation-platform"), evaluationMode = true, onBack = back)
         "manual" -> ManualEvaluationScreen(school, evaluation, onBack = back)
         else -> {
-            Column(Modifier.widthIn(max = 720.dp).fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant).verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                ProfileHero(if (summaryState.listed) "${summaryState.pending.size} 门待评" else "待评课程", if (summaryState.listed) "已选 ${summaryState.selected.size} 门" else "只读加载后显示数量", Icons.AutoMirrored.Outlined.FactCheck, "先预览，再确认 · 每个答案都由你决定")
-                CompactEntry("自动评课 · 服务器", "同意托管学校凭据后，每天自动运行", Icons.Outlined.CloudQueue, SectionAccent.BRAND, onClick = { route = "automatic" })
-                CompactEntry("手动一键 · 本机", "学校直连 · 选择、预览、确认后逐门提交", Icons.AutoMirrored.Outlined.FactCheck, SectionAccent.ACADEMIC, onClick = { route = "manual" })
+            Column(Modifier.widthIn(max = 720.dp).fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                ProfileHero(if (summaryState.listed) "${summaryState.pending.size} 门待评" else "待评课程", if (summaryState.listed) "已选 ${summaryState.selected.size} 门" else "", Icons.AutoMirrored.Outlined.FactCheck)
+                CompactEntry("自动评课", icon = Icons.Outlined.CloudQueue, accent = SectionAccent.BRAND, onClick = { route = "automatic" })
+                CompactEntry("手动评课", icon = Icons.AutoMirrored.Outlined.FactCheck, accent = SectionAccent.ACADEMIC, onClick = { route = "manual" })
             }
         }
     }
@@ -85,20 +84,19 @@ private fun ManualEvaluationScreen(school: SchoolState, evaluation: EvaluationSt
     val demoState: EvaluationState = viewModel(key = "manual-evaluation-demo")
     val state = if (demo) demoState else evaluation
     BackHandler(!state.busy) { state.run.dismiss(); onBack() }
-    Column(Modifier.widthIn(max = 720.dp).fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant).verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(Modifier.widthIn(max = 720.dp).fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         TextButton(onClick = { state.run.dismiss(); onBack() }, enabled = !state.busy) { Text("返回课程评价") }
         Text("手动一键评课", style = MaterialTheme.typography.headlineMedium)
-        Text(if (demo) "演示模式 · 不联网，不会提交真实评价。" else "学校直连 · 不托管密码，不使用 Nanyee 服务器。只读加载不会提交评价。")
-        if (state.error.isNotBlank()) Text(state.error, color = MaterialTheme.colorScheme.error)
+        if (state.error.isNotBlank()) InlineError(state.error)
         if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         if (demo) ScenarioPicker(state.demoScenario.label, DemoEvaluationScenario.entries.map { it.label }, enabled = !state.busy) { state.selectDemoScenario(DemoEvaluationScenario.entries[it]) }
-        if (state.run.stale) Text("学校会话已变更，上轮结果已过期；请先核验已提交的课程，再重新只读加载。", color = MaterialTheme.colorScheme.error)
+        if (state.run.stale) Text("学校会话已变更", color = MaterialTheme.colorScheme.error)
         Button(onClick = { state.load({ if (demo) "demo" else school.evaluationSessionIdentity }) { if (demo) state.demoSource else school.evaluationAccess() } }, enabled = !state.busy) { Text("只读加载待评课程") }
         if (!school.demo) TextButton(onClick = { demoChoice = !demoChoice }, enabled = !state.busy) { Text(if (demoChoice) "返回真实学校数据" else "无账号体验演示") }
-        if (state.listed && state.pending.isEmpty()) Text("暂无待评课程。可能评教尚未开放，或今天及昨天的课程已评完。")
-        if (state.pending.isNotEmpty()) {
+        if (state.listed && state.pending.isEmpty()) Text("暂无待评课程")
+        if (state.pending.isNotEmpty() && state.run.preview.isEmpty()) {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(12.dp)) { SectionHeading("待评 ${state.pending.size} 门", "已选 ${state.selected.size} 门 · 生成答案后仍可修改", Icons.Outlined.RateReview, SectionAccent.PLUM) }
+                Column(Modifier.padding(16.dp)) { SectionHeading("待评 ${state.pending.size} 门", "已选 ${state.selected.size} 门", Icons.Outlined.RateReview, SectionAccent.PLUM) }
             }
             TextButton(onClick = { state.selected = if (state.selected.size == state.pending.size) emptySet() else state.pending.map { it.key }.toSet(); state.run.dismiss() }, enabled = !state.busy) { Text("全选 / 全不选") }
             state.pending.forEach { course ->
@@ -107,11 +105,12 @@ private fun ManualEvaluationScreen(school: SchoolState, evaluation: EvaluationSt
                     Text("${course.courseName}\n${course.teacherName} · ${course.endDate}", Modifier.weight(1f))
                 }
             }
-            Button(onClick = { state.prepare() }, enabled = !state.busy && state.selected.isNotEmpty()) { Text("生成并预览答案（不提交）") }
+            Button(onClick = { state.prepare() }, enabled = !state.busy && state.selected.isNotEmpty()) { Text("预览评价") }
         }
+        if (state.run.preview.isNotEmpty()) TextButton(onClick = { state.run.dismiss() }, enabled = !state.busy) { Text("返回待评课程") }
         state.run.preview.forEach { value ->
             Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     CourseHeading(value.draft.reference.courseName, value.draft.reference.teacherName, showAvatar = false)
                     Text("合计 ${evaluationTotal(value)} 分", style = MaterialTheme.typography.titleLarge)
                     OutlinedButton(onClick = { state.run.randomize(value.draft.reference.key) }, enabled = !state.busy && !confirming) { Text("重新随机") }
@@ -124,14 +123,12 @@ private fun ManualEvaluationScreen(school: SchoolState, evaluation: EvaluationSt
             }
         }
         if (state.run.preview.isNotEmpty()) {
-            Text("默认使用旧工具偏高随机档位，可逐题修改；此处显示的答案会原样提交，不会在确认时重新生成。")
             Button(onClick = { confirming = true }, enabled = !state.busy) { Text(if (demo) "确认演示提交" else "确认提交以上评价") }
         }
         if (state.run.progress > 0) Text(if (state.busy && state.run.confirmed) "正在提交第 ${state.run.progress} 门…" else "逐门进度：${state.run.progress}")
         state.run.results.forEach { Text(it) }
-        if (state.run.confirmed && !state.busy) Text("本轮已执行或已停止。结果未知时请先到教务系统核验；不要直接重复提交。")
     }
-    if (confirming) AlertDialog(onDismissRequest = { confirming = false }, title = { Text("确认提交课程评价？") }, text = { Text(if (demo) "演示模式，不会真正评课。" else "将逐门向学校提交上方预览的评价；第一处错误后立即停止。真实提交不可撤回，请确认您同意这些答案。") }, confirmButton = {
+    if (confirming) AlertDialog(onDismissRequest = { confirming = false }, title = { Text("确认提交课程评价？") }, text = { Text(if (demo) "演示模式，不会真正评课。" else "评价提交后不可撤回，确认提交？") }, confirmButton = {
         TextButton(onClick = { confirming = false; state.confirm() }, enabled = !state.busy) { Text("确认提交") }
     }, dismissButton = { TextButton(onClick = { confirming = false }) { Text("返回检查") } })
 }

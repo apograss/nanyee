@@ -89,23 +89,23 @@ private fun XxtScreen(state: XxtState, onBack: () -> Unit, onToggleDemo: () -> U
     val back = { if (!state.busy) { if (state.course != null) state.back() else onBack() } }
     BackHandler { if (state.qrLogin != null || (method == "qr" && state.busy)) state.stopQrLogin() else back() }
     PullToRefreshBox(isRefreshing = state.busy, onRefresh = { if (state.user != null && !state.busy) state.refresh() }, modifier = Modifier.widthIn(max = 720.dp).fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant)) {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (state.course != null) TextButton(onClick = back, enabled = !state.busy) { Text(if (state.activity == null) "返回课程" else "返回活动") }
         ClassroomAccountRow(state.user?.name ?: "未登录学习通", "学习通", state.demo, !state.busy, state.user != null, state::logout, onToggleDemo)
         if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-        if (state.error.isNotBlank()) Text(state.error, color = MaterialTheme.colorScheme.error)
-        if (deviceError.isNotBlank()) Text(deviceError, color = MaterialTheme.colorScheme.error)
-        if (state.message.isNotBlank()) Text(state.message, style = MaterialTheme.typography.titleMedium)
+        if (state.error.isNotBlank()) InlineError(state.error)
+        if (deviceError.isNotBlank()) InlineError(deviceError)
+        if (state.message.isNotBlank()) Text(state.message, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, style = MaterialTheme.typography.titleMedium)
         if (state.hasUnknownWrite) {
-            Text("上次提交结果未知。在官方学习通核验前，所有写入均已阻止。")
-            TextButton(onClick = state::acknowledgeUnknown, enabled = !state.busy) { Text("我已在官方学习通核验，解除写入阻止") }
+            Text("提交结果未知", style = MaterialTheme.typography.bodySmall)
+            TextButton(onClick = state::acknowledgeUnknown, enabled = !state.busy) { Text("已核验结果") }
         }
-        if (state.user == null || state.qrLogin != null) Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("学习通账号", style = MaterialTheme.typography.titleLarge)
+        if (state.user == null || state.qrLogin != null) {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("登录学习通", style = MaterialTheme.typography.titleMedium)
                 val user = state.user
                 if (user != null) {
-                    Text("${user.name} · 仅本人账号")
+                    Text(user.name)
                     TextButton(onClick = state::logout, enabled = !state.busy || state.qrLogin != null) { Text("退出并清除学习通数据") }
                 } else {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -117,25 +117,22 @@ private fun XxtScreen(state: XxtState, onBack: () -> Unit, onToggleDemo: () -> U
                     when (method) {
                         "password" -> {
                             OutlinedTextField(password, { password = it }, label = { Text("学习通密码") }, visualTransformation = PasswordVisualTransformation(), singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !state.busy)
-                            Row { Checkbox(rememberPassword, { rememberPassword = it }, enabled = !state.busy); Text("加密保存凭据，过期时自动重新登录", Modifier.weight(1f).padding(top = 12.dp)) }
+                            Row { Checkbox(rememberPassword, { rememberPassword = it }, enabled = !state.busy); Text("记住账号和密码", Modifier.weight(1f).padding(top = 12.dp)) }
                             Button(onClick = { state.login(account, password, rememberPassword); password = "" }, enabled = !state.busy && account.isNotBlank() && password.isNotBlank()) { Text("密码登录") }
                         }
                         "sms" -> {
                             OutlinedTextField(smsCode, { smsCode = it }, label = { Text("短信验证码") }, singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !state.busy)
                             OutlinedButton(onClick = { confirmSms = true }, enabled = !state.busy && state.smsResendSeconds == 0 && account.matches(Regex("1[0-9]{10}"))) { Text(if (state.smsResendSeconds > 0) "${state.smsResendSeconds}s 后重发" else "发送验证码") }
                             Button(onClick = { state.loginSms(account, smsCode); smsCode = "" }, enabled = !state.busy && account.matches(Regex("1[0-9]{10}")) && smsCode.matches(Regex("[0-9]{4,8}"))) { Text("短信登录") }
-                            Text(if (state.demo) "演示验证码：123456；不会发送短信。" else "验证码仅用于本次登录，不会保存。")
                         }
                         else -> {
                             OutlinedButton(onClick = state::beginQrLogin, enabled = !state.busy) { Text("显示学习通登录二维码") }
-                            Text("二维码由官方学习通 App 授权；授权后加密保留 Cookie，不保存密码。")
                         }
                     }
                 }
                 state.qrLogin?.let { qr ->
                     val bitmap = remember(qr) { BitmapFactory.decodeByteArray(qr.image, 0, qr.image.size) }
                     if (bitmap != null) Image(bitmap.asImageBitmap(), "用官方学习通扫码授权登录", Modifier.fillMaxWidth().height(240.dp), contentScale = ContentScale.Fit)
-                    Text("前台等待授权，失效后自动刷新；请用另一台设备扫码。")
                     TextButton(onClick = state::stopQrLogin) { Text("取消二维码登录") }
                 }
             }
@@ -144,28 +141,24 @@ private fun XxtScreen(state: XxtState, onBack: () -> Unit, onToggleDemo: () -> U
             val course = state.course; val activity = state.activity; val detail = state.detail
             if (course == null) {
                 Text("我的课程", style = MaterialTheme.typography.titleLarge)
-                Text("下拉刷新 · 仅本人账号", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (state.courseError.isNotBlank() || state.loaded && state.courses.isEmpty()) {
-                    Text(state.courseError.ifBlank { "暂无课程" }, color = if (state.courseError.isNotBlank()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (state.courseError.isNotBlank()) InlineError(state.courseError) else Text("暂无课程")
                     OutlinedButton(onClick = state::retryCourses, enabled = !state.busy) { Text("重试") }
                 }
                 state.courses.forEach { row ->
                     Card(onClick = { state.selectCourse(row) }, enabled = !state.busy, modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                        Row(Modifier.padding(12.dp)) { CourseHeading(row.name, row.teacher, row.image) }
+                        Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) { CourseHeading(row.name, row.teacher, row.image) }
                     }
                 }
             } else if (activity == null) {
                 Text(course.name, style = MaterialTheme.typography.titleLarge)
-                Text("活动 · 进行中优先")
+                Text("活动")
                 if (state.loaded && state.activities.isEmpty()) Text("本课程暂无活动。")
                 state.activities.forEach { row ->
                     Card(onClick = { state.selectActivity(row) }, modifier = Modifier.fillMaxWidth(), enabled = !state.busy) {
-                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(row.name, style = MaterialTheme.typography.titleMedium)
                             Text("${if (row.ongoing) "进行中" else "已结束"} · ${xxtActivityLabel(row)}")
-                            Text("开始 ${xxtTime(row.start)}${if (row.end > 0) " · 结束 ${xxtTime(row.end)}" else ""}")
-                            if (row.description.isNotBlank()) Text(row.description)
-                            if (row.type !in xxtClassroomWrites && row.type !in setOf(2, 74, 11)) Text("只读详情")
                         }
                     }
                 }
@@ -174,14 +167,14 @@ private fun XxtScreen(state: XxtState, onBack: () -> Unit, onToggleDemo: () -> U
                 Text("${xxtActivityLabel(activity)} · ${xxtTime(activity.start)}")
                 if (activity.type !in setOf(2, 74)) XxtClassroomContent(state)
                 else if (detail != null) {
-                    if (!activity.ongoing) Text("活动已结束，仅供只读查看。")
-                    else if (detail.face) Text("此活动要求人脸签到，暂不支持。请使用官方学习通，不提供跳过或替代身份。", color = MaterialTheme.colorScheme.error)
-                    else if (detail.signed) Text("当前本人账号已签到，无需再次提交。")
-                    else if (detail.type !in setOf(0, 2, 3, 4, 5)) Text("暂不支持此签到类型，请使用官方学习通。")
+                    if (!activity.ongoing) Text("活动已结束")
+                    else if (detail.face) Text("暂不支持人脸签到", color = MaterialTheme.colorScheme.error)
+                    else if (detail.signed) Text("已签到")
+                    else if (detail.type !in setOf(0, 2, 3, 4, 5)) Text("暂不支持此签到类型")
                     else {
                         Text(xxtSignLabel(detail))
                         if (detail.photo) {
-                            Text(if (state.demo) "演示模式：照片仅用于本地预览，不会上传；可使用系统相机或相册。" else "照片仅在确认后上传至超星云盘；可使用系统相机或相册。")
+
                             OutlinedButton(onClick = {
                                 try {
                                     val dir = File(context.cacheDir, "xxt_camera").apply { mkdirs() }
@@ -197,21 +190,19 @@ private fun XxtScreen(state: XxtState, onBack: () -> Unit, onToggleDemo: () -> U
                         if (detail.type == 3) XxtPattern(state.code, enabled = !state.busy && !state.completed, onChange = state::updateCode)
                         if (detail.type == 2) {
                             Button(onClick = { try { scanner.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setPrompt("扫描当前活动的签到二维码").setOrientationLocked(false).setBeepEnabled(false)) } catch (_: Exception) { deviceError = "扫码相机不可用，请检查相机权限。" } }, enabled = !state.busy && !state.completed) { Text("相机扫描签到二维码") }
-                            if (state.qr.isNotBlank()) Text("已扫描二维码；提交前将校验活动编号。")
+                            if (state.qr.isNotBlank()) Text("已扫描二维码")
                             if (state.demo) TextButton(onClick = { state.scanned("https://mobilelearn.chaoxing.com/widget/sign/e?id=${activity.id}&enc=demo-only") }, enabled = !state.busy) { Text("使用离线演示二维码") }
                         }
                         if (detail.type == 4 || (detail.type in setOf(2, 3, 5) && detail.address.isNotBlank())) {
                             Text("活动地点：${detail.address.ifBlank { "活动未提供地址文本" }}${if (detail.range.isBlank()) "" else " · 范围 ${detail.range} 米"}")
-                            Text("仅手机真实位置，BD-09 坐标；不允许手动编辑。请开启定位并选择精确权限。")
                             Button(onClick = { locationPermission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)) }, enabled = !state.busy && !state.completed) { Text("获取手机当前位置") }
                             state.position?.let { position ->
-                                Text("已取得位置，精度约 ${position.accuracy.roundToInt()} 米。两分钟内有效。")
-                                if (detail.latitude != null && detail.longitude != null) Text("距要求地点约 ${xxtDistance(position, detail.latitude, detail.longitude)} 米") else Text("活动未提供目标坐标，无法计算距离。")
+                                Text("定位精度约 ${position.accuracy.roundToInt()} 米")
+                                if (detail.latitude != null && detail.longitude != null) Text("距要求地点约 ${xxtDistance(position, detail.latitude, detail.longitude)} 米") else Text("暂无目标坐标")
                             }
                         }
-                        if (detail.captcha) Text("该活动需要手动拼图验证；不会自动解题。")
+                        if (detail.captcha) Text("需要拼图验证")
                         Button(onClick = state::preview, enabled = !state.busy && !state.completed) { Text("预览并确认签到") }
-                        Text("提交结果未知时不会自动重试，请先在官方学习通核验。")
                     }
                 }
             }
@@ -223,15 +214,7 @@ private fun XxtScreen(state: XxtState, onBack: () -> Unit, onToggleDemo: () -> U
     }
     state.confirmation?.let { plan ->
         AlertDialog(onDismissRequest = state::dismissConfirmation, title = { Text("确认本人签到") }, text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("账号：${state.user?.name}（仅当前本人）\n课程：${plan.course.name}\n活动：${plan.activity.name}\n方式：${xxtSignLabel(plan.detail)}")
-                if (state.error.isNotBlank()) Text(state.error, color = MaterialTheme.colorScheme.error)
-                if (plan.code.isNotBlank()) Text("${if (plan.detail.type == 3) "手势顺序" else "签到码"}：${plan.code}")
-                if (plan.detail.photo) Text(xxtPhotoConfirmation(state.demo))
-                if (plan.qr.isNotBlank()) Text("使用相机扫描的当前活动二维码。")
-                plan.position?.let { Text("使用刚获取的真实位置（BD-09）：${"%.6f".format(it.latitude)}, ${"%.6f".format(it.longitude)}\n地址：${plan.detail.address.ifBlank { "当前位置" }}\n精度约 ${it.accuracy.roundToInt()} 米") }
-                Text(if (state.demo) "离线演示：没有网络请求。" else "将改变当前账号的签到状态。请核对后提交，勿替他人签到。")
-            }
+            Text(if (state.demo) "确认演示签到？" else "确认提交此活动的签到？")
         }, confirmButton = { Button(onClick = state::submit, enabled = !state.busy) { Text("确认提交") } }, dismissButton = { TextButton(onClick = state::dismissConfirmation) { Text("返回修改") } })
     }
     state.captcha?.let { XxtCaptchaDialog(it, state.busy, state.error, state::verifyCaptcha, state::reloadCaptcha, state::dismissCaptcha) }
@@ -257,7 +240,7 @@ private fun XxtPattern(code: String, enabled: Boolean, onChange: (String) -> Uni
     val currentChange by rememberUpdatedState(onChange)
     val color = MaterialTheme.colorScheme.primary
     var drawing by remember { mutableStateOf("") }
-    Text("按 1–9 九宫格绘制手势，或依次轻点下方数字。手势：$code")
+    Text("手势 $code")
     Canvas(Modifier.fillMaxWidth().height(240.dp).pointerInput(enabled) {
         fun append(point: Offset) {
             val hit = (1..9).firstOrNull { n -> hypot((point.x - size.width * (((n - 1) % 3 + 0.5f) / 3)).toDouble(), (point.y - size.height * (((n - 1) / 3 + 0.5f) / 3)).toDouble()) < minOf(size.width / 7.0, size.height / 5.0) }
@@ -281,7 +264,7 @@ private fun XxtCaptchaDialog(challenge: XxtCaptcha, busy: Boolean, error: String
     val tint = MaterialTheme.colorScheme.primary
     AlertDialog(onDismissRequest = { if (!busy) dismiss() }, title = { Text("请手动完成拼图") }, text = {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("观察缺口，拖动下方滑块使拼图对齐，再点击验证。此处没有自动识别。")
+
             if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error)
             BoxWithConstraints(Modifier.fillMaxWidth().aspectRatio(2f)) {
                 if (background != null) Image(background, "滑动拼图背景", Modifier.fillMaxSize(), contentScale = ContentScale.FillBounds)

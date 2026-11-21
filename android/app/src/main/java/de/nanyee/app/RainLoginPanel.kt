@@ -35,7 +35,6 @@ internal fun RainLoginPanel(state: RainState) {
         }
         if (method == RainLoginMethod.QR) {
             Button(onClick = state::beginQr, enabled = !state.busy && state.qr == null) { Text("获取雨课堂登录二维码") }
-            Text("扫码登录仅保留加密会话，不保存密码。切到微信后继续等待最多 60 秒。", style = MaterialTheme.typography.bodySmall)
             state.qr?.let { qr ->
                 var imageError by remember(qr) { mutableStateOf(false) }
                 val bitmap by produceState<Bitmap?>(null, qr, state.host) {
@@ -43,19 +42,17 @@ internal fun RainLoginPanel(state: RainState) {
                         ?: qr.content.takeIf { it.isNotBlank() }?.let { runCatching { rainQrBitmap(it) }.getOrNull() }
                 }
                 if (bitmap != null) Image(requireNotNull(bitmap).asImageBitmap(), "雨课堂官方登录授权二维码", Modifier.fillMaxWidth().height(260.dp), contentScale = ContentScale.Fit)
-                else Text(if (imageError) "二维码图片不可用，请取消后重新获取。" else "正在加载二维码…")
+                else Text(if (imageError) "二维码不可用" else "正在加载二维码…")
                 TextButton(onClick = state::cancelQr) { Text("取消扫码登录") }
             }
         } else {
             OutlinedTextField(value = account, onValueChange = { account = it.trim() }, label = { Text(if (method == RainLoginMethod.SMS) "手机号" else "手机号或邮箱") }, singleLine = true, enabled = !state.busy, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = if (method == RainLoginMethod.SMS) KeyboardType.Phone else KeyboardType.Email))
             OutlinedTextField(value = secret, onValueChange = { secret = it }, label = { Text(if (method == RainLoginMethod.SMS) "短信验证码" else "密码") }, singleLine = true, enabled = !state.busy, modifier = Modifier.fillMaxWidth(), visualTransformation = if (method == RainLoginMethod.PASSWORD) PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None, keyboardOptions = KeyboardOptions(keyboardType = if (method == RainLoginMethod.SMS) KeyboardType.Number else KeyboardType.Password))
             if (method == RainLoginMethod.SMS) {
-                OutlinedButton(onClick = { if (state.demo) state.sendSms(account, RainCaptchaProof("offline-ticket", "offline-rand")) else challenge = "sms" }, enabled = !state.busy && phoneValid && remaining == 0) { Text(if (remaining > 0) "${remaining} 秒后重发" else "腾讯验证并发送验证码") }
-                Text(if (state.demo) "离线演示，不联网；验证码 123456。" else "发送短信前需完成腾讯验证。验证码仅用于本次登录。", style = MaterialTheme.typography.bodySmall)
+                OutlinedButton(onClick = { if (state.demo) state.sendSms(account, RainCaptchaProof("offline-ticket", "offline-rand")) else challenge = "sms" }, enabled = !state.busy && phoneValid && remaining == 0) { Text(if (remaining > 0) "${remaining} 秒后重发" else "发送验证码") }
                 Button(onClick = { state.login(method, account, secret) }, enabled = !state.busy && phoneValid && secret.matches(Regex("[0-9]{4,8}"))) { Text("短信登录") }
             } else {
-                Text(if (state.demo) "离线演示，任意非空密码；不会加载网络验证码。" else "密码仅用于本次登录，不保存。登录前需完成腾讯安全验证。", style = MaterialTheme.typography.bodySmall)
-                Button(onClick = { if (state.demo) state.login(method, account, secret, RainCaptchaProof("offline-ticket", "offline-rand")) else challenge = "password" }, enabled = !state.busy && account.isNotBlank() && secret.isNotBlank()) { Text("腾讯验证并登录") }
+                Button(onClick = { if (state.demo) state.login(method, account, secret, RainCaptchaProof("offline-ticket", "offline-rand")) else challenge = "password" }, enabled = !state.busy && account.isNotBlank() && secret.isNotBlank()) { Text("登录") }
             }
         }
     }
