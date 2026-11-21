@@ -22,7 +22,8 @@ class AccountContractTest {
             "POST" to "/account/password-reset", "POST" to "/account/password-reset/confirm",
             "GET" to "/credentials", "PUT" to "/credentials/fixture/secret", "POST" to "/credentials/fixture/reveal",
             "POST" to "/credentials/fixture/renew", "DELETE" to "/credentials/fixture", "DELETE" to "/credentials/fixture?hard=true",
-            "GET" to "/jobs", "GET" to "/jobs/fixture", "POST" to "/jobs/fixture/cancel", "GET" to "/notices"
+            "GET" to "/jobs", "GET" to "/jobs/fixture", "POST" to "/jobs/fixture/cancel", "GET" to "/notices",
+            "POST" to "/registration/challenges", "POST" to "/registration/challenges/fixture-1/verify", "POST" to "/registration"
         )
         requests.forEach { (method, path) ->
             val request = platformRequest(method, path, accountPayload("fixture" to "value"), "fixture-csrf")
@@ -34,7 +35,7 @@ class AccountContractTest {
             } else assertNull(request.header(platformCsrfHeader))
         }
         assertNull(platformRequest("POST", "/account/password-reset", accountPayload("email" to "fixture@example.invalid"), null).header(platformCsrfHeader))
-        listOf("/account/../../auth/me", "/credentials/id?hard=false", "/jobs/id?anything=true", "/account/nickname", "https://evil.invalid", "/credentials/id/reveal?hard=true").forEach { path ->
+        listOf("/account/../../auth/me", "/credentials/id?hard=false", "/jobs/id?anything=true", "/account/nickname", "https://evil.invalid", "/credentials/id/reveal?hard=true", "/registration/challenges/../verify", "/registration/challenges/id/verify?x=1").forEach { path ->
             assertTrue(path, runCatching { platformRequest("GET", path, null, "csrf") }.isFailure)
         }
     }

@@ -29,6 +29,12 @@ internal class AccountModel(private val backend: PlatformBackend, private val re
     var editing by mutableStateOf(""); private set
     var route by mutableStateOf(recovery.read("route") ?: ""); private set
     var challenge by mutableStateOf(recovery.read("challenge")?.let { runCatching { accountChallenge(Json.parseToJsonElement(it)) }.getOrNull() }); private set
+    var registerMethod by mutableStateOf(RegistrationMethod.QUIZ); private set
+    var registration by mutableStateOf(recovery.read("registration")?.let { runCatching { registrationChallenge(Json.parseToJsonElement(it)) }.getOrNull() }); private set
+    var registrationVerified by mutableStateOf(registration != null && recovery.read("registrationVerified") == "true"); private set
+    var answers by mutableStateOf(List<Int?>(registration?.questions?.size ?: 0) { null }); private set
+    var nickname by mutableStateOf("")
+    var passwordAgain by mutableStateOf("")
     private var challengeOwner = recovery.read("challengeOwner").orEmpty()
     private var hidden = emptySet<String>()
     private var visibility = 0
@@ -38,9 +44,87 @@ internal class AccountModel(private val backend: PlatformBackend, private val re
         if (busy) return
         clearTransient(); route = value; recovery.write("route", value)
         if (value !in setOf("email", "reset")) clearChallenge()
+        if (value != "register") clearRegistration()
     }
-    fun clearTransient() { visibility++; password = ""; newPassword = ""; secret = ""; schoolAccount = ""; code = ""; pending = null; revealed = ""; editing = "" }
+    fun clearTransient() { visibility++; password = ""; passwordAgain = ""; newPassword = ""; secret = ""; schoolAccount = ""; code = ""; pending = null; revealed = ""; editing = "" }
     private fun clearChallenge() { challenge = null; challengeOwner = ""; recovery.write("challenge", ""); recovery.write("challengeOwner", "") }
+    private fun clearRegistration() { registration = null; registrationVerified = false; answers = emptyList(); recovery.write("registration", ""); recovery.write("registrationVerified", "") }
+    fun chooseRegisterMethod(method: RegistrationMethod) { if (!busy && method != registerMethod) { clearRegistration(); registerMethod = method; code = ""; error = ""; message = "" } }
+    fun answer(question: Int, option: Int) {
+        val questions = registration?.questions ?: return
+        if (busy || registrationVerified || question !in questions.indices || option !in questions[question].options.indices) return
+        answers = answers.toMutableList().also { it[question] = option }
+    }
+    private fun registrationFailed(e: PlatformFailure) {
+        error = registrationFailureMessage(e)
+        if (registrationRestartNeeded(e)) clearRegistration()
+    }
+    suspend fun startRegistration() {
+        if (user != null) return
+        val method = registerMethod
+        if (method == RegistrationMethod.EMAIL && !(email.length <= 254 && email.trim().matches(Regex("[^\\s@]+@[^\\s@]+\\.edu\\.cn", RegexOption.IGNORE_CASE)))) { error = "请填写 .edu.cn 教育邮箱。"; return }
+        if (method == RegistrationMethod.EMAIL && registration?.canResend() == false) { error = "请等待验证码重发时间。"; return }
+        run {
+            val body = if (method == RegistrationMethod.EMAIL) accountPayload("method" to method.wire, "email" to email.trim()) else accountPayload("method" to method.wire)
+            try {
+                val result = backend.call("POST", "/registration/challenges", body)
+                val next = registrationChallenge(result); require(next.method == method)
+                registration = next; registrationVerified = false; answers = List(next.questions.size) { null }; code = ""
+                recovery.write("registration", result.toString()); recovery.write("registrationVerified", "")
+                message = if (method == RegistrationMethod.QUIZ) "答对 ${next.passScore}/${next.questions.size} 题即可设置账号。" else "验证码已发送至 ${next.maskedEmail.ifBlank { "你的邮箱" }}，请查收。"
+            } catch (e: PlatformFailure) { registrationFailed(e) }
+        }
+    }
+    suspend fun verifyRegistration() {
+        val current = registration ?: return
+        if (registrationVerified) return
+        if (current.expired()) { clearRegistration(); error = "注册验证已过期，请重新开始。"; return }
+        val body = if (current.method == RegistrationMethod.QUIZ) {
+            if (answers.size != current.questions.size || answers.any { it == null }) { error = "请先答完全部 ${current.questions.size} 题。"; return }
+            accountPayload("answers" to JsonArray(answers.map { JsonPrimitive(it!!) }))
+        } else {
+            if (!code.matches(Regex("[0-9]{6}"))) { error = "请输入六位验证码。"; return }
+            accountPayload("code" to code)
+        }
+        run {
+            try {
+                val result = backend.call("POST", "/registration/challenges/${accountId(current.id)}/verify", body)
+                require((result as? JsonObject)?.get("verified")?.jsonPrimitive?.booleanOrNull == true)
+                registrationVerified = true; code = ""; recovery.write("registrationVerified", "true")
+                message = "验证通过，请设置用户名和密码。"
+            } catch (e: PlatformFailure) { registrationFailed(e) }
+        }
+    }
+    suspend fun register() {
+        val current = registration ?: return
+        if (!registrationVerified || user != null) return
+        val hint = when {
+            current.expired() -> "注册验证已过期，请重新开始。"
+            !username.matches(registrationUsernamePattern) -> "用户名须为 2–24 位字母、数字或下划线。"
+            nickname.trim().length > 30 -> "昵称最多 30 字。"
+            password.length !in 8..128 -> "密码须为 8–128 字符。"
+            password != passwordAgain -> "两次输入的密码不一致。"
+            else -> ""
+        }
+        if (hint.isNotEmpty()) { if (current.expired()) clearRegistration(); error = hint; return }
+        val body = buildJsonObject {
+            put("challenge_id", current.id); put("username", username); put("password", password)
+            nickname.trim().takeIf { it.isNotEmpty() }?.let { put("nickname", it) }
+        }
+        password = ""; passwordAgain = ""
+        run {
+            try {
+                val result = backend.call("POST", "/registration", body)
+                clearAccount(); user = platformUser(result); hidden = dismissed(owner)
+                clearRegistration(); route = ""; recovery.write("route", ""); nickname = ""
+                load()
+                message = if (current.method == RegistrationMethod.QUIZ) "注册成功，已登录。建议在“邮箱”里绑定邮箱，便于找回密码。" else "注册成功，已登录 Nanyee。"
+            } catch (e: PlatformFailure) {
+                if (user != null) throw e
+                registrationFailed(e)
+            }
+        }
+    }
     fun dismissConfirmation() { pending = null }
     fun hideSecret() { revealed = "" }
     private fun clearAccount() { user = null; credentials = emptyList(); jobs = emptyList(); notices = emptyList(); job = null; hidden = emptySet(); clearTransient() }
