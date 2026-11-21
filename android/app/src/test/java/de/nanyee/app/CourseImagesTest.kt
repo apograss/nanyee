@@ -33,6 +33,20 @@ class CourseImagesTest {
     }
     private val url = "https://images.example/course.png"
 
+    @Test fun imageClientRejectsPrivateDnsAndRedirects() = runBlocking<Unit> {
+        val client = courseImageClient()
+        assertFalse(client.followRedirects); assertFalse(client.followSslRedirects)
+        assertFalse(client.retryOnConnectionFailure)
+        for (host in listOf("127.0.0.1", "10.0.0.1", "169.254.169.254", "192.168.1.1", "::1")) {
+            assertTrue(runCatching { client.dns.lookup(host) }.isFailure)
+        }
+        val never = Call.Factory { error("No network allowed") }
+        for (host in listOf("127.0.0.1", "10.0.0.1", "169.254.169.254", "192.168.1.1", "[::1]", "[fc00::1]")) {
+            assertNull(courseImageBytes("https://$host/a.png", never))
+        }
+        assertNull(courseImageBytes(url, Transport(code = 302)))
+    }
+
     @Test fun publicImageFetchIsBoundedAndDoesNotCarryAccountCredentials() = runBlocking<Unit> {
         val transport = Transport()
         assertArrayEquals(byteArrayOf(1, 2, 3), courseImageBytes(url, transport))
