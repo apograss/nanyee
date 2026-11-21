@@ -58,7 +58,7 @@ internal fun ExamsScreen(school: SchoolState, onBack: () -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         TextButton(onClick = onBack) { Text("返回工具") }
         Text("待考", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (!school.homeVisible) Login(school) else {
+        if (!school.homeVisible) Login(school, embedded = true) else {
             if (upcoming.isEmpty()) Text("暂无待考", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             @Composable fun rows(values: List<JsonObject>) {
                 values.forEach { exam ->
