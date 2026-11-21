@@ -9,8 +9,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -20,13 +19,13 @@ import kotlinx.serialization.json.JsonObject
 @Composable
 internal fun ExamNumber(row: JsonObject) {
     val number = row.text("exam_number")
-    val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
     if (number.isNotBlank()) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text("网考号", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(number, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodyLarge)
         }
-        TextButton(onClick = { clipboard.setText(AnnotatedString(number)) }) { Text("复制") }
+        TextButton(onClick = { copySensitive(context, "网考号", number) }) { Text("复制") }
     }
 }
 
