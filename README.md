@@ -1,5 +1,7 @@
 # Nanyee 学生工具平台
 
+**不要在意那些没有意思的介绍，快给我去试用新的手机 APP!** QWQ
+
 Nanyee 是面向学生的小型工具平台，线上运行于 [nanyee.de](https://nanyee.de)。当前仓库把旧工具统一到 FastAPI 模块化单体、独立 Worker 与 React 前端中；视觉层可以继续独立迭代，接口行为以固定 OpenAPI 和接入文档为准。
 
 ## 已实现的后端基础
