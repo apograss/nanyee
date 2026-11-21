@@ -21,7 +21,7 @@ internal class AccountState(app: Application, private val saved: SavedStateHandl
     private val preferences = app.getSharedPreferences("account_ui", 0)
     private val models = mutableMapOf<Boolean, AccountModel>()
     private fun key(owner: String) = "dismissed." + MessageDigest.getInstance("SHA-256").digest(owner.toByteArray()).joinToString("") { "%02x".format(it) }
-    fun restoreOverview() { open() }
+    fun restoreOverview(schoolDemo: Boolean = false) { if (!schoolDemo) open() }
     fun open(forceDemo: Boolean = false) {
         if (forceDemo && !demo) {
             work?.cancel(); clearTransient(); demo = true; saved["accountDemo"] = true; model = null

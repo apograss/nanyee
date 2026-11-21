@@ -5,6 +5,8 @@ import android.content.SharedPreferences
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModelStore
 import kotlinx.coroutines.*
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import org.junit.Assert.*
 import org.junit.Test
 import java.lang.reflect.Proxy
@@ -49,6 +51,37 @@ class AccountStateTest {
                 assertSame(model, state.model)
                 assertNotNull(model.user)
             }
+            ViewModelStore().apply { put("account", state); clear() }
+        }
+    }
+
+    @Test fun schoolDemoOverviewNeverCallsThePlatformOrChangesItsSelection() = runBlocking<Unit> {
+        for (explicitDemo in listOf(false, true)) {
+            val saved = SavedStateHandle(if (explicitDemo) mapOf("accountDemo" to true) else emptyMap())
+            val state = state(saved)
+            var calls = 0
+            val backend = object : PlatformBackend by DemoAccountBackend(initiallySignedIn = true) {
+                override suspend fun call(method: String, path: String, body: JsonObject?, key: String?): JsonElement {
+                    calls++
+                    error("Demo overview must not call the platform")
+                }
+            }
+            @Suppress("UNCHECKED_CAST")
+            val models = AccountState::class.java.getDeclaredField("models").apply { isAccessible = true }.get(state) as MutableMap<Boolean, AccountModel>
+            models[explicitDemo] = AccountModel(backend, AccountRecovery({ null }, { _, _ -> }))
+            state.restoreOverview(schoolDemo = true)
+            assertEquals(0, calls)
+            assertNull(state.model)
+            assertEquals(explicitDemo, state.demo)
+            assertEquals(if (explicitDemo) true else null, saved.get<Boolean>("accountDemo"))
+            state.restoreOverview(schoolDemo = false)
+            val job = AccountState::class.java.getDeclaredField("work").apply { isAccessible = true }.get(state) as Job
+            withTimeout(5000) { job.join() }
+            assertEquals(1, calls)
+            state.restoreOverview(schoolDemo = true)
+            assertEquals(1, calls)
+            assertEquals(explicitDemo, state.demo)
+            assertEquals(if (explicitDemo) true else null, saved.get<Boolean>("accountDemo"))
             ViewModelStore().apply { put("account", state); clear() }
         }
     }
