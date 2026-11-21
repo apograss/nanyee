@@ -37,8 +37,9 @@ internal fun RainLoginPanel(state: RainState) {
             Button(onClick = state::beginQr, enabled = !state.busy && state.qr == null) { Text("获取雨课堂登录二维码") }
             state.qr?.let { qr ->
                 var imageError by remember(qr) { mutableStateOf(false) }
-                val bitmap by produceState<Bitmap?>(null, qr, state.host) {
-                    value = try { state.qrBitmap(qr) } catch (e: CancellationException) { throw e } catch (_: Exception) { imageError = true; null }
+                var bitmap by remember(qr, state.host) { mutableStateOf<Bitmap?>(null) }
+                LaunchedEffect(qr, state.host) {
+                    bitmap = try { state.qrBitmap(qr) } catch (e: CancellationException) { throw e } catch (_: Exception) { imageError = true; null }
                         ?: qr.content.takeIf { it.isNotBlank() }?.let { runCatching { rainQrBitmap(it) }.getOrNull() }
                 }
                 if (bitmap != null) Image(requireNotNull(bitmap).asImageBitmap(), "雨课堂官方登录授权二维码", Modifier.fillMaxWidth().height(260.dp), contentScale = ContentScale.Fit)

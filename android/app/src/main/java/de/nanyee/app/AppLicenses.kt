@@ -18,9 +18,10 @@ internal fun OpenSourceLicenses(onClose: () -> Unit) {
     val files = listOf("NOTICE", "LICENSE", "THIRD_PARTY_NOTICES.txt")
     val labels = listOf("声明", "GPL-3.0", "第三方")
     var selected by remember { mutableIntStateOf(0) }
-    val text by produceState("", selected) {
-        value = ""
-        value = withContext(Dispatchers.IO) {
+    var text by remember { mutableStateOf("") }
+    LaunchedEffect(selected) {
+        text = ""
+        text = withContext(Dispatchers.IO) {
             runCatching { context.assets.open(files[selected]).bufferedReader().use { it.readText() } }.getOrDefault("暂时无法读取许可")
         }
     }
