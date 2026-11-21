@@ -375,3 +375,26 @@ def test_metadata_keeps_only_well_formed_token_digest() -> None:
         "token_digest": digest
     }
     assert redact_credential_metadata({"token_digest": "raw-token"}) == {}
+
+
+@pytest.mark.asyncio
+async def test_secret_update_drops_stale_token_digest() -> None:
+    engine, factory, vault = await _make_vault()
+    async with factory() as db:
+        owner = await _make_user(db, "digest_owner")
+        credential = await vault.create(
+            db,
+            user_id=owner.id,
+            upstream="qun100",
+            purpose="qun_checkin",
+            plaintext="old-token",
+            public_metadata={"token_digest": "b" * 64},
+            consent_version="credential-hosting-v1",
+            ttl_seconds=300,
+        )
+        assert credential.public_metadata == {"token_digest": "b" * 64}
+        updated = await vault.update_secret(
+            db, credential_id=credential.id, user_id=owner.id, plaintext="new-token"
+        )
+        assert "token_digest" not in updated.public_metadata
+    await engine.dispose()

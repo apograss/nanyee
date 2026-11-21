@@ -291,6 +291,11 @@ class CredentialVaultService:
         record.account_digest = digest_for_plaintext(self._settings, record.purpose, plaintext)
         if public_metadata is not None:
             record.public_metadata = redact_credential_metadata(public_metadata)
+        else:
+            # 旧摘要对应的是旧 Token，换了内容就不能再据此复用
+            record.public_metadata = {
+                k: v for k, v in record.public_metadata.items() if k != "token_digest"
+            }
         await db.commit()
         return record
 
