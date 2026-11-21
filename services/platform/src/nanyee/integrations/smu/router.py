@@ -54,7 +54,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/smu", tags=["smu"])
 # 正常使用一节课表会话只需 1-2 个验证码；限流主要用于挡脚本，保留量级但放宽到不误伤真人
-CAPTCHA_POLICY = RateLimitPolicy(window_seconds=10 * 60, soft_limit=12, hard_limit=36)
 LOGIN_POLICY = RateLimitPolicy(window_seconds=10 * 60, soft_limit=6, hard_limit=15)
 READ_POLICY = RateLimitPolicy(window_seconds=10 * 60, soft_limit=40, hard_limit=120)
 ENROLL_POLICY = RateLimitPolicy(window_seconds=60, soft_limit=3, hard_limit=6)
@@ -281,7 +280,11 @@ async def captcha(
         request,
         action="smu_captcha",
         identity="captcha",
-        policy=CAPTCHA_POLICY,
+        policy=RateLimitPolicy(
+            window_seconds=10 * 60,
+            soft_limit=settings.smu_captcha_soft_limit,
+            hard_limit=settings.smu_captcha_hard_limit,
+        ),
         turnstile_token=turnstile_token,
         anti_abuse_pass=anti_abuse_pass,
     )

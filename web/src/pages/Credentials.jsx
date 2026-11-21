@@ -1,5 +1,5 @@
 // Canvas design runtime editable source marker: credentials
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion } from "motion/react";
 import { KeyRound, Plus, Trash2, Armchair, Users, GraduationCap, ShieldCheck, Eye, EyeOff, Ban, RefreshCw, Pencil } from "lucide-react";
@@ -52,6 +52,10 @@ export default function Credentials() {
   const [revealData, setRevealData] = useState(null);
   const [revealVisible, setRevealVisible] = useState(false);
   const [revealError, setRevealError] = useState("");
+  const [revealPassword, setRevealPassword] = useState("");
+  const [revealing, setRevealing] = useState(false);
+  // 每次打开/关闭对话框递增；过期请求的结果不得写入新对话框
+  const revealSeq = useRef(0);
   const [deleteFor, setDeleteFor] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [editFor, setEditFor] = useState(null);
@@ -144,20 +148,44 @@ export default function Credentials() {
     setEditing(false);
   };
 
-  const openReveal = async (cred) => {
+  const openReveal = (cred) => {
+    revealSeq.current += 1;
+    setRevealing(false);
     setRevealFor(cred);
     setRevealData(null);
     setRevealVisible(false);
     setRevealError("");
+    setRevealPassword("");
+  };
+
+  const closeReveal = () => {
+    revealSeq.current += 1;
+    setRevealing(false);
+    setRevealFor(null);
+    setRevealData(null);
+    setRevealPassword("");
+  };
+
+  const doReveal = async () => {
+    if (!revealFor || !revealPassword) return;
+    const seq = ++revealSeq.current;
+    setRevealing(true);
+    setRevealError("");
     try {
-      const result = await revealCredential(cred.id);
+      const result = await revealCredential(revealFor.id, revealPassword);
+      if (seq !== revealSeq.current) return;
       let parsed = null;
       try { parsed = JSON.parse(result.secret); } catch { /* 非 JSON 的是 token 类凭据 */ }
       setRevealData(parsed && typeof parsed === "object"
         ? { account: parsed.account || "", password: parsed.password || "" }
         : { account: "", password: result.secret });
     } catch (err) {
-      setRevealError(err?.message || "读取失败，请稍后重试。");
+      if (seq === revealSeq.current) setRevealError(err?.message || "读取失败，请稍后重试。");
+    } finally {
+      if (seq === revealSeq.current) {
+        setRevealPassword("");
+        setRevealing(false);
+      }
     }
   };
 
@@ -358,15 +386,19 @@ export default function Credentials() {
 
       <Dialog
         open={!!revealFor}
-        onClose={() => setRevealFor(null)}
+        onClose={closeReveal}
         title="查看凭据"
         description={revealFor ? `${PURPOSE_META[revealFor.purpose]?.label || revealFor.purpose} · ${revealFor.metadata?.account_hint || "无备注"}` : ""}
-        footer={<Button onClick={() => setRevealFor(null)}>关闭</Button>}
+        footer={revealData ? <Button onClick={closeReveal}>关闭</Button> : <><Button variant="ghost" onClick={closeReveal}>取消</Button><Button onClick={doReveal} loading={revealing} disabled={!revealPassword}>查看</Button></>}
       >
-        {revealError ? (
-          <Alert variant="danger" title="读取失败"><span>{revealError}</span></Alert>
-        ) : !revealData ? (
-          <div className="text-[13px] text-[var(--muted)]">读取中…</div>
+        {!revealData ? (
+          <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); doReveal(); }}>
+            {revealError && <Alert variant="danger" title="读取失败"><span>{revealError}</span></Alert>}
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="reveal-password">Nanyee 密码</Label>
+              <Input id="reveal-password" type="password" autoComplete="current-password" value={revealPassword} onChange={(e) => setRevealPassword(e.target.value)} placeholder="查看明文前请确认平台密码" />
+            </div>
+          </form>
         ) : (
           <div className="flex flex-col gap-3">
             {revealData.account && (

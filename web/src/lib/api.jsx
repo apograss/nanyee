@@ -351,8 +351,9 @@ export function renewCredential(id, body, opts) {
 export function updateCredentialSecret(id, body, opts) {
   return apiFetch(`/credentials/${id}/secret`, { ...opts, method: "PUT", body, action: "credential_update" });
 }
-export function revealCredential(id, opts) {
-  return apiPost(`/credentials/${id}/reveal`, undefined, { ...opts, action: "credential_reveal" });
+// 查看明文需要再输一次 Nanyee 密码
+export function revealCredential(id, password, opts) {
+  return apiPost(`/credentials/${id}/reveal`, { password }, { ...opts, action: "credential_reveal" });
 }
 export function deleteCredential(id, opts) {
   return apiDelete(`/credentials/${id}?hard=true`, opts);

@@ -103,3 +103,9 @@ def test_configuration_rejects_noncanonical_upstreams_and_origins(
 ) -> None:
     with pytest.raises(ValidationError):
         production_settings(**{field: value})
+
+
+def test_shared_prefix_limits_default_to_launch_scale() -> None:
+    settings = Settings(app_env="test")
+    assert settings.registration_quiz_hard_limit == 300
+    assert settings.smu_captcha_hard_limit == 300

@@ -42,6 +42,8 @@ async def api_client() -> AsyncIterator[httpx.AsyncClient]:
         allowed_hosts=["testserver"],
         cors_origins=["http://localhost:3000"],
         credential_local_master_key=SecretStr(b64encode(b"k" * 32).decode("ascii")),
+        registration_quiz_soft_limit=5,
+        registration_quiz_hard_limit=15,
     )
     app = create_app(settings)
     app.dependency_overrides[get_db_session] = override_db
@@ -92,6 +94,20 @@ async def test_registration_rejects_reserved_usernames(
         assert rejected.json()["error"]["details"]["field"] == "username"
 
 
+async def _verified_quick_challenge(api_client: httpx.AsyncClient) -> str:
+    created = await api_client.post("/api/v1/registration/challenges", json={"method": "quick"})
+    assert created.status_code == 200, created.text
+    challenge = created.json()
+    bank_by_content = {question.content: question for question in load_quiz_bank()}
+    correct = [bank_by_content[item["question"]].correctAnswer for item in challenge["questions"]]
+    verified = await api_client.post(
+        f"/api/v1/registration/challenges/{challenge['challenge_id']}/verify",
+        json={"answers": correct},
+    )
+    assert verified.status_code == 200, verified.text
+    return str(challenge["challenge_id"])
+
+
 @pytest.mark.asyncio
 async def test_quick_registration_uses_short_quiz(api_client: httpx.AsyncClient) -> None:
     created = await api_client.post("/api/v1/registration/challenges", json={"method": "quick"})
@@ -99,7 +115,7 @@ async def test_quick_registration_uses_short_quiz(api_client: httpx.AsyncClient)
     challenge = created.json()
     assert challenge["method"] == "quick"
     assert len(challenge["questions"]) == challenge["total_questions"] == 3
-    assert challenge["pass_score"] == 2
+    assert challenge["pass_score"] == 3
 
     bank_by_content = {question.content: question for question in load_quiz_bank()}
     correct = [bank_by_content[item["question"]].correctAnswer for item in challenge["questions"]]
@@ -109,20 +125,16 @@ async def test_quick_registration_uses_short_quiz(api_client: httpx.AsyncClient)
     ]
     rejected = await api_client.post(
         f"/api/v1/registration/challenges/{challenge['challenge_id']}/verify",
-        json={"answers": [correct[0], *wrong[1:]]},
-    )
-    assert rejected.status_code == 422, rejected.text
-    assert rejected.json()["error"]["details"] == {
-        "attempts_remaining": 4,
-        "score": 1,
-        "required_score": 2,
-    }
-    verified = await api_client.post(
-        f"/api/v1/registration/challenges/{challenge['challenge_id']}/verify",
         json={"answers": [*correct[:2], wrong[2]]},
     )
+    assert rejected.status_code == 422, rejected.text
+    # 不返回分数，且 quick 只有 3 次机会
+    assert rejected.json()["error"]["details"] == {"attempts_remaining": 2}
+    verified = await api_client.post(
+        f"/api/v1/registration/challenges/{challenge['challenge_id']}/verify",
+        json={"answers": correct},
+    )
     assert verified.status_code == 200, verified.text
-    assert verified.json()["required_score"] == 2
 
     registered = await api_client.post(
         "/api/v1/registration",
@@ -141,6 +153,48 @@ async def test_quick_registration_uses_short_quiz(api_client: httpx.AsyncClient)
         json={"method": "quick", "email": "student@smu.edu.cn"},
     )
     assert with_email.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_quick_quiz_attempts_run_out(api_client: httpx.AsyncClient) -> None:
+    created = await api_client.post("/api/v1/registration/challenges", json={"method": "quick"})
+    challenge_id = created.json()["challenge_id"]
+    url = f"/api/v1/registration/challenges/{challenge_id}/verify"
+    for remaining in (2, 1, 0):
+        failed = await api_client.post(url, json={"answers": [9, 9, 9]})
+        assert failed.json()["error"]["details"] == {"attempts_remaining": remaining}
+    exhausted = await api_client.post(url, json={"answers": [9, 9, 9]})
+    assert exhausted.status_code == 429
+
+
+@pytest.mark.asyncio
+async def test_device_cookie_does_not_reset_rate_limit(api_client: httpx.AsyncClient) -> None:
+    statuses = []
+    for index in range(16):
+        api_client.cookies.set("nanyee_device", f"device-{index}")
+        created = await api_client.post("/api/v1/registration/challenges", json={"method": "quiz"})
+        statuses.append(created.status_code)
+    api_client.cookies.delete("nanyee_device")
+    assert statuses[:15] == [200] * 15
+    assert statuses[15] == 429
+
+
+@pytest.mark.asyncio
+async def test_taken_usernames_use_up_the_challenge(api_client: httpx.AsyncClient) -> None:
+    first = await _verified_quick_challenge(api_client)
+    body = {"username": "taken_01", "password": "一段好记的密码 2026"}
+    created = await api_client.post("/api/v1/registration", json={"challenge_id": first, **body})
+    assert created.status_code == 201, created.text
+    api_client.cookies.clear()
+
+    second = await _verified_quick_challenge(api_client)
+    statuses = []
+    for _ in range(6):
+        attempt = await api_client.post(
+            "/api/v1/registration", json={"challenge_id": second, **body}
+        )
+        statuses.append(attempt.status_code)
+    assert statuses == [409] * 5 + [429]
 
 
 @pytest.mark.asyncio
@@ -410,12 +464,28 @@ async def test_school_credential_shared_reveal_and_hard_delete(
     )
     assert qun_job.status_code == 403
 
-    rejected_reveal = await api_client.post(f"/api/v1/credentials/{credential_id}/reveal")
+    rejected_reveal = await api_client.post(
+        f"/api/v1/credentials/{credential_id}/reveal",
+        json={"password": "一段好记的密码 2026"},
+    )
     assert rejected_reveal.status_code == 403
+
+    wrong_password = await api_client.post(
+        f"/api/v1/credentials/{credential_id}/reveal",
+        headers={"X-CSRF-Token": csrf},
+        json={"password": "not-my-password"},
+    )
+    assert wrong_password.status_code == 401
+    no_password = await api_client.post(
+        f"/api/v1/credentials/{credential_id}/reveal",
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert no_password.status_code == 422
 
     revealed = await api_client.post(
         f"/api/v1/credentials/{credential_id}/reveal",
         headers={"X-CSRF-Token": csrf},
+        json={"password": "一段好记的密码 2026"},
     )
     assert revealed.status_code == 200, revealed.text
     assert revealed.json()["secret"] == '{"account":"20260001","password":"school-password"}'
@@ -430,5 +500,6 @@ async def test_school_credential_shared_reveal_and_hard_delete(
     gone = await api_client.post(
         f"/api/v1/credentials/{credential_id}/reveal",
         headers={"X-CSRF-Token": csrf},
+        json={"password": "一段好记的密码 2026"},
     )
     assert gone.status_code == 404

@@ -64,7 +64,13 @@ class Settings(BaseSettings):
     quiz_question_count: int = Field(default=20, ge=10, le=50)
     quiz_pass_score: int = Field(default=18, ge=1, le=50)
     quick_quiz_question_count: int = Field(default=3, ge=1, le=10)
-    quick_quiz_pass_score: int = Field(default=2, ge=1, le=10)
+    quick_quiz_pass_score: int = Field(default=3, ge=1, le=10)
+    quick_quiz_max_attempts: int = Field(default=3, ge=1, le=10)
+    # 下面两项按 IP 段（IPv4 /24、IPv6 /56）共享：同一校园网的学生共用一份额度，按开放规模调整
+    registration_quiz_soft_limit: int = Field(default=200, ge=1)
+    registration_quiz_hard_limit: int = Field(default=300, ge=2)
+    smu_captcha_soft_limit: int = Field(default=200, ge=1)
+    smu_captcha_hard_limit: int = Field(default=300, ge=2)
     edu_email_suffixes: list[str] = Field(default_factory=lambda: [".edu.cn"])
 
     turnstile_enabled: bool = False
@@ -136,6 +142,10 @@ class Settings(BaseSettings):
             raise ValueError("quiz_pass_score cannot exceed quiz_question_count")
         if self.quick_quiz_pass_score > self.quick_quiz_question_count:
             raise ValueError("quick_quiz_pass_score cannot exceed quick_quiz_question_count")
+        if self.registration_quiz_hard_limit <= self.registration_quiz_soft_limit:
+            raise ValueError("registration_quiz_hard_limit must exceed the soft limit")
+        if self.smu_captcha_hard_limit <= self.smu_captcha_soft_limit:
+            raise ValueError("smu_captcha_hard_limit must exceed the soft limit")
         if self.evaluation_daily_window_start > self.evaluation_daily_window_end:
             raise ValueError("evaluation_daily_window_start cannot be later than window end")
 

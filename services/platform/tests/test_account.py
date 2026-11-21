@@ -310,3 +310,16 @@ async def test_password_reset_code_invalid_after_email_changes(harness: Harness)
         },
     )
     assert reset.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_email_signup_challenge_is_not_shared(harness: Harness) -> None:
+    h = harness
+    body = {"method": "email", "email": "victim@smu.edu.cn"}
+    victim = await h.client.post("/api/v1/registration/challenges", json=body)
+    assert victim.status_code == 200, victim.text
+    attacker = await h.client.post("/api/v1/registration/challenges", json=body)
+    assert attacker.status_code == 429
+    assert "challenge_id" not in attacker.text
+    assert victim.json()["challenge_id"] not in attacker.text
+    assert len([c for c in h.mailer.codes if c["to"] == "victim@smu.edu.cn"]) <= 1

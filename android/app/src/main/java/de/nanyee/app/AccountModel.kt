@@ -128,7 +128,7 @@ internal class AccountModel(private val backend: PlatformBackend, private val re
             }
         }
     }
-    fun dismissConfirmation() { pending = null }
+    fun dismissConfirmation() { if (pending?.kind == AccountWrite.REVEAL) password = ""; pending = null }
     fun hideSecret() { revealed = "" }
     private fun clearAccount() { user = null; credentials = emptyList(); jobs = emptyList(); notices = emptyList(); job = null; hidden = emptySet(); clearTransient() }
     private suspend fun run(block: suspend () -> Unit) {
@@ -137,7 +137,8 @@ internal class AccountModel(private val backend: PlatformBackend, private val re
         try { block() }
         catch (e: CancellationException) { throw e }
         catch (e: PlatformFailure) {
-            if (e.status == 401) { clearAccount(); if (route !in setOf("reset", "register")) { route = ""; recovery.write("route", ""); clearChallenge() } }
+            // INVALID_CREDENTIALS 是密码输错（如查看秘密时），会话仍有效
+            if (e.status == 401 && e.code != "INVALID_CREDENTIALS") { clearAccount(); if (route !in setOf("reset", "register")) { route = ""; recovery.write("route", ""); clearChallenge() } }
             error = accountFailureMessage(e)
         }
         catch (_: Exception) { error = "操作未完成，网络或响应可能异常。如已提交，请刷新核对后再操作，勿重复提交。" }
@@ -230,10 +231,14 @@ internal class AccountModel(private val backend: PlatformBackend, private val re
     suspend fun confirm() {
         val action = pending ?: return
         if (busy) return
+        val body = if (action.kind == AccountWrite.REVEAL) {
+            if (password.length !in 1..128) { error = "请输入 Nanyee 密码以查看秘密。"; return }
+            accountPayload("password" to password).also { password = "" }
+        } else action.body
         val visible = visibility
         pending = null
         run {
-            val result = backend.call(action.method, action.path, action.body)
+            val result = backend.call(action.method, action.path, body)
             when (action.kind) {
                 AccountWrite.LOGIN -> { clearAccount(); user = platformUser(result); hidden = dismissed(owner); route = ""; recovery.write("route", ""); clearChallenge(); load() }
                 AccountWrite.LOGOUT -> { backend.clearLocal(); clearAccount(); route = ""; recovery.write("route", ""); clearChallenge(); message = "已退出 Nanyee；学校登录不受影响。" }

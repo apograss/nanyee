@@ -4,7 +4,7 @@ import { motion } from "motion/react";
 import { Image as ImageIcon, CheckCircle2, ArrowRight, KeyRound, MapPin, Send, Download, ExternalLink, Link2, CalendarClock } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Input, Label, Badge, Alert, Table, EmptyState } from "@/components/ui.jsx";
 import AmapLocationPicker from "@/components/AmapLocationPicker.jsx";
-import { apiFetch, apiPost, listCredentials, createCredential, revealCredential, deleteCredential, createJob, isCredentialUsable, CONFIRMATION_VERSIONS } from "@/lib/api.jsx";
+import { apiFetch, apiPost, listCredentials, createCredential, createJob, isCredentialUsable, CONFIRMATION_VERSIONS } from "@/lib/api.jsx";
 
 // 默认打卡点：学校正中心。新表单首次打卡没有历史记录可复用，必须给出真实坐标，
 // 不能依赖输入框占位符（占位符不会进入提交数据）。
@@ -186,20 +186,23 @@ export default function Qun() {
     setMessage({ variant: "success", title: "提交成功", text: `${result.title || "表单"} 已提交。` });
   });
 
-  // 预约打卡：Token 必须托管为凭据（worker 到点自取），与页面里粘贴的 Token 保持一致
+  // 预约打卡：Token 必须托管为凭据（worker 到点自取）。按 Token 摘要复用同一凭据；
+  // 换了 Token 就新建一份，不改动旧凭据，避免已预约的打卡换成别的账号提交
   const ensureHostedCredential = async () => {
+    const secret = token.trim();
+    const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(secret));
+    const tokenDigest = Array.from(new Uint8Array(bytes), (b) => b.toString(16).padStart(2, "0")).join("");
     const list = await listCredentials();
-    const existing = (Array.isArray(list) ? list : []).find((c) => c.purpose === "qun_checkin" && isCredentialUsable(c));
-    if (existing) {
-      const { secret } = await revealCredential(existing.id);
-      if (secret === token.trim()) return { credential: existing, created: false };
-      await deleteCredential(existing.id);
-    }
+    const existing = (Array.isArray(list) ? list : []).find(
+      (c) => c.purpose === "qun_checkin" && isCredentialUsable(c) && c.metadata?.token_digest === tokenDigest,
+    );
+    if (existing) return { credential: existing, created: false };
     const credential = await createCredential({
       upstream: "qun100",
       purpose: "qun_checkin",
-      secret: token.trim(),
+      secret,
       consent_version: CONFIRMATION_VERSIONS.credentialHosting,
+      metadata: { token_digest: tokenDigest },
     });
     return { credential, created: true };
   };

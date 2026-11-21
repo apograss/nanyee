@@ -127,7 +127,10 @@ class AccountModelTest {
         val f = Fixture(); f.login(); val m = f.model; m.navigate("credentials")
         val before = f.calls.size
         m.review(AccountWrite.REVEAL, "demo-school"); assertEquals("", m.revealed); assertEquals(before, f.calls.size)
-        m.confirm(); assertEquals("demo-only-secret-not-real", m.revealed); assertFalse(f.saved.toString().contains(m.revealed))
+        m.confirm(); assertEquals("", m.revealed); assertEquals(before, f.calls.size); assertNotNull(m.pending)
+        m.password = "typed-then-cancelled"; m.dismissConfirmation(); assertEquals("", m.password)
+        m.review(AccountWrite.REVEAL, "demo-school"); m.password = "fixture-password"
+        m.confirm(); assertEquals("demo-only-secret-not-real", m.revealed); assertEquals("", m.password); assertFalse(f.saved.toString().contains(m.revealed))
         m.clearTransient(); assertEquals("", m.revealed)
         m.editCredential("demo-school"); m.schoolAccount = "fixture-account"; m.secret = "new-fixture"
         m.review(AccountWrite.UPDATE, "demo-school"); assertEquals("", m.secret)
@@ -154,7 +157,7 @@ class AccountModelTest {
         val f = Fixture(); f.login(); val m = f.model
         val entered = CompletableDeferred<Unit>(); val resume = CompletableDeferred<Unit>()
         f.interceptor = { path -> if (path.endsWith("/reveal")) { entered.complete(Unit); resume.await() } }
-        m.review(AccountWrite.REVEAL, "demo-school")
+        m.review(AccountWrite.REVEAL, "demo-school"); m.password = "fixture-password"
         val write = launch { m.confirm() }; entered.await(); m.clearTransient(); resume.complete(Unit); write.join()
         assertEquals("", m.revealed)
     }
@@ -175,7 +178,7 @@ class AccountModelTest {
             AccountWrite.LOGIN -> { m.username = "demo"; m.password = "fixture-password" }
             AccountWrite.EMAIL_CODE -> { m.navigate("email"); m.email = "new@example.invalid"; m.password = "fixture-password" }
             AccountWrite.EMAIL_CONFIRM -> { m.navigate("email"); m.email = "new@example.invalid"; m.password = "fixture-password"; m.review(AccountWrite.EMAIL_CODE); m.confirm(); m.code = "123456" }
-            AccountWrite.EMAIL_UNBIND -> m.password = "fixture-password"
+            AccountWrite.EMAIL_UNBIND, AccountWrite.REVEAL -> m.password = "fixture-password"
             AccountWrite.RESET_CODE, AccountWrite.RESET_CONFIRM -> { m.navigate("reset"); m.email = "demo@example.invalid"; if (kind == AccountWrite.RESET_CONFIRM) { m.review(AccountWrite.RESET_CODE); m.confirm(); m.code = "123456"; m.newPassword = "new-fixture-password" } }
             AccountWrite.UPDATE -> { m.schoolAccount = "fixture-account"; m.secret = "fixture-password" }
             else -> Unit
