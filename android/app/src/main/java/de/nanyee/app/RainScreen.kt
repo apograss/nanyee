@@ -168,28 +168,11 @@ private fun RainContent(state: RainState, onBack: () -> Unit, toggleDemo: () -> 
 
 @Composable
 private fun RainLessonContent(state: RainState, locate: () -> Unit) {
-    Text("当前课堂", style = MaterialTheme.typography.titleLarge)
-    Text(state.liveStatus)
-
-    AssistChip(onClick = state::reconnect, enabled = !state.busy && !state.lessonFinished, label = { Text("重新连接直播") })
     Row(verticalAlignment = Alignment.CenterVertically) { Switch(state.follow, state::updateFollow, enabled = !state.busy); Text("跟随课堂翻页", Modifier.weight(1f).padding(start = 8.dp)) }
     val deck = state.presentation
     if (deck == null) Text("暂无课件") else {
-        Text(deck.title, style = MaterialTheme.typography.titleLarge)
-        if (deck.slides.isEmpty()) Text("此课件暂无幻灯片。")
-        state.currentSlide?.let { slide ->
-            Text("第 ${state.slide + 1} / ${deck.slides.size} 页")
-            val bitmap = state.image
-            if (bitmap != null) Image(bitmap.asImageBitmap(), "幻灯片第 ${state.slide + 1} 页", Modifier.fillMaxWidth().heightIn(min = 180.dp, max = 420.dp), contentScale = ContentScale.Fit)
-            else Text("图片暂不可用")
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { state.updateFollow(false); state.selectSlide(state.slide - 1) }, enabled = !state.busy && state.slide > 0) { Text("上一页") }
-                OutlinedButton(onClick = { state.updateFollow(false); state.selectSlide(state.slide + 1) }, enabled = !state.busy && state.slide + 1 < deck.slides.size) { Text("下一页") }
-            }
-            AssistChip(onClick = state::loadImage, enabled = !state.busy, label = { Text("重新加载当前图片") })
-            OutlinedButton(onClick = { state.loadPresentation() }, enabled = !state.busy) { Text("重新加载课件") }
-            Button(onClick = { state.previewExport(false) }, enabled = !state.busy && slide.image.isNotBlank()) { Text("保存本页到相册…") }
-            OutlinedButton(onClick = { state.previewExport(true) }, enabled = !state.busy) { Text("保存全部 ${deck.slides.size} 页到相册…") }
+        RainSlides(state)
+        state.currentSlide?.let {
             RainProblemContent(state)
         }
     }

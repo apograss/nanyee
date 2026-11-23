@@ -50,6 +50,8 @@ internal fun MyScreen(school: SchoolState) {
             CompactEntry("Nanyee 账号", if (school.demo) "演示账号" else profile?.text("username").orEmpty().ifBlank { "未登录" }, Icons.Outlined.AccountCircle, SectionAccent.BRAND) { section = "platform" }
             Text("应用", style = MaterialTheme.typography.labelLarge, color = AppMuted)
             FeedbackRow()
+            val uri = LocalUriHandler.current
+            CompactEntry("捐赠", "", Icons.Outlined.MoreHoriz, SectionAccent.PLUM) { uri.openUri("https://donate.apograss.cn") }
             CompactEntry("关于", BuildConfig.VERSION_NAME, Icons.Outlined.Info, SectionAccent.BRAND) { section = "about" }
         } else {
             TextButton(onClick = { section = "" }) { Text("返回我的") }
@@ -68,7 +70,7 @@ internal fun MyScreen(school: SchoolState) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun AccountSection(state: AccountState = viewModel(key = "platform-account"), demoOnly: Boolean = false) {
+internal fun AccountSection(state: AccountState = viewModel(key = "platform-account"), demoOnly: Boolean = false, initialRoute: String = "") {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val revision by PlatformSession.revision.collectAsState()
     val uri = LocalUriHandler.current
@@ -84,6 +86,13 @@ internal fun AccountSection(state: AccountState = viewModel(key = "platform-acco
     SectionHeading("Nanyee 账号", icon = Icons.Outlined.AccountCircle)
     if (state.initializationError.isNotBlank()) InlineError(state.initializationError) { state.open(demoOnly) }
     val model = state.model
+    var initialRouteOpened by remember(model, initialRoute) { mutableStateOf(false) }
+    LaunchedEffect(model, initialRoute, model?.busy) {
+        if (!initialRouteOpened && initialRoute == NATIVE_REGISTRATION && model != null && !model.busy) {
+            model.navigate(NATIVE_REGISTRATION)
+            initialRouteOpened = true
+        }
+    }
     if (model == null) { Button(onClick = { state.open(demoOnly) }) { Text("打开平台账号") }; return }
     BackHandler(model.route.isNotEmpty() && !model.busy) { model.navigate("") }
     if (model.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -106,7 +115,7 @@ internal fun AccountSection(state: AccountState = viewModel(key = "platform-acco
             }
         }
     }
-    if (model.error.contains("请在网页完成验证")) AssistChip(onClick = { uri.openUri(if (model.route == "register") "https://nanyee.de/auth/register" else "https://nanyee.de/account") }, label = { Text("在网页完成验证") })
+    if (model.error.contains("请在网页完成验证") && model.route != NATIVE_REGISTRATION) AssistChip(onClick = { uri.openUri("https://nanyee.de/account") }, label = { Text("在网页完成验证") })
     if (model.route.isNotEmpty()) TextButton(onClick = { model.navigate("") }, enabled = enabled) { Text("返回 Nanyee 账号") }
     when {
         model.route == "reset" -> {
@@ -119,7 +128,7 @@ internal fun AccountSection(state: AccountState = viewModel(key = "platform-acco
             CabinField("平台密码", model.password, { model.password = it }, enabled, password = true)
             Button(onClick = { model.review(AccountWrite.LOGIN) }, enabled = enabled) { Text("登录 Nanyee…") }
             FlowRow {
-                TextButton(onClick = { model.navigate("register") }, enabled = enabled) { Text("注册账号") }
+                TextButton(onClick = { model.navigate(NATIVE_REGISTRATION) }, enabled = enabled) { Text("注册账号") }
                 TextButton(onClick = { model.navigate("reset") }, enabled = enabled) { Text("忘记密码") }
             }
         }

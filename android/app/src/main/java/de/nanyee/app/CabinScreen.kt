@@ -16,7 +16,6 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -31,10 +30,18 @@ import java.time.format.DateTimeFormatter
 @Composable
 internal fun CabinToolsScreen(school: SchoolState, state: CabinState = viewModel(), evaluationMode: Boolean = false, onBack: (() -> Unit)? = null) {
     var pane by rememberSaveable { mutableStateOf("new") }
+    var registration by rememberSaveable { mutableStateOf(false) }
+    if (registration) {
+        BackHandler { registration = false }
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            TextButton(onClick = { registration = false }) { Text("返回工具") }
+            AccountSection(demoOnly = school.demo, initialRoute = NATIVE_REGISTRATION)
+        }
+        return
+    }
     var opened by rememberSaveable { mutableStateOf(onBack != null) }
     var demoChoice by rememberSaveable { mutableStateOf(false) }
     var action by remember { mutableStateOf<Pair<String, String>?>(null) }
-    val uri = LocalUriHandler.current
     val sessionRevision by PlatformSession.revision.collectAsState()
     LaunchedEffect(opened, school.demo, demoChoice, sessionRevision) { if (opened) state.open(school.demo || demoChoice, evaluationMode) }
     DisposableEffect(state) { onDispose { state.cancelCredential(); state.platformPassword = "" } }
@@ -65,7 +72,7 @@ internal fun CabinToolsScreen(school: SchoolState, state: CabinState = viewModel
                     CabinField("平台用户名", state.username, { state.username = it }, !state.busy)
                     CabinField("平台密码", state.platformPassword, { state.platformPassword = it }, !state.busy, password = true)
                     Button(onClick = { state.login() }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { Text("登录 Nanyee") }
-                    TextButton(onClick = { uri.openUri("https://nanyee.de") }) { Text("去 nanyee.de 注册") }
+                    TextButton(onClick = { registration = true }) { Text("注册账号") }
                 }
                 if (!school.demo) OutlinedButton(onClick = { demoChoice = !state.demo; state.open(demoChoice, evaluationMode) }, enabled = !state.busy) { Text(if (state.demo) "返回真实平台登录" else "无账号体验演示") }
             } else {

@@ -41,7 +41,7 @@ internal fun registrationFailureMessage(error: PlatformFailure): String {
     return when {
         score != null && required != null -> "答对 $score 题，需答对 $required 题。" + if (remaining == 0) "次数已用完，请换一套题。" else "还可再交 ${remaining ?: 0} 次。"
         remaining != null -> "验证码不正确。" + if (remaining == 0) "次数已用完，请重新发送。" else "还可再试 $remaining 次。"
-        error.code == "RATE_LIMIT_CHALLENGE_REQUIRED" || error.code == "HUMAN_VERIFICATION_FAILED" -> "注册太频繁，请在网页完成验证后注册：https://nanyee.de/auth/register"
+        error.code == "RATE_LIMIT_CHALLENGE_REQUIRED" || error.code == "HUMAN_VERIFICATION_FAILED" -> "注册太频繁，请稍后重试。"
         registrationRestartNeeded(error) -> error.serverMessage.ifBlank { "注册验证已失效。" } + "已为你重新开始。"
         error.status == 429 -> "请求过于频繁，请稍后再试。"
         error.status in setOf(409, 422) && error.serverMessage.isNotBlank() -> error.serverMessage

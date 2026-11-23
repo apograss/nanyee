@@ -7,6 +7,27 @@ import org.junit.Test
 import java.time.Instant
 
 class AccountRegistrationTest {
+    @Test fun nativeRegistrationRouteOpensAndRestoresWithoutBrowserNavigation() = runBlocking {
+        val saved = mutableMapOf<String, String>()
+        val account = model(saved)
+        account.refresh()
+        assertTrue(account.error.isNotBlank())
+        account.navigate(NATIVE_REGISTRATION)
+        assertEquals("", account.error)
+        assertEquals("register", account.route)
+        assertEquals("register", saved["route"])
+        assertEquals("register", model(saved).route)
+        account.navigate("")
+        assertEquals("", account.route)
+    }
+
+    @Test fun registrationRateLimitStaysNativeAndDoesNotOfferAWebsite() {
+        for (code in listOf("RATE_LIMIT_CHALLENGE_REQUIRED", "HUMAN_VERIFICATION_FAILED")) {
+            val message = registrationFailureMessage(PlatformFailure(429, code, "x", ""))
+            assertFalse(message.contains("https://"))
+            assertTrue(message.contains("稍后重试"))
+        }
+    }
     private fun model(store: MutableMap<String, String> = mutableMapOf(), backend: PlatformBackend = DemoAccountBackend()) =
         AccountModel(backend, AccountRecovery({ store[it] }, { k, v -> store[k] = v }))
 
@@ -42,7 +63,7 @@ class AccountRegistrationTest {
         assertTrue(registrationRestartNeeded(PlatformFailure(429, "RATE_LIMITED", "x", "验证次数已用完，请重新开始。")))
         val taken = PlatformFailure(409, "CONFLICT", "x", "用户名或邮箱已被使用。")
         assertFalse(registrationRestartNeeded(taken)); assertEquals("用户名或邮箱已被使用。", registrationFailureMessage(taken))
-        assertTrue(registrationFailureMessage(PlatformFailure(429, "RATE_LIMIT_CHALLENGE_REQUIRED", "x")).contains("请在网页完成验证"))
+        assertTrue(registrationFailureMessage(PlatformFailure(429, "RATE_LIMIT_CHALLENGE_REQUIRED", "x")).contains("稍后重试"))
     }
 
     @Test fun quizRegistrationSignsInAndClearsPasswords() = runBlocking {

@@ -57,6 +57,9 @@ internal class RainState(application: Application) : AndroidViewModel(applicatio
     private var visibleWork: Job? = null
     private var deckWork: Job? = null
     private var imageWork: Job? = null
+    private val imagePages = mutableStateMapOf<Int, Bitmap>()
+    fun slideImage(index: Int): Bitmap? = imagePages[index]
+    fun reloadImage() { imagePages.remove(slide); loadImage() }
     private var eligibilityWork: Job? = null
     private var draftWork: Job? = null
     val currentSlide get() = presentation?.slides?.getOrNull(slide)
@@ -224,21 +227,40 @@ internal class RainState(application: Application) : AndroidViewModel(applicatio
             try {
                 val value = backend.presentation(joined, id)
                 ensureActive(); if (lesson != joined) return@launch
+                imageWork?.cancel(); imagePages.clear()
                 presentation = value; slide = (number - 1).coerceIn(0, maxOf(0, value.slides.lastIndex)); loadImage()
             } catch (e: CancellationException) { throw e } catch (e: Exception) { fail(e) }
         }
     }
     private fun selectSlideNumber(number: Int) { selectSlide(number - 1) }
-    fun selectSlide(index: Int) { if (index in presentation?.slides.orEmpty().indices) { slide = index; loadImage() } }
+    fun selectSlide(index: Int) {
+        if (index !in presentation?.slides.orEmpty().indices || index == slide && imagePages[index] != null) return
+        slide = index; loadImage()
+    }
     fun selectEvent(event: RainEvent) { follow = false; if (event.presentation.isNotBlank()) loadPresentation(event.presentation, event.slide) }
     fun loadImage() {
-        imageWork?.cancel(); image = null
+        imageWork?.cancel(); image = imagePages[slide]
         val selected = currentSlide ?: return
+        val deck = presentation ?: return
+        val index = slide
+        val window = slideWindow(index, deck.slides.size)
+        imagePages.keys.toList().filter { it !in window }.forEach { imagePages.remove(it) }
         if (selected.image.isBlank()) { error = "本页没有可用图片，仅供查看题目文字。"; return }
         imageWork = viewModelScope.launch {
             try {
-                val bitmap = withContext(Dispatchers.IO) { val bytes = backend.image(selected.image); if (demo) rainDemoBitmap(selected) else rainBitmap(bytes) }
+                val bitmap = imagePages[index] ?: withContext(Dispatchers.IO) { if (demo) rainDemoBitmap(selected) else rainBitmap(backend.image(selected.image)) }
                 ensureActive(); if (currentSlide == selected) image = bitmap
+                imagePages[index] = bitmap
+                coroutineScope {
+                    window.filter { it != index && imagePages[it] == null }.forEach { neighbour -> launch {
+                        try {
+                            val item = deck.slides[neighbour]
+                            val next = withContext(Dispatchers.IO) { if (demo) rainDemoBitmap(item) else rainBitmap(backend.image(item.image)) }
+                            ensureActive(); imagePages[neighbour] = next
+                        } catch (e: CancellationException) { throw e } catch (_: Exception) { }
+                    }
+                    }
+                }
             } catch (e: CancellationException) { throw e } catch (e: Exception) { fail(e) }
         }
     }
@@ -334,7 +356,7 @@ internal class RainState(application: Application) : AndroidViewModel(applicatio
     fun cancelExport() { if (exporting) work?.cancel() }
     fun acknowledgeUnknown() = read { val journal = pendingJournal(); withContext(Dispatchers.IO) { journal.completed() }; unknownKey = ""; message = "已清除本地未知结果标记；下一次写入仍需重新预览确认。" }
     fun leaveLesson() {
-        stopVisibility(); deckWork?.cancel(); imageWork?.cancel(); eligibilityWork?.cancel(); lesson = null; position = null; eligibility = null; unlocks.clear(); liveSlides.clear()
+        stopVisibility(); deckWork?.cancel(); imageWork?.cancel(); imagePages.clear(); eligibilityWork?.cancel(); lesson = null; position = null; eligibility = null; unlocks.clear(); liveSlides.clear()
     }
     fun backToCourses() { if (!busy) { leaveLesson(); presentation = null; image = null; events.clear(); drafts = emptyMap(); restartVisibility() } }
     fun selectScenario(value: RainDemoFailure) { if (demo && !busy) { scenario = value; (backend as? DemoRainBackend)?.failure = value; dismiss(); restartVisibility() } }
