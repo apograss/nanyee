@@ -68,13 +68,17 @@ private fun SlidePager(state: RainState, pager: PagerState, zoomable: Boolean, m
     var scale by remember(pager.currentPage, zoomable) { mutableFloatStateOf(1f) }
     var offset by remember(pager.currentPage, zoomable) { mutableStateOf(Offset.Zero) }
     var size by remember { mutableStateOf(IntSize.Zero) }
+    val currentBitmap = state.slideImage(pager.currentPage)
+    val drawn = fittedSlideSize(size.width, size.height, currentBitmap?.width ?: 0, currentBitmap?.height ?: 0)
+    LaunchedEffect(size, drawn, scale) {
+        offset = Offset(clampSlidePan(offset.x, scale, size.width, drawn.first), clampSlidePan(offset.y, scale, size.height, drawn.second))
+    }
     val transform = rememberTransformableState { zoom, pan, _ ->
         scale = (scale * zoom).coerceIn(1f, 4f)
-        offset = Offset(clampSlidePan(offset.x + pan.x, scale, size.width), clampSlidePan(offset.y + pan.y, scale, size.height))
+        offset = Offset(clampSlidePan(offset.x + pan.x, scale, size.width, drawn.first), clampSlidePan(offset.y + pan.y, scale, size.height, drawn.second))
     }
     HorizontalPager(state = pager, beyondViewportPageCount = 2, userScrollEnabled = scale == 1f, modifier = modifier.onSizeChanged {
         size = it
-        offset = Offset(clampSlidePan(offset.x, scale, it.width), clampSlidePan(offset.y, scale, it.height))
     }.background(if (zoomable) Color.Black else MaterialTheme.colorScheme.surfaceContainerHigh)) { page ->
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             val bitmap = state.slideImage(page)
