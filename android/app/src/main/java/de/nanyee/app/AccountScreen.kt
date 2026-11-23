@@ -227,7 +227,7 @@ private fun RegistrationFields(state: AccountState, model: AccountModel, enabled
     }
     when (model.registerMethod) {
         RegistrationMethod.QUICK, RegistrationMethod.QUIZ -> if (challenge == null) {
-            Text("答几道南医校园常识题即可注册，无需邮箱。", style = MaterialTheme.typography.bodySmall, color = AppMuted)
+            Text("答几道校园常识题即可注册，无需邮箱。", style = MaterialTheme.typography.bodySmall, color = AppMuted)
             Button(onClick = { state.registration { startRegistration() } }, enabled = enabled, modifier = Modifier.fillMaxWidth()) { Text("开始答题") }
         } else {
             val answered = model.answers.count { it != null }

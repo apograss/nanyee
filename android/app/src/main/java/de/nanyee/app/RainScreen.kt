@@ -86,7 +86,7 @@ private fun RainContent(state: RainState, onBack: () -> Unit, toggleDemo: () -> 
         }
     }
     BackHandler(onBack = back)
-    PullToRefreshBox(isRefreshing = state.busy, onRefresh = { if (state.user != null && !state.busy && state.lesson == null) state.refresh() }, modifier = Modifier.widthIn(max = 920.dp).fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant)) {
+    PullToRefreshBox(isRefreshing = state.busy, onRefresh = { if (state.user != null) state.refreshClassroom() }, modifier = Modifier.widthIn(max = 920.dp).fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant)) {
     Column(Modifier.fillMaxSize().verticalScroll(scroll).padding(if (state.lesson == null) 16.dp else 0.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (state.lesson == null) {
             if (state.qr != null) TextButton(onClick = back, enabled = !state.busy) { Text("取消二维码登录") }
@@ -173,6 +173,7 @@ private fun RainContent(state: RainState, onBack: () -> Unit, toggleDemo: () -> 
 @Composable
 private fun RainLessonContent(state: RainState, deviceError: String, locate: () -> Unit) {
     val deck = state.presentation
+    var more by rememberSaveable(state.lesson?.id) { mutableStateOf(false) }
     if (deck == null) Text("暂无课件") else {
         RainSlides(state)
     }
@@ -182,6 +183,14 @@ private fun RainLessonContent(state: RainState, deviceError: String, locate: () 
         if (state.error.isNotBlank()) InlineError(state.error)
         if (deviceError.isNotBlank()) InlineError(deviceError)
         if (state.unknownKey.isNotBlank()) Text("提交结果未知，请先在官方核验。", style = MaterialTheme.typography.bodySmall)
+        TextButton(onClick = { more = !more }, modifier = Modifier.fillMaxWidth()) {
+            Text("更多", Modifier.weight(1f))
+            Icon(if (more) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, if (more) "收起" else "展开")
+        }
+        if (more) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = { state.previewExport(false) }, enabled = !state.busy && state.currentSlide != null) { Text("保存本页") }
+            OutlinedButton(onClick = { state.previewExport(true) }, enabled = !state.busy && state.currentSlide != null) { Text("保存全部") }
+        }
         RainProblemContent(state)
         if (state.exporting) TextButton(onClick = state::cancelExport) { Text("停止保存（已保存 ${state.saved} 张）") }
         Text("真实位置签到", style = MaterialTheme.typography.titleLarge)

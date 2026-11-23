@@ -103,6 +103,15 @@ internal class RainState(application: Application) : AndroidViewModel(applicatio
         courses = backend.courses(); loaded = true
     }
     fun refresh() = read { loadAccount() }
+    fun refreshClassroom() = read {
+        val joined = lesson
+        if (joined == null) loadAccount() else {
+            stopVisibility()
+            deckWork?.cancelAndJoin()
+            val target = presentation?.let { it.id to (slide + 1) } ?: liveSlides.target
+            if (target != null) replacePresentation(joined, target.first, target.second)
+        }
+    }
     fun cancelLogin() {
         loginAccount = ""; loginSecret = ""
         cancelQr(); smsProof = null; smsPhone = ""; smsDeadline = 0
@@ -174,7 +183,7 @@ internal class RainState(application: Application) : AndroidViewModel(applicatio
         if (joined != null) {
             if (lessonFinished) return
             liveStatus = "前台连接中"
-            live.update(true, true, joined) { value -> backend.connect(value, { frame -> viewModelScope.launch { if (foreground && version == generation && lesson == value) accept(frame) } }, { viewModelScope.launch { if (version == generation) { live.stop(); liveStatus = "连接已断开，点击重新连接；不会自动签到" } } }) }
+            live.update(true, true, joined) { value -> backend.connect(value, { frame -> viewModelScope.launch { if (foreground && version == generation && lesson == value) accept(frame) } }, { viewModelScope.launch { if (version == generation) { live.stop(); liveStatus = "连接已断开，下拉刷新重连；不会自动签到" } } }) }
             return
         }
         visibleWork = viewModelScope.launch {
@@ -227,12 +236,16 @@ internal class RainState(application: Application) : AndroidViewModel(applicatio
         deckWork?.cancel()
         deckWork = viewModelScope.launch {
             try {
-                val value = backend.presentation(joined, id)
-                ensureActive(); if (lesson != joined) return@launch
-                imagePages.clear()
-                presentation = value; slide = (number - 1).coerceIn(0, maxOf(0, value.slides.lastIndex)); loadImage()
+                replacePresentation(joined, id, number)
             } catch (e: CancellationException) { throw e } catch (e: Exception) { fail(e) }
         }
+    }
+    private suspend fun replacePresentation(joined: RainLesson, id: String, number: Int) {
+        val value = backend.presentation(joined, id)
+        currentCoroutineContext().ensureActive()
+        if (lesson != joined) return
+        imagePages.clear()
+        presentation = value; slide = (number - 1).coerceIn(0, maxOf(0, value.slides.lastIndex)); loadImage()
     }
     private fun selectSlideNumber(number: Int) { selectSlide(number - 1) }
     fun selectSlide(index: Int) {
