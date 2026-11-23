@@ -178,6 +178,7 @@ private fun RainLessonContent(state: RainState, deviceError: String, locate: () 
     }
     Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+        if (state.message.isNotBlank()) Text(state.message, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
         if (state.error.isNotBlank()) InlineError(state.error)
         if (deviceError.isNotBlank()) InlineError(deviceError)
         if (state.unknownKey.isNotBlank()) Text("提交结果未知，请先在官方核验。", style = MaterialTheme.typography.bodySmall)
