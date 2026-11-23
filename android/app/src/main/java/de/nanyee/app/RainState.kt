@@ -21,6 +21,7 @@ internal class RainState(application: Application) : AndroidViewModel(applicatio
     var courses by mutableStateOf<List<RainCourse>>(emptyList()); private set
     var onLesson by mutableStateOf<List<RainOnLesson>>(emptyList()); private set
     var lesson by mutableStateOf<RainLesson?>(null); private set
+    var lessonTitle by mutableStateOf(""); private set
     var lessonFinished by mutableStateOf(false); private set
     var resolvedLesson by mutableStateOf(""); private set
     var eligibility by mutableStateOf<RainEligibility?>(null); private set
@@ -56,10 +57,11 @@ internal class RainState(application: Application) : AndroidViewModel(applicatio
     private var work: Job? = null
     private var visibleWork: Job? = null
     private var deckWork: Job? = null
-    private var imageWork: Job? = null
-    private val imagePages = mutableStateMapOf<Int, Bitmap>()
+    private val imagePages by lazy { SlideImageCache<Bitmap>(viewModelScope,
+        loaded = { index, bitmap -> if (index == slide) image = bitmap },
+        failed = { index, failure -> if (index == slide) fail(failure) }) }
     fun slideImage(index: Int): Bitmap? = imagePages[index]
-    fun reloadImage() { imagePages.remove(slide); loadImage() }
+    fun reloadImage() { imagePages.invalidate(slide); loadImage() }
     private var eligibilityWork: Job? = null
     private var draftWork: Job? = null
     val currentSlide get() = presentation?.slides?.getOrNull(slide)
@@ -227,7 +229,7 @@ internal class RainState(application: Application) : AndroidViewModel(applicatio
             try {
                 val value = backend.presentation(joined, id)
                 ensureActive(); if (lesson != joined) return@launch
-                imageWork?.cancel(); imagePages.clear()
+                imagePages.clear()
                 presentation = value; slide = (number - 1).coerceIn(0, maxOf(0, value.slides.lastIndex)); loadImage()
             } catch (e: CancellationException) { throw e } catch (e: Exception) { fail(e) }
         }
@@ -235,33 +237,16 @@ internal class RainState(application: Application) : AndroidViewModel(applicatio
     private fun selectSlideNumber(number: Int) { selectSlide(number - 1) }
     fun selectSlide(index: Int) {
         if (index !in presentation?.slides.orEmpty().indices || index == slide && imagePages[index] != null) return
-        slide = index; loadImage()
+        slide = index; error = ""; loadImage()
     }
     fun selectEvent(event: RainEvent) { follow = false; if (event.presentation.isNotBlank()) loadPresentation(event.presentation, event.slide) }
     fun loadImage() {
-        imageWork?.cancel(); image = imagePages[slide]
-        val selected = currentSlide ?: return
+        image = imagePages[slide]
         val deck = presentation ?: return
-        val index = slide
-        val window = slideWindow(index, deck.slides.size)
-        imagePages.keys.toList().filter { it !in window }.forEach { imagePages.remove(it) }
-        if (selected.image.isBlank()) { error = "本页没有可用图片，仅供查看题目文字。"; return }
-        imageWork = viewModelScope.launch {
-            try {
-                val bitmap = imagePages[index] ?: withContext(Dispatchers.IO) { if (demo) rainDemoBitmap(selected) else rainBitmap(backend.image(selected.image)) }
-                ensureActive(); if (currentSlide == selected) image = bitmap
-                imagePages[index] = bitmap
-                coroutineScope {
-                    window.filter { it != index && imagePages[it] == null }.forEach { neighbour -> launch {
-                        try {
-                            val item = deck.slides[neighbour]
-                            val next = withContext(Dispatchers.IO) { if (demo) rainDemoBitmap(item) else rainBitmap(backend.image(item.image)) }
-                            ensureActive(); imagePages[neighbour] = next
-                        } catch (e: CancellationException) { throw e } catch (_: Exception) { }
-                    }
-                    }
-                }
-            } catch (e: CancellationException) { throw e } catch (e: Exception) { fail(e) }
+        imagePages.select(slide, deck.slides.size) { index ->
+            val item = deck.slides[index]
+            if (item.image.isBlank()) throw RainFailure("IMAGE", "本页没有可用图片，仅供查看题目文字。")
+            withContext(Dispatchers.IO) { if (demo) rainDemoBitmap(item) else rainBitmap(backend.image(item.image)) }
         }
     }
     fun refreshEligibility() {
@@ -322,9 +307,9 @@ internal class RainState(application: Application) : AndroidViewModel(applicatio
                 when (action) {
                     is RainAction.Join -> {
                         val joined = backend.join(action.user, action.lessonId)
-                        lesson = joined; lessonFinished = false; resolvedLesson = ""; presentation = null; slide = 0; image = null; follow = true; events.clear(); unlocks.clear(); eligibility = null; position = null
+                        lesson = joined; lessonTitle = action.title; lessonFinished = false; resolvedLesson = ""; presentation = null; slide = 0; image = null; follow = true; events.clear(); unlocks.clear(); eligibility = null; position = null
                         drafts = runCatching { Json.decodeFromString<Map<String, RainDraft>>(store.read(draftKey(joined))) }.getOrDefault(emptyMap())
-                        message = "课堂签到成功；直播只在前台页面运行。"; refreshEligibility()
+                        refreshEligibility()
                     }
                     is RainAction.Scan -> { resolvedLesson = backend.scan(action.user, action.url); message = "课堂码已解析；尚未调用课堂签到，请另行确认加入。" }
                     is RainAction.Location -> { handleResult(backend.locate(action)); eligibility = eligibility?.copy(signed = true); position = null }
@@ -356,7 +341,7 @@ internal class RainState(application: Application) : AndroidViewModel(applicatio
     fun cancelExport() { if (exporting) work?.cancel() }
     fun acknowledgeUnknown() = read { val journal = pendingJournal(); withContext(Dispatchers.IO) { journal.completed() }; unknownKey = ""; message = "已清除本地未知结果标记；下一次写入仍需重新预览确认。" }
     fun leaveLesson() {
-        stopVisibility(); deckWork?.cancel(); imageWork?.cancel(); imagePages.clear(); eligibilityWork?.cancel(); lesson = null; position = null; eligibility = null; unlocks.clear(); liveSlides.clear()
+        stopVisibility(); deckWork?.cancel(); imagePages.clear(); eligibilityWork?.cancel(); lesson = null; lessonTitle = ""; position = null; eligibility = null; unlocks.clear(); liveSlides.clear()
     }
     fun backToCourses() { if (!busy) { leaveLesson(); presentation = null; image = null; events.clear(); drafts = emptyMap(); restartVisibility() } }
     fun selectScenario(value: RainDemoFailure) { if (demo && !busy) { scenario = value; (backend as? DemoRainBackend)?.failure = value; dismiss(); restartVisibility() } }

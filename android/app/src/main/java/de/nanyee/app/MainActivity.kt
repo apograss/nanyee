@@ -108,14 +108,21 @@ internal fun Nanyee(state: SchoolState, preview: AppRelease? = null) {
     val tabState = rememberSaveableStateHolder()
     val pageTitle = if (state.tab == MainTab.TOOLS) when (state.toolsRoute) { "grades" -> "成绩"; "exams" -> "考试"; "cabin" -> "自习舱"; "grab" -> "抢课"; else -> state.tab.label } else state.tab.label
     var platformMenu by remember { mutableStateOf(false) }
+    var rainLogout by remember { mutableStateOf(false) }
+    var rainScenario by remember { mutableStateOf(false) }
+    var rainUnknown by remember { mutableStateOf(false) }
     Scaffold(
         contentWindowInsets = WindowInsets.safeDrawing,
         topBar = { if (state.tab != MainTab.TIMETABLE || !state.homeVisible) TopAppBar(expandedHeight = if (landscape) 48.dp else 56.dp, colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background), title = { Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(pageTitle, style = if (landscape) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineLarge, maxLines = 1)
         } }, actions = {
             if (state.tab == MainTab.CLASSROOM) Box {
-                IconButton(onClick = { platformMenu = true }) { Icon(Icons.Outlined.MoreHoriz, "课堂平台与服务器") }
+                IconButton(onClick = { platformMenu = true }) { Icon(Icons.Outlined.MoreVert, "课堂操作") }
                 DropdownMenu(expanded = platformMenu, onDismissRequest = { platformMenu = false }) {
+                    if (state.classroomPlatform == ClassroomPlatform.RAIN && rain.lesson != null) {
+                        RainLiveMenuItems(rain, { platformMenu = false }, { rainLogout = true }, { rainScenario = true }, { rainUnknown = true }) { demoSelection = classroomDemo.toggle(ClassroomPlatform.RAIN) }
+                        HorizontalDivider()
+                    }
                     ClassroomPlatform.entries.forEach { platform -> DropdownMenuItem(text = { Text(platform.label) }, onClick = { state.selectClassroom(platform); platformMenu = false }, leadingIcon = { RadioButton(selected = state.classroomPlatform == platform, onClick = null) }) }
                     if (state.classroomPlatform == ClassroomPlatform.RAIN) {
                         HorizontalDivider()
@@ -163,6 +170,13 @@ internal fun Nanyee(state: SchoolState, preview: AppRelease? = null) {
         }
     }
     pendingRainHost?.let { host -> AlertDialog(onDismissRequest = { pendingRainHost = null }, title = { Text("请确认") }, text = { Text("切换到 ${host.domain}？") }, confirmButton = { TextButton(onClick = { rain.switchHost(host); pendingRainHost = null }) { Text("确认") } }, dismissButton = { TextButton(onClick = { pendingRainHost = null }) { Text("取消") } }) }
+    if (rainLogout) AlertDialog(onDismissRequest = { rainLogout = false }, title = { Text("切换雨课堂账号") }, text = { Text("退出并清除雨课堂本机数据？") }, confirmButton = { TextButton(onClick = { rain.logout(); rainLogout = false }) { Text("确认") } }, dismissButton = { TextButton(onClick = { rainLogout = false }) { Text("取消") } })
+    if (rainUnknown) AlertDialog(onDismissRequest = { rainUnknown = false }, title = { Text("请确认") }, text = { Text("确认已在官方核验结果？") }, confirmButton = { TextButton(onClick = { rain.acknowledgeUnknown(); rainUnknown = false }) { Text("确认") } }, dismissButton = { TextButton(onClick = { rainUnknown = false }) { Text("取消") } })
+    if (rainScenario && rain.demo) AlertDialog(onDismissRequest = { rainScenario = false }, title = { Text("演示场景") }, text = {
+        Column(Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState())) {
+            RainDemoFailure.entries.forEach { scenario -> TextButton(onClick = { rain.selectScenario(scenario); rainScenario = false }, enabled = !rain.busy) { Text(if (rain.scenario == scenario) "✓ ${scenario.label}" else scenario.label) } }
+        }
+    }, confirmButton = { TextButton(onClick = { rainScenario = false }) { Text("关闭") } })
     detail?.let { (kind, item) -> if (kind == "course" && isExam(item)) ExamDetailSheet(item) { detailIndex = -1 } else AlertDialog(onDismissRequest = { detailIndex = -1 }, confirmButton = { TextButton(onClick = { detailIndex = -1 }) { Text("关闭") } }, title = { Text(item.text("name")) }, text = {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (kind == "course") {

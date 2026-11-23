@@ -12,7 +12,6 @@ import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,27 +30,12 @@ import androidx.compose.ui.window.DialogProperties
 internal fun RainSlides(state: RainState) {
     val deck = state.presentation ?: return
     if (deck.slides.isEmpty()) { Text("暂无幻灯片"); return }
-    val pager = rememberPagerState(initialPage = state.slide) { deck.slides.size }
-    var menu by remember { mutableStateOf(false) }
-    var fullscreen by remember { mutableStateOf(false) }
+    val pager = key(deck.id) { rememberPagerState(initialPage = state.slide) { deck.slides.size } }
+    var fullscreen by remember(deck.id) { mutableStateOf(false) }
     LaunchedEffect(state.slide, deck.id) { if (pager.currentPage != state.slide) pager.scrollToPage(state.slide) }
     LaunchedEffect(pager, deck.id) {
         snapshotFlow { pager.currentPage }.collect { index ->
-            if (pager.isScrollInProgress && index != state.slide) { state.updateFollow(false); state.selectSlide(index) }
-        }
-    }
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(deck.title, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text("${pager.currentPage + 1}/${deck.slides.size}", style = MaterialTheme.typography.labelMedium)
-        Box {
-            IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, "课件操作") }
-            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                DropdownMenuItem(text = { Text("重新加载本页") }, onClick = { menu = false; state.reloadImage() })
-                DropdownMenuItem(text = { Text("重新加载课件") }, onClick = { menu = false; state.loadPresentation() })
-                DropdownMenuItem(text = { Text("重新连接课堂") }, onClick = { menu = false; state.reconnect() })
-                DropdownMenuItem(text = { Text("保存本页") }, onClick = { menu = false; state.previewExport(false) })
-                DropdownMenuItem(text = { Text("保存全部") }, onClick = { menu = false; state.previewExport(true) })
-            }
+            if (index != state.slide) { state.updateFollow(false); state.selectSlide(index) }
         }
     }
     if (!fullscreen) SlidePager(state, pager, false, Modifier.fillMaxWidth().aspectRatio(4f / 3f)) { fullscreen = true }
@@ -68,6 +52,11 @@ internal fun RainSlides(state: RainState) {
                 }
             }
         }
+    }
+    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(state.lessonTitle.ifBlank { deck.title }, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text("${pager.currentPage + 1}/${deck.slides.size}", style = MaterialTheme.typography.labelMedium)
+        FilterChip(selected = state.follow, onClick = { state.updateFollow(!state.follow) }, enabled = !state.busy, label = { Text("跟随") })
     }
 }
 
