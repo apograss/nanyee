@@ -34,8 +34,7 @@ internal fun CabinToolsScreen(school: SchoolState, state: CabinState = viewModel
     if (registration) {
         BackHandler { registration = false }
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            TextButton(onClick = { registration = false }) { Text("返回工具") }
-            AccountSection(demoOnly = school.demo, initialRoute = NATIVE_REGISTRATION)
+            AccountSection(demoOnly = school.demo, initialRoute = NATIVE_REGISTRATION, onRegistrationBack = { registration = false })
         }
         return
     }

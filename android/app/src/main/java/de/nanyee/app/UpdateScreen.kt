@@ -19,6 +19,7 @@ import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
@@ -99,8 +100,13 @@ private fun sendFeedback(context: Context) {
 @Composable
 internal fun FeedbackRow() {
     val context = LocalContext.current
-    ListItem(headlineContent = { Text("反馈") }, leadingContent = { Icon(Icons.Outlined.MailOutline, null) },
-        modifier = Modifier.combinedClickable(onClick = { sendFeedback(context) }, onLongClick = { copyContact(context) }))
+    Card(modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+        Row(Modifier.fillMaxWidth().combinedClickable(onClick = { sendFeedback(context) }, onLongClick = { copyContact(context) }).heightIn(min = 52.dp).padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            AccentIcon(Icons.Outlined.MailOutline, SectionAccent.BRAND)
+            Text("反馈", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+            Icon(Icons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+        }
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
