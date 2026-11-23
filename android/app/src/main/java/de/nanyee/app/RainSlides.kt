@@ -21,6 +21,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -65,11 +67,15 @@ internal fun RainSlides(state: RainState) {
 private fun SlidePager(state: RainState, pager: PagerState, zoomable: Boolean, modifier: Modifier, onTap: () -> Unit) {
     var scale by remember(pager.currentPage, zoomable) { mutableFloatStateOf(1f) }
     var offset by remember(pager.currentPage, zoomable) { mutableStateOf(Offset.Zero) }
+    var size by remember { mutableStateOf(IntSize.Zero) }
     val transform = rememberTransformableState { zoom, pan, _ ->
         scale = (scale * zoom).coerceIn(1f, 4f)
-        offset = if (scale == 1f) Offset.Zero else Offset((offset.x + pan.x).coerceIn(-1200f, 1200f), (offset.y + pan.y).coerceIn(-1200f, 1200f))
+        offset = Offset(clampSlidePan(offset.x + pan.x, scale, size.width), clampSlidePan(offset.y + pan.y, scale, size.height))
     }
-    HorizontalPager(state = pager, beyondViewportPageCount = 2, userScrollEnabled = scale == 1f, modifier = modifier.background(if (zoomable) Color.Black else MaterialTheme.colorScheme.surfaceContainerHigh)) { page ->
+    HorizontalPager(state = pager, beyondViewportPageCount = 2, userScrollEnabled = scale == 1f, modifier = modifier.onSizeChanged {
+        size = it
+        offset = Offset(clampSlidePan(offset.x, scale, it.width), clampSlidePan(offset.y, scale, it.height))
+    }.background(if (zoomable) Color.Black else MaterialTheme.colorScheme.surfaceContainerHigh)) { page ->
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             val bitmap = state.slideImage(page)
             if (bitmap == null) {
