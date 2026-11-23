@@ -22,9 +22,10 @@ internal class AccountState(app: Application, private val saved: SavedStateHandl
     private val models = mutableMapOf<Boolean, AccountModel>()
     private fun key(owner: String) = "dismissed." + MessageDigest.getInstance("SHA-256").digest(owner.toByteArray()).joinToString("") { "%02x".format(it) }
     fun restoreOverview(schoolDemo: Boolean = false) { if (!schoolDemo) open() }
-    fun open(forceDemo: Boolean = false) {
-        if (forceDemo && !demo) {
-            work?.cancel(); clearTransient(); demo = true; saved["accountDemo"] = true; model = null
+    fun open(forceDemo: Boolean = false, registration: Boolean = false) {
+        val nextDemo = if (registration) forceDemo else demo || forceDemo
+        if (nextDemo != demo) {
+            work?.cancel(); clearTransient(); demo = nextDemo; saved["accountDemo"] = demo; model = null
         }
         if (work?.isActive == true) return
         initializationError = ""

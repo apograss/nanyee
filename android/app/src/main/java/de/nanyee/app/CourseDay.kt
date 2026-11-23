@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.serialization.json.JsonObject
 
 @Composable
-fun CourseDay(courses: List<JsonObject>, nodes: Int, periodHeight: Dp, onCourse: (JsonObject) -> Unit, onConflicts: (List<JsonObject>) -> Unit, modifier: Modifier = Modifier) {
+fun CourseDay(courses: List<JsonObject>, nodes: Int, periodHeight: Dp, onCourse: (JsonObject) -> Unit, onConflicts: (List<JsonObject>) -> Unit, modifier: Modifier = Modifier, colors: Map<String, Int> = courseColors(courses)) {
     val titleStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.Medium, lineBreak = LineBreak.Heading, hyphens = Hyphens.None)
     BoxWithConstraints(modifier.height(periodHeight * nodes)) {
         courseGroups(courses).forEach { group ->
@@ -37,7 +37,7 @@ fun CourseDay(courses: List<JsonObject>, nodes: Int, periodHeight: Dp, onCourse:
                 val span = if (collapse) requireNotNull(courseSpan(group)) else course.number("start_node")..course.number("end_node")
                 val name = course.text("name")
                 val maxTitleLines = if (span.first == span.last) 2 else (span.last - span.first + 1) * 3
-                Surface(onClick = { if (collapse && group.size > 1) onConflicts(group) else onCourse(course) }, color = courseFill(name), contentColor = Color.White, shape = RoundedCornerShape(5.dp), modifier = Modifier.offset(x = if (collapse) 0.dp else laneWidth * placement.lane, y = periodHeight * (span.first - 1)).width(laneWidth).padding(end = if (!collapse && placement.laneCount > 1) 2.dp else 0.dp).height(periodHeight * (span.last - span.first + 1) - 3.dp)) {
+                Surface(onClick = { if (collapse && group.size > 1) onConflicts(group) else onCourse(course) }, color = Color(coursePalette[colors[courseColorKey(course)] ?: 0]), contentColor = Color.White, shape = RoundedCornerShape(5.dp), modifier = Modifier.offset(x = if (collapse) 0.dp else laneWidth * placement.lane, y = periodHeight * (span.first - 1)).width(laneWidth).padding(end = if (!collapse && placement.laneCount > 1) 2.dp else 0.dp).height(periodHeight * (span.last - span.first + 1) - 3.dp)) {
                     Box(Modifier.fillMaxSize()) {
                     Column(Modifier.padding(horizontal = 3.dp, vertical = 5.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         if (collapse && group.size > 1) Text("+${group.size - 1}", fontSize = 10.sp, lineHeight = 10.sp, maxLines = 1, fontWeight = FontWeight.Bold)

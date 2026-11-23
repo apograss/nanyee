@@ -43,6 +43,7 @@ internal class AccountModel(private val backend: PlatformBackend, private val re
     fun navigate(value: String) {
         if (busy) return
         clearTransient(); message = ""; route = value; recovery.write("route", value)
+        if (value == NATIVE_REGISTRATION) error = ""
         if (value !in setOf("email", "reset")) clearChallenge()
         if (value != "register") clearRegistration()
     }

@@ -32,6 +32,7 @@ internal fun TimetablePages(
     onConflicts: (List<JsonObject>) -> Unit
 ) {
     val verticalScroll = rememberScrollState()
+    val colors = remember(courses) { courseColors(courses) }
     val nodeTimes = remember(courses) { periodStartTimes(courses) }
     val endTimes = remember(courses) { periodEndTimes(courses) }
     val nodes = maxOf(nodeTimes.size, courses.maxOfOrNull { it.number("end_node") } ?: 0)
@@ -67,7 +68,7 @@ internal fun TimetablePages(
                     }
                     (1..7).forEach { day ->
                         Box(Modifier.weight(1f).height(periodHeight * nodes)) {
-                            CourseDay(active.filter { it.number("weekday") == day }, nodes, periodHeight, onCourse, onConflicts, Modifier.fillMaxWidth())
+                            CourseDay(active.filter { it.number("weekday") == day }, nodes, periodHeight, onCourse, onConflicts, Modifier.fillMaxWidth(), colors)
                         }
                     }
                 }
