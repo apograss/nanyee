@@ -13,6 +13,31 @@ import java.lang.reflect.Proxy
 import kotlin.coroutines.CoroutineContext
 
 class AccountStateTest {
+    @Test fun toolRegistrationSelectsTheSchoolModeInsteadOfThePreviousAccountDemo() = runBlocking<Unit> {
+        for (schoolDemo in listOf(false, true)) {
+            for (scenario in listOf(AccountDemoFailure.NONE, AccountDemoFailure.SESSION, AccountDemoFailure.NETWORK)) {
+                val saved = SavedStateHandle(mapOf("accountDemo" to true))
+                val state = state(saved)
+                val realModel = AccountModel(DemoAccountBackend(initiallySignedIn = false).apply { selectScenario(scenario) }, AccountRecovery({ null }, { _, _ -> }))
+                @Suppress("UNCHECKED_CAST")
+                val models = AccountState::class.java.getDeclaredField("models").apply { isAccessible = true }.get(state) as MutableMap<Boolean, AccountModel>
+                models[false] = realModel
+                state.open(forceDemo = schoolDemo, registration = true)
+                val job = AccountState::class.java.getDeclaredField("work").apply { isAccessible = true }.get(state) as Job
+                withTimeout(5000) { job.join() }
+                assertEquals(schoolDemo, state.demo)
+                assertEquals(schoolDemo, saved.get<Boolean>("accountDemo"))
+                if (!schoolDemo) {
+                    assertSame(realModel, state.model)
+                    assertNull(state.model?.user)
+                    state.model?.navigate(NATIVE_REGISTRATION)
+                    assertEquals(NATIVE_REGISTRATION, state.model?.route)
+                }
+                ViewModelStore().apply { put("account", state); clear() }
+            }
+        }
+    }
+
     private class TestApplication : Application() {
         override fun getSharedPreferences(name: String, mode: Int): SharedPreferences =
             Proxy.newProxyInstance(SharedPreferences::class.java.classLoader, arrayOf(SharedPreferences::class.java)) { _, method, _ ->

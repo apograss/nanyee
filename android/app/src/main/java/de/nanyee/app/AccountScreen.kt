@@ -78,11 +78,11 @@ internal fun AccountSection(state: AccountState = viewModel(key = "platform-acco
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val revision by PlatformSession.revision.collectAsState()
     val uri = LocalUriHandler.current
-    LaunchedEffect(revision, demoOnly) { state.open(demoOnly) }
+    LaunchedEffect(revision, demoOnly, initialRoute) { state.open(demoOnly, registration = initialRoute == NATIVE_REGISTRATION) }
     DisposableEffect(lifecycle, state, demoOnly) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_STOP) state.clearTransient()
-            if (event == Lifecycle.Event.ON_RESUME) state.open(demoOnly)
+            if (event == Lifecycle.Event.ON_RESUME) state.open(demoOnly, registration = initialRoute == NATIVE_REGISTRATION)
         }
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer); state.clearTransient() }
