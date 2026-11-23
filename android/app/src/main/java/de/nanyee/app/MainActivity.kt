@@ -121,13 +121,13 @@ internal fun Nanyee(state: SchoolState, preview: AppRelease? = null) {
                 DropdownMenu(expanded = platformMenu, onDismissRequest = { platformMenu = false }) {
                     if (state.classroomPlatform == ClassroomPlatform.RAIN && rain.lesson != null) {
                         RainLiveMenuItems(rain, { platformMenu = false }, { rainLogout = true }, { rainScenario = true }, { rainUnknown = true }) { demoSelection = classroomDemo.toggle(ClassroomPlatform.RAIN) }
-                    } else {
-                        ClassroomPlatform.entries.forEach { platform -> DropdownMenuItem(text = { Text(platform.label) }, onClick = { state.selectClassroom(platform); platformMenu = false }, leadingIcon = { RadioButton(selected = state.classroomPlatform == platform, onClick = null) }) }
-                        if (state.classroomPlatform == ClassroomPlatform.RAIN) {
+                        HorizontalDivider()
+                    }
+                    ClassroomPlatform.entries.forEach { platform -> DropdownMenuItem(text = { Text(platform.label) }, onClick = { state.selectClassroom(platform); platformMenu = false }, leadingIcon = { RadioButton(selected = state.classroomPlatform == platform, onClick = null) }) }
+                        if (state.classroomPlatform == ClassroomPlatform.RAIN && rain.lesson == null) {
                             HorizontalDivider()
                             RainHost.entries.forEach { host -> DropdownMenuItem(text = { Text(host.domain) }, enabled = rain.ready && !rain.busy && rain.lesson == null, onClick = { if (rain.host != host) pendingRainHost = host; platformMenu = false }, leadingIcon = { RadioButton(selected = rain.host == host, onClick = null) }) }
                         }
-                    }
                 }
             }
             if ((state.tab == MainTab.TIMETABLE || state.tab == MainTab.TOOLS && state.toolsRoute in setOf("grades", "exams")) && state.homeVisible && !state.demo) IconButton(onClick = { state.reload() }, enabled = !state.busy) { Icon(Icons.Outlined.Refresh, "刷新", Modifier.size(iconSize)) }
