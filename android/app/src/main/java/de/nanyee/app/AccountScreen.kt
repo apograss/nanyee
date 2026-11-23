@@ -95,6 +95,9 @@ internal fun AccountSection(state: AccountState = viewModel(key = "platform-acco
             initialRouteOpened = true
         }
     }
+    LaunchedEffect(model?.user, initialRouteOpened) {
+        if (initialRouteOpened && model?.user != null) onRegistrationBack?.invoke()
+    }
     if (model?.route == NATIVE_REGISTRATION && model.user == null) {
         NativeRegistrationPage(state, model) { model.navigate(""); onRegistrationBack?.invoke() }
         return
