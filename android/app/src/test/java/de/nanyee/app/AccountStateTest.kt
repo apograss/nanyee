@@ -18,7 +18,7 @@ class AccountStateTest {
             for (scenario in listOf(AccountDemoFailure.NONE, AccountDemoFailure.SESSION, AccountDemoFailure.NETWORK)) {
                 val saved = SavedStateHandle(mapOf("accountDemo" to true))
                 val state = state(saved)
-                val realModel = AccountModel(DemoAccountBackend(initiallySignedIn = false).apply { selectScenario(scenario) }, AccountRecovery({ null }, { _, _ -> }))
+                val realModel = AccountModel(DemoAccountBackend(initiallySignedIn = false).apply { failure = scenario }, AccountRecovery({ null }, { _, _ -> }))
                 @Suppress("UNCHECKED_CAST")
                 val models = AccountState::class.java.getDeclaredField("models").apply { isAccessible = true }.get(state) as MutableMap<Boolean, AccountModel>
                 models[false] = realModel
