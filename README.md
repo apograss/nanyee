@@ -1,89 +1,50 @@
-<div align="center">
-
 # Nanyee
 
-**南方医科大学学生的一站式 Android App**
+给南医学生写的 Android App。打开就是课表，雨课堂、抢课、评课也都在里面。
 
-课表 · 考试与网考号 · 成绩 · 评课 · 抢课 · 自习舱 · 学习通 / 雨课堂
+**[下载 APK](https://nanyee.de/download)**（国内直连）· [GitHub Releases](https://github.com/apograss/nanyee/releases/latest) · 需要 Android 8.0+
 
-[**下载 APK**](https://nanyee.de/download) · [GitHub Releases](https://github.com/apograss/nanyee/releases/latest) · [反馈](mailto:contact@nanyee.de)
-
-![Android 8.0+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)
-![Kotlin](https://img.shields.io/badge/Kotlin-Jetpack%20Compose-7F52FF?logo=kotlin&logoColor=white)
-![License](https://img.shields.io/badge/license-GPL--3.0-blue)
-[![Release](https://img.shields.io/github/v/release/apograss/nanyee)](https://github.com/apograss/nanyee/releases/latest)
-
-</div>
-
-<div align="center">
+<p>
 <img src="docs/screenshots/timetable.png" width="24%" />
 <img src="docs/screenshots/classroom.png" width="24%" />
-<img src="docs/screenshots/grades.png" width="24%" />
-<img src="docs/screenshots/exam.png" width="24%" />
-</div>
+<img src="docs/screenshots/grab.png" width="24%" />
+<img src="docs/screenshots/evaluation.png" width="24%" />
+</p>
 
-<p align="center"><sub>截图为 App 内「演示模式」的示例数据。</sub></p>
+<sub>截图用的是 App 里的演示模式，数据是假的。</sub>
 
-## 为什么用 Nanyee
+## 主要能做什么
 
-不用再在教务、学习通、雨课堂、评教页面之间来回切换。一个 App，打开就是本周课表。
+**课表**：按 WakeUp 的样子做的，每门课一种颜色，同一门课永远是同一种颜色。左右滑动切周，考试会直接标在课表上，网考号点一下就能复制。课表存在手机里，没网、教务崩了也能看。
 
-- **一次登录，之后不用管**：学校验证码在手机上自动识别；勾选「记住」后，登录过期会自动重新登录。
-- **离线也能看课表**：课表加密保存在本机，没网、教务崩了也照样看。
-- **和 WakeUp 一样好看**：每门课一种颜色，左右滑动切周，考试直接标在课表上。
-- **数据直连学校**：除自习舱和自动评课外，所有功能都由手机直接访问学校系统，不经过任何第三方服务器。
+**雨课堂 PPT**：PPT 是整屏宽的大图，左右滑动翻页，点开可以全屏、双指放大。翻页时前后两页已经提前加载好了，不用每翻一页等一下。下拉刷新，保存本页或整套 PPT 都在下面的「更多」里。
 
-## 功能
+**抢课**：可以排好几个志愿，按教务服务器的时间对好表，到点自动开抢。抢到了就停，撞课会先问你。
 
-| | |
-|---|---|
-| **课表** | 按周查看、左右滑动切周、每门课固定配色、离线可用 |
-| **考试** | 考试时间和地点显示在课表上，附带网考号，一键复制 |
-| **成绩** | 各学期成绩与加权平均绩点 |
-| **评课** | 手动一键评课（逐题可改、提交前预览），或交给服务器自动评课 |
-| **抢课** | 多志愿排队、按教务服务器校时定点开抢、冲突确认 |
-| **自习舱** | 设定时段和舱位优先级，服务器自动预约 |
-| **学习通** | 密码 / 短信 / 扫码登录，签到、投票、问卷、练习、讨论 |
-| **雨课堂** | 支持长江、荷塘、黄河等服务器；PPT 大图滑动翻页、全屏缩放、预加载；课堂答题 |
-| **更多** | 新版本提醒、演示模式（不登录也能先试用） |
+**自动评课**：交给服务器，它会自己登录教务，把待评的课一次评完，不用一门门点。想自己评也行，一键填好，每题都能改，提交前可以先看一遍。
 
-## 下载安装
+其他还有：成绩和绩点、自习舱自动预约、学习通签到和课堂互动。登录验证码在手机上自动识别，过期了会自己重新登录。
 
-1. 打开 [nanyee.de/download](https://nanyee.de/download)（国内可直接访问），下载 APK。也可以从 [GitHub Releases](https://github.com/apograss/nanyee/releases/latest) 下载。
-2. 允许浏览器安装应用，点击安装。
-3. 以后有新版本，App 会提示更新，直接覆盖安装，数据保留。
+没有学校账号也能先用演示模式看看。
 
-需要 Android 8.0 及以上。
+## 安装和更新
 
-## 隐私与安全
+从 [nanyee.de/download](https://nanyee.de/download) 下载 APK 安装就行。以后有新版本 App 会提醒，下载后直接覆盖安装，数据都在。
 
-- 学校密码、Cookie 和课表都用 Android Keystore 加密保存在本机，不备份、不上传。
-- 只有你主动开启**自习舱预约**或**自动评课**时，才会把学校凭据加密托管到 nanyee.de，用于服务器替你执行；随时可以在「我的」里删除。
-- 学习通 / 雨课堂的签到使用手机真实定位，拒绝模拟位置；所有作答都由你本人填写并确认后提交，不代签、不自动答题。
-- 代码完全开源，可以自己审查和编译。
+## 关于隐私
 
-> **非官方项目**，与南方医科大学无隶属关系。请遵守学校规定，合理使用。
+学校密码、Cookie 和课表都加密存在你手机上，App 直接连学校的系统。只有你自己打开了自动评课或自习舱预约，账号才会加密存到 nanyee.de，让服务器替你操作，在「我的」里随时可以删掉。
 
-## 反馈与支持
+学习通和雨课堂签到用的是真实定位，答题都由你自己填写、确认后才提交。
 
-- 邮件：[contact@nanyee.de](mailto:contact@nanyee.de)（App 内「我的 → 反馈」会自动带上版本和机型）
-- 问题与建议：[GitHub Issues](https://github.com/apograss/nanyee/issues)
-- 觉得好用的话，可以在「我的 → 捐赠」请作者喝杯咖啡
+这不是学校的官方 App。
 
-## 开发者
+## 反馈
 
-本仓库同时包含 Android App 和 nanyee.de 的后端与网站：
+有问题或想法发邮件到 [contact@nanyee.de](mailto:contact@nanyee.de)，或者提 [Issue](https://github.com/apograss/nanyee/issues)。觉得好用的话，「我的 → 捐赠」可以请我喝杯咖啡。
 
-| 目录 | 内容 | 文档 |
-|---|---|---|
-| `android/` | Kotlin · Jetpack Compose · Material 3 原生客户端 | [android/README.md](android/README.md) |
-| `services/`、`web/`、`infra/` | FastAPI 后端、Worker、React 网站、部署配置 | [docs/backend.md](docs/backend.md) |
+## 开发
 
-```sh
-cd android
-./gradlew assembleDebug testDebugUnitTest
-```
+`android/` 是 App（Kotlin + Jetpack Compose），说明见 [android/README.md](android/README.md)。nanyee.de 的后端、网站和部署配置见 [docs/backend.md](docs/backend.md)。
 
-## 许可
-
-Android App 以 [GPL-3.0](android/LICENSE) 发布，其中学习通与雨课堂部分移植自 [AneryCoft/course_helper](https://github.com/AneryCoft/course_helper)，感谢原作者。课表界面参考了 WakeUp 课程表的设计。
+App 以 [GPL-3.0](android/LICENSE) 开源。学习通和雨课堂部分移植自 [AneryCoft/course_helper](https://github.com/AneryCoft/course_helper)，感谢原作者。
