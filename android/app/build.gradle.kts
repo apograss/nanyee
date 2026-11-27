@@ -7,7 +7,7 @@ plugins {
 android {
     namespace = "de.nanyee.app"
     compileSdk = 35
-    defaultConfig { applicationId = "de.nanyee.app"; minSdk = 26; targetSdk = 35; versionCode = 101; versionName = "1.0.1" }
+    defaultConfig { applicationId = "de.nanyee.app"; minSdk = 26; targetSdk = 35; versionCode = 102; versionName = "1.0.2" }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }

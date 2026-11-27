@@ -17,6 +17,9 @@ import androidx.compose.material.icons.outlined.School
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.Explore
+import androidx.compose.material.icons.outlined.Code
+import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -45,6 +48,9 @@ internal fun MyScreen(school: SchoolState) {
     var section by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
     BackHandler(section.isNotEmpty()) { section = "" }
     val profile = account.model?.user
+    if (section == "recommendations") {
+        RecommendationsPage { section = "" }
+    }
     val name = if (school.demo) "演示同学" else profile?.text("nickname").orEmpty().ifBlank { profile?.text("username").orEmpty() }.ifBlank { "你好，同学" }
     Column(Modifier.widthIn(max = 720.dp).fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         if (section.isEmpty()) ProfileHero(name, if (school.demo) "2026000001" else if (school.loggedIn) school.account else "未登录", Icons.Outlined.AccountCircle)
@@ -55,9 +61,12 @@ internal fun MyScreen(school: SchoolState) {
             Text("应用", style = MaterialTheme.typography.labelLarge, color = AppMuted)
             FeedbackRow()
             val uri = LocalUriHandler.current
+            CompactEntry("推荐", "", Icons.Outlined.Explore, SectionAccent.BRAND) { section = "recommendations" }
             CompactEntry("捐赠", "", Icons.Outlined.FavoriteBorder, SectionAccent.PLUM) { uri.openUri("https://donate.apograss.cn") }
+            CompactEntry("GitHub", "", Icons.Outlined.Code, SectionAccent.BRAND) { uri.openUri("https://github.com/apograss/nanyee") }
+            CompactEntry("nanyee.de", "", Icons.Outlined.Language, SectionAccent.BRAND) { uri.openUri("https://nanyee.de") }
             CompactEntry("关于", BuildConfig.VERSION_NAME, Icons.Outlined.Info, SectionAccent.BRAND) { section = "about" }
-        } else {
+        } else if (section != "recommendations") {
             TextButton(onClick = { section = "" }) { Text("返回我的") }
             if (section == "about") AppAbout(updates)
             else if (section == "platform") AccountSection(state = account, demoOnly = school.demo)
