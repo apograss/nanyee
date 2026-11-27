@@ -62,9 +62,9 @@ internal fun MyScreen(school: SchoolState) {
             FeedbackRow()
             val uri = LocalUriHandler.current
             CompactEntry("推荐", "", Icons.Outlined.Explore, SectionAccent.BRAND) { section = "recommendations" }
-            CompactEntry("捐赠", "", Icons.Outlined.FavoriteBorder, SectionAccent.PLUM) { uri.openUri("https://donate.apograss.cn") }
-            CompactEntry("GitHub", "", Icons.Outlined.Code, SectionAccent.BRAND) { uri.openUri("https://github.com/apograss/nanyee") }
-            CompactEntry("nanyee.de", "", Icons.Outlined.Language, SectionAccent.BRAND) { uri.openUri("https://nanyee.de") }
+            CompactEntry("捐赠", "", Icons.Outlined.FavoriteBorder, SectionAccent.PLUM) { uri.openSafely("https://donate.apograss.cn") }
+            CompactEntry("GitHub", "", Icons.Outlined.Code, SectionAccent.BRAND) { uri.openSafely("https://github.com/apograss/nanyee") }
+            CompactEntry("nanyee.de", "", Icons.Outlined.Language, SectionAccent.BRAND) { uri.openSafely("https://nanyee.de") }
             CompactEntry("关于", BuildConfig.VERSION_NAME, Icons.Outlined.Info, SectionAccent.BRAND) { section = "about" }
         } else if (section != "recommendations") {
             TextButton(onClick = { section = "" }) { Text("返回我的") }

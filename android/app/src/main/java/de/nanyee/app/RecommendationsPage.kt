@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -35,7 +36,7 @@ internal fun RecommendationsPage(back: () -> Unit) {
                 recommendationGroups.forEach { group ->
                     Text(group.title, style = MaterialTheme.typography.labelLarge, color = AppMuted)
                     group.items.forEach { item ->
-                        Card(onClick = { uri.openUri(item.url) }, modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+                        Card(onClick = { uri.openSafely(item.url) }, modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
                             Row(Modifier.heightIn(min = 52.dp).padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 Image(painterResource(item.icon), null, Modifier.size(36.dp).clip(MaterialTheme.shapes.small).background(Color.White).padding(3.dp))
                                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -50,4 +51,8 @@ internal fun RecommendationsPage(back: () -> Unit) {
             }
         }
     }
+}
+
+internal fun UriHandler.openSafely(url: String) {
+    try { openUri(url) } catch (_: Exception) { }
 }
