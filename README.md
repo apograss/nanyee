@@ -1,121 +1,89 @@
-# Nanyee 学生工具平台
+<div align="center">
 
-**不要在意那些没有意思的介绍，快给我去试用新的手机 APP!** QWQ
+# Nanyee
 
-Nanyee 是面向学生的小型工具平台，线上运行于 [nanyee.de](https://nanyee.de)。当前仓库把旧工具统一到 FastAPI 模块化单体、独立 Worker 与 React 前端中；视觉层可以继续独立迭代，接口行为以固定 OpenAPI 和接入文档为准。
+**南方医科大学学生的一站式 Android App**
 
-## 已实现的后端基础
+课表 · 考试与网考号 · 成绩 · 评课 · 抢课 · 自习舱 · 学习通 / 雨课堂
 
-- 教育邮箱验证码与校内答题两种注册 Challenge。
-- 8–128 字符平台密码、Argon2id、常见密码拦截。
-- 服务端 Session、HttpOnly Cookie、双提交 CSRF、登录/注销。
-- PostgreSQL 持久限流、Cloudflare Turnstile 软门槛与不可绕过的硬门槛。
-- 学校登录：验证码流程短期有效；核验后的教务 Cookie 仅在服务端内存固定保存 24 小时，选课成功立即擦除。
-- 课表查询、聚合、ICS/WakeUp 文件导出与可选 WakeUp 分享；成绩汇总、逐科排名和分数段分布。
-- 自动选课：账号密码/Cookie 两种登录、多级志愿、教务服务器校时、定时启动、100–300 毫秒随机间隔、15–120 次自动尝试、冲突确认、运行日志与取消。
-- VPS 自动评课：加密托管教务凭据，Worker 自动 OCR 登录、读取全部待评课程并按旧版高分策略批量提交；OCR 和网络错误持久化退避重试。
-- 学习舱预约：18 个舱位优先级、开放/冻结时段判断、加密学校凭据、OCR 退避登录与持续重试。
-- 群报数即时 Token 校验、链接解析、表单同步、浏览器地图选点、受限图片上传、字段预览、临时 Token 立即提交与托管预约提交。
-- 托管凭据信封加密：每条凭据独立 AES-256-GCM 数据密钥，可用 Azure Key Vault RSA-OAEP-256 或本地主密钥包裹。
-- 持久任务：幂等键、计划时间、租约、心跳、取消、持续重试和人工核验状态。
-- 固定 OpenAPI、结构化错误码和字段白名单日志。
+[**下载 APK**](https://nanyee.de/download) · [GitHub Releases](https://github.com/apograss/nanyee/releases/latest) · [反馈](mailto:contact@nanyee.de)
 
-旧代码只作为参考保留在 `legacy/`，不进入生产镜像。
+![Android 8.0+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)
+![Kotlin](https://img.shields.io/badge/Kotlin-Jetpack%20Compose-7F52FF?logo=kotlin&logoColor=white)
+![License](https://img.shields.io/badge/license-GPL--3.0-blue)
+[![Release](https://img.shields.io/github/v/release/apograss/nanyee)](https://github.com/apograss/nanyee/releases/latest)
 
-## 本地启动
+</div>
 
-要求 Python 3.12、[uv](https://docs.astral.sh/uv/) 和 PostgreSQL 17。Docker 可用时可以启动仓库自带的开发数据库：
+<div align="center">
+<img src="docs/screenshots/timetable.png" width="24%" />
+<img src="docs/screenshots/classroom.png" width="24%" />
+<img src="docs/screenshots/grades.png" width="24%" />
+<img src="docs/screenshots/exam.png" width="24%" />
+</div>
 
-```powershell
-docker compose -f infra/compose/compose.dev.yaml up -d
-Copy-Item .env.example .env
-uv sync --frozen --all-packages --dev
-uv run alembic -c services/platform/alembic.ini upgrade head
-uv run uvicorn nanyee.main:app --host 127.0.0.1 --port 8000
-uv run nanyee-worker
+<p align="center"><sub>截图为 App 内「演示模式」的示例数据。</sub></p>
+
+## 为什么用 Nanyee
+
+不用再在教务、学习通、雨课堂、评教页面之间来回切换。一个 App，打开就是本周课表。
+
+- **一次登录，之后不用管**：学校验证码在手机上自动识别；勾选「记住」后，登录过期会自动重新登录。
+- **离线也能看课表**：课表加密保存在本机，没网、教务崩了也照样看。
+- **和 WakeUp 一样好看**：每门课一种颜色，左右滑动切周，考试直接标在课表上。
+- **数据直连学校**：除自习舱和自动评课外，所有功能都由手机直接访问学校系统，不经过任何第三方服务器。
+
+## 功能
+
+| | |
+|---|---|
+| **课表** | 按周查看、左右滑动切周、每门课固定配色、离线可用 |
+| **考试** | 考试时间和地点显示在课表上，附带网考号，一键复制 |
+| **成绩** | 各学期成绩与加权平均绩点 |
+| **评课** | 手动一键评课（逐题可改、提交前预览），或交给服务器自动评课 |
+| **抢课** | 多志愿排队、按教务服务器校时定点开抢、冲突确认 |
+| **自习舱** | 设定时段和舱位优先级，服务器自动预约 |
+| **学习通** | 密码 / 短信 / 扫码登录，签到、投票、问卷、练习、讨论 |
+| **雨课堂** | 支持长江、荷塘、黄河等服务器；PPT 大图滑动翻页、全屏缩放、预加载；课堂答题 |
+| **更多** | 新版本提醒、演示模式（不登录也能先试用） |
+
+## 下载安装
+
+1. 打开 [nanyee.de/download](https://nanyee.de/download)（国内可直接访问），下载 APK。也可以从 [GitHub Releases](https://github.com/apograss/nanyee/releases/latest) 下载。
+2. 允许浏览器安装应用，点击安装。
+3. 以后有新版本，App 会提示更新，直接覆盖安装，数据保留。
+
+需要 Android 8.0 及以上。
+
+## 隐私与安全
+
+- 学校密码、Cookie 和课表都用 Android Keystore 加密保存在本机，不备份、不上传。
+- 只有你主动开启**自习舱预约**或**自动评课**时，才会把学校凭据加密托管到 nanyee.de，用于服务器替你执行；随时可以在「我的」里删除。
+- 学习通 / 雨课堂的签到使用手机真实定位，拒绝模拟位置；所有作答都由你本人填写并确认后提交，不代签、不自动答题。
+- 代码完全开源，可以自己审查和编译。
+
+> **非官方项目**，与南方医科大学无隶属关系。请遵守学校规定，合理使用。
+
+## 反馈与支持
+
+- 邮件：[contact@nanyee.de](mailto:contact@nanyee.de)（App 内「我的 → 反馈」会自动带上版本和机型）
+- 问题与建议：[GitHub Issues](https://github.com/apograss/nanyee/issues)
+- 觉得好用的话，可以在「我的 → 捐赠」请作者喝杯咖啡
+
+## 开发者
+
+本仓库同时包含 Android App 和 nanyee.de 的后端与网站：
+
+| 目录 | 内容 | 文档 |
+|---|---|---|
+| `android/` | Kotlin · Jetpack Compose · Material 3 原生客户端 | [android/README.md](android/README.md) |
+| `services/`、`web/`、`infra/` | FastAPI 后端、Worker、React 网站、部署配置 | [docs/backend.md](docs/backend.md) |
+
+```sh
+cd android
+./gradlew assembleDebug testDebugUnitTest
 ```
 
-API 与 Worker 必须使用同一数据库和同一凭据包裹密钥。只启动 API 不会执行计划任务；生产环境应把两者配置为独立进程并分别设置健康监控。
+## 许可
 
-本机没有 Docker 时，纯逻辑和 SQLite 契约测试仍可运行：
-
-```powershell
-uv run python scripts/tasks.py check
-```
-
-常用命令：
-
-```powershell
-uv run python scripts/tasks.py format
-uv run python scripts/tasks.py test
-uv run python scripts/tasks.py openapi
-uv run python scripts/tasks.py migrate
-uv run nanyee-worker
-```
-
-前端开发与构建：
-
-```powershell
-Set-Location web
-npm ci
-npm run dev
-npm run build
-```
-
-地图默认复用旧群报数工具的高德 Web JS 配置；需要更换时设置前端构建变量 `VITE_AMAP_KEY` 与 `VITE_AMAP_SECURITY_CODE`。
-
-## 配置与秘密
-
-复制 `.env.example` 后仅在本机填值。任何真实 `.env`、主密钥、Azure 凭据、SMTP 密码、学校密码、Cookie 或群报数 Token 都不得提交。
-
-生产启动会拒绝以下配置：
-
-- 默认 Session Secret、非 `__Host-` Session Cookie、非 Secure Cookie；
-- 通配 CORS/Host、公开交互式 API 文档、SQLite；
-- Cloudflare 官方测试密钥；
-- 未配置的凭据包裹密钥或未包含版本的 Azure Key ID；
-- 非官方 HTTPS SMU 上游地址。
-
-本地凭据主密钥必须是恰好 32 个随机字节的 Base64。示例生成方式：
-
-```powershell
-@'
-import base64, secrets
-print(base64.b64encode(secrets.token_bytes(32)).decode())
-'@ | python -
-```
-
-Azure 模式设置 `NANYEE_CREDENTIAL_KEY_PROVIDER=azure` 和包含版本的 `NANYEE_AZURE_KEY_VAULT_KEY_ID`。程序不会在 Azure 故障时自动降级到本地主密钥。
-
-## API 与前端交接
-
-- 开发环境文档：`http://127.0.0.1:8000/docs`
-- 固定契约：[openapi/openapi.json](openapi/openapi.json)
-- 前端流程：[docs/frontend-integration.md](docs/frontend-integration.md)
-- 请求示例：[docs/examples/api-flows.md](docs/examples/api-flows.md)
-- 后续代理出口边界：[docs/integrations/upstream-egress.md](docs/integrations/upstream-egress.md)
-
-前端不得把学校密码、UIS/教务会话 ID、托管凭据明文、群报数 Token 或 `anti_abuse_pass` 写入 `localStorage`、客户端日志或错误上报。
-
-## 质量检查
-
-```powershell
-uv run ruff format --check .
-uv run ruff check .
-uv run mypy
-uv run pytest -q
-uv run python scripts/export_openapi.py --check
-```
-
-## 生产部署
-
-- 容器镜像：[infra/docker/Dockerfile](infra/docker/Dockerfile)
-- API/Worker/PostgreSQL/内部网关：[infra/compose/compose.prod.yaml](infra/compose/compose.prod.yaml)
-- 内部 Nginx 安全配置：[infra/nginx/nanyee.conf](infra/nginx/nanyee.conf)
-- 宿主 TLS 反代参考（Cloudflare 真实 IP 还原）：[infra/nginx/host-nanyee.conf](infra/nginx/host-nanyee.conf)
-- 加密备份与受控恢复：[infra/scripts](infra/scripts)
-- 生产运行手册（切换记录、备份与恢复演练结果）：[docs/operations/runbook.md](docs/operations/runbook.md)
-
-生产网关只绑定宿主机 `127.0.0.1:8080`，TLS 和公网 80/443 由宿主机反向代理负责。`.env.production.example` 只含占位符，不得把复制后填入真实值的 `.env.production` 提交到仓库。
-
-生产已于 2026-08-08 切换到本仓库实现（旧 Next.js 站保留在 VPS 作回滚）。push 到 `main` 后 GitHub Actions 构建 `nanyee-backend` / `nanyee-web` 镜像并推送到 GHCR，VPS 按 `pull_policy: always` 拉取更新。数据库每日 03:17 UTC 加密备份到 Azure Blob（90 天生命周期），备份与恢复流程见运行手册。
+Android App 以 [GPL-3.0](android/LICENSE) 发布，其中学习通与雨课堂部分移植自 [AneryCoft/course_helper](https://github.com/AneryCoft/course_helper)，感谢原作者。课表界面参考了 WakeUp 课程表的设计。
